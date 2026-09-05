@@ -85,7 +85,7 @@ const APP = (() => {
     const u = user(); if (!u) return 0;
     let n = noDemo(S.notifs).filter(x=>!(x.read||{})[u.id]).length;
     chatForUser(u).forEach(c=>n += unreadCount(c, u.id));
-    if (isStaff(u.role)) n += S.tickets.filter(t=>t.status==='new').length;
+    if (isStaff(u.role)) n += noDemo(S.tickets).filter(t=>t.status==='new').length;
     return n;
   }
 
@@ -111,7 +111,7 @@ const APP = (() => {
               <a class="side__link ${route.name===it.route?'on':''}" href="#/${it.route}" title="${esc(it.title)}" data-tour="${it.route==='orders'?'orders-link':''}">
                 ${icon(it.icon)}<span class="lbl">${it.title}</span>
                 ${it.route==='chats'&&unreadChats(u)?`<span class="side__link__cnt">${unreadChats(u)}</span>${collapsed?'<span class="rail-dot"></span>':''}`:''}
-                ${it.route==='tickets'&&isStaff(u.role)&&S.tickets.filter(t=>t.status==='new').length?`<span class="side__link__cnt">${S.tickets.filter(t=>t.status==='new').length}</span>${collapsed?'<span class="rail-dot"></span>':''}`:''}
+                ${it.route==='tickets'&&isStaff(u.role)&&noDemo(S.tickets).filter(t=>t.status==='new').length?`<span class="side__link__cnt">${noDemo(S.tickets).filter(t=>t.status==='new').length}</span>${collapsed?'<span class="rail-dot"></span>':''}`:''}
               </a>`).join('')}</div>`).join('')}
           </nav>
           <div class="side__foot">
@@ -575,7 +575,7 @@ const APP = (() => {
     const done = orders.filter(o=>o.status==='done');
     const revenue = done.reduce((a,o)=>a+o.total,0);
     const active = orders.filter(o=>['waiting','work'].includes(o.status)).length;
-    const onlineExecs = S.users.filter(x=>x.role==='executor'&&x.is_online&&x.ext.status==='active').length;
+    const onlineExecs = noDemo(S.users.filter(x=>x.role==='executor'&&x.is_online&&x.ext.status==='active')).length;
     const avg = done.length ? Math.round(revenue/done.length) : 0;
     const hello = new Date().getHours();
     const greet = hello<5?'Доброй ночи':hello<12?'Доброе утро':hello<18?'Добрый день':'Добрый вечер';
@@ -584,7 +584,7 @@ const APP = (() => {
     const series = Array.from({length:14},(_,i)=>{
       const d0 = new Date(); d0.setHours(0,0,0,0); d0.setDate(d0.getDate()-13+i);
       const t0 = d0.getTime(), t1 = t0 + DAY;
-      return S.orders.filter(o=>o.status==='done'&&o.history.some(h=>h.t>=t0&&h.t<t1&&h.txt.includes('Выполнено'))).reduce((a,o)=>a+o.total,0);
+      return noDemo(S.orders.filter(o=>o.status==='done'&&o.history.some(h=>h.t>=t0&&h.t<t1&&h.txt.includes('Выполнено')))).reduce((a,o)=>a+o.total,0);
     });
     const maxV = Math.max(...series, 1);
     const W=520,H=120;
@@ -656,7 +656,7 @@ const APP = (() => {
           <span class="metric__ico c-blue">${icon('orders')}</span></div>
         <div class="metric"><div class="metric__label">${icon('executors','ico-sm')} Исполнители онлайн</div>
           <div class="metric__value">${onlineExecs}</div>
-          <div class="metric__delta">из ${S.users.filter(x=>x.role==='executor'&&x.ext.status==='active').length} активных</div>
+          <div class="metric__delta">из ${noDemo(S.users.filter(x=>x.role==='executor'&&x.ext.status==='active')).length} активных</div>
           <span class="metric__ico c-violet">${icon('executors')}</span></div>
         <div class="metric"><div class="metric__label">${icon('calc','ico-sm')} Средний чек</div>
           <div class="metric__value">${fmtMoney(avg)}</div>
@@ -672,7 +672,7 @@ const APP = (() => {
           </div></div>
         <div class="card"><div class="card-h"><h3>ТОП клиентов</h3><a href="#/clients" class="small">Все →</a></div>
           <div class="card-b stack" style="gap:2px">
-            ${topClients.map(({c,sum},i)=>`<div class="list-row"><span class="rank rank--${i+1}">${i+1}</span>${avatarHTML(c)}<span style="flex:1;min-width:0"><b class="small">${esc(c.full_name)}</b><div class="cell-sub">${c.ordersCount||S.orders.filter(o=>o.client_id===c.id).length} заказов</div></span><b class="small">${fmtMoney(sum)}</b></div>`).join('')}
+            ${topClients.map(({c,sum},i)=>`<div class="list-row"><span class="rank rank--${i+1}">${i+1}</span>${avatarHTML(c)}<span style="flex:1;min-width:0"><b class="small">${esc(c.full_name)}</b><div class="cell-sub">${c.ordersCount||noDemo(S.orders.filter(o=>o.client_id===c.id)).length} заказов</div></span><b class="small">${fmtMoney(sum)}</b></div>`).join('')}
           </div></div>
       </div>`}
       ${isAdmin?`
@@ -905,7 +905,7 @@ const APP = (() => {
     const bc = $('#btn-broadcast', root);
     bc.style.display = isStaff(user().role) ? '' : 'none';
     bc.onclick = ()=>openModal({ narrow:true, title:'Массовое сообщение клиентам',
-      body:`<div class="field"><label>Текст рассылки</label><textarea class="input" id="bc-t" placeholder="Например: сообщаем о новых тарифах…"></textarea></div><p class="small faint" style="margin-top:8px">Получатели: клиенты с согласием на рассылку (${S.users.filter(x=>x.role==='client'&&x.consent_marketing).length})</p>`,
+      body:`<div class="field"><label>Текст рассылки</label><textarea class="input" id="bc-t" placeholder="Например: сообщаем о новых тарифах…"></textarea></div><p class="small faint" style="margin-top:8px">Получатели: клиенты с согласием на рассылку (${noDemo(S.users.filter(x=>x.role==='client'&&x.consent_marketing)).length})</p>`,
       footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-send>Отправить</button>`,
       onMount:(m2,c2)=>{ m2.querySelector('[data-x]').onclick=c2;
         m2.querySelector('[data-send]').onclick=()=>{
@@ -936,7 +936,7 @@ const APP = (() => {
     const tkExp = root.querySelector('#tk-exp');
     if (tkExp) tkExp.onclick = ()=>{
       const rows = [['№','Статус','Тема','Сообщение','Автор','Заказ','Создан']];
-      S.tickets.forEach(t=>{ const a = userById(t.user_id)||{}; rows.push([t.id.slice(0,4).toUpperCase(), {new:'Новое', in_progress:'В работе', resolved:'Решено'}[t.status]||t.status, t.subject, String(t.message||'').replace(/\s+/g,' '), a.full_name||'', t.order_id? (S.orders.find(o=>o.id===t.order_id)||{}).order_id||t.order_id : '', fmtDT(t.created_at)]); });
+      noDemo(S.tickets).forEach(t=>{ const a = userById(t.user_id)||{}; rows.push([t.id.slice(0,4).toUpperCase(), {new:'Новое', in_progress:'В работе', resolved:'Решено'}[t.status]||t.status, t.subject, String(t.message||'').replace(/\s+/g,' '), a.full_name||'', t.order_id? (S.orders.find(o=>o.id===t.order_id)||{}).order_id||t.order_id : '', fmtDT(t.created_at)]); });
       const csv = rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\n');
       const aEl = document.createElement('a');
       aEl.href = URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'})); aEl.download = 'tickets.csv'; aEl.click();
@@ -1007,7 +1007,7 @@ const APP = (() => {
           }; } });
     const ideaExp = root.querySelector('#idea-exp'); ideaExp && (ideaExp.onclick = ()=>{
       const rows = [['Заголовок','Описание','Автор','Голоса','Видимость','Статус','Дата']];
-      [...S.ideas].filter(i=>i.status!=='deleted').sort((a,b)=>b.likes-a.likes).forEach(i=>{
+      [...noDemo(S.ideas)].filter(i=>i.status!=='deleted').sort((a,b)=>b.likes-a.likes).forEach(i=>{
         const a = userById(i.user_id)||{};
         rows.push([i.title, String(i.description||'').replace(/\s+/g,' '), a.full_name||'', i.likes, {all:'Все', executors:'Исполнители', clients:'Клиенты'}[i.visibility]||i.visibility, i.status==='hidden'?'Скрыта':'Активна', fmtDT(i.created_at)]);
       });
