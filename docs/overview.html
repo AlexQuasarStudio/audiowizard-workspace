@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audiowizard Workspace — обзор PWA</title>
+<style>
+  :root{--bg:#0a0d13;--p:#12161f;--p2:#181e2a;--b:rgba(255,255,255,.08);--t:#e8ecf4;--m:#8b96ab;--ac:#f04b51;--g:#34c77b;--y:#f5b83d;--bl:#4c7dff;--v:#8f7bff}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--t);padding:0 20px 60px}
+  .wrap{max-width:980px;margin:0 auto}
+  .hero{padding:64px 0 36px;position:relative}
+  .hero::before{content:"";position:absolute;inset:-40% 0 auto;height:420px;background:radial-gradient(40% 60% at 20% 40%,rgba(240,75,81,.22),transparent 70%),radial-gradient(40% 60% at 80% 30%,rgba(76,125,255,.16),transparent 70%);pointer-events:none}
+  .logo{width:62px;height:62px;border-radius:18px;background:linear-gradient(120deg,#ff5f63,#f04b51 45%,#c2293b);display:inline-flex;align-items:center;justify-content:center;box-shadow:0 12px 34px rgba(240,75,81,.3)}
+  .logo svg{width:32px;height:32px;stroke:#fff;stroke-width:1.8;fill:none;stroke-linecap:round}
+  h1{font-size:32px;letter-spacing:-.02em;margin:16px 0 6px}
+  h1 span{background:linear-gradient(120deg,#ff5f63,#c2293b);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--m);max-width:640px}
+  .badges{margin-top:16px;display:flex;gap:8px;flex-wrap:wrap}
+  .badge{font-size:11.5px;font-weight:700;letter-spacing:.04em;padding:4px 11px;border-radius:99px;border:1px solid var(--b);color:var(--m)}
+  .badge.red{color:var(--ac);border-color:rgba(240,75,81,.4);background:rgba(240,75,81,.1)}
+  h2{font-size:20px;margin:44px 0 16px;letter-spacing:-.01em}
+  .grid{display:grid;gap:12px}
+  .g4{grid-template-columns:repeat(4,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}
+  @media(max-width:820px){.g4,.g3{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.g4,.g3,.g2{grid-template-columns:1fr}}
+  .card{background:var(--p);border:1px solid var(--b);border-radius:16px;padding:16px 18px}
+  .card b{display:block;font-size:14px;margin-bottom:4px}
+  .card p{font-size:12.5px;color:var(--m)}
+  .ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:10px}
+  .ic svg{width:17px;height:17px;stroke-width:1.8;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round}
+  .ic.red{background:rgba(240,75,81,.13);color:var(--ac)}.ic.gr{background:rgba(52,199,123,.13);color:var(--g)}
+  .ic.yl{background:rgba(245,184,61,.13);color:var(--y)}.ic.bl{background:rgba(76,125,255,.13);color:var(--bl)}
+  .ic.vi{background:rgba(143,123,255,.13);color:var(--v)}
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media(max-width:820px){.metrics{grid-template-columns:repeat(2,1fr)}}
+  .metric{background:var(--p);border:1px solid var(--b);border-radius:16px;padding:16px}
+  .metric .v{font-size:26px;font-weight:750;letter-spacing:-.02em;margin-top:4px}
+  .metric .l{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--m);font-weight:700}
+  table{width:100%;border-collapse:collapse;background:var(--p);border:1px solid var(--b);border-radius:14px;overflow:hidden;font-size:13px}
+  th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--b)}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--m);background:var(--p2)}
+  tr:last-child td{border-bottom:0}
+  td:first-child{font-family:ui-monospace,Menlo,monospace;font-weight:600}
+  .st{display:inline-block;padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700}
+  .tl{position:relative;padding-left:26px}
+  .tl::before{content:"";position:absolute;left:8px;top:6px;bottom:6px;width:2px;background:linear-gradient(var(--ac),rgba(240,75,81,.1))}
+  .step{position:relative;padding-bottom:18px}
+  .step::before{content:"";position:absolute;left:-24px;top:4px;width:12px;height:12px;border-radius:50%;background:var(--bg);border:3px solid var(--ac)}
+  .step b{font-size:14px}
+  .step p{font-size:12.5px;color:var(--m)}
+  .note{background:rgba(245,184,61,.08);border:1px solid rgba(245,184,61,.3);border-radius:14px;padding:14px 18px;font-size:13px;color:#e8d5a8;margin-top:26px}
+  a{color:var(--ac);text-decoration:none}
+  .foot{margin-top:40px;color:#57627a;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <span class="logo"><svg viewBox="0 0 24 24"><line x1="4" y1="10" x2="4" y2="14"/><line x1="8" y1="7" x2="8" y2="17"/><line x1="12" y1="9.5" x2="12" y2="14.5"/><line x1="16" y1="5" x2="16" y2="19"/><line x1="20" y1="8" x2="20" y2="16"/></svg></span>
+    <h1>Audiowizard <span>Workspace</span></h1>
+    <p class="sub">PWA-приложение по техническому заданию: внутренняя CRM для менеджеров сервиса обработки контента и клиентский портал для заказчиков и исполнителей. Функционально-футуристичный минимализм, статичный интерфейс после входа, семь тем оформления.</p>
+    <div class="badges">
+      <span class="badge red">v0.9.3 · Beta</span>
+      <span class="badge">PWA · Service Worker</span>
+      <span class="badge">Offline-first черновики</span>
+      <span class="badge">5 ролей</span>
+      <span class="badge">7 тем</span>
+      <span class="badge">ИИ-сервисы</span>
+      <span class="badge">0 внешних зависимостей</span>
+    </div>
+  </div>
+
+  <h2>Ключевые цифры</h2>
+  <div class="metrics">
+    <div class="metric"><div class="l">Реализовано FR-требований SRS</div><div class="v">40+</div></div>
+    <div class="metric"><div class="l">Живой поиск</div><div class="v">&lt;200 мс</div></div>
+    <div class="metric"><div class="l">Автосохранение черновика</div><div class="v">5 сек</div></div>
+    <div class="metric"><div class="l">Автотест-проверок пройдено</div><div class="v">26/26</div></div>
+  </div>
+
+  <h2>Модули системы</h2>
+  <div class="grid g3">
+    <div class="card"><span class="ic red"><svg viewBox="0 0 24 24"><rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span><b>Заказы</b><p>Цветовые статусы строк, фильтры, групповые операции, контекстное меню, калькулятор, предоплата 0–100% с проверкой договора, файлы с длительностью аудио.</p></div>
+    <div class="card"><span class="ic bl"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c.9-3.6 3.9-5.6 7.5-5.6s6.6 2 7.5 5.6"/></svg></span><b>Клиенты и исполнители</b><p>Карточки со статистикой, квалификация с голосованием, чёрный список, передача менеджеру, личные пометки, реквизиты.</p></div>
+    <div class="card"><span class="ic gr"><svg viewBox="0 0 24 24"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v8a2.5 2.5 0 0 1-2.5 2.5H9l-5 4z"/></svg></span><b>Чаты</b><p>5 типов чатов, реакции, опросы, эмодзи, модерация, «не беспокоить», массовые рассылки, режим невидимки для админа.</p></div>
+    <div class="card"><span class="ic yl"><svg viewBox="0 0 24 24"><rect x="3.5" y="4" width="5" height="16" rx="1.6"/><rect x="9.8" y="4" width="5" height="10" rx="1.6"/><rect x="16.2" y="4" width="4.8" height="13" rx="1.6"/></svg></span><b>Канбан</b><p>Личные и общие доски, drag-and-drop, карточки связаны со статусами заказов.</p></div>
+    <div class="card"><span class="ic vi"><svg viewBox="0 0 24 24"><path d="M12 3.5v11.5"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 17.5v1.5a1.8 1.8 0 0 0 1.8 1.8h12.4A1.8 1.8 0 0 0 20 19v-1.5"/></svg></span><b>Импорт / экспорт</b><p>Drag-and-drop, прогресс, логи на русском, защита от дубликатов, гибкие правила «текст → действие», CSV и XLSX.</p></div>
+    <div class="card"><span class="ic red"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5.3l3.6 2.2"/></svg></span><b>Жизненный цикл заказов</b><p>Возврат в «В ожидании» запрещён всем, удаление только в черновике/ожидании, аннулирование начислений при снятии «Выполнено».</p></div>
+  </div>
+
+  <h2>ИИ-сервисы (v0.9.3)</h2>
+  <div class="grid g3">
+    <div class="card"><span class="ic red"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11.5" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><path d="M12 18v3"/></svg></span><b>ИИ-стенограммы</b><p>Караоке-синхрон: подсветка бежит по словам вместе с аудио. Диаризация спикеров, волновая дорожка с перемоткой, экспорт TXT/SRT.</p></div>
+    <div class="card"><span class="ic bl"><svg viewBox="0 0 24 24"><path d="m13.5 5.5 5 5-10 10h-5v-5z"/><path d="m16 3 5 5-2 2-5-5z"/></svg></span><b>Альтернативы слов</b><p>Неуверенные слова подчёркнуты пунктиром: клик открывает варианты с уверенностью распознавания, замена сохраняется и помечается зелёным.</p></div>
+    <div class="card"><span class="ic vi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c-4.7 4.7-4.7 12.3 0 17 4.7-4.7 4.7-12.3 0-17z"/></svg></span><b>ИИ-переводы</b><p>RU → EN/DE/ES с сохранением структуры: абзацы, списки и переносы один в один, покрытие словаря показывается честно.</p></div>
+    <div class="card"><span class="ic yl"><svg viewBox="0 0 24 24"><path d="M12 4c.6 3.4 1.8 4.9 5.5 5.5-3.7.6-4.9 2.1-5.5 5.5-.6-3.4-1.8-4.9-5.5-5.5 3.7-.6 4.9-2.1 5.5-5.5z"/></svg></span><b>ИИ-копирайтинг</b><p>Текст по брифу (тема × тон × длина) в трёх вариантах, рерайт, саммари, заголовки — с эффектом печати и выгрузкой в заказ.</p></div>
+    <div class="card"><span class="ic gr"><svg viewBox="0 0 24 24"><path d="M12 20v-8"/><path d="m7.5 13.5 4.5-4.5 4.5 4.5"/><path d="M4 6.5V5a1.8 1.8 0 0 1 1.8-1.8h12.4A1.8 1.8 0 0 1 20 5v1.5"/></svg></span><b>Всё — в заказ</b><p>Любой ИИ-результат прикрепляется к карточке заказа в один клик и виден клиенту и менеджеру вместе с файлами.</p></div>
+    <div class="card"><span class="ic red"><svg viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.1-5"/><path d="M17.5 3.5V7H14"/></svg></span><b>Демо-движок</b><p>Локальный ИИ-движок без сети: аудио и word-тайминги генерируются генератором — караоке совпадает с звуком точно.</p></div>
+  </div>
+
+  <h2>Статусная модель заказа</h2>
+  <table>
+    <tr><th>Статус</th><th>Строка таблицы</th><th>Правила</th></tr>
+    <tr><td>draft</td><td><span class="st" style="background:rgba(139,150,171,.16);color:#8b96ab">Черновик</span></td><td>Можно удалить, автосохранение в IndexedDB</td></tr>
+    <tr><td>waiting</td><td><span class="st" style="background:rgba(139,150,171,.1);color:#aab4c6">В ожидании</span></td><td>В него нельзя вернуться ни из одного статуса — ни одной роли</td></tr>
+    <tr><td>work</td><td><span class="st" style="background:rgba(245,184,61,.14);color:#f5b83d">В работе</span></td><td>При предоплате &lt;50% требуется договор (модуль в разработке)</td></tr>
+    <tr><td>done</td><td><span class="st" style="background:rgba(52,199,123,.14);color:#34c77b">Выполнено</span></td><td>Начисление заработка исполнителям, чекбокс принятия работы</td></tr>
+    <tr><td>revision / problem</td><td><span class="st" style="background:rgba(249,124,52,.15);color:#f97c34">Доработка</span></td><td>Снятие «Выполнено» аннулирует начисления с подтверждением</td></tr>
+    <tr><td>archived</td><td><span class="st" style="background:rgba(139,150,171,.06);color:#8b96ab">Архив</span></td><td>Восстановление в исходный статус, дата архивации</td></tr>
+  </table>
+
+  <h2>PWA и офлайн</h2>
+  <div class="tl">
+    <div class="step"><b>Splash → вход → тур</b><p>Переливающиеся градиенты, демо-вход всех ролей, обучающий тур с подсветкой интерфейса.</p></div>
+    <div class="step"><b>Service Worker и версия</b><p>Кеш оболочки, фоновое обновление, version.json, уведомление «Обновить сейчас / позже», история патчноутов.</p></div>
+    <div class="step"><b>Офлайн-режим</b><p>Индикатор сети, очередь операций, автосохранение черновика каждые 5 секунд, синхронизация при восстановлении.</p></div>
+    <div class="step"><b>Установка на устройства</b><p>manifest.json, иконки any/maskable, ярлыки «Новый заказ» и «Поиск».</p></div>
+  </div>
+
+  <h2>Роли и разграничение</h2>
+  <table>
+    <tr><th>Роль</th><th>Видит</th><th>Особенности</th></tr>
+    <tr><td>admin</td><td>Всё</td><td>Аудит-лог, ниши, бекапы, статистика функций, режим невидимки в чатах</td></tr>
+    <tr><td>top_manager</td><td>Всё</td><td>Изменения без голосования менеджеров</td></tr>
+    <tr><td>manager</td><td>CRM целиком</td><td>Заказы, люди, импорт/экспорт, тикеты, рассылки</td></tr>
+    <tr><td>executor</td><td>Свои заказы</td><td>Сокращённый дедлайн −15%, оплата без сумм, чекбокс о правах на материалы</td></tr>
+    <tr><td>client</td><td>Свои заказы</td><td>Прогресс оплаты, запрет скачивания файлов, предложенная цена</td></tr>
+  </table>
+
+  <div class="note">Демо-данные и авторизация — в самом приложении: <b>admin / admin123</b>, <b>top / top123</b>, <b>manager / manager123</b>, <b>maria / executor123</b>, <b>client / client123</b>. Серверная часть ТЗ (PHP 8.1, MySQL, Redis, WebSocket) — следующий этап; функции «в разработке» из ТЗ оформлены фирменными заглушками.</div>
+
+  <p class="foot">Audiowizard Workspace · собрано по SPECIFICATION.md и SRS.md · 2026</p>
+</div>
+</body>
+</html>
