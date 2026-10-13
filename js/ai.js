@@ -69,7 +69,7 @@ const AI = (() => {
   const srtTime = s => { const ms = Math.round((s%1)*1000); return `${String(Math.floor(s/3600)).padStart(2,'0')}:${String(Math.floor(s/60)%60).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')},${String(ms).padStart(3,'0')}`; };
 
   /* ==================== СТЕНОГРАММЫ ==================== */
-  const T = { audio:null, flat:[], activeWord:-1, activeSeg:-1, processed:false, uploading:false, scale:1, rate:1, search:'' };
+  const T = { audio:null, flat:[], activeWord:-1, activeSeg:-1, processed:false, uploading:false, scale:1, rate:1, search:'', _typeIv:null, _html:null };
 
   function segText(si){
     const ov = S.aiSegOverrides[si];
@@ -122,7 +122,6 @@ const AI = (() => {
   function transcribeView(root){
     let data = AI_DATA;
     T.scale = T.scale || 1;
-    bindTabs(root);
 
     const segsHTML = ()=> AI_DATA.segments.map((seg, si)=>{
       const spkId = seg.speaker;
@@ -154,9 +153,9 @@ const AI = (() => {
           <div class="card card-pad">
             <b class="small">${icon('mic','ico-sm')} Источник аудио</b>
             <div class="ai-source ${T.uploading?'has-file':''}" id="ai-src">
-              <span class="ai-source__ic">${icon(T.uploading?'check-c':'upload','ico-sm')}</span>
+              <span class="ai-source__ic">${icon(T.uploading?'check-c':'mic','ico-sm')}</span>
               <div style="min-width:0"><b class="small" id="ai-src-name">${esc(T.sourceName||'Демо-подкаст «Про ИИ-сервисы»')}</b>
-              <div class="small faint" id="ai-src-meta">${T.uploading?`ваш файл · ${Math.round(AI_DATA.duration*T.scale)} сек`:'58 сек · 2 спикера'}</div></div>
+              <div class="small faint" id="ai-src-meta">${T.uploading?`ваш файл · ${Math.round(AI_DATA.duration*T.scale)} сек`:`${Math.round(AI_DATA.duration)} сек · 2 спикера`}</div></div>
             </div>
             <input type="file" id="ai-file" accept="audio/*" hidden>
             <div class="row" style="gap:8px;margin-top:12px">
@@ -174,6 +173,7 @@ const AI = (() => {
             <b class="small">Экспорт и действия</b>
             <div class="stack" style="gap:8px;margin-top:10px">
               <button class="btn btn--ghost btn--sm btn--block" id="ai-txt" disabled>${icon('file')} Скачать TXT</button>
+              <button class="btn btn--ghost btn--sm btn--block" id="ai-doc" disabled>${icon('file')} Скачать Word</button>
               <button class="btn btn--ghost btn--sm btn--block" id="ai-srt" disabled>${icon('file')} Скачать SRT (субтитры)</button>
               <button class="btn btn--soft btn--sm btn--block" id="ai-attach" disabled>${icon('clip')} Прикрепить к заказу</button>
             </div>
@@ -216,7 +216,7 @@ const AI = (() => {
           g('#ai-segs').hidden = false;
           g('#ai-run').disabled = true;
           g('#ai-run').innerHTML = icon('check-c')+' Готово';
-          ['#ai-txt','#ai-srt','#ai-attach'].forEach(s=>g(s).disabled = false);
+          ['#ai-txt','#ai-doc','#ai-srt','#ai-attach'].forEach(s=>g(s).disabled = false);
           g('#ai-play').disabled = false;
           stage.textContent = 'Стенограмма готова · 139 слов · 2 спикера';
           rebuildFlat();
@@ -256,15 +256,17 @@ const AI = (() => {
       if (T.audio){
         T.audio.pause();
         if (T._handlers) Object.entries(T._handlers).forEach(([ev,fn])=>T.audio.removeEventListener(ev, fn));
+        try{ T.audio.remove(); }catch(e){}
       }
       T.audio = a;
       T.audio.preload = 'auto';
+      T.audio.id = 'ai-audio';
+      T.audio.style.display = 'none';
     }
     function bindAudio(){
       if (!T.audio) return;
-      const old = document.getElementById('ai-audio');
-      if (old && old !== T.audio) old.remove();
-      if (!T.audio.isConnected){ T.audio.id = 'ai-audio'; T.audio.style.display = 'none'; document.body.appendChild(T.audio); }
+      if (T._handlers) Object.entries(T._handlers).forEach(([ev,fn])=>T.audio.removeEventListener(ev, fn));
+      if (!T.audio.isConnected) document.body.appendChild(T.audio);
       T._handlers = {
         timeupdate:onTime, seeked:onTime, play:onTime,
         ended:()=>{ const b = g('#ai-play'); b && (b.innerHTML = icon('play')); }
@@ -272,13 +274,13 @@ const AI = (() => {
       Object.entries(T._handlers).forEach(([ev,fn])=>T.audio.addEventListener(ev, fn));
     }
     if (!T.audio) setAudio(new Audio('data:audio/wav;base64,' + AI_AUDIO_B64));
-    if (T.uploading && T.audio) { /* уже установлен */ }
     bindAudio();
+    if (T.audio) g('#ai-play').innerHTML = T.audio.paused ? icon('play') : icon('pause');
 
     /* --- плеер --- */
     g('#ai-play').onclick = ()=>{
       if (!T.audio) return;
-      if (T.audio.paused){ T.audio.playbackRate = T.rate; T.audio.play(); g('#ai-play').innerHTML = icon('x-c'); }
+      if (T.audio.paused){ T.audio.playbackRate = T.rate; T.audio.play(); g('#ai-play').innerHTML = icon('pause'); }
       else { T.audio.pause(); g('#ai-play').innerHTML = icon('play'); }
     };
     g('#ai-rate').onchange = e=>{ T.rate = +e.target.value; if (T.audio) T.audio.playbackRate = T.rate; };
@@ -371,7 +373,7 @@ const AI = (() => {
     }
     T._onTimeBound = true;
 
-    /* --- слова: альтернативы --- */
+/* --- слова: альтернативы и перемотка по клику --- */
     root.addEventListener('click', e=>{
       const wEl = e.target.closest('.w.low');
       if (wEl){
@@ -382,7 +384,6 @@ const AI = (() => {
           label:`${alt} · уверенность ${Math.max(38, curConf - 7 - i*9)}%`,
           icon:'edit',
           onClick:()=>{
-            /* сохраняем знаки препинания слова */
             const m = w.t.match(/^(.*?)([.,!?;:…]*)$/);
             const punct = m[2]||'';
             S.aiEdits[si+'_'+wi] = { t: alt + punct };
@@ -396,18 +397,74 @@ const AI = (() => {
         contextMenu(e.clientX, e.clientY, [
           { label:`Уверенность распознавания: ${curConf}%`, header:true },
           ...items,
+          { label:'Свой вариант…', icon:'edit', onClick:()=>{
+            const m0 = w.t.match(/^(.*?)([.,!?;:…]*)$/);
+            const base = m0[1]||w.t;
+            const punct = m0[2]||'';
+            openModal({
+              narrow:true, title:'Свой вариант слова',
+              body:`<p class="small muted" style="margin-bottom:10px">Заменить «<b>${esc(base)}</b>» на:</p>
+                <div class="field"><input class="input" id="own-word" value="${esc(base)}"></div>`,
+              footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-save>Заменить</button>`,
+              onMount:(m2,close)=>{
+                const inp = m2.querySelector('#own-word');
+                inp.focus(); inp.select();
+                m2.querySelector('[data-x]').onclick = close;
+                m2.querySelector('[data-save]').onclick = ()=>{
+                  const val = inp.value.trim();
+                  if (!val){ toast('Введите свой вариант слова','warn'); return; }
+                  S.aiEdits[si+'_'+wi] = { t: val + punct };
+                  saveState();
+                  wEl.textContent = val + punct;
+                  wEl.classList.remove('low'); wEl.classList.add('edited');
+                  logAudit(`ИИ-стенограмма: «${w.t}» → «${val}»`, 'ИИ');
+                  toast('Слово заменено','ok');
+                  close();
+                };
+                inp.addEventListener('keydown', e=>{ if (e.key==='Enter') m2.querySelector('[data-save]').click(); });
+              }
+            });
+          }},
           '-',
           { label:'Оставить как есть', icon:'check-c', onClick:()=>{ wEl.classList.remove('low'); wEl.classList.add('edited'); S.aiEdits[si+'_'+wi] = { t:wEl.textContent }; saveState(); } }
         ]);
         return;
+      }
+      /* клик по обычному слову — перемотка */
+      const wSeek = e.target.closest('.w:not(.low)');
+      if (wSeek && T.audio){
+        const si = +wSeek.dataset.si, wi = +wSeek.dataset.wi;
+        const flat = T._flat || [];
+        const found = flat.find(f=>f.si===si && f.wi===wi);
+        if (found){
+          T.audio.currentTime = found.s * (T.scale||1);
+          if (T.audio.paused) g('#ai-play').click();
+          return;
+        }
       }
       const ts = e.target.closest('[data-seek]');
       if (ts && T.audio){ T.audio.currentTime = +ts.dataset.seek * (T.scale||1); if (T.audio.paused) g('#ai-play').click(); return; }
       const spk = e.target.closest('[data-spk]');
       if (spk){
         const idv = spk.dataset.spk;
-        const name = prompt2(`Имя спикера ${idv}:`, S.aiSpeakers[idv]||AI_DATA.speakers[idv]);
-        if (name){ S.aiSpeakers[idv] = name; saveState(); render(); }
+        const cur = S.aiSpeakers[idv] || AI_DATA.speakers[idv];
+        openModal({
+          narrow:true, title:'Имя спикера',
+          body:`<div class="field"><label>Спикер ${idv}</label><input class="input" id="spk-name" value="${esc(cur)}"></div>`,
+          footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-save>Сохранить</button>`,
+          onMount:(m2,close)=>{
+            const inp = m2.querySelector('#spk-name');
+            inp.focus(); inp.select();
+            m2.querySelector('[data-x]').onclick = close;
+            m2.querySelector('[data-save]').onclick = ()=>{
+              const name = inp.value.trim();
+              if (!name){ toast('Введите имя спикера','warn'); return; }
+              S.aiSpeakers[idv] = name; saveState(); close();
+              render(); toast('Имя спикера обновлено','ok');
+            };
+            inp.addEventListener('keydown', e=>{ if (e.key==='Enter') m2.querySelector('[data-save]').click(); });
+          }
+        });
       }
     });
 
@@ -435,13 +492,21 @@ const AI = (() => {
 
     /* --- экспорт --- */
     g('#ai-txt').onclick = ()=>{ dl(`transcript-${fmtDate(Date.now()).replace(/\s/g,'-')}.txt`, transcriptPlain()); toast('TXT выгружен','ok'); };
+    g('#ai-doc').onclick = ()=>{
+      const text = transcriptPlain();
+      const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'><head><meta charset='utf-8'><title>Стенограмма</title><style>body{font-family:Arial;font-size:12pt;line-height:1.5} .spk{font-weight:700;color:#7a60a0} .ts{color:#999;font-size:10pt}</style></head><body>${AI_DATA.segments.map(s=>`<p><span class="ts">[${fmtClock(s.start)}]</span> <span class="spk">${esc(AI_DATA.speakers[s.speaker]||'Спикер '+s.speaker)}:</span> ${esc(s.text)}</p>`).join('')}</body></html>`;
+      const blob = new Blob([html], {type:'application/msword'});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `transcript-${fmtDate(Date.now()).replace(/\s/g,'-')}.doc`;
+      a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+      toast('Word выгружен','ok');
+    };
     g('#ai-srt').onclick = ()=>{ dl('transcript.srt', transcriptSRT(), 'application/x-subrip'); toast('SRT выгружен','ok'); };
     g('#ai-attach').onclick = ()=>attachToOrder('стенограмма', 'ai-transcript.txt', transcriptPlain());
 
     /* --- индекс слов для караоке --- */
     function rebuildFlat(){
       T._flat = [];
-      $$('#ai-segs .tseg').forEach(segEl=>{
+      $$('.tseg', root).forEach(segEl=>{
         const si = +segEl.dataset.seg;
         const words = buildWords(si);
         $$('.w', segEl).forEach(sp=>{
@@ -453,21 +518,29 @@ const AI = (() => {
       T._flat.sort((a,b)=>a.s-b.s);
       T.activeWord = -1; T.activeSeg = -1;
     }
-    if (T.processed){ rebuildFlat(); drawWave(); g('#ai-msg').style.display='none'; g('#ai-segs').hidden=false; }
+    if (T.processed){ g('#ai-msg').style.display='none'; g('#ai-segs').hidden=false; g('#ai-run').disabled = true; g('#ai-run').innerHTML = icon('check-c')+' Готово'; g('#ai-play').disabled = false; ['#ai-txt','#ai-doc','#ai-srt','#ai-attach'].forEach(s=>g(s).disabled = false); T.activeWord = -1; T.activeSeg = -1;
+      requestAnimationFrame(()=>{ requestAnimationFrame(()=>{ if (document.body.contains(root)){ rebuildFlat(); drawWave(); } }); });
+    }
     if (!T._resizeInit){ T._resizeInit = true; window.addEventListener('resize', debounce(()=>{ if (T.processed && document.querySelector('#ai-wave')) drawWave(); }, 200)); }
+    /* Перерисовать волну при смене темы/акцента (как на паузе, так и при воспроизведении) */
+    window.addEventListener('ai-theme-change', ()=>{
+      if (!T.processed || !document.querySelector('#ai-wave')) return;
+      const cur = T.audio ? T.audio.currentTime / (T.scale||1) : 0;
+      paintWave(Math.min(1, cur/AI_DATA.duration));
+    });
   }
 
   /* ==================== ИИ-КОПИРАЙТИНГ ==================== */
   const TONES = {
-    business: { name:'Деловой', adj:'надёжное решение', verb:'обеспечивает', cta:'Запросите коммерческое предложение — ответим в течение рабочего дня.' },
+    business: { name:'Деловой', adj:'надёжное решение', verb:'экономит', cta:'Запросите коммерческое предложение — ответим в течение рабочего дня.' },
     friendly: { name:'Дружелюбный', adj:'удобное решение', verb:'помогает', cta:'Попробуйте бесплатно — и убедитесь сами!' },
     selling:  { name:'Продающий', adj:'выгодное решение', verb:'экономит', cta:'Оставьте заявку сегодня — скидка 10% на первый заказ!' }
   };
-  const HOOKS = [
+const HOOKS = [
     t=>`${t} — задача, которая отнимает часы у вашей команды.`,
-    t=>`Каждый день бизнес теряет время на ${t.toLowerCase()}. Пора это исправить.`,
-    t=>`Что если ${t.toLowerCase()} занимали бы минуты, а не дни?`,
-    t=>`${t}: как перестать тонуть в рутине и начать расти.`
+    t=>`Каждый день бизнес тратит время на ${t.toLowerCase()}. Пора это исправить.`,
+    t=>`Что если ${t.toLowerCase()} экономит десятки часов рабочего времени?`,
+    t=>`${t}: как избавиться от рутины и сосредоточиться на главном.`
   ];
   const BENEFITS = [
     'Экономия до 70% рабочего времени на рутинных операциях',
@@ -478,10 +551,10 @@ const AI = (() => {
     'Конфиденциальность: данные шифруются по стандарту AES-256'
   ];
   const DETAILS = [
-    t=>`Мы спроектировали решение так, чтобы ${t.toLowerCase()} не требовали обучения: интерфейс понятен с первого экрана, а умные подсказки ведут пользователя шаг за шагом.`,
-    t=>`Команды, которые уже перешли к нам, отмечают главное — предсказуемость. Дедлайны соблюдаются, статусы прозрачны, а каждый заказ виден в реальном времени.`,
+    t=>`Мы спроектировали решение так, чтобы работа с ${t.toLowerCase()} не требовала обучения: интерфейс понятен с первого экрана, а подсказки ведут пользователя шаг за шагом.`,
+    t=>`Команды, которые уже перешли к нам, отмечают главное — предсказуемость. Дедлайны соблюдаются, статусы прозрачны, каждый заказ виден в реальном времени.`,
     t=>`Безопасность встроена по умолчанию: резервные копии, журнал аудита и разграничение прав ролей. Ваши данные остаются вашими.`,
-    t=>`Подключение занимает один день: импорт данных из привычных таблиц, настройка процессов с наставником и запуск без остановки работы.`
+    t=>`Подключение занимает один день: импорт из привычных таблиц, настройка с наставником и запуск без остановки работы.`
   ];
 
   function composeArticle(theme, tone, len, variant){
@@ -492,13 +565,13 @@ const AI = (() => {
     for (let i=0;i<Math.max(1, Math.round(len/1.5));i++) details.push(pick(DETAILS, i)(theme));
     const title = pick([
       `${theme}: ${T2.adj} для вашей команды`,
-      `Как ${theme.toLowerCase()} перестаёт быть проблемой`,
+      `Как навести порядок в ${theme.toLowerCase()}`,
       `${theme} без хаоса — за один день`,
-      `Пора перезагрузить ${theme.toLowerCase()}`
+      `Пора пересмотреть подход к ${theme.toLowerCase()}`
     ], 0);
     const body = [
       pick(HOOKS, 0)(theme),
-      `«${theme}» ${T2.verb} время и нервы: процессы выстроены, статусы прозрачны, а результат предсказуем. ${details[0]}`,
+      theme + ' экономит время и нервы команды: процессы выстроены, статусы прозрачны, а результат предсказуем. ' + details[0],
       `Что вы получаете:\n${bullets.join('\n')}`,
       details.slice(1).join(' '),
       T2.cta
@@ -506,7 +579,7 @@ const AI = (() => {
     return { title, body };
   }
   function rewriteText(src){
-    const DICT = { 'очень':'по-настоящему', 'быстро':'стремительно', 'хорошо':'качественно', 'проблема':'задача', 'купить':'приобрести', 'дешево':'выгодно', 'крутой':'отличный', 'сделать':'выполнить', 'сказал':'отметил', 'много':'значительный объём', 'хочу':'планирую', 'надо':'необходимо', 'лучший':'оптимальный', 'просто':'легко', 'красивый':'аккуратный', 'быстрый':'оперативный', 'большой':'масштабный', 'плохо':'недостаточно хорошо', 'работает':'функционирует', 'использовать':'применять', 'начать':'приступить', 'получить':'получить доступ к' };
+    const DICT = { 'очень':'по-настоящему', 'быстро':'стремительно', 'хорошо':'качественно', 'проблема':'задача', 'купить':'приобрести', 'дешево':'выгодно', 'крутой':'отличный', 'сделать':'выполнить', 'сказал':'отметил', 'много':'значительный объём', 'хочу':'планирую', 'надо':'необходимо', 'лучший':'оптимальный', 'просто':'легко', 'красивый':'аккуратный', 'быстрый':'оперативный', 'большой':'масштабный', 'плохо':'недостаточно продумано', 'работает':'функционирует', 'использовать':'применять', 'начать':'приступить', 'получить':'получить доступ', 'важный':'ключевой', 'сложный':'нетривиальный', 'компания':'организация', 'деньги':'бюджет', 'помогает':'способствует' };
     let count = 0;
     const out = src.replace(/[А-ЯЁа-яё]+/g, w=>{
       const lw = w.toLowerCase();
@@ -537,7 +610,6 @@ const AI = (() => {
   }
 
   function textsView(root){
-    bindTabs(root);
     let variants = [], curVar = 0, genKind = null;
     root.innerHTML = `
       ${aiHead('ИИ-копирайтинг','Генерация, рерайт, саммари и заголовки — структура и стиль сохраняются','ai-texts')}
@@ -585,6 +657,7 @@ const AI = (() => {
           </div>
         </div>
       </div>`;
+    bindTabs(root);
 
     const g = s => root.querySelector(s);
     let tone = 'business', lastResult = '';
@@ -595,14 +668,15 @@ const AI = (() => {
       const out = g('#tx-out');
       out.hidden = false; g('#tx-msg').style.display = 'none';
       g('#tx-actions').style.display = '';
+      if (T._typeIv) clearInterval(T._typeIv);
       let i = 0;
       out.textContent = '';
       const plain = lastResult;
-      const iv = setInterval(()=>{
+      T._typeIv = setInterval(()=>{
         i += 7;
         out.textContent = plain.slice(0, i);
         out.scrollTop = out.scrollHeight;
-        if (i >= plain.length){ clearInterval(iv); out.textContent = plain; }
+        if (i >= plain.length){ clearInterval(T._typeIv); T._typeIv = null; out.textContent = plain; }
       }, 12);
     }
     function showResult(kind, content, stat){
@@ -657,9 +731,9 @@ const AI = (() => {
   }
 
   /* ==================== ИИ-ПЕРЕВОДЫ ==================== */
-  const DICT_EN = ('и:and,в:in,не:not,на:on,с:with,как:as,а:and,но:but,мы:we,вы:you,они:they,это:this,того:that,для:for,по:on,из:from,у:at,о:about,за:behind,то:then,же:too,от:from,бы:would,был:was,была:was,было:was,будет:will,есть:is,мой:my,ваш:your,наш:our,их:their,к:to,до:until,при:at,над:above,под:under,без:without,через:through,между:between,каждый:every,все:all,или:or,если:if,когда:when,что:that,чтобы:to,клиент:client,клиента:client,заказ:order,заказа:order,заказы:orders,заказов:orders,документ:document,документа:document,документы:documents,аудио:audio,запись:recording,записи:recording,файл:file,файла:file,файлы:files,текст:text,текста:text,тексты:texts,перевод:translation,перевода:translation,переводы:translations,переводчик:translator,стенограмма:transcript,стенограммы:transcripts,расшифровка:transcription,качество:quality,качества:quality,срок:deadline,сроки:deadlines,дедлайн:deadline,цена:price,цены:prices,стоимость:cost,оплата:payment,оплаты:payment,счёт:invoice,счета:invoice,договор:contract,договора:contract,проект:project,проекта:project,команда:team,команды:team,менеджер:manager,менеджера:manager,исполнитель:contractor,исполнителя:contractor,время:time,времени:time,день:day,дня:day,минута:minute,минуты:minutes,час:hour,часа:hour,работа:work,работы:work,работать:work,сделать:make,сделает:will make,система:system,системы:system,сервис:service,сервиса:service,сервисы:services,платформа:platform,данные:data,данных:data,данные_:data,безопасность:security,караоке:karaoke,синхрон:sync,подсветка:highlight,слово:word,слова:words,язык:language,языка:language,языки:languages,структура:structure,структуры:structure,абзац:paragraph,абзацы:paragraphs,список:list,списки:lists,форматирование:formatting,сохраняется:is preserved,сохранение:preservation,быстро:fast,точно:accurate,точно_:precisely,удобно:convenient,просто:simply,готовый:ready,готовая:ready,готовое:ready,новый:new,новая:new,новое:new,первый:first,второй:second,три:three,два:two,один:one,вы:you,ваш_:your,результат:result,результаты:results,вариант:variant,варианты:variants,задача:task,задачи:tasks,рутина:routine,машине:machine,команда_:team,занимается:handles,спасибо:thank you,привет:hello,добро:welcome,пожаловать:welcome,сегодня:today,говорить:speak,говорим:speak,понимает:understands,понял:understood,нравится:like,понравилось:liked,выбираешь:choose,выбрать:choose,запускаем:launch,запустить:launch,загрузили:uploaded,загрузка:upload,получили:received,получаете:get,прикрепить:attach,приложить:attach,отправить:send,отправка:sending,скачать:download,копировать:copy,буфер:buffer,интерфейс:interface,тап:none,клик:click,кнопка:button,сервер:server,облако:cloud,офлайн:offline,онлайн:online,тариф:plan,тарифы:plans,подписка:subscription,минута_:minute,бесплатно:free,бесплатный:free,скидка:discount,скидки:discounts,промокод:promo code,услуга:service,услуги:services,заказчик:customer,заказчика:customer,аудио_:audio,видео:video,субтитры:subtitles,субтитр:subtitle,таймкод:timecode,таймкоды:timecodes,точность:accuracy,модель:model,модели:model,нейросеть:neural network,и_:and,а_:whereas,да:yes,нет:no,хорошо:good,отлично:excellent,спасибо_:thanks,пожалуйста:please,извините:sorry,здравствуйте:hello');
-  const DICT_DE = ('и:und,в:in,не:nicht,на:auf,с:mit,как:wie,но:aber,мы:wir,вы:Sie,они:sie,это:dies,для:für,из:aus,у:bei,о:über,есть:ist,будет:wird,был:war,клиент:Kunde,заказ:Bestellung,документ:Dokument,документы:Dokumente,аудио:Audio,запись:Aufnahme,файл:Datei,текст:Text,перевод:Übersetzung,стенограмма:Transkript,качество:Qualität,срок:Frist,цена:Preis,стоимость:Kosten,оплата:Zahlung,договор:Vertrag,проект:Projekt,команда:Team,менеджер:Manager,время:Zeit,день:Tag,час:Stunde,работа:Arbeit,система:System,сервис:Service,платформа:Plattform,данные:Daten,безопасность:Sicherheit,язык:Sprache,структура:Struktur,абзац:Absatz,список:Liste,быстро:schnell,точно:genau,готовый:fertig,новый:neu,результат:Ergebnis,задача:Aufgabe,подписка:Abonnement,скидка:Rabatt,услуги:Leistungen,субтитры:Untertitel,таймкод:Zeitcode,модель:Modell,привет:Hallo,спасибо:Danke,пожалуйста:bitte,сегодня:heute,понимает:versteht,сохраняется:wird beibehalten');
-  const DICT_ES = ('и:y,в:en,не:no,на:en,с:con,как:como,но:pero,мы:nosotros,вы:ustedes,они:ellos,это:esto,для:para,из:de,есть:es,будет:será,клиент:cliente,заказ:pedido,документ:documento,документы:documentos,аудио:audio,запись:grabación,файл:archivo,текст:texto,перевод:traducción,стенограмма:transcripción,качество:calidad,срок:plazo,цена:precio,стоимость:coste,оплата:pago,договор:contrato,проект:proyecto,команда:equipo,менеджер:gerente,время:tiempo,день:día,час:hora,работа:trabajo,система:sistema,сервис:servicio,платформа:plataforma,данные:datos,безопасность:seguridad,язык:idioma,структура:estructura,абзаz:párrafo,абзац:párrafo,список:lista,быстро:rápido,точно:preciso,готовый:listo,новый:nuevo,результат:resultado,задача:tarea,подписка:suscripción,скидка:descuento,услуги:servicios,субтитры:subtítulos,таймкод:código de tiempo,модель:modelo,привет:hola,спасибо:gracias,пожалуйста:por favor,сегодня:hoy,понимает:entiende,сохраняется:se conserva');
+  const DICT_EN = ('здравствуйте:hello,рады:glad,сообщить:to inform,что:that,ваш:your,заказ:order,на:for,расшифровку:transcription,аудио:audio,выполнен:completed,качество:quality,подтверждено:confirmed,таймкоды:timestamps,проставлены:set,файлы:files,готовы:ready,к:for,скачиванию:download,счёт:invoice,уже:already,доступен:available,личном:personal,кабинете:cabinet,спасибо:thank you,пользуетесь:use,нашим:our,сервисом:service,и:and,в:in,не:not,с:with,есть:is,будет:will,мой:my,был:was,документ:document,текст:text,перевод:translation,команда:team,менеджер:manager,исполнитель:contractor,время:time,день:day,час:hour,работа:work,данные:data,язык:language,список:list,быстро:fast,новый:new,результат:result,сегодня:today,отлично:excellent');;
+  const DICT_DE = ('здравствуйте:Hallo,рады:froh,сообщить:mitteilen,что:dass,ваш:Ihr,заказ:Bestellung,на:für,расшифровку:Transkription,аудио:Audio,выполнен:erledigt,качество:Qualität,подтверждено:bestätigt,таймкоды:Zeitstempel,проставлены:gesetzt,файлы:Dateien,готовы:bereit,к:zum,скачиванию:Download,счет:Rechnung,уже:bereits,доступен:verfügbar,личном:persönlich,кабинете:Konto,спасибо:danke,пользуетесь:nutzen,нашим:unseren,сервисом:Dienst,и:und,в:in,не:nicht,с:mit,есть:ist,будет:wird,мой:mein,был:war,документ:Dokument,текст:Text,перевод:Übersetzung,команда:Team,менеджер:Manager,время:Zeit,день:Tag,час:Stunde,работа:Arbeit,данные:Daten,язык:Sprache,список:Liste,быстро:schnell,новый:neu,результат:Ergebnis,сегодня:heute,отлично:ausgezeichnet,пожалуйста:bitte,или:oder,но:aber,это:dies,мы:wir,они:sie,для:für,из:aus,как:wie');;
+  const DICT_ES = ('здравствуйте:hola,рады:contentos,сообщить:informar,что:que,ваш:su,заказ:pedido,на:para,расшифровку:transcripción,аудио:audio,выполнен:completado,качество:calidad,подтверждено:confirmado,таймкоды:marcas de tiempo,проставлены:establecidas,файлы:archivos,готовы:listos,к:para,скачиванию:descarga,счет:factura,уже:ya,доступен:disponible,личном:personal,кабинете:cuenta,спасибо:gracias,пользуетесь:utiliza,нашим:nuestro,сервисом:servicio,и:y,в:en,не:no,с:con,есть:es,будет:será,мой:mi,был:era,документ:documento,текст:texto,перевод:traducción,команда:equipo,менеджер:gerente,время:tiempo,день:día,час:hora,работа:trabajo,данные:datos,язык:idioma,список:lista,быстро:rápido,новый:nuevo,результат:resultado,сегодня:hoy,отлично:excelente,пожалуйста:por favor,или:o,но:pero,это:esto,мы:nosotros,они:ellos,из:de,как:como');;
   const LANGS = { en:{ name:'English', dict:DICT_EN }, de:{ name:'Deutsch', dict:DICT_DE }, es:{ name:'Español', dict:DICT_ES } };
   function parseDict(str){
     const d = {};
@@ -684,7 +758,6 @@ const AI = (() => {
   }
 
   function translateView(root){
-    bindTabs(root);
     let target = 'en', lastResult = '', lastSrc = '';
     root.innerHTML = `
       ${aiHead('ИИ-переводы','Автоматический перевод с сохранением структуры: абзацы, списки и форматирование остаются на местах','ai-translate')}
@@ -699,7 +772,7 @@ const AI = (() => {
                 <select class="input" id="tr-lang">${Object.entries(LANGS).map(([k,l])=>`<option value="${k}">${l.name}</option>`).join('')}</select></div>
             </div>
             <div class="field" style="margin-top:12px"><label>Текст для перевода</label>
-              <textarea class="input" id="tr-src" style="min-height:180px" placeholder="Вставьте текст на русском… Абзацы, списки и переносы строк сохранятся.">Уважаемый клиент! Ваш заказ готов. Расшифровка аудио выполнена точно и в срок. Качество перевода гарантируем: структура документа сохраняется, абзацы и списки на своих местах. Счёт за услуги уже в вашем кабинете. Спасибо, что выбираете наш сервис!</textarea></div>
+              <textarea class="input" id="tr-src" style="min-height:180px" placeholder="Вставьте текст на русском… Абзацы, списки и переносы строк сохранятся.">Здравствуйте! Рады сообщить, что ваш заказ на расшифровку аудио выполнен. Качество подтверждено, таймкоды проставлены, файлы готовы к скачиванию. Счёт уже доступен в личном кабинете. Спасибо, что пользуетесь нашим сервисом!</textarea></div>
             <div class="row" style="gap:8px;margin-top:12px">
               <button class="btn btn--primary" id="tr-go">${icon('sparkle')} Перевести</button>
               <button class="btn btn--ghost btn--sm" id="tr-swap">${icon('refresh')} Вставить результат в источник</button>
@@ -723,6 +796,7 @@ const AI = (() => {
           </div>
         </div>
       </div>`;
+    bindTabs(root);
 
     const g = s => root.querySelector(s);
     g('#tr-src').addEventListener('input', ()=>g('#tr-count').textContent = g('#tr-src').value.length + ' символов');
@@ -765,6 +839,7 @@ const AI = (() => {
 
   function stopPlayback(){
     if (T.audio){ try{ T.audio.pause(); }catch(e){} }
+    if (T._typeIv){ clearInterval(T._typeIv); T._typeIv = null; }
   }
 
   return { transcribeView, textsView, translateView, stopPlayback,

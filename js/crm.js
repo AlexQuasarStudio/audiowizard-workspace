@@ -9,7 +9,11 @@ const CRM = (() => {
   /* ==================== ЗАКАЗЫ ==================== */
   const canStatus = (from, to, user) => {
     if (from === to) return { ok:false, why:'Статус не изменён' };
-    if (to === 'waiting') return { ok:false, why:'Заказ нельзя вернуть в статус «В ожидании» — это запрещено для всех ролей, включая администратора' };
+    if (to === 'waiting'){
+      return from === 'draft'
+        ? { ok:true }
+        : { ok:false, why:'Вернуть заказ в «В ожидании» можно только из «Черновика»' };
+    }
     return { ok:true };
   };
 
@@ -271,6 +275,8 @@ const CRM = (() => {
         io.observe(sent);
       }
       updateCount();
+      const wrap = root.querySelector('.tbl-wrap');
+      if (wrap) requestAnimationFrame(() => { wrap.scrollTop = +(localStorage.getItem('ordersScrollTop') || 0); });
     }
 
     function updateBulk(){
@@ -346,6 +352,19 @@ const CRM = (() => {
     function bindTable(){
       const wrap = root.querySelector('.tbl-wrap');
       if (!wrap) return;
+      const memKey = 'ordersScrollTop';
+      requestAnimationFrame(() => { wrap.scrollTop = +(localStorage.getItem(memKey) || 0); });
+      wrap.addEventListener('scroll', ()=>{ localStorage.setItem(memKey, String(wrap.scrollTop)); }, { passive:true });
+      if (!wrap.querySelector('.o-to-top')){
+        const tt = document.createElement('button');
+        tt.className = 'to-top o-to-top';
+        tt.hidden = true;
+        tt.innerHTML = icon('chev-d');
+        tt.style.transform = 'rotate(180deg)';
+        tt.onclick = () => wrap.scrollTo({ top: 0, behavior: 'smooth' });
+        wrap.appendChild(tt);
+        wrap.addEventListener('scroll', ()=>{ tt.hidden = wrap.scrollTop < 300; }, { passive:true });
+      }
       wrap.addEventListener('change', e => {
         const c = e.target.closest('.row-sel');
         if (c){ c.checked ? sel.add(c.value) : sel.delete(c.value); updateBulk(); }
@@ -933,6 +952,39 @@ const CRM = (() => {
     </div>`;
   }
 
+  function openPersonForm(role, editPerson){
+    const p = editPerson || { id:uid(), username:'', email:'', pw:'', role, full_name:'', phone:'', about:'', mode:'system', accent:'violet', is_online:true, avatar:'', consent_marketing:true, tour_completed:true, created_at:Date.now(), ext:{ specializations:[], qualification:{}, qualOverall:0, earned:0, status:'active', workStatus:'working', comment:'', commentPersonal:'', managerId:'' } };
+    const isNew = !editPerson;
+    const manOpts = S.users.filter(x=>['manager','top_manager'].includes(x.role)).map(m=>'<option value="'+m.id+'" '+(p.ext.managerId===m.id?'selected':'')+'>'+esc(m.full_name)+'</option>').join('');
+    openModal({
+      narrow:true, title: isNew ? (role==='executor'?'Новый исполнитель':'Новый клиент') : 'Редактировать профиль',
+      body: '<div class="stack" style="gap:12px">' +
+        '<div class="field"><label>ФИО / Название *</label><input class="input" id="pf-name" value="'+esc(p.full_name)+'"></div>' +
+        '<div class="cols-2 grid" style="gap:12px">' +
+          '<div class="field"><label>Email</label><input class="input" id="pf-email" value="'+esc(p.email)+'"></div>' +
+          '<div class="field"><label>Телефон</label><input class="input" id="pf-phone" value="'+esc(p.phone)+'"></div>' +
+        '</div>' +
+        (isNew ? '<div class="field"><label>Пароль</label><input class="input" id="pf-pw" value="'+esc(p.pw||'client123')+'"></div>' : '') +
+        '<div class="field"><label>О себе</label><textarea class="input" id="pf-about" rows="2">'+esc(p.about||'')+'</textarea></div>' +
+        (role==='executor' ? '<div class="field"><label>Менеджер</label><select class="input" id="pf-manager">'+manOpts+'</select></div>' : '') +
+      '</div>',
+      footer: '<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-save>'+(isNew?'Добавить':'Сохранить')+'</button>',
+      onMount: (mask, close)=>{
+        mask.querySelector('[data-x]').onclick = close;
+        mask.querySelector('[data-save]').onclick = ()=>{
+          const name = mask.querySelector('#pf-name').value.trim();
+          if (!name){ toast('Введите имя','warn'); return; }
+          p.full_name = name; p.email = mask.querySelector('#pf-email').value.trim(); p.phone = mask.querySelector('#pf-phone').value.trim(); p.about = mask.querySelector('#pf-about').value.trim();
+          if (isNew){ p.pw = mask.querySelector('#pf-pw').value || 'client123'; p.username = 'user_'+uid().slice(0,5); S.users.push(p); }
+          if (role==='executor'){ p.ext.managerId = mask.querySelector('#pf-manager').value; }
+          if (isNew) logAudit('Добавлен ' + (role==='executor'?'исполнитель':'клиент') + ': ' + p.full_name, 'Люди');
+          else logAudit('Профиль обновлён: ' + p.full_name, 'Люди');
+          saveState(); close(); APP.render(); toast(isNew?((role==='executor'?'Исполнитель':'Клиент') + ' добавлен'):'Профиль обновлён','ok');
+        };
+      }
+    });
+  }
+
   function openPersonCard(uidv, role){
     const p = userById(uidv); if (!p) return;
     const u = me(); const staff = isStaff(u.role);
@@ -1221,7 +1273,7 @@ const CRM = (() => {
   function toolsView(root){
     const u = me(); const admin = u.role==='admin';
     root.innerHTML = `
-      <div class="page-head"><div><h2>Импорт и экспорт</h2><div class="sub">${S.importLogs.length} операций журнала · добавлено: ${S.importLogs.reduce((a,l)=>a+(l.added||0),0)} · пропущено: ${S.importLogs.reduce((a,l)=>a+(l.skipped||0),0)} · ошибок: ${S.importLogs.reduce((a,l)=>a+(l.errs||0),0)} · предупреждений: ${S.importLogs.reduce((a,l)=>a+(l.warns||0),0)}</div></div>${me().role==='admin'?`<div class="page-actions"><button class="btn btn--ghost btn--sm" id="il-exp">${icon('export')} Экспорт журнала</button></div>`:''}</div>
+      <div class="page-head"><div><h2>Импорт и экспорт</h2><div class="sub">${S.importLogs.length ? 'Добавлено '+(S.importLogs[0].added||0)+' · пропущено '+(S.importLogs[0].skipped||0)+' · ошибок '+(S.importLogs[0].errs||0) : 'Нет импортов'}</div></div>${me().role==='admin'?`<div class="page-actions"><button class="btn btn--ghost btn--sm" id="il-exp">${icon('export')} Экспорт журнала</button></div>`:''}</div>
       <div class="cols-2 grid">
         <div class="card"><div class="card-h"><h3>${icon('import')} Импорт</h3><span class="badge c-blue">XLSX → CSV автоматически</span></div>
           <div class="card-b stack" style="gap:12px">
@@ -1380,11 +1432,14 @@ const CRM = (() => {
       return null;
     }
 
+    const parseMoney = s => { const raw = String(s||'').trim(); const n = raw.replace(/[^0-9.,]/g, ''); const lastComma = n.lastIndexOf(','); const lastDot = n.lastIndexOf('.'); let num = 0; if (lastComma > lastDot && lastComma > 0) num = parseFloat(n.replace(/\./g,'').replace(',','.')) || 0; else if (lastDot > -1) num = parseFloat(n) || 0; else num = parseFloat(n.replace(',','.')) || 0; return num; };
     function parseExecsRaw(v){
       const out = [];
       String(v||'').split(/[,;]/).forEach(tok=>{
-        const m = tok.trim().replace(/^[№#\s]+/,'').match(/^(\d+)\s*(?:\s*[—–\-=:]\s*([\d.,]+))?$/);
-        if (m) out.push({ num: +m[1], amount: m[2] ? parseFloat(m[2].replace(',', '.')) : 0 });
+        const t = tok.trim();
+        const m = t.match(/^\+?(\d+)\s*[—–\-=:]\s*([\d.,]+)/);
+        if (m) out.push({ num: +m[1], amount: parseMoney(m[2]) });
+        else { const m2 = t.match(/(\d+)/); if (m2) out.push({ num: +m2[1], amount: 0 }); }
       });
       return out;
     }
@@ -1588,7 +1643,7 @@ const CRM = (() => {
           logBuf.push([`[${j.sheet}] Строка ${rowNo}: + клиент ${fio}`, 'ok']);
         } else if (j.kind === 'executors'){
           const fio = get(r,j.map,'fio'), email = get(r,j.map,'email'), phone = get(r,j.map,'phone').replace(/[^\d+]/g,''), spec = get(r,j.map,'spec'), comment = collectComments(r,j.map);
-          const earned = parseFloat(String(get(r,j.map,'earned')).replace(/\s/g,'').replace(',', '.')) || 0;
+          const earned = parseMoney(get(r,j.map,'earned'));
           if (!fio || (!email && !phone)){ logBuf.push([`[${j.sheet}] Строка ${rowNo}: пропущена — нет ФИО или контактов`, 'err']); mark(j,'skipped',1); skipped++; return; }
           if ((email && execKeys.has('e:' + norm(email))) || (phone && execKeys.has('p:' + phone))){
             logBuf.push([`[${j.sheet}] Строка ${rowNo}: дубликат (${fio}) — пропущен`, 'warn']); mark(j,'skipped',1); skipped++; return;
@@ -1611,8 +1666,8 @@ const CRM = (() => {
           const cl = clientByNum(clNum);
           if (!cl){ logBuf.push([`[${j.sheet}] Строка ${rowNo}: клиент №${clNum || '?'} не найден — пропущено`, 'warn']); mark(j,'skipped',1); skipped++; return; }
           const status = STATUS_RU[norm(get(r,j.map,'status'))] || 'waiting';
-          const total2 = parseFloat(String(get(r,j.map,'total')).replace(/\s/g,'').replace(',', '.')) || 0;
-          const cert = parseFloat(String(get(r,j.map,'cert')).replace(/\s/g,'').replace(',', '.')) || 0;
+          const total2 = parseMoney(get(r,j.map,'total'));
+          const cert = parseMoney(get(r,j.map,'cert'));
           const dateTs = parseDateVal(get(r,j.map,'date')) || Date.now();
           const startTs = parseDateVal(get(r,j.map,'start')) || dateTs;
           const dlRaw = String(get(r,j.map,'deadline'));
@@ -1931,6 +1986,7 @@ const CRM = (() => {
           </div>`,
           footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-kc-save>Добавить</button>`,
           onMount:(m2,close)=>{
+            m2.querySelector('[data-x]').onclick = close;
             m2.querySelector('[data-kc-save]').onclick = ()=>{
               const title = m2.querySelector('#kc-title').value.trim();
               if (!title){ toast('Введите название карточки','warn'); return; }

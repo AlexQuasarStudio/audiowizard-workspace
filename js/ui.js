@@ -46,6 +46,75 @@ function toast(msg, kind='info', title=''){
 }
 
 /* ---------- Аватар: ручной кроп кружком ---------- */
+function openBgCropper(file, onDone){
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    const S = 400;
+    let scale = 1, ox = 0, oy = 0, darken = 0, drag = null;
+    const base = Math.max(S / img.width, S / img.height);
+    scale = base;
+    const mask = document.createElement('div');
+    mask.className = 'modal-mask';
+    mask.innerHTML = `
+      <div class="modal" style="max-width:${S + 48}px">
+        <div class="modal__h"><h3>Фон приложения</h3><button class="modal__x" data-x>${icon('x')}</button></div>
+        <div class="modal__b" style="display:flex;flex-direction:column;align-items:center;gap:12px">
+          <div style="width:${S}px;height:${Math.round(S*0.56)}px;border-radius:12px;overflow:hidden;position:relative;background:var(--bg-2);cursor:grab;touch-action:none">
+            <canvas id="bg-cv" width="${S}" height="${Math.round(S*0.56)}" style="width:100%;height:100%;display:block"></canvas>
+          </div>
+          <div class="row" style="gap:10px;width:${S}px;align-items:center">
+            ${icon('zoom-out','ico-sm')}<input type="range" id="bg-zoom" min="100" max="400" value="100" style="flex:1;accent-color:var(--accent)">${icon('zoom-in','ico-sm')}
+          </div>
+          <div class="row" style="gap:10px;width:${S}px;align-items:center">
+            <span class="small faint">${icon('sun','ico-sm')}</span><input type="range" id="bg-darken" min="0" max="80" value="0" style="flex:1;accent-color:var(--accent)"><span class="small faint">${icon('moon','ico-sm')}</span>
+          </div>
+          <p class="tiny faint">Перетаскивайте, масштабируйте, затемните фон по вкусу</p>
+        </div>
+        <div class="modal__f"><button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-ok>Сохранить</button></div>
+      </div>`;
+    document.body.appendChild(mask);
+    const cv = mask.querySelector('#bg-cv'), ctx = cv.getContext('2d');
+    const W = S, H = Math.round(S*0.56);
+    const draw = () => {
+      ctx.clearRect(0, 0, W, H);
+      const w = img.width * scale, h = img.height * scale;
+      ctx.drawImage(img, (W - w)/2 + ox, (H - h)/2 + oy, w, h);
+      if (darken > 0){ ctx.fillStyle = `rgba(0,0,0,${darken/100})`; ctx.fillRect(0, 0, W, H); }
+    };
+    draw();
+    mask.querySelector('#bg-zoom').addEventListener('input', e => {
+      const old = scale; scale = base * (+e.target.value / 100);
+      ox = ox * (scale/old); oy = oy * (scale/old); draw();
+    });
+    mask.querySelector('#bg-darken').addEventListener('input', e => {
+      darken = +e.target.value; draw();
+    });
+    cv.addEventListener('wheel', e => { e.preventDefault(); const z = document.querySelector('#bg-zoom'); z.value = Math.min(400, Math.max(100, +z.value + (e.deltaY < 0 ? 10 : -10))); z.dispatchEvent(new Event('input')); }, { passive:false });
+    const pos = e => { const r = cv.getBoundingClientRect(); return { x: (e.touches ? e.touches[0].clientX : e.clientX) - r.left, y: (e.touches ? e.touches[0].clientY : e.clientY) - r.top }; };
+    const down = e => { drag = pos(e); cv.style.cursor = 'grabbing'; };
+    const move = e => { if (!drag) return; e.preventDefault(); const p2 = pos(e); ox += p2.x - drag.x; oy += p2.y - drag.y; drag = p2; draw(); };
+    const up = () => { drag = null; cv.style.cursor = 'grab'; };
+    cv.addEventListener('mousedown', down); window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+    cv.addEventListener('touchstart', down, { passive:true }); cv.addEventListener('touchmove', move, { passive:false }); cv.addEventListener('touchend', up);
+    const closeAll = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); mask.classList.add('closing'); setTimeout(() => mask.remove(), 200); URL.revokeObjectURL(url); };
+    mask.querySelectorAll('[data-x]').forEach(x => x.onclick = closeAll);
+    mask.querySelector('[data-ok]').onclick = () => {
+      const out = document.createElement('canvas'); out.width = W; out.height = H;
+      const octx = out.getContext('2d');
+      const w = img.width * scale, h = img.height * scale;
+      octx.drawImage(img, (W - w)/2 + ox, (H - h)/2 + oy, w, h);
+      if (darken > 0){ octx.fillStyle = `rgba(0,0,0,${darken/100})`; octx.fillRect(0, 0, W, H); }
+      out.toBlob(blob => {
+        const rd = new FileReader();
+        rd.onload = () => { onDone(rd.result, darken); closeAll(); };
+        rd.readAsDataURL(blob);
+      }, 'image/png');
+    };
+  };
+  img.src = url;
+}
+
 function openAvatarCropper(file, onDone){
   const url = URL.createObjectURL(file);
   const img = new Image();
@@ -91,7 +160,7 @@ function openAvatarCropper(file, onDone){
     const up = () => { drag = null; cv.style.cursor = 'grab'; };
     cv.addEventListener('mousedown', down); window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
     cv.addEventListener('touchstart', down, { passive:true }); cv.addEventListener('touchmove', move, { passive:false }); cv.addEventListener('touchend', up);
-    const closeAll = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); mask.remove(); URL.revokeObjectURL(url); };
+    const closeAll = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); mask.classList.add('closing'); setTimeout(() => mask.remove(), 200); URL.revokeObjectURL(url); };
     mask.querySelectorAll('[data-x]').forEach(x => x.onclick = closeAll);
     mask.querySelector('[data-ok]').onclick = () => {
       const out = document.createElement('canvas'); out.width = OUT; out.height = OUT;
@@ -124,7 +193,10 @@ function openModal({ title='', body='', footer='', wide=false, narrow=false, onC
       ${footer ? `<div class="modal__f">${footer}</div>` : ''}
     </div>`;
   $('#overlays').appendChild(mask);
-  const close = () => { mask.remove(); document.removeEventListener('keydown', onKey); onClose && onClose(); };
+  const close = () => {
+    mask.classList.add('closing');
+    setTimeout(() => { mask.remove(); document.removeEventListener('keydown', onKey); onClose && onClose(); }, 200);
+  };
   const onKey = e => { if (e.key==='Escape') close(); };
   document.addEventListener('keydown', onKey);
   mask.addEventListener('mousedown', e => { if (e.target === mask) close(); });
@@ -166,7 +238,7 @@ function wipModal(name='Эта функция'){
       <span class="small faint">готовность ≈ 64%</span>
     </div>`,
     footer:`<button class="btn btn--ghost" data-x>Закрыть</button>`
-  }).el.querySelector('[data-x]').addEventListener('click', e => e.target.closest('.modal-mask').remove());
+  }).el.querySelector('[data-x]').addEventListener('click', e => { const m = e.target.closest('.modal-mask'); if (m) { m.classList.add('closing'); setTimeout(() => m.remove(), 200); } });
 }
 
 /* ---------- Выпадающие меню / контекстное меню ---------- */
@@ -217,10 +289,16 @@ function showDropdown(anchor, items, opts={}){
 const ddLastClose = { t: 0, anchor: null };
 function closeDropdown(){
   if (openDD){
-    ddLastClose.anchor = openDD.__anchor || null; ddLastClose.t = Date.now();
-    if (openDD.__ddClose) document.removeEventListener('pointerdown', openDD.__ddClose);
-    if (openDD.__ddEsc) document.removeEventListener('keydown', openDD.__ddEsc);
-    openDD.remove(); openDD = null;
+    const dd = openDD;
+    const ddClose = dd.__ddClose;
+    const ddEsc = dd.__ddEsc;
+    if (ddClose) document.removeEventListener('pointerdown', ddClose);
+    if (ddEsc) document.removeEventListener('keydown', ddEsc);
+    dd.__ddClose = null; dd.__ddEsc = null;
+    dd.classList.add('closing');
+    setTimeout(() => { if (openDD === dd) { dd.remove(); openDD = null; } }, 180);
+    ddLastClose.t = Date.now();
+    ddLastClose.anchor = dd.__anchor || null;
   }
 }
 
@@ -238,6 +316,7 @@ const mqlDark = window.matchMedia('(prefers-color-scheme: dark)');
 function applyTheme(mode, accent){
   const m = mode || 'system';
   const a = accent || 'violet';
+  try { localStorage.setItem('aw_theme', JSON.stringify({mode:m, accent:a})); } catch(e){}
   const resolved = m === 'system' ? (mqlDark.matches ? 'dark' : 'light') : m;
   if (document.body) document.documentElement.classList.add('theme-anim');
   setFaviconFor(resolved, a);
@@ -252,6 +331,16 @@ function applyTheme(mode, accent){
   clearTimeout(applyTheme._t);
   applyTheme._t = setTimeout(() => document.documentElement.classList.remove('theme-anim'), 480);
   document.documentElement.dataset.theme = resolved + '-' + a;
+  /* Перерисовать канвас волны стенограмм при смене темы */
+  const cv = document.querySelector('#ai-wave');
+  if (cv && AI && AI.__dbg){
+    const st = AI.__dbg();
+    if (st && st.processed){
+      const pct = st.cur / (st.scale * 60 || 1);
+      const evt = new CustomEvent('ai-theme-change', { detail: { progress: pct } });
+      window.dispatchEvent(evt);
+    }
+  }
 }
 mqlDark.addEventListener('change', ()=>{ const u = me(); applyTheme(u ? u.mode : 'system', u ? u.accent : 'violet'); });
 
@@ -326,24 +415,24 @@ function renderPalette(){
     el.onmouseenter = () => { paletteSel = +el.dataset.pi; host.querySelectorAll('.palette__item').forEach((e2,i)=>e2.classList.toggle('sel', i===paletteSel)); };
   });
 }
-function closePalette(){ paletteEl && paletteEl.remove(); paletteEl = null; }
+function closePalette(){ if (paletteEl) { paletteEl.classList.add('closing'); setTimeout(() => { if (paletteEl) { paletteEl.remove(); paletteEl = null; } }, 180); } }
 
 /* ---------- Живой поиск (задержка <200 мс) ---------- */
 const liveSearch = debounce(fn => fn(), 150);
 
-/* ---------- Фавиконка: цвет согласован с палитрой ---------- */
+/* ---------- Фавиконка: контейнер под тему, цвет волн согласован с палитрой ---------- */
 const FAVICON_COLORS = {
-  red: ['#c96f5e', '#a85a4c'], blue: ['#7a95c4', '#55718b'], green: ['#87ab93', '#6f8f6a'],
-  violet: ['#c0a9dd', '#8a6faf']
+  red: ['#d47668', '#b55a4c'], blue: ['#7a95c4', '#6a85b4'], green: ['#87ab93', '#729a7d'],
+  violet: ['#b49dd6', '#9a83bc'], mono: ['#a6a0ae', '#8e8896']
 };
-const FAVICON_BG = { dark: ['#1d1730', '#100e14'], light: ['#ffffff', '#efeae2'] };
+const FAVICON_BG = { dark: ['#1d1a26', '#12101a'], light: ['#ffffff', '#efeae2'] };
 function setFaviconFor(mode, accent){
   const light = mode === 'light';
   const a = accent === 'mono'
-    ? (light ? ['#14181f', '#000000'] : ['#f0ede8', '#14181f'])
+    ? (light ? ['#5a5562', '#8a8592'] : ['#c0bcc8', '#a6a0ae'])
     : (FAVICON_COLORS[accent] || FAVICON_COLORS.violet);
-  const m = light ? FAVICON_BG.light : (accent === 'mono' ? ['#161512', '#0e0d0c'] : FAVICON_BG.dark);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="${m[0]}"/><g fill="${a[0]}"><rect x="12" y="25" width="7" height="14" rx="3.5"/><rect x="24" y="18" width="7" height="28" rx="3.5"/><rect x="36" y="12" width="7" height="40" rx="3.5"/><rect x="48" y="21" width="7" height="22" rx="3.5"/></g></svg>`;
+  const bg = light ? FAVICON_BG.light : (accent === 'mono' ? ['#161512', '#0e0d0c'] : FAVICON_BG.dark);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="${bg[0]}"/><g fill="${a[0]}"><rect x="12.5" y="24.5" width="4.5" height="15" rx="2.25"/><rect x="21" y="19" width="4.5" height="26" rx="2.25"/><rect x="29.75" y="14" width="4.5" height="36" rx="2.25"/><rect x="38.5" y="21" width="4.5" height="22" rx="2.25"/><rect x="47" y="25.5" width="4.5" height="13" rx="2.25"/></g></svg>`;
   let link = document.querySelector('link[rel="icon"][data-dyn]');
   if (!link){
     link = document.createElement('link');

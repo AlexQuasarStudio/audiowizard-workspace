@@ -41,6 +41,11 @@ const $  = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3);
+
+/* Глобальное переопределение текста интерфейса.
+   __t('dash.subtitle', 'Значение по умолчанию') → берёт S.uiText['dash.subtitle'], если задано.
+   Имя __t — чтобы не конфликтовать с локальными const t в других модулях. */
+const __t = (key, fallback) => (S && S.uiText && S.uiText[key] != null && S.uiText[key] !== '') ? S.uiText[key] : (fallback ?? key);
 const DAY = 86400000;
 const today = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
 
@@ -217,7 +222,9 @@ function seedState(){
   ];
 
   const changelog = [
-    { id:'v1', version:'0.9.2-beta', title:'Онбординг, темы и калькулятор', content:'Обучающий тур для новых ролей, семь тем оформления (включая системную), калькулятор услуг встроен в форму заказа, автосохранение черновиков и очередь офлайн-операций.', created_at:Date.now()-2*3600000, is_published:true },
+    { id:'v0', version:'0.1-prototype', title:'Прототип Audiowizard Workspace', content:'Заказы, клиенты, исполнители, чаты с реакциями и опросами, тикеты, идеи, канбан, импорт/экспорт Excel, ИИ-стенограммы, копирайтинг и переводы, темы с кастомным акцентом, фоны приложения, полноэкранный режим и техработы.', created_at:Date.now()-3600000, is_published:true },
+    { id:'v4', version:'0.9.4-beta', title:'PWA-оболочка и финальная полировка', content:'Тосты, плавные модалки, глобальный поиск, офлайн-очередь, обновления через service worker.', created_at:days(1), is_published:true },
+    { id:'v1', version:'0.9.2-beta', title:'Онбординг, темы и калькулятор', content:'Обучающий тур для новых ролей, семь тем оформления (включая системную), калькулятор услуг встроен в форму заказа, автосохранение черновиков и очередь офлайн-операций.', created_at:days(2), is_published:true },
     { id:'v2', version:'0.9.1-beta', title:'Чаты: реакции и опросы', content:'Реакции на сообщения, опросы с голосованием, массовые сообщения клиентам от менеджеров. Исправлена мелкая ошибка в таблице заказов.', created_at:days(6), is_published:true },
     { id:'v3', version:'0.9.0-beta', title:'Первый бета-релиз', content:'Дашборды, заказы со статусами, клиенты и исполнители, импорт/экспорт, тикеты и идеи. Добро пожаловать в Audiowizard Workspace!', created_at:days(20), is_published:true }
   ];
@@ -225,10 +232,7 @@ function seedState(){
   const importRules = [
     { id:'r-d1', entity:'client', conditions:[{ field:'name', op:'not_empty' }], action_type:'manager', action_value:'u-top' },
     { id:'r-a1', entity:'client', conditions:[{ field:'comment', op:'contains', value:'Андрей' }], action_type:'manager', action_value:'u-manager' },
-    { id:'r-p1', entity:'client', conditions:[{ field:'comment', op:'regex', value:'промокод|скидка|PROMO10' }], action_type:'discount', action_value:'' },
-
-    { id:'r3', entity:'order', conditions:[{ field:'comment', op:'regex', value:'СРОЧНО|ASAP' }], action_type:'status', action_value:'work' },
-    { id:'r4', entity:'order', conditions:[{ field:'total', op:'gt', value:'50000' }, { field:'status', op:'equals', value:'Выполнено' }], action_type:'status', action_value:'done' }
+    { id:'r-p1', entity:'client', conditions:[{ field:'comment', op:'regex', value:'промокод|скидка|PROMO10' }], action_type:'discount', action_value:'' }
   ];
 
   const calcServices = {
@@ -243,13 +247,16 @@ function seedState(){
     { id:'nf3', icon:'i-tickets', title:'Новый тикет #2', text:'АО «ФинКом»: проблема с испорченной записью', t:days(1)+9*3600000, read:{'u-manager':false} }
   ];
 
-  const audit = [
-    { id:uid(), user:'Игорь Волков', action:'Статус заказа AW-1042: В работе', entity:'Заказ', ip:rndIp(), t:days(1)+15*3600000 },
-    { id:uid(), user:'Мария Кузнецова', action:'Скачивание файла episode17_raw.m4a', entity:'Файл', ip:rndIp(), t:days(2)+10*3600000 },
-    { id:uid(), user:'Марина Соколова', action:'Смена статуса AW-1046: Выполнено, начисление 9 800 ₽', entity:'Заказ', ip:rndIp(), t:days(4)+12*3600000 },
-    { id:uid(), user:'Алексей Орлов', action:'Гостевой вход в аккаунт: Игорь Волков (guest access by admin)', entity:'Сессия', ip:rndIp(), t:days(5)+9*3600000 },
-    { id:uid(), user:'Неизвестный IP', action:'5 неудачных попыток входа — блокировка на 15 минут', entity:'Безопасность', ip:'203.0.113.66', t:days(3)+21*3600000 }
+  /* помечаем только демо-записи аудита (seed) */
+function getDemoAudit(){ return [
+    { id:uid(), user:'Игорь Волков', action:'Статус заказа AW-1042: В работе', entity:'Заказ', ip:rndIp(), t:days(1)+15*3600000, demo:true },
+    { id:uid(), user:'Мария Кузнецова', action:'Скачивание файла episode17_raw.m4a', entity:'Файл', ip:rndIp(), t:days(2)+10*3600000, demo:true },
+    { id:uid(), user:'Марина Соколова', action:'Смена статуса AW-1046: Выполнено, начисление 9 800 ₽', entity:'Заказ', ip:rndIp(), t:days(4)+12*3600000, demo:true },
+    { id:uid(), user:'Алексей Орлов', action:'Гостевой вход в аккаунт: Игорь Волков (guest access by admin)', entity:'Сессия', ip:rndIp(), t:days(5)+9*3600000, demo:true },
+    { id:uid(), user:'Неизвестный IP', action:'5 неудачных попыток входа — блокировка на 15 минут', entity:'Безопасность', ip:'203.0.113.66', t:days(3)+21*3600000, demo:true }
   ];
+}
+const audit = getDemoAudit();
 
   const sessions = u => ([
     { device:'MacBook Pro · Chrome', ip:rndIp(), t:Date.now()-40*60000, current:true },
@@ -257,19 +264,33 @@ function seedState(){
     { device:'Windows 11 · Edge', ip:rndIp(), t:Date.now()-3*DAY }
   ]).slice(0, u.role==='client' ? 2 : 3);
 
+  const importLogs = [
+    { t:days(3)+4*3600000, added:12, skipped:1, ruled:2, errs:0, warns:1, infos:2, file:'clients-2026.csv', entity:'clients' },
+    { t:days(1)+9*3600000, added:8, skipped:0, ruled:1, errs:1, warns:0, infos:1, file:'executors.xlsx', entity:'executors' }
+  ];
+  const importLogLines = [
+    { t:days(3)+4*3600000, file:'clients-2026.csv', entity:'clients', kind:'ok', text:'Кодировка: UTF-8 (определена автоматически)' },
+    { t:days(3)+4*3600000, file:'clients-2026.csv', entity:'clients', kind:'ok', text:'[Клиенты] Строка 2: + клиент ООО «Медиа-Лайн»' },
+    { t:days(3)+4*3600000, file:'clients-2026.csv', entity:'clients', kind:'rule', text:'[Клиенты] Правило: назначить менеджера (u-top)' },
+    { t:days(3)+4*3600000, file:'clients-2026.csv', entity:'clients', kind:'warn', text:'[Клиенты] Строка 9: дубликат (ИП Соколова) — пропущен' },
+    { t:days(1)+9*3600000, file:'executors.xlsx', entity:'executors', kind:'ok', text:'XLSX прочитан напрямую: 8 строк' },
+    { t:days(1)+9*3600000, file:'executors.xlsx', entity:'executors', kind:'ok', text:'Итог: добавлено 8, пропущено 0 · листов: 1' }
+  ];
+
   return {
     _v:1,
     users, niches, specializations, projects, folders, orders, chats, messages, polls,
     tickets, ideas, kanbanBoards:kanban, kbCards, changelog, importRules, calcServices,
-    calcHistory:[], notifs, audit, backups:[], opQueue:[], importLogs:[],
-    settings:{ demoEnabled:true, minPrepay:50, selfDeleteDays:90, hiddenRoutes:[] },
-    product:{ beta:true, version:'0.9.4-beta', build:217, notes:['ИИ-сервисы: стенограммы, копирайтинг, переводы','Импорт Excel с выбором листов'] },
+    calcHistory:[], notifs, audit, backups:[], opQueue:[], importLogs, importLogLines,
+    settings:{ demoEnabled:true, minPrepay:50, selfDeleteDays:90, hiddenRoutes:[], balance: 100000 },
+    product:{ beta:true, version:'0.1-prototype', build:1, notes:['Прототип Audiowizard Workspace'] },
     featureUsage:[
       { name:'Заказы', share:34 }, { name:'Чаты', share:26 }, { name:'Дашборды', share:16 },
       { name:'Импорт/экспорт', share:10 }, { name:'Идеи', share:8 }, { name:'Тикеты', share:6 }
     ],
     usageConsent:{}, cookiesAccepted:false,
-    draftPrefs:{}, currentUserId:null, rememberedLogin:null
+    draftPrefs:{}, currentUserId:null, rememberedLogin:null,
+    uiText:{} /* переопределения текстов интерфейса: {ключ: текст} (правит админ) */
   };
 }
 
@@ -278,7 +299,7 @@ let S;
 function loadState(){
   try{
     const raw = localStorage.getItem(LS_KEY);
-    if (raw){ S = JSON.parse(raw); if (S && S._v === 1){ migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); return; } }
+    if (raw){ S = JSON.parse(raw); if (S && S._v === 1){ migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); saveState(); return; } }
   }catch(e){}
   S = seedState();
   saveState();
@@ -286,7 +307,24 @@ function loadState(){
 /* ---------- Демо-данные: пометки и полная очистка для продакшена ---------- */
 const SEED_DEMO_RE = /^(u-(manager|top|ex\d+|cl\d+)|(o|ch|m\d|n\d|nf\d|i\d|t\d|p\d|f\d|v\d|kb\d|kc\d)\d*$)/;
 function migrateDemoMarks(){
-  if (S.__demoMarked) return;
+  /* Гарантия: баланс платформы есть для всех пользователей (и старых сохранений) */
+  if (S.settings && S.settings.balance == null) S.settings.balance = 100000;
+  if (S.__demoMarked) {
+    (S.featureUsage || []).forEach(f => { if (!f.demo) f.demo = true; });
+    if (!S.importLogs || !S.importLogs.length) S.importLogs = [
+      { t:Date.now()-3*DAY, added:12, skipped:1, ruled:2, errs:0, warns:1, infos:2, file:'clients-2026.csv', entity:'clients' },
+      { t:Date.now()-DAY, added:8, skipped:0, ruled:1, errs:1, warns:0, infos:1, file:'executors.xlsx', entity:'executors' }
+    ];
+    if (!S.importLogLines || !S.importLogLines.length) S.importLogLines = [
+      { t:Date.now()-3*DAY, file:'clients-2026.csv', entity:'clients', kind:'ok', text:'Кодировка: UTF-8 (определена автоматически)' },
+      { t:Date.now()-3*DAY, file:'clients-2026.csv', entity:'clients', kind:'ok', text:'[Клиенты] Строка 2: + клиент ООО «Медиа-Лайн»' },
+      { t:Date.now()-3*DAY, file:'clients-2026.csv', entity:'clients', kind:'rule', text:'[Клиенты] Правило: назначить менеджера (u-top)' },
+      { t:Date.now()-3*DAY, file:'clients-2026.csv', entity:'clients', kind:'warn', text:'[Клиенты] Строка 9: дубликат (ИП Соколова) — пропущен' },
+      { t:Date.now()-DAY, file:'executors.xlsx', entity:'executors', kind:'ok', text:'XLSX прочитан напрямую: 8 строк' },
+      { t:Date.now()-DAY, file:'executors.xlsx', entity:'executors', kind:'ok', text:'Итог: добавлено 8, пропущено 0 · листов: 1' }
+    ];
+    return;
+  }
   (S.users || []).forEach(u => { if (u.id !== 'u-admin' && SEED_DEMO_RE.test(u.id)) u.demo = true; });
   (S.orders || []).forEach(o => { if (SEED_DEMO_RE.test(o.id)) o.demo = true; });
   (S.chats || []).forEach(c => { if (SEED_DEMO_RE.test(c.id)) c.demo = true; });
@@ -297,6 +335,7 @@ function migrateDemoMarks(){
   (S.kbCards || []).forEach(k => { if (SEED_DEMO_RE.test(k.id)) k.demo = true; });
   (S.projects || []).forEach(p => { if (SEED_DEMO_RE.test(p.id)) p.demo = true; });
   (S.folders || []).forEach(f => { if (SEED_DEMO_RE.test(f.id)) f.demo = true; });
+  (S.featureUsage || []).forEach(f => { f.demo = true; });
   S.__demoMarked = true;
 }
 function purgeDemoData(){
@@ -311,7 +350,7 @@ function purgeDemoData(){
   S.kbCards = (S.kbCards || []).filter(k => !k.demo);
   S.projects = (S.projects || []).filter(p => !p.demo);
   S.folders = (S.folders || []).filter(f => !f.demo);
-  S.audit = []; S.importLogs = []; S.calcHistory = []; S.backups = []; S.opQueue = [];
+  S.audit = []; S.importLogs = []; S.importLogLines = []; S.calcHistory = []; S.backups = []; S.opQueue = [];
   S.settings.demoEnabled = false;
   S.featureUsage = [];
 }
@@ -336,6 +375,9 @@ function migrateVioletDefault(){
   if (S.violetDefaultDone) return;
   S.users.forEach(u => { u.accent = 'violet'; });
   S.violetDefaultDone = true;
+}
+function migrateUiText(){
+  if (!S.uiText || typeof S.uiText !== 'object') S.uiText = {};
 }
 function migrateRules(){
   (S.importRules || []).forEach(r => {
