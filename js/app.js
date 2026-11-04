@@ -130,6 +130,7 @@ const APP = (() => {
           <div class="side__brand">
             <span class="side__brand-logo" id="brand-click" title="О программе" role="button" tabindex="0">${icon('logo-full')}</span>
             <span class="side__brand-name">${__t('nav.brand','Audiowizard')}<small>workspace</small></span>
+            <button class="iconbtn side__close" id="side-close" aria-label="Закрыть меню" title="Закрыть">${icon('x')}</button>
             <button class="iconbtn side__burger" id="burger" aria-label="Меню" title="Свернуть/развернуть меню">${icon('menu')}</button>
           </div>
           <nav class="side__nav" data-tour="nav">
@@ -391,15 +392,42 @@ const APP = (() => {
       mainEl.classList.remove('view-in'); void mainEl.offsetWidth; mainEl.classList.add('view-in');
     }
     if (prefsFor().zen) applyZen(true, { skipFullscreen:true });
+    const closeSideDrawer = ()=>{
+      const side = $('#side');
+      if (side) side.classList.remove('open');
+      const sc = document.querySelector('.side-scrim');
+      if (sc && !sc.classList.contains('closing')){
+        sc.classList.remove('show');
+        sc.classList.add('closing');
+        setTimeout(()=>sc.remove(), 320);
+      }
+    };
     const openSideDrawer = ()=>{
       const side = $('#side');
-      if (!side || side.classList.contains('open')) return;
+      if (!side) return;
+      /* Повторное нажатие на кнопку меню закрывает drawer, а не игнорируется */
+      if (side.classList.contains('open')){ closeSideDrawer(); return; }
       side.classList.add('open');
       const sc = document.createElement('div'); sc.className = 'side-scrim';
-      const closeScrim = ()=>{ side.classList.remove('open'); sc.classList.add('closing'); setTimeout(()=>sc.remove(), 320); };
-      sc.onclick = closeScrim;
-      document.body.appendChild(sc);
+      sc.onclick = ()=>closeSideDrawer();
+      /* Scrim кладём внутрь .shell: у оболочки свой stacking context (z-index:1),
+         и body-оверлей оказывался выше всей панели, перекрывая кнопку закрытия. */
+      const host = document.querySelector('.shell') || document.body;
+      host.appendChild(sc);
+      requestAnimationFrame(()=>sc.classList.add('show'));
     };
+    { const sc = $('#side-close'); if (sc) sc.onclick = e=>{ e.stopPropagation(); closeSideDrawer(); }; }
+    /* Esc и возврат к десктопной ширине закрывают drawer */
+    if (!window.__sideDrawerKeys){
+      window.__sideDrawerKeys = true;
+      document.addEventListener('keydown', e=>{
+        if (e.key === 'Escape' && document.querySelector('.side.open')) closeSideDrawer();
+      });
+      const mq = window.matchMedia('(max-width:960px)');
+      const onMq = ()=>{ if (!mq.matches) closeSideDrawer(); };
+      if (mq.addEventListener) mq.addEventListener('change', onMq);
+      else if (mq.addListener) mq.addListener(onMq);
+    }
     $('#burger').onclick = ()=>{
       if (window.matchMedia('(max-width:960px)').matches){
         openSideDrawer();

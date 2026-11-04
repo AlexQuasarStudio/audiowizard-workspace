@@ -118,6 +118,12 @@
   .shell--collapsed .side{width:var(--side-w-c)}
 }
 
+.side__close{display:none}
+/* Затемнение под мобильным drawer: тап по нему закрывает меню */
+.side-scrim{position:fixed;inset:0;z-index:55;background:rgba(12,10,18,.42);opacity:0;transition:opacity .3s var(--ease);-webkit-backdrop-filter:blur(1px);backdrop-filter:blur(1px)}
+.side-scrim.show{opacity:1}
+.side-scrim.closing{opacity:0;pointer-events:none}
+
 /* Header */
 .head{grid-column:2;background:transparent;border-bottom:none;display:flex;align-items:center;gap:10px;padding:10px 12px 10px 26px;position:sticky;top:0;z-index:50;pointer-events:none}
 /* Поиск: в правом блоке шапки, свёрнут в иконку и раскрывается в поле */
@@ -980,7 +986,9 @@ body:not(.zen) .side{position:fixed;top:7px;left:12px;bottom:7px;height:auto;tra
   .chats-layout--withlist .chat-main{display:none}
   .chats-layout--withlist .chat-list{display:flex}
   .chats-layout .chat-main .chat-msgs{max-width:none;margin:0}
-  .head__burger{display:inline-flex;flex:none}
+.head__burger{display:inline-flex;flex:none}
+  .side__burger{display:none}
+  .side__close{display:inline-flex}
 }
 body:not(.zen) .head{position:sticky;top:0}
 body.zen .shell{grid-template-rows:0fr 1fr 0fr;grid-template-columns:1fr}
