@@ -22,6 +22,11 @@
 .main, .head{min-width:0}
 /* Кнопка мобильного меню в шапке: на десктопе не нужна */
 .head__burger{display:none}
+/* Иконка поиска появляется на телефоне вместо поля в шапке */
+.head__msearch{display:none}
+.m-search-back{display:none}
+@keyframes mSearchIn{from{opacity:0;transform:translateY(-8px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes mSearchFade{from{opacity:0}to{opacity:1}}
 @media (min-width:961px){
   }
 
@@ -1002,7 +1007,17 @@ body:not(.zen) .side{position:fixed;top:7px;left:12px;bottom:7px;height:auto;tra
   /* Компактная шапка: поиск тянется, баланс на телефоне убираем —
      иначе шапка шире экрана. */
   .head{gap:8px}
-  .head__search{flex:1 1 auto;width:auto;max-width:none;min-width:0}
+  /* Поиск на телефоне: в шапке остаётся только иконка. По нажатию поле
+     распахивается во всю ширину поверх страницы, фон под ним размывается. */
+  .head__search{display:none}
+  .head__msearch{display:inline-flex;flex:none}
+  body.m-search-open .head{z-index:5200}
+  body.m-search-open .head > *:not(#open-search):not(#m-search-back){visibility:hidden}
+  body.m-search-open .head__search{display:block;position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 10px);width:auto;max-width:none;min-width:0;z-index:5200;animation:mSearchIn .2s var(--ease)}
+  body.m-search-open .head__search .fake-input{height:48px;background:var(--panel);border-color:var(--border-2);box-shadow:var(--sh-2)}
+  body.m-search-open .head__search .fake-input input{font-size:14px}
+  .m-search-back:not([hidden]){display:block;position:fixed;inset:0;z-index:4250;pointer-events:auto;background:color-mix(in srgb,var(--bg) 46%,transparent);-webkit-backdrop-filter:blur(14px) saturate(1.12);backdrop-filter:blur(14px) saturate(1.12);animation:mSearchFade .2s var(--ease)}
+  body.m-search-open .head-search-dd{z-index:4300}
   .head__pill--balance{display:inline-flex;height:40px;padding:0 4px 0 8px;gap:2px;flex:none}
   .head__pill--balance .head-balance{font-size:11.5px;gap:4px}
   .head__pill--balance .sep{margin-left:3px;height:24px}
@@ -2129,6 +2144,18 @@ body.pills-hide .head{pointer-events:none}
 @keyframes inlineIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 .inline-add{animation:inlineIn .2s var(--ease)}
 .inline-add.closing{animation:none;opacity:0;transform:translateY(-4px);transition:opacity .16s var(--ease),transform .16s var(--ease)}
+/* Строка добавления в таблице: плавно появляется и схлопывается по высоте */
+tr.inl-tr{transition:height .2s var(--ease),opacity .16s var(--ease);overflow:hidden}
+tr.inl-tr>td{transition:padding .18s var(--ease)}
+tr.inl-tr.closing>td{padding-top:0;padding-bottom:0}
+.inline-add--in{animation:inlineIn .22s var(--ease)}
+/* Подпись кнопки добавления: «Строка» ↔ «Карточка» */
+.inline-add-label{display:inline-block}
+.inline-add-label.label-swap{animation:labelSwap .3s var(--ease)}
+@keyframes labelSwap{0%{opacity:0;transform:translateY(4px)}100%{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){
+  tr.inl-tr,.inline-add--in,.inline-add-label.label-swap{animation:none!important;transition:none!important}
+}
 
 
 /* ---- Профиль: текст не сжимается в ноль, контакты не рвутся посередине ---- */

@@ -163,6 +163,7 @@ const APP = (() => {
         </aside>
         <header class="head">
           <button class="iconbtn head__burger" id="mobile-menu" aria-label="Меню" title="Меню">${icon('menu')}</button>
+          <button class="iconbtn head__msearch" id="m-search" aria-label="Поиск" title="Поиск">${icon('search')}</button>
           <div class="head__search" data-tour="search" id="open-search">
             <div class="fake-input">${icon('search')}<input id="head-search-input" placeholder="Глобальный поиск…" autocomplete="off" spellcheck="false"><span class="kbd" id="head-search-hint">${fmtKeys(S.keys && S.keys.search)}</span></div>
           </div>
@@ -179,6 +180,7 @@ const APP = (() => {
             </div>
           </div>
         </header>
+        <div class="m-search-back" id="m-search-back" hidden></div>
         <main class="main view" id="main"></main>
         <footer class="foot">
           <a href="#/docs" data-doc="Пользовательское соглашение">Пользовательское соглашение</a>
@@ -461,6 +463,40 @@ const APP = (() => {
         si.addEventListener('blur', ()=>{ if (!si.value.trim()) setTimeout(()=> sw.classList.remove('is-open'), 140); });
         si.addEventListener('keydown', e=>{ if (e.key === 'Escape'){ si.value = ''; si.blur(); sw.classList.remove('is-open'); } });
       } }
+    /* Мобильный поиск: иконка в шапке распахивает поле во всю ширину
+       поверх страницы, фон под ним размывается. */
+    { const mb = $('#m-search'), mback = $('#m-search-back'), sw = $('#open-search'), si = $('#head-search-input');
+      const closeM = ()=>{
+        if (!document.body.classList.contains('m-search-open')) return;
+        document.body.classList.remove('m-search-open');
+        if (mback) mback.hidden = true;
+        if (sw) sw.classList.remove('is-open');
+        if (si) si.blur();
+        if (typeof closeHeaderSearch === 'function') closeHeaderSearch();
+      };
+      window.__closeMobileSearch = closeM;
+      if (mb && sw && si) mb.onclick = ()=>{
+        if (typeof closeSideDrawer === 'function') closeSideDrawer();
+        document.body.classList.add('m-search-open');
+        if (mback) mback.hidden = false;
+        sw.classList.add('is-open');
+        /* Фокус сразу в обработчике клика: на iOS клавиатура открывается
+           только при синхронном focus() — по таймеру вызов игнорируется. */
+        try { si.focus({ preventScroll:true }); } catch(e){ si.focus(); }
+        requestAnimationFrame(()=>{ if (document.body.classList.contains('m-search-open') && document.activeElement !== si) si.focus({ preventScroll:true }); });
+      };
+      if (mback) mback.onmousedown = e=>{ e.preventDefault(); closeM(); };
+      if (!window.__mSearchBound){
+        window.__mSearchBound = true;
+        /* capture: обработчик поля в ui.js останавливает всплытие Escape */
+        document.addEventListener('keydown', e=>{ if (e.key === 'Escape' && window.__closeMobileSearch) window.__closeMobileSearch(); }, true);
+        window.addEventListener('hashchange', ()=>{ if (window.__closeMobileSearch) window.__closeMobileSearch(); });
+        document.addEventListener('click', e=>{
+          if (!document.body.classList.contains('m-search-open')) return;
+          if (e.target.closest('.head-search-dd .palette__item')) setTimeout(()=>{ if (window.__closeMobileSearch) window.__closeMobileSearch(); }, 0);
+        }, true);
+      }
+    }
     bindHeaderSearch();
     $('#btn-bell').onclick = ()=>toggleNotifPanel();
     { const sb = $('#side-balance'); if (sb) sb.onclick = ()=>{ closeSideDrawer(); showBalanceHistory(); }; }

@@ -504,21 +504,21 @@ const CRM = (() => {
               <button data-view="cards" class="${cardsView?'on':''}" title="Карточки" aria-label="Карточки">${icon('cards-view','ico-sm')}</button>
             </div>
             <button class="btn btn--ghost" id="btn-tools">${icon('import')} Импорт / экспорт</button>
-            ${staff?`<button class="btn btn--soft" id="btn-inline-order" title="Добавить строку прямо в список">${icon('plus')} Строка</button>`:''}
+            ${staff?`<button class="btn btn--soft" id="btn-inline-order" title="Добавить ${cardsView?'карточку':'строку'} прямо в список">${icon('plus')} <span class="inline-add-label">${cardsView?'Карточка':'Строка'}</span></button>`:''}
             ${staff?`<button class="btn btn--primary" id="btn-new-order">${icon('plus')} Новый заказ</button>`:''}
           </div>
         </div>
         <div id="o-bulk"></div>
         <div class="inline-add" id="o-inline" hidden>
           <div class="inline-add__row">
-            <input class="input" id="oi-id" placeholder="ID (пусто = авто AW-N)" style="font-family:var(--mono);max-width:150px">
-            <input class="input" id="oi-client" placeholder="Клиент (ФИО/название)" style="min-width:170px">
-            <input class="input" id="oi-total" placeholder="Сумма, ₽" type="number" min="0" style="max-width:120px">
-            <input class="input" id="oi-deadline" placeholder="дд.мм.гггг" title="Дедлайн" style="max-width:150px"${window.matchMedia && window.matchMedia('(max-width:960px)').matches ? ' type="date"' : ''}>
-            <button class="btn btn--primary btn--sm" id="oi-save" title="Создать заказ">${icon('check-c','ico-sm')}</button>
-            <button class="iconbtn" id="oi-cancel" title="Отмена">${icon('x','ico-sm')}</button>
+            <input class="input" data-f="id" placeholder="ID (пусто = авто AW-N)" style="font-family:var(--mono);max-width:150px">
+            <input class="input" data-f="client" placeholder="Клиент (ФИО/название)" style="min-width:170px">
+            <input class="input" data-f="total" placeholder="Сумма, ₽" type="number" min="0" style="max-width:120px">
+            <input class="input" data-f="deadline" placeholder="дд.мм.гггг" title="Дедлайн" style="max-width:150px"${window.matchMedia && window.matchMedia('(max-width:960px)').matches ? ' type="date"' : ''}>
+            <button class="btn btn--primary btn--sm" type="button" data-inline-save title="Создать заказ">${icon('check-c','ico-sm')}</button>
+            <button class="iconbtn" type="button" data-inline-cancel title="Отмена">${icon('x','ico-sm')}</button>
           </div>
-          <div class="small faint" id="oi-hint">ID сгенерируется автоматически, если оставить поле пустым</div>
+          <div class="small faint" data-inline-hint>ID сгенерируется автоматически, если оставить поле пустым</div>
         </div>
         <p class="small faint" style="margin:0 0 8px">Правый клик по строке — контекстное меню · двойной клик — карточка заказа</p>
         <div class="filters">
@@ -819,6 +819,7 @@ const CRM = (() => {
         vw.querySelectorAll('[data-view]').forEach(x => x.classList.toggle('on', x === b));
         render(false);
         animateViewSwitch(root);
+        swapInlineLabel(root, '#btn-inline-order .inline-add-label');
       }));
       /* Делегируем change: шапка с #sel-all пересоздаётся в fillRows()
          (порционная подгрузка), прямой listener прикреплялся к старому элементу */
@@ -830,29 +831,60 @@ const CRM = (() => {
       const nb = root.querySelector('#btn-new-order');
       nb && (nb.onclick = () => openOrderForm());
       const ni = root.querySelector('#btn-inline-order');
-      const inlineBox = root.querySelector('#o-inline');
-      if (ni && inlineBox){
-        ni.onclick = ()=>{
-          if (!inlineBox.hidden){ inlineClose(inlineBox, root); return; }
-          inlineOpen(inlineBox, root, 'orders');
-          {
-            const id = root.querySelector('#oi-id'); if (id) id.value = '';
-            const cl = root.querySelector('#oi-client'); if (cl) cl.value = '';
-            const tot = root.querySelector('#oi-total'); if (tot) tot.value = '';
-            const dl = root.querySelector('#oi-deadline'); if (dl) dl.value = '';
-            const f = root.querySelector('#oi-id'); if (f) f.focus();
+      if (ni && root.querySelector('#o-inline')){
+        const spawnOrderRow = (values)=>{
+          const box = inlineSpawn(root, 'orders');
+          if (!box) return null;
+          if (values){
+            ['id','client','total','deadline'].forEach(f=>{
+              const inp = box.querySelector(`[data-f="${f}"]`);
+              if (inp) inp.value = values[f] || '';
+            });
+            checkInlineOrderId(box);
           }
+          const f = box.querySelector('[data-f="id"]');
+          if (f) requestAnimationFrame(()=>f.focus());
+          return box;
         };
-        const saveInline = () => {
-          const id = sanitizeOrderId(root.querySelector('#oi-id').value);
-          const cl = (root.querySelector('#oi-client').value||'').trim();
-          const total = parseFloat(root.querySelector('#oi-total').value)||0;
-          const dlRaw = (root.querySelector('#oi-deadline').value || '').trim();
+        /* Каждое нажатие — новая строка, ничего не закрываем и не подменяем */
+        ni.onclick = ()=> spawnOrderRow();
+
+        const checkInlineOrderId = (box)=>{
+          const inp = box.querySelector('[data-f="id"]');
+          const hint = box.querySelector('[data-inline-hint]');
+          if (!inp) return null;
+          if (hint && !hint.dataset.empty) hint.dataset.empty = hint.textContent;
+          const dup = orderIdTaken(inp.value);
+          inp.classList.toggle('is-bad', !!dup);
+          inp.setAttribute('aria-invalid', dup ? 'true' : 'false');
+          if (hint){
+            if (dup){
+              hint.textContent = `ID ${dup.order_id} уже занят — выберите другой`;
+              hint.style.color = 'var(--red)';
+              hint.hidden = false;
+            } else {
+              const def = hint.dataset.empty || '';
+              hint.textContent = def;
+              hint.style.color = '';
+              hint.hidden = !def;
+            }
+          }
+          return dup;
+        };
+
+        const saveInline = (box)=>{
+          if (!box) return;
+          const v = f => { const i = box.querySelector(`[data-f="${f}"]`); return i ? i.value : ''; };
+          const focusField = f => { const i = box.querySelector(`[data-f="${f}"]`); if (i) i.focus(); };
+          const id = sanitizeOrderId(v('id'));
+          const cl = (v('client')||'').trim();
+          const total = parseFloat(v('total'))||0;
+          const dlRaw = (v('deadline') || '').trim();
           const dlTs = dlRaw ? parseDateText(dlRaw) : null;
-          if (!cl){ toast('Укажите клиента', 'warn'); return; }
+          if (!cl){ toast('Укажите клиента', 'warn'); focusField('client'); return; }
           if (dlRaw && dlTs == null){
             toast('Дедлайн в формате дд.мм.гггг', 'err');
-            const f = root.querySelector('#oi-deadline');
+            const f = box.querySelector('[data-f="deadline"]');
             if (f){ f.classList.add('is-bad'); f.focus(); }
             return;
           }
@@ -861,7 +893,7 @@ const CRM = (() => {
           let oid = id || generateOrderId();
           if (id && orderIdTaken(id)){
             toast(`ID ${id} уже занят — выберите другой`, 'err');
-            const f = root.querySelector('#oi-id');
+            const f = box.querySelector('[data-f="id"]');
             if (f){ f.classList.add('is-bad'); f.focus(); }
             return;
           }
@@ -871,39 +903,60 @@ const CRM = (() => {
             comment:'', project_id:'', folder_id:'', nish_id:'', executors:[], audio:0, files:[], proposed_price:0, paid_amount:0,
             forbid_download:false, portfolio_ban:true, nda:false, history:[{ t: now, txt:'Заказ создан (инлайн)' }], created_at: now };
           if (no.deadline && no.start_date && no.deadline < no.start_date){ toast('Дедлайн раньше даты создания — исправьте','err'); return; }
+          /* Незаполненные соседние строки не теряем при перерисовке */
+          const drafts = [...root.querySelectorAll('.inline-add[data-clone="1"]')]
+            .filter(b => b !== box && b.isConnected)
+            .map(b => ({
+              id: (b.querySelector('[data-f="id"]')||{}).value || '',
+              client: (b.querySelector('[data-f="client"]')||{}).value || '',
+              total: (b.querySelector('[data-f="total"]')||{}).value || '',
+              deadline: (b.querySelector('[data-f="deadline"]')||{}).value || ''
+            }));
           S.orders.unshift(no);
           logAudit(`Создан заказ ${oid} (инлайн)`, 'Заказ');
           saveState();
           toast(`Заказ ${oid} создан`,'ok');
-          inlineBox.hidden = true;
-          render(false);
-          /* Плавное появление новой строки/карточки посреди таблицы */
-          const newRow = root.querySelector(`[data-oid="${no.id}"]`);
-          if (newRow){
-            newRow.classList.add('inline-in');
-            setTimeout(()=>newRow.classList.remove('inline-in'), 400);
-          }
+          /* Строка плавно схлопывается, затем список перерисовывается */
+          inlineClose(box, root, ()=>{
+            render(false);
+            drafts.forEach(d => spawnOrderRow(d));
+            const newRow = root.querySelector(`[data-oid="${no.id}"]`);
+            if (newRow){
+              newRow.classList.add('inline-in');
+              setTimeout(()=>newRow.classList.remove('inline-in'), 400);
+            }
+          });
         };
-        root.querySelector('#oi-save').onclick = saveInline;
-        root.querySelector('#oi-cancel').onclick = () => { inlineClose(inlineBox, root); };
-        /* ID заказа: только латиница, цифры и дефис; всегда капсом.
-           Неуникальный номер подсвечиваем сразу при вводе. */
-        const oiHint = root.querySelector('#oi-hint');
-        if (oiHint) oiHint.dataset.empty = oiHint.textContent;
-        const checkInlineId = markOrderIdField(root.querySelector('#oi-id'), oiHint);
-        root.querySelector('#oi-id').addEventListener('input', e=>{
-          const el = e.target;
-          const clean = sanitizeOrderId(el.value);
-          if (el.value !== clean){
-            const pos = Math.min(el.selectionStart || 0, clean.length);
-            el.value = clean;
-            try { el.setSelectionRange(pos, pos); } catch(err){}
-          }
-          if (checkInlineId) checkInlineId();
+
+        root.addEventListener('click', e=>{
+          const box = e.target.closest && e.target.closest('.inline-add');
+          if (!box || box.id) return;
+          if (e.target.closest('[data-inline-save]')){ saveInline(box); return; }
+          if (e.target.closest('[data-inline-cancel]')){ inlineClose(box, root); }
         });
-        root.querySelector('#oi-id').addEventListener('keydown', e=>{ if (e.key==='Enter') saveInline(); });
-        root.querySelector('#oi-client').addEventListener('keydown', e=>{ if (e.key==='Enter') saveInline(); });
-        root.querySelector('#oi-total').addEventListener('keydown', e=>{ if (e.key==='Enter') saveInline(); });
+        root.addEventListener('input', e=>{
+          const box = e.target.closest && e.target.closest('.inline-add');
+          if (!box || box.id) return;
+          const f = e.target.dataset && e.target.dataset.f;
+          if (f === 'id'){
+            const el = e.target;
+            const clean = sanitizeOrderId(el.value);
+            if (el.value !== clean){
+              const pos = Math.min(el.selectionStart || 0, clean.length);
+              el.value = clean;
+              try { el.setSelectionRange(pos, pos); } catch(err){}
+            }
+            checkInlineOrderId(box);
+          } else if (f === 'deadline'){
+            e.target.classList.remove('is-bad');
+          }
+        });
+        root.addEventListener('keydown', e=>{
+          const box = e.target.closest && e.target.closest('.inline-add');
+          if (!box || box.id) return;
+          if (e.key === 'Enter' && e.target.tagName === 'INPUT'){ e.preventDefault(); saveInline(box); }
+          if (e.key === 'Escape'){ inlineClose(box, root); }
+        });
       }
       const bt = root.querySelector('#btn-tools');
       bt && (bt.onclick = () => APP.go('tools'));
@@ -1759,10 +1812,14 @@ const CRM = (() => {
   function inlineOpen(box, root, kind){
     if (!box) return;
     const wrap = root.querySelector(kind === 'orders' ? '.o-wrap' : '.pl-wrap');
-    if (!box.__home) box.__home = { parent: box.parentNode, next: box.nextSibling };
+    /* Клоны — самостоятельные строки: у каждой своя tr, домой ничего не возвращаем */
+    if (box.dataset.clone !== '1' && !box.__home) box.__home = { parent: box.parentNode, next: box.nextSibling };
     box.hidden = false;
     box.style.cssText = '';
-    box.classList.remove('closing','inline-add--row','inline-add--card');
+    box.classList.remove('closing','inline-add--row','inline-add--card','inline-add--in');
+    void box.offsetWidth;
+    box.classList.add('inline-add--in');
+    setTimeout(()=>box.classList.remove('inline-add--in'), 280);
     if (!wrap){ box.classList.add('inline-show'); return; }
     const grid = wrap.querySelector('.o-cards, .person-grid');
     if (grid){
@@ -1772,19 +1829,31 @@ const CRM = (() => {
     }
     const table = wrap.querySelector('table.tbl');
     if (table){
-      let tr = wrap.querySelector('tr.inl-tr');
-      if (!tr){
-        tr = document.createElement('tr');
-        tr.className = 'inl-tr';
-        const td = document.createElement('td');
-        td.colSpan = (table.tHead && table.tHead.rows[0]) ? table.tHead.rows[0].cells.length : 1;
-        tr.appendChild(td);
-        const tbody = table.tBodies[0] || table.appendChild(document.createElement('tbody'));
-        tbody.insertBefore(tr, tbody.firstChild);
-      }
+      const tr = document.createElement('tr');
+      tr.className = 'inl-tr';
+      const td = document.createElement('td');
+      td.colSpan = (table.tHead && table.tHead.rows[0]) ? table.tHead.rows[0].cells.length : 1;
+      tr.appendChild(td);
+      const tbody = table.tBodies[0] || table.appendChild(document.createElement('tbody'));
+      tbody.insertBefore(tr, tbody.firstChild);
       box.classList.add('inline-add--row');
-      tr.firstChild.appendChild(box);
+      td.appendChild(box);
+      box.__tr = tr;
     }
+  }
+
+  /* Новая пустая строка/карточка на каждое нажатие: форма-шаблон #o-inline
+     или #pl-inline никогда не перемещается, из неё делается клон. */
+  function inlineSpawn(root, kind){
+    const tpl = root.querySelector(kind === 'orders' ? '#o-inline' : '#pl-inline');
+    if (!tpl) return null;
+    const box = tpl.cloneNode(true);
+    box.removeAttribute('id');
+    box.dataset.clone = '1';
+    box.hidden = true;
+    tpl.parentNode.insertBefore(box, tpl.nextSibling);
+    inlineOpen(box, root, kind);
+    return box;
   }
 
   /* Закрытие: сначала плавно схлопываем строку, потом убираем её из списка
@@ -1796,6 +1865,14 @@ const CRM = (() => {
     box.style.overflow = 'hidden';
     box.style.maxHeight = h + 'px';
     box.classList.add('closing');
+    /* Высоту самой строки тоже ведём к нулю: иначе после схлопывания плашки
+       остаётся полоса с паддингами ячейки и строка исчезает рывком. */
+    let trH = 0;
+    if (tr){
+      trH = tr.getBoundingClientRect().height;
+      tr.style.height = trH + 'px';
+      tr.classList.add('closing');
+    }
     requestAnimationFrame(()=>{
       box.style.maxHeight = '0px';
       box.style.opacity = '0';
@@ -1803,12 +1880,17 @@ const CRM = (() => {
       box.style.paddingBottom = '0px';
       box.style.marginTop = '0px';
       box.style.marginBottom = '0px';
+      if (tr) tr.style.height = '0px';
     });
     setTimeout(()=>{
-      box.classList.remove('closing','inline-add--row','inline-add--card');
+      box.classList.remove('closing','inline-add--row','inline-add--card','inline-add--in');
       box.style.cssText = '';
-      if (box.__home && box.__home.parent && box.__home.parent.isConnected) box.__home.parent.insertBefore(box, box.__home.next);
-      box.hidden = true;
+      if (box.dataset.clone === '1'){
+        box.remove();
+      } else {
+        if (box.__home && box.__home.parent && box.__home.parent.isConnected) box.__home.parent.insertBefore(box, box.__home.next);
+        box.hidden = true;
+      }
       if (tr && tr.isConnected) tr.remove();
       cb && cb();
     }, 210);
@@ -1818,6 +1900,17 @@ const CRM = (() => {
      «Активные», «Чёрный список»): список перерисовывается сразу (клик
      отзывается мгновенно) и мягко «оседает» на место — сдвиг на пару
      пикселей вместо паузы и мигания в пустоту. */
+  /* Подпись кнопки добавления («Строка» ↔ «Карточка») мягко сменяется
+     при переключении таблицы и карточек. */
+  function swapInlineLabel(root, sel){
+    const lb = root.querySelector(sel);
+    if (!lb) return;
+    lb.classList.remove('label-swap');
+    void lb.offsetWidth;
+    lb.classList.add('label-swap');
+    setTimeout(()=>lb.classList.remove('label-swap'), 320);
+  }
+
   function animateFilterChange(root, renderFn){
     const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     renderFn();
@@ -1896,20 +1989,20 @@ const CRM = (() => {
             </div>
             <button class="btn btn--ghost" data-exp>${icon('export')} Экспорт</button>
             <button class="btn btn--ghost" data-inv>${icon('user-plus')} Приглашения</button>
-            ${staff?`<button class="btn btn--soft" data-inline-add title="Добавить строку прямо в список">${icon('plus')} Строка</button>`:''}
+            ${staff?`<button class="btn btn--soft" data-inline-add title="Добавить ${cardsView?'карточку':'строку'} прямо в список">${icon('plus')} <span class="inline-add-label">${cardsView?'Карточка':'Строка'}</span></button>`:''}
             ${staff?`<button class="btn btn--primary" data-add>${icon('user-plus')} ${role==='executor'?'Добавить исполнителя':'Добавить клиента'}</button>`:''}
           </div>
         </div>
         <div id="pl-bulk"></div>
         <div class="inline-add" id="pl-inline" hidden>
           <div class="inline-add__row">
-            <input class="input" id="pi-name" placeholder="${role==='executor'?'ФИО исполнителя *':'ФИО / Компания *'}" style="min-width:180px">
-            <input class="input" id="pi-email" placeholder="Email" style="min-width:160px">
-            <input class="input" id="pi-phone" placeholder="Телефон" style="min-width:130px">
-            <button class="btn btn--primary btn--sm" id="pi-save" title="Добавить">${icon('check-c','ico-sm')}</button>
-            <button class="iconbtn" id="pi-cancel" title="Отмена">${icon('x','ico-sm')}</button>
+            <input class="input" data-f="name" placeholder="${role==='executor'?'ФИО исполнителя *':'ФИО / Компания *'}" style="min-width:180px">
+            <input class="input" data-f="email" placeholder="Email" style="min-width:160px">
+            <input class="input" data-f="phone" placeholder="Телефон" style="min-width:130px">
+            <button class="btn btn--primary btn--sm" type="button" data-inline-save title="Добавить">${icon('check-c','ico-sm')}</button>
+            <button class="iconbtn" type="button" data-inline-cancel title="Отмена">${icon('x','ico-sm')}</button>
           </div>
-          <div class="small faint">Нужно имя и хотя бы один контакт; номер присвоится автоматически</div>
+          <div class="small faint" data-inline-hint>Нужно имя и хотя бы один контакт; номер присвоится автоматически</div>
         </div>
         <div class="filters">
           <div class="input-wrap">${icon('search')}<input class="input" id="pl-q" placeholder="Поиск: имя, логин, email, телефон…" value="${esc(q)}"></div>
@@ -1986,6 +2079,7 @@ const CRM = (() => {
         pv.querySelectorAll('[data-view]').forEach(x => x.classList.toggle('on', x === b));
         render();
         animateViewSwitch(root);
+        swapInlineLabel(root, '[data-inline-add] .inline-add-label');
       }));
       const qq = $('#pl-q', root);
       qq.addEventListener('input', ()=>liveSearch(()=>{ q=qq.value; render(); }));
@@ -2002,23 +2096,41 @@ const CRM = (() => {
         animateFilterChange(root, () => render());
       };
       $$('[data-add]', root).forEach(b=>b.onclick = ()=>openPersonForm(role, null));
-      $$('[data-inline-add]', root).forEach(b=>b.onclick = ()=>{
-        const box = root.querySelector('#pl-inline');
-        if (!box) return;
-        if (!box.hidden){ inlineClose(box, root); return; }
-        inlineOpen(box, root, 'people');
-        { const f = root.querySelector('#pi-name'); if (f) f.focus(); }
-      });
-      const piSave = root.querySelector('#pi-save');
-      if (piSave){
-        const savePerson = () => {
-          const name = (root.querySelector('#pi-name').value||'').trim();
-          const email = (root.querySelector('#pi-email').value||'').trim();
-          const phone = (root.querySelector('#pi-phone').value||'').trim();
-          if (!name){ toast('Укажите имя', 'warn'); return; }
-          if (!email && !phone){ toast('Нужен email или телефон', 'warn'); return; }
+      const plTemplate = root.querySelector('#pl-inline');
+      if (plTemplate){
+        const spawnPersonRow = (values)=>{
+          const box = inlineSpawn(root, 'people');
+          if (!box) return null;
+          if (values){
+            ['name','email','phone'].forEach(f=>{
+              const inp = box.querySelector(`[data-f="${f}"]`);
+              if (inp) inp.value = values[f] || '';
+            });
+          }
+          const f = box.querySelector('[data-f="name"]');
+          if (f) requestAnimationFrame(()=>f.focus());
+          return box;
+        };
+        /* Каждое нажатие — новая строка, а не переключение уже открытой */
+        $$('[data-inline-add]', root).forEach(b=>b.onclick = ()=> spawnPersonRow());
+
+        const savePerson = (box)=>{
+          if (!box) return;
+          const v = f => { const i = box.querySelector(`[data-f="${f}"]`); return i ? i.value : ''; };
+          const name = (v('name')||'').trim();
+          const email = (v('email')||'').trim();
+          const phone = (v('phone')||'').trim();
+          if (!name){ toast('Укажите имя', 'warn'); const i = box.querySelector('[data-f="name"]'); if (i) i.focus(); return; }
+          if (!email && !phone){ toast('Нужен email или телефон', 'warn'); const i = box.querySelector('[data-f="email"]'); if (i) i.focus(); return; }
           const normE = norm(email);
           if (S.users.some(x=>x.role===role && ((x.email && norm(x.email)===normE) || (x.phone && x.phone===phone)))){ toast('Такой контакт уже существует','err'); return; }
+          const drafts = [...root.querySelectorAll('.inline-add[data-clone="1"]')]
+            .filter(b => b !== box && b.isConnected)
+            .map(b => ({
+              name: (b.querySelector('[data-f="name"]')||{}).value || '',
+              email: (b.querySelector('[data-f="email"]')||{}).value || '',
+              phone: (b.querySelector('[data-f="phone"]')||{}).value || ''
+            }));
           const nu = { id: uid(), username: normE.split('@')[0] || 'user'+Date.now(), email, pw:'inline123', role,
             full_name: name, phone, about:'', theme:'system', is_online:false, avatar:'', consent_marketing:false, tour_completed:false, created_at: Date.now(),
             ext: { specializations: [], qualification:{}, qualOverall:0, earned:0, status:'active', workStatus:'working', comment:'',
@@ -2030,20 +2142,28 @@ const CRM = (() => {
           logAudit(`${role==='executor'?'Исполнитель':'Клиент'} ${name} добавлен (инлайн)`, 'Люди');
           saveState();
           toast(`${name} добавлен`,'ok');
-          root.querySelector('#pl-inline').hidden = true;
-          render();
-          /* Плавное появление новой строки/карточки посреди списка */
-          const newPerson = root.querySelector(`[data-uid="${nu.id}"]`);
-          if (newPerson){
-            newPerson.classList.add('inline-in');
-            setTimeout(()=>newPerson.classList.remove('inline-in'), 400);
-          }
+          inlineClose(box, root, ()=>{
+            render();
+            drafts.forEach(d => spawnPersonRow(d));
+            const newPerson = root.querySelector(`[data-uid="${nu.id}"]`);
+            if (newPerson){
+              newPerson.classList.add('inline-in');
+              setTimeout(()=>newPerson.classList.remove('inline-in'), 400);
+            }
+          });
         };
-        piSave.onclick = savePerson;
-        root.querySelector('#pi-cancel').onclick = ()=> { inlineClose(root.querySelector('#pl-inline'), root); };
-        ['#pi-name','#pi-email','#pi-phone'].forEach(sel=>{
-          const el = root.querySelector(sel);
-          if (el) el.addEventListener('keydown', e=>{ if (e.key==='Enter') savePerson(); });
+
+        root.addEventListener('click', e=>{
+          const box = e.target.closest && e.target.closest('.inline-add');
+          if (!box || box.id) return;
+          if (e.target.closest('[data-inline-save]')){ savePerson(box); return; }
+          if (e.target.closest('[data-inline-cancel]')){ inlineClose(box, root); }
+        });
+        root.addEventListener('keydown', e=>{
+          const box = e.target.closest && e.target.closest('.inline-add');
+          if (!box || box.id) return;
+          if (e.key === 'Enter' && e.target.tagName === 'INPUT'){ e.preventDefault(); savePerson(box); }
+          if (e.key === 'Escape'){ inlineClose(box, root); }
         });
       }
       $$('[data-inv]', root).forEach(b=>b.onclick = ()=>openInvites());
