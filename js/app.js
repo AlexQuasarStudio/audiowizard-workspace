@@ -1417,11 +1417,21 @@ ex.innerHTML = avatarHTML(user(), '');
     const isBC = (corner === 'bc');
     let left, top;
     if (isBC){
-      const input = document.querySelector('.chat-input');
+      /* Только поле ввода ОСНОВНОГО приложения: .chat-input внутри плавающего
+         окна чата (`.aw-win`) может стоять посреди экрана — из-за него аватар
+         «съезжал» в середину. Если поле не внизу экрана, встаём по центру снизу. */
+      const input = document.querySelector('#app .chat-input');
       const inputR = input ? input.getBoundingClientRect() : null;
-      left = inputR ? Math.round(inputR.left + inputR.width/2 - aw/2) : Math.round(window.innerWidth/2 - aw/2);
-      const topY = inputR ? Math.round(inputR.top) : (window.innerHeight - 64);
-      top = Math.max(gap, Math.min(window.innerHeight - aw - gap, topY - aw));
+      const nearBottom = inputR && inputR.width > 0
+        && inputR.top > window.innerHeight * 0.45
+        && inputR.top < window.innerHeight;
+      if (nearBottom){
+        left = Math.round(inputR.left + inputR.width/2 - aw/2);
+        top = Math.max(gap, Math.min(window.innerHeight - aw - gap, Math.round(inputR.top) - aw));
+      } else {
+        left = Math.round(window.innerWidth/2 - aw/2);
+        top = window.innerHeight - 64 - aw;
+      }
     } else {
       left = (corner==='tl'||corner==='bl') ? gap : window.innerWidth - aw - gap;
       top = (corner==='tl'||corner==='tr') ? gap : window.innerHeight - aw - gap;
@@ -1487,6 +1497,16 @@ snapToCorner(prefsFor().zenAvatarPos || 'bc', false);
     window.__zenResizeBound = true;
     const re = () => { if (zenAvatar && !zenDrag) snapToCorner(prefsFor().zenAvatarPos || 'bc', false); };
     window.addEventListener('resize', re, { passive: true });
+    /* Перетаскивание, прерванное потерей фокуса (отпустили мышь вне окна):
+       не оставляем аватар там, куда его затащили, — возвращаем в угол/к полю. */
+    window.addEventListener('blur', ()=>{
+      if (!zenDrag || !zenAvatar) return;
+      zenDrag = null;
+      zenAvatar.classList.remove('zen-avatar--drag');
+      document.body.classList.remove('zen-dragging');
+      try { hideDropZones(); } catch(e){}
+      snapToCorner(prefsFor().zenAvatarPos || 'bc', true);
+    });
     ['fullscreenchange', 'webkitfullscreenchange'].forEach(ev => document.addEventListener(ev, re));
   }
   function showDropZones(){
