@@ -810,22 +810,28 @@ const Windows = (() => {
       if (e.target.closest('.aw-win__close') || e.target.closest('.aw-win__max')) return;
       if (e.target.closest('.aw-win__min')) return;
       e.preventDefault();
-      const r = win.getBoundingClientRect();
-      /* Геометрия ДО драга: если окно уронят в уголок, вернём его сюда. */
-      win.__dragStartRect = { left: win.style.left || (r.left + 'px'), top: win.style.top || (r.top + 'px'),
-        width: win.style.width || (r.width + 'px'), height: win.style.height || (r.height + 'px') };
+      let r = win.getBoundingClientRect();
       win.__inSplit = null; /* перетащили окно — оно больше не в сплите */
       if (win.classList.contains('aw-win--corner')){
         /* Вытащили из уголка — окно становится обычным, размер сохраняем. */
         win.classList.remove('aw-win--corner');
         if (win.classList.contains('aw-win--corner-min')){
           win.classList.remove('aw-win--corner-min');
-          win.style.height = (win.__cornerHeight || 520) + 'px';
+          const ch = win.__cornerHeight || 520;
+          const hh2 = win.offsetHeight;
+          const curTop = parseFloat(win.style.top) || r.top;
+          if ((win.__cornerPos || '').includes('b')) win.style.top = (curTop - (ch - hh2)) + 'px';
+          win.style.height = ch + 'px';
           win.__cornerHeight = null;
+          win.__cornerTop = null;
+          r = win.getBoundingClientRect();
         }
         win.__cornerPrev = null;
         win.__cornerPos = null;
       }
+      /* Геометрия ДО драга: если окно уронят в уголок, вернём его сюда. */
+      win.__dragStartRect = { left: win.style.left || (r.left + 'px'), top: win.style.top || (r.top + 'px'),
+        width: win.style.width || (r.width + 'px'), height: win.style.height || (r.height + 'px') };
       active = { kind:'drag', win:win, sx:e.clientX, sy:e.clientY, ox:r.left, oy:r.top, moved:false };
       win.classList.add('aw-win--dragging');
       document.body.classList.add('win-dragging');
@@ -941,6 +947,7 @@ const Windows = (() => {
     win.__cornerPos = p;
     win.classList.remove('aw-win--corner-min');
     win.__cornerHeight = null;
+    win.__cornerTop = null;
     win.classList.add('aw-win--corner', 'aw-win--animating');
     setTimeout(() => win.classList.remove('aw-win--animating'), 320);
     focusWin(win);
@@ -954,16 +961,26 @@ const Windows = (() => {
     const hh = head ? Math.round(head.offsetHeight) : 53;
     win.classList.add('aw-win--animating');
     const minBtn = win.querySelector('.aw-win__min');
+    const pos = win.__cornerPos || 'br';
+    const bottomAnchor = pos.includes('b');
+    const curTop = parseFloat(win.style.top) || win.getBoundingClientRect().top;
     if (win.classList.contains('aw-win--corner-min')){
       win.classList.remove('aw-win--corner-min');
-      win.style.height = (win.__cornerHeight || cornerRectFor(win.__cornerPos || 'br').height) + 'px';
+      const ch = win.__cornerHeight || cornerRectFor(pos).height;
+      win.style.height = ch + 'px';
+      /* Шапка возвращается на место: для нижних углов — от нижней кромки. */
+      if (bottomAnchor) win.style.top = (win.__cornerTop != null ? win.__cornerTop : curTop - (ch - hh)) + 'px';
+      win.__cornerTop = null;
       win.__cornerHeight = null;
       if (minBtn) minBtn.title = 'Свернуть';
     } else {
       win.__cornerHeight = win.offsetHeight;
+      win.__cornerTop = curTop;
       win.classList.add('aw-win--corner-min');
       win.style.height = hh + 'px';
       win.style.minHeight = '0';
+      /* Сворачиваемся К НИЖНЕМУ КРАЮ: шапка остаётся у нижней границы окна. */
+      if (bottomAnchor) win.style.top = (curTop + win.__cornerHeight - hh) + 'px';
       if (minBtn) minBtn.title = 'Развернуть';
     }
     setTimeout(() => win.classList.remove('aw-win--animating'), 340);
@@ -973,6 +990,7 @@ const Windows = (() => {
     if (!win || !win.classList.contains('aw-win--corner')) return;
     win.classList.remove('aw-win--corner', 'aw-win--corner-min');
     win.__cornerHeight = null;
+    win.__cornerTop = null;
     const p = win.__cornerPrev;
     if (p){
       win.style.left = p.left || '';
