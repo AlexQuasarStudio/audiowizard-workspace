@@ -347,8 +347,13 @@ function showDropdown(anchor, items, opts={}){
        к низу экрана, чтобы она была чуть пониже, а не улетала вверх. */
     y = Math.max(8, window.innerHeight - ddH - 10);
   } else if (y + ddH > window.innerHeight - 10){
-    /* Обычный случай: если снизу не хватает места — раскрываем НАД анкором */
-    const top = r.top - ddH - 6;
+    /* Снизу не хватает места — раскрываем НАД анкором, а не над невидимой
+       точкой (0,0). У правого клика по шапке окна анкор — сама шапка; у меню,
+       открытого по координатам, анкора с размерами нет — берём точку клика,
+       иначе плашка улетает к верху экрана, далеко от шапки нижнего уголка. */
+    const hasAnchorBox = !!(r.width || r.height);
+    const baseTop = (opts.y != null && !hasAnchorBox) ? y : r.top;
+    const top = baseTop - ddH - 6;
     y = top >= 8 ? top : 8;
   }
   y = Math.min(y, window.innerHeight - ddH - 10);

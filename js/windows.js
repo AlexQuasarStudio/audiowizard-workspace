@@ -721,7 +721,9 @@ const Windows = (() => {
           ? { label:'Выйти из уголка', icon:'shrink', onClick:()=>exitCorner(win) }
           : { label:'В уголок', icon:'corner', onClick:()=>enterCorner(win, win.__cornerPos || 'br') });
       }
-      contextMenu(e.clientX, e.clientY, menuItems);
+      /* Анкор — сама шапка: плашка у нижнего уголка раскрывается над ней,
+         а не над точкой клика, и не наезжает на текст шапки. */
+      contextMenu(e.clientX, e.clientY, menuItems, head);
     });
 
     /* Переключение раздела прямо в шапке окна: содержимое меняется,
@@ -1156,9 +1158,14 @@ const Windows = (() => {
         if (other === el || !other.__inSplit) return false;
         const o2 = other.getBoundingClientRect();
         if (!o2.width || !o2.height) return false;
-        const ov = (r.top <= o2.bottom - 10) && (o2.top <= r.bottom - 10);
-        if (!ov) return false;
-        return Math.abs(o2.left - r.right) <= 12 || Math.abs(o2.right - r.left) <= 12;
+        /* Соседство по горизонтали (сплит слева/справа) и по вертикали
+           (окна друг над другом). Вертикальный стык раньше не учитывался —
+           из-за этого между верхним и нижним окном оставалась тень. */
+        const vertOv = (r.top <= o2.bottom - 10) && (o2.top <= r.bottom - 10);
+        const horOv  = (r.left <= o2.right - 10) && (o2.left <= r.right - 10);
+        const horAdj = vertOv && (Math.abs(o2.left - r.right) <= 12 || Math.abs(o2.right - r.left) <= 12);
+        const verAdj = horOv  && (Math.abs(o2.top - r.bottom) <= 12 || Math.abs(o2.bottom - r.top) <= 12);
+        return horAdj || verAdj;
       });
       el.classList.toggle('aw-win--split', adj);
     });
@@ -1276,6 +1283,69 @@ const Windows = (() => {
        зазор >12px, снимал aw-win--split, и тень мигала при каждом движении. */
     syncSplitClasses();
   }
+  /* Магнитное прилипание на дропе: окно, унесённое почти встык к краю соседа
+     или экрана, прилипает вплотную (с анимацией). Ресайз при этом остаётся
+     независимым — это не «сплит», а лишь выравнивание на дропе.
+     neighborsOnly — только стык с соседним окном. Такой стык приоритетнее
+     прилипания к половине экрана: иначе в вертикальном сплите у левого края
+     окно уезжало в левую половину, не доходя до стыка. */
+  function applyDropMagnet(win, opts = {}){
+    if (!win) return false;
+    const rr = win.getBoundingClientRect();
+    const th = 14, vert = o => (rr.top <= o.bottom - 10) && (o.top <= rr.bottom - 10);
+    const others = allWins().filter(rc => rc.win !== win).map(rc => ({ winEl: rc.win, rc: rc.win.getBoundingClientRect() }));
+    const left = rr.left, right = rr.right, top = rr.top, bottom = rr.bottom;
+    let nl = null, nr = null, nt = null;
+    let br = null, bd = th + 1, brWin = null;
+    others.forEach(o => { if (vert(o.rc)){ const d = Math.abs(o.rc.left - right); if (d < bd){ bd = d; br = o.rc.left; brWin = o.winEl; } } });
+    if (br !== null) nr = br;
+    let bl = null, ld = th + 1, blWin = null;
+    others.forEach(o => { if (vert(o.rc)){ const d = Math.abs(o.rc.right - left); if (d < ld){ ld = d; bl = o.rc.right; blWin = o.winEl; } } });
+    if (bl !== null) nl = bl;
+    /* Вертикальный магнит: прилипание к ВЕРХНЕМУ/НИЖНЕМУ краю соседнего окна
+       (перекрытие по горизонтали ≥10px, зазор по вертикали ≤14px). */
+    const hor = o => (left <= o.rc.right - 10) && (o.rc.left <= right - 10);
+    let bm = null, bmD = th + 1, bmWin = null;   /* сосед ВЫШЕ (прилипаем к его низу) */
+    others.forEach(o => { if (hor(o)){ const d = Math.abs(o.rc.bottom - top); if (d < bmD){ bmD = d; bm = o; bmWin = o.winEl; } } });
+    let tm = null, tmD = th + 1, tmWin = null;   /* сосед НИЖЕ (прилипаем к его верху) */
+    others.forEach(o => { if (hor(o)){ const d = Math.abs(o.rc.top - bottom); if (d < tmD){ tmD = d; tm = o; tmWin = o.winEl; } } });
+    const vNeighbor = bmWin !== null ? bmWin : (tmWin !== null ? tmWin : null);
+    const vNeighborTop = bmWin !== null;
+    const vNeighborBottom = tmWin !== null;
+    const sideNeighbor = brWin !== null ? brWin : (blWin !== null ? blWin : null);
+    const hasNeighbor = !!(vNeighbor || sideNeighbor);
+    if (opts.neighborsOnly && !hasNeighbor) return false;
+    /* Прилипание к КРАЮ ЭКРАНА (нет соседа встык) — лишь магнит к краю,
+       НЕ связка: флаг сплита не ставим. */
+    if (nr == null && right < window.innerWidth && window.innerWidth - right < th) nr = window.innerWidth;
+    if (nl == null && left > 0 && left < th) nl = 0;
+    if (top < th) nt = 0;
+    const bottomScreen = (bottom > window.innerHeight - th) && (window.innerHeight - bottom < th);
+    if (nl === null && nr === null && nt === null && !vNeighbor && !bottomScreen) return false;
+    const L = nl !== null ? nl : left, R = nr !== null ? nr : right;
+    let T = nt !== null ? nt : rr.top;
+    if (vNeighborTop && bm){ T = bm.rc.bottom; }
+    else if (vNeighborBottom && tm){ T = tm.rc.top - rr.height; }
+    else if (bottomScreen){ T = window.innerHeight - rr.height; }
+    win.classList.add('aw-win--animating');
+    win.style.left = L + 'px';
+    win.style.right = '';
+    win.style.top = T + 'px';
+    win.style.bottom = '';
+    win.style.width = Math.max(200, R - L) + 'px';
+    win.style.height = rr.height + 'px';
+    win.style.minWidth = '0'; win.style.minHeight = '0';
+    setTimeout(() => win.classList.remove('aw-win--animating'), 320);
+    /* Прилипание встык к соседу = связка: помечаем оба окна «в сплите»,
+       чтобы стык можно было тянуть совместно. */
+    if (hasNeighbor){
+      win.__inSplit = win.__inSplit || 'magnet';
+      if (vNeighbor) vNeighbor.__inSplit = vNeighbor.__inSplit || 'magnet';
+      if (sideNeighbor) sideNeighbor.__inSplit = sideNeighbor.__inSplit || 'magnet';
+    }
+    return true;
+  }
+
   document.addEventListener('mouseup', () => {
     if (active && active.moved && active.kind === 'drag'){
       const win = active.win;
@@ -1286,12 +1356,20 @@ const Windows = (() => {
          унесённое вплотную к краю окно прилипает к половине экрана. */
       const snapDir = win.__lastSnap || null;
       let snapped = false;
+      /* Стык с соседним окном проверяем ДО прилипания к половине экрана:
+         в вертикальном сплите у края экрана окно должно лечь к стыку, а не
+         уехать в половину. */
+      let magnetDone = false;
+      if (!win.__cornerDrop && !win.__inSplit && !snapped){
+        magnetDone = applyDropMagnet(win, { neighborsOnly:true });
+        if (magnetDone) snapped = true;
+      }
       if (win.__cornerDrop){
         snapped = true;
         const cd = win.__cornerDrop;
         win.__cornerDrop = null;
         enterCorner(win, cd);
-      } else if (snapDir){
+      } else if (!magnetDone && snapDir){
         snapped = true;
         /* Пиксельная геометрия (left/top/width/height), без auto —
            иначе окно «телепортируется» вместо плавного прилипания.
@@ -1330,66 +1408,7 @@ const Windows = (() => {
       if (!win.classList.contains('aw-win--corner')) win.__cornerWasMin = false;
       const g = document.querySelector('.aw-snap-guide');
       if (g){ g.style.display = 'none'; g.classList.remove('aw-snap-guide--corner'); }
-      /* Магнитное прилипание на дропе: окно, унесённое почти встык к краю
-         соседа или экрана, прилипает вплотную (с анимацией). Ресайз при этом
-         остаётся независимым — это не «сплит», а лишь выравнивание на дропе. */
-      if (!win.__inSplit && !snapped){
-        const rr = win.getBoundingClientRect();
-        const th = 14, vert = o => (rr.top <= o.bottom - 10) && (o.top <= rr.bottom - 10);
-        const others = allWins().filter(rc => rc.win !== win).map(rc => ({ winEl: rc.win, rc: rc.win.getBoundingClientRect() }));
-        const left = rr.left, right = rr.right, top = rr.top, bottom = rr.bottom;
-        let nl = null, nr = null, nt = null;
-        let br = null, bd = th + 1, brWin = null;
-        others.forEach(o => { if (vert(o.rc)){ const d = Math.abs(o.rc.left - right); if (d < bd){ bd = d; br = o.rc.left; brWin = o.winEl; } } });
-        if (br !== null) nr = br;
-        let bl = null, ld = th + 1, blWin = null;
-        others.forEach(o => { if (vert(o.rc)){ const d = Math.abs(o.rc.right - left); if (d < ld){ ld = d; bl = o.rc.right; blWin = o.winEl; } } });
-        if (bl !== null) nl = bl;
-        /* Вертикальный магнит: прилипание к ВЕРХНЕМУ/НИЖНЕМУ краю соседнего окна
-           (перекрытие по горизонтали ≥10px, зазор по вертикали ≤14px). Раньше
-           работал только горизонтальный стык (лево/право) — по высоте окно
-           не прилипало к краям окон, только к верху экрана. */
-        const hor = o => (left <= o.rc.right - 10) && (o.rc.left <= right - 10);
-        let bm = null, bmD = th + 1, bmWin = null;   /* сосед ВЫШЕ (мы снизу прилипаем к его низу) */
-        others.forEach(o => { if (hor(o)){ const d = Math.abs(o.rc.bottom - top); if (d < bmD){ bmD = d; bm = o; bmWin = o.winEl; } } });
-        let tm = null, tmD = th + 1, tmWin = null;   /* сосед НИЖЕ (мы сверху прилипаем к его верху) */
-        others.forEach(o => { if (hor(o)){ const d = Math.abs(o.rc.top - bottom); if (d < tmD){ tmD = d; tm = o; tmWin = o.winEl; } } });
-        /* Сосед по вертикали — только если он ближе, чем сосед-экран */
-        const vNeighbor = bmWin !== null && bmD < (bottom - 14 > window.innerHeight - 14 ? 1e9 : 1e9) ? bmWin : (tmWin !== null ? tmWin : null);
-        const vNeighborTop = bmWin !== null; /* прилипаем к НИЖНЕМУ краю верхнего соседа */
-        const vNeighborBottom = tmWin !== null; /* прилипаем к ВЕРХНЕМУ краю нижнего соседа */
-        /* Прилипание к КРАЮ ЭКРАНА (нет соседа встык) — это лишь магнит к краю,
-           НЕ связка: флаг сплита не ставим. */
-        const neighborEl = brWin !== null ? brWin : (blWin !== null ? blWin : null);
-        if (nr == null && right < window.innerWidth && window.innerWidth - right < th) nr = window.innerWidth;
-        if (nl == null && left > 0 && left < th) nl = 0;
-        if (top < th) nt = 0;
-        const bottomScreen = (bottom > window.innerHeight - th) && (window.innerHeight - bottom < th);
-        if (nl !== null || nr !== null || nt !== null || vNeighbor !== null || bottomScreen){
-          const L = nl !== null ? nl : left, R = nr !== null ? nr : right;
-          let T = nt !== null ? nt : rr.top;
-          /* Вертикальное прилипание: встык к краю соседа/экрана */
-          if (vNeighborTop && bm){ T = bm.rc.bottom; }
-          else if (vNeighborBottom && tm){ T = tm.rc.top - rr.height; }
-          else if (bottomScreen){ T = window.innerHeight - rr.height; }
-          win.classList.add('aw-win--animating');
-          win.style.left = L + 'px';
-          win.style.right = '';
-          win.style.top = T + 'px';
-          win.style.bottom = '';
-          win.style.width = Math.max(200, R - L) + 'px';
-          win.style.height = rr.height + 'px';
-          win.style.minWidth = '0'; win.style.minHeight = '0';
-          setTimeout(() => win.classList.remove('aw-win--animating'), 320);
-          /* Магнитное прилипание встык к соседу = связка: помечаем оба окна
-             как «в сплите», чтобы стык можно было тянуть совместно. */
-          const vNeighborEl = vNeighbor !== null ? vNeighbor : (brWin !== null ? brWin : blWin);
-          if (vNeighborEl){
-            win.__inSplit = win.__inSplit || 'magnet';
-            vNeighborEl.__inSplit = vNeighborEl.__inSplit || 'magnet';
-          }
-        }
-      }
+      if (!win.__inSplit && !snapped && !magnetDone) applyDropMagnet(win, { neighborsOnly:false });
       try {
         const store = JSON.parse(sessionStorage.getItem('aw_wins') || '{"wins":[]}');
         const arr = store.wins.filter(x => x.route !== win._route);
