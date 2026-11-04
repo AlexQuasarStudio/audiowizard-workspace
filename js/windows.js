@@ -700,9 +700,9 @@ const Windows = (() => {
       e.preventDefault();
       if (typeof contextMenu !== 'function') return;
       const menuItems = [
-        { label:'Слева (½ экрана)', icon:'split-h', onClick:()=>splitWin('left') },
-        { label:'Справа (½ экрана)', icon:'split-h', onClick:()=>splitWin('right') },
-        { label:'Сверху', icon:'split-v', onClick:()=>splitWin('tl') },
+        { label:'Слева (½ экрана)', icon:'split-left', onClick:()=>splitWin('left') },
+        { label:'Справа (½ экрана)', icon:'split-right', onClick:()=>splitWin('right') },
+        { label:'Сверху', icon:'split-top', onClick:()=>splitWin('tl') },
         '-',
         { label:'По центру', icon:'center', onClick:()=>splitWin('center') },
         { label:'На весь экран', icon:'expand', onClick:()=>splitWin('max') },
@@ -710,7 +710,7 @@ const Windows = (() => {
       if (isChatWin(win)){
         menuItems.push('-', win.classList.contains('aw-win--corner')
           ? { label:'Выйти из уголка', icon:'shrink', onClick:()=>exitCorner(win) }
-          : { label:'В уголок', icon:'app', onClick:()=>enterCorner(win, win.__cornerPos || 'br') });
+          : { label:'В уголок', icon:'corner', onClick:()=>enterCorner(win, win.__cornerPos || 'br') });
       }
       contextMenu(e.clientX, e.clientY, menuItems);
     });
