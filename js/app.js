@@ -149,6 +149,11 @@ const APP = (() => {
               })()}`).join('')}</div>`).join('')}
           </nav>
           <div class="side__foot">
+            <button class="side__balance" id="side-balance" type="button" title="История баланса">
+              <span class="side__balance-ico">${icon('card','ico-sm')}</span>
+              <span class="side__balance-meta"><span>Баланс платформы</span><b>${fmtMoney(S.settings.demoEnabled === false ? 0 : (S.settings.balance || 0))}</b></span>
+              <span class="side__balance-chev">${icon('chev-r','ico-sm')}</span>
+            </button>
             <div class="side__user" id="side-user" data-tour="user">
               ${avatarHTML(u)}
               <span class="side__user-meta"><b>${esc(u.full_name)}</b><span>${ROLE_LABEL[u.role]}</span></span>
@@ -458,6 +463,7 @@ const APP = (() => {
       } }
     bindHeaderSearch();
     $('#btn-bell').onclick = ()=>toggleNotifPanel();
+    { const sb = $('#side-balance'); if (sb) sb.onclick = ()=>{ closeSideDrawer(); showBalanceHistory(); }; }
     const netPill = $('#net-pill');
     if (netPill) netPill.onclick = ()=>{
       /* Повторный клик по балансу закрывает уже открытую плашку */

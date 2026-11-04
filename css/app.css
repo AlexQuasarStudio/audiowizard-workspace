@@ -56,6 +56,7 @@
 .side__link__cnt{margin-left:auto;background:var(--panel-3);color:var(--text-2);font-size:10.5px;font-weight:700;border-radius:99px;padding:1px 7px}
 .side__link.on .side__link__cnt{background:var(--accent);color:var(--on-accent,#fff)}
 .side__foot{padding:8px;border-top:1px solid var(--border);flex:none;background:color-mix(in srgb,var(--bg) 55%,transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.side__balance{display:none}
 .shell--collapsed .side__foot{padding:8px}
 .side__user{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:12px;cursor:pointer;transition:background var(--dur)}
 .side__user:hover{background:var(--panel-2)}
@@ -978,7 +979,24 @@ body:not(.zen) .side{position:fixed;top:7px;left:12px;bottom:7px;height:auto;tra
      иначе шапка шире экрана. */
   .head{gap:8px}
   .head__search{flex:1 1 auto;width:auto;max-width:none;min-width:0}
-  .head__pill--balance{display:none}
+  .head__pill--balance{display:inline-flex;height:40px;padding:0 4px 0 8px;gap:2px;flex:none}
+  .head__pill--balance .head-balance{font-size:11.5px;gap:4px}
+  .head__pill--balance .sep{margin-left:3px;height:24px}
+  .head__pill--balance #btn-bell{width:24px;height:26px}
+  .head__search .kbd{display:none}
+  /* Узкие экраны (320–360): заголовок карточки и герой переносятся,
+     иначе плашка-подпись и спарклайн вылезали за край на 16px. */
+  .card-h{flex-wrap:wrap}
+  .dash-hero{flex-wrap:wrap}
+  .chart-wrap--hero{flex:none}
+  /* Баланс в мобильном drawer: всегда под рукой, даже если шапка тесная */
+  .side__balance{display:flex;align-items:center;gap:10px;width:100%;margin-bottom:6px;padding:8px 9px;border-radius:12px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);cursor:pointer;text-align:left;font:inherit}
+  .side__balance:hover{background:var(--panel-3)}
+  .side__balance-ico{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:var(--accent-soft);color:var(--accent);flex:none}
+  .side__balance-meta{min-width:0;display:flex;flex-direction:column;gap:1px}
+  .side__balance-meta span{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+  .side__balance-meta b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .side__balance-chev{margin-left:auto;color:var(--faint)}
   /* Мобильные чаты: одна панель на всю ширину — список ИЛИ лента.
      Класс chats-layout--withlist ставит JS (mobilePane). */
   .chats-layout{display:block;width:100%}
