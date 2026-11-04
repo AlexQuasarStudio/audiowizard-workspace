@@ -338,6 +338,41 @@ const CRM = (() => {
       .replace(/^-+|-+$/g, '');
   }
 
+  /* Проверка уникальности ID на лету: возвращает заказ-дубль или null.
+     ignoreId — сам редактируемый заказ, чтобы он не считался своим дублем. */
+  function orderIdTaken(v, ignoreId){
+    const id = sanitizeOrderId(v);
+    if (!id) return null;
+    return S.orders.find(x => x.order_id === id && x.id !== ignoreId) || null;
+  }
+
+  /* Подсветка поля ID: красная рамка и подсказка, пока номер занят */
+  function markOrderIdField(input, hint, ignoreId){
+    if (!input) return null;
+    const check = ()=>{
+      const dup = orderIdTaken(input.value, ignoreId);
+      input.classList.toggle('is-bad', !!dup);
+      input.setAttribute('aria-invalid', dup ? 'true' : 'false');
+      if (hint){
+        if (dup){
+          hint.textContent = `ID ${dup.order_id} уже занят — выберите другой`;
+          hint.style.color = 'var(--red)';
+          hint.hidden = false;
+        } else {
+          const def = hint.dataset.empty || '';
+          hint.textContent = def;
+          hint.style.color = '';
+          hint.hidden = !def;
+        }
+      }
+      return dup;
+    };
+    input.addEventListener('input', check);
+    input.addEventListener('blur', check);
+    check();
+    return check;
+  }
+
   /* ---------- Таблица заказов ---------- */
   const ofilter = { q:'', statuses:new Set(), niche:'', project:'', manager:'', archived:false,
     dateFrom:'', dateTo:'', sortKey:'start_date', sortDir:1 };
@@ -813,7 +848,12 @@ const CRM = (() => {
           const client = S.users.find(x => x.role==='client' && (norm(x.full_name)===norm(cl) || norm(x.email)===norm(cl)));
           if (!client){ toast('Клиент не найден. Сначала добавьте его в список (кнопка «Добавить клиента»)','warn'); return; }
           let oid = id || generateOrderId();
-          if (id && S.orders.some(x=>x.order_id===id)){ oid = id + '-' + (1 + Math.floor(Math.random()*90)+10); toast(`ID занят — назначен ${oid}`,'warn'); }
+          if (id && orderIdTaken(id)){
+            toast(`ID ${id} уже занят — выберите другой`, 'err');
+            const f = root.querySelector('#oi-id');
+            if (f){ f.classList.add('is-bad'); f.focus(); }
+            return;
+          }
           const now = Date.now();
           const no = { id: uid(), order_id: oid, client_id: client.id, order_date: now, deadline: dlRaw ? new Date(dlRaw).getTime() : null,
             status: 'waiting', total, certification_amount: 0, need_cert:false, start_date: now, manager_id: me().id,
@@ -835,7 +875,11 @@ const CRM = (() => {
         };
         root.querySelector('#oi-save').onclick = saveInline;
         root.querySelector('#oi-cancel').onclick = () => { inlineClose(inlineBox, root); };
-        /* ID заказа: только латиница, цифры и дефис; всегда капсом */
+        /* ID заказа: только латиница, цифры и дефис; всегда капсом.
+           Неуникальный номер подсвечиваем сразу при вводе. */
+        const oiHint = root.querySelector('#oi-hint');
+        if (oiHint) oiHint.dataset.empty = oiHint.textContent;
+        const checkInlineId = markOrderIdField(root.querySelector('#oi-id'), oiHint);
         root.querySelector('#oi-id').addEventListener('input', e=>{
           const el = e.target;
           const clean = sanitizeOrderId(el.value);
@@ -844,6 +888,7 @@ const CRM = (() => {
             el.value = clean;
             try { el.setSelectionRange(pos, pos); } catch(err){}
           }
+          if (checkInlineId) checkInlineId();
         });
         root.querySelector('#oi-id').addEventListener('keydown', e=>{ if (e.key==='Enter') saveInline(); });
         root.querySelector('#oi-client').addEventListener('keydown', e=>{ if (e.key==='Enter') saveInline(); });
@@ -1059,7 +1104,8 @@ const CRM = (() => {
           <div class="cols-2 grid" style="gap:13px">
             <div class="field"><label>ID заказа</label>
               <div class="row"><input class="input" id="of-id" value="${esc(o.order_id)}" placeholder="AW-0000" style="font-family:var(--mono)">
-              <button class="btn btn--ghost btn--icon" id="of-gen" title="Сгенерировать по правилам">${icon('refresh')}</button></div></div>
+              <button class="btn btn--ghost btn--icon" id="of-gen" title="Сгенерировать по правилам">${icon('refresh')}</button></div>
+              <div class="small" id="of-id-hint" hidden></div></div>
             <div class="field"><label>Клиент *</label>
               <div class="input-wrap" style="position:relative">${icon('clients')}
                 <input class="input" id="of-client-search" placeholder="Начните вводить имя клиента…" autocomplete="off" style="padding-left:36px">
@@ -1167,7 +1213,9 @@ const CRM = (() => {
         renderChips(); syncPf();
 
         g('#of-gen').onclick = ()=>{ g('#of-id').value = generateOrderId(); };
-        /* ID заказа: только латиница, цифры и дефис; всегда капсом */
+        /* ID заказа: только латиница, цифры и дефис; всегда капсом.
+           Неуникальный номер подсвечиваем сразу при вводе. */
+        const checkFormId = markOrderIdField(g('#of-id'), g('#of-id-hint'), isEdit ? o.id : null);
         g('#of-id').addEventListener('input', e=>{
           const el = e.target;
           const clean = sanitizeOrderId(el.value);
@@ -1176,7 +1224,9 @@ const CRM = (() => {
             el.value = clean;
             try { el.setSelectionRange(pos, pos); } catch(err){}
           }
+          if (checkFormId) checkFormId();
         });
+        g('#of-gen').addEventListener('click', ()=>{ setTimeout(()=>checkFormId && checkFormId(), 0); });
         g('#of-need-cert').addEventListener('change', e=>{ g('#of-cert').disabled = !e.target.checked; });
         const prepayHint = ()=> {
           const v = +g('#of-prepay').value;
@@ -1400,7 +1450,14 @@ const CRM = (() => {
           const c = collect();
           if (!c.client_id || !c.nish_id || !c.total){ toast('Заполните клиента, нишу и сумму','err'); return; }
           if (!c.order_id){ c.order_id = generateOrderId(); }
-          if (S.orders.some(x=>x.order_id===c.order_id && x.id!==o.id)){ toast('ID заказа уже существует — включён суффикс -N','warn'); c.order_id += '-N'; }
+          if (S.orders.some(x=>x.order_id===c.order_id && x.id!==o.id)){
+            toast(`ID ${c.order_id} уже занят — выберите другой`, 'err');
+            const f = g('#of-id');
+            if (f){ f.classList.add('is-bad'); f.focus(); }
+            const hint = g('#of-id-hint');
+            if (hint){ hint.textContent = `ID ${c.order_id} уже занят — выберите другой`; hint.style.color = 'var(--red)'; hint.hidden = false; }
+            return;
+          }
           clearInterval(autoTimer);
           /* итоговое подтверждение */
           const clList2 = clientsOf(c);
