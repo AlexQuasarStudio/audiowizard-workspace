@@ -216,6 +216,8 @@ body.pills-move .head__ops{-webkit-backdrop-filter:none!important;backdrop-filte
 .foot a{color:var(--muted);background:color-mix(in srgb,var(--panel) 62%,transparent);border:1px solid color-mix(in srgb,var(--border-2) 55%,transparent);border-radius:99px;padding:5px 12px;display:inline-flex;align-items:center;gap:6px;transition:color var(--dur),border-color var(--dur),background var(--dur);white-space:nowrap}
 .foot a:hover{color:var(--text);text-decoration:none}
 .foot__ver{margin-left:auto;display:flex;align-items:center;gap:8px;white-space:nowrap;background:color-mix(in srgb,var(--panel) 62%,transparent);border:1px solid color-mix(in srgb,var(--border-2) 55%,transparent);border-radius:99px;padding:3px 6px 3px 12px;color:var(--text-2)}
+/* Номер сборки в подвале: по нему видно, какая версия реально открыта */
+.foot__build{font-size:10.5px;color:var(--faint);font-variant-numeric:tabular-nums}
 .foot__ver > span:not(.beta-badge){font-weight:600;color:var(--text)}
 .foot__ver .btn{background:none;border:none;padding:4px 8px;color:var(--text);font-size:11.5px;font-weight:600}
 .foot__ver .btn:hover{color:var(--accent);background:var(--panel-2);border-radius:99px}
@@ -819,9 +821,15 @@ body.zen .chat-msgs{
 .o-tbl{border-collapse:separate;border-spacing:0}
 /* Строки заказов — как у клиентов/исполнителей: плоские, с разделителем,
    без «капсульного» скругления и отдельной плашки. */
+/* Фон строки держим на <tr>, а не на отдельных ячейках: подсветка идёт
+   сплошной полосой. Ячейки правки ([data-inline]) скруглялись на 6px, и при
+   наведении между ними появлялись вырезы — строка выглядела разорванной. */
 .o-tbl tbody td{background:transparent;border-bottom:1px solid var(--border)}
 .o-tbl tbody tr td:first-child,.o-tbl tbody tr td:last-child{border-radius:0}
-.o-tbl tbody tr:hover td{background:var(--panel-2)}
+/* Ячейки правки внутри таблиц: без скругления и заливки — подсветку строки
+   рисует <tr>, а редактируемость показывает внутренняя обводка. */
+.tbl tbody td[data-inline]{border-radius:0}
+.tbl tbody td[data-inline]:hover{background:transparent;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent)}
 .o-tbl thead th{background:var(--panel-2);border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;white-space:nowrap}
 /* Как у клиентов/исполнителей: у шапки скруглены только верхние углы,
    нижняя кромка прямая — иначе она «отрывается» от первой строки. */

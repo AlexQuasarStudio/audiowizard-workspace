@@ -696,7 +696,7 @@ const CRM = (() => {
         inlinePicker(el, { items:opts, selected:[o.status], single:true, onSave:ids => {
           const v = ids[0];
           if (!v || v === o.status) return;
-          Promise.resolve(setStatus(o, v)).then(ok => { if (ok) inlineRefresh(() => render(false)); });
+          Promise.resolve(setStatus(o, v)).then(ok => { if (ok) inlineRefresh(() => animateFilterChange(root, () => render(false))); });
         }});
         return;
       }

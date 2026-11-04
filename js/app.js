@@ -190,6 +190,7 @@ const APP = (() => {
           <span class="foot__ver">
             ${!((S.product||{}).beta === false) ? '<span class="beta-badge">Beta</span>' : ''}
             <span>v${esc((S.product||{}).version || '0.1-prototype')}</span>
+            <span class="foot__build" title="Номер сборки">${window.__BUILD_NUM__ || ''}</span>
             <button class="btn btn--ghost btn--sm" id="btn-update-check">${icon('refresh')} Обновления</button>
           </span>
         </footer>
@@ -6901,6 +6902,40 @@ function initPWA(){
     }catch(e){ if (manual) toast('Не удалось проверить обновления (нет сервера в демо-режиме)','warn'); }
   }
 
+  /* ---------- Обновление сборки ----------
+     Вкладка может остаться открытой со старым кодом (SPA + service worker),
+     поэтому сверяем именно номер сборки: version.json читаем в обход кеша.
+     Без этого после выкладки новой сборки пользователь видел прежнее поведение
+     и справедливо считал, что ничего не исправлено. */
+  async function checkBuild(){
+    if (!location.protocol.startsWith('http')) return;
+    try{
+      const res = await fetch('version.json?_=' + Date.now(), { cache:'no-store' });
+      const d = await res.json();
+      const srv = Number(d && d.build || 0);
+      const cur = Number(window.__BUILD_NUM__ || 0);
+      if (!srv || !cur || srv <= cur) return;
+      if (window.__buildNotified === srv) return;
+      window.__buildNotified = srv;
+      toast(`Открыта сборка ${cur}, на сервере уже ${srv}. Обновите страницу, чтобы увидеть изменения.`,
+        'info', 'Доступно обновление', { action:{ label:'Обновить', onClick: hardReload } });
+    }catch(e){}
+  }
+  async function hardReload(){
+    try{
+      if ('serviceWorker' in navigator){
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r => r.unregister()));
+      }
+      if (window.caches){
+        const ks = await caches.keys();
+        await Promise.all(ks.filter(k => k.startsWith('aw-')).map(k => caches.delete(k)));
+      }
+    }catch(e){}
+    location.reload();
+  }
+  window.__checkBuild = checkBuild;
+
   /* ---------- Горячие клавиши ---------- */
   /* "ctrl+shift+f" → "Ctrl Shift F" (для подсказок) */
   function fmtKeys(combo){
@@ -7362,6 +7397,9 @@ function initPWA(){
       showMaintBanner();
     maybeCookieBanner();
     checkUpdates(false);
+    /* Новая сборка могла появиться, пока вкладка была открыта */
+    setTimeout(()=>{ try { checkBuild(); } catch(e){} }, 2200);
+    document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) { try { checkBuild(); } catch(e){} } });
     /* Восстановление открытых окон после перезагрузки (только для залогиненного пользователя) */
     if (user() && window.Windows && typeof Windows.restoreSavedWins === 'function'){
       try { setTimeout(() => Windows.restoreSavedWins(), 150); } catch(e){}
