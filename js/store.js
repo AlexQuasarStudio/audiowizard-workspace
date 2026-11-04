@@ -339,6 +339,9 @@ function migrateDemoMarks(){
   /* Настройки интерфейса теперь хранятся у аккаунта (u.prefs): глобальные
      значения переносим только текущему пользователю и без zen-состояния,
      чтобы полноэкранный режим и позиция аватара не переходили между аккаунтами. */
+  /* Старая позиция «низ по центру» больше не используется — только углы. */
+  if (S.draftPrefs && S.draftPrefs.zenAvatarPos === 'bc') S.draftPrefs.zenAvatarPos = 'br';
+  (S.users||[]).forEach(u => { if (u.prefs && u.prefs.zenAvatarPos === 'bc') u.prefs.zenAvatarPos = 'br'; });
   if (S.draftPrefs && S.currentUserId){
     const cu = (S.users||[]).find(x => x.id === S.currentUserId);
     if (cu && !cu.prefs){

@@ -1406,43 +1406,25 @@ ex.innerHTML = avatarHTML(user(), '');
     });
     zenAvatar = ex;
     document.body.appendChild(ex);
-    snapToCorner(prefsFor().zenAvatarPos || 'bc', false);
+    snapToCorner(prefsFor().zenAvatarPos || 'br', false);
   }
 
   function snapToCorner(corner, animate){
     if (!zenAvatar) return;
     const aw = 42, gap = 12;
-    /* bc — «низ по центру»: аватар встаёт рядом с полем ввода ленты чата
-       (как в обычном режиме), а не в дальнем углу. */
-    const isBC = (corner === 'bc');
-    let left, top;
-    if (isBC){
-      /* Только поле ввода ОСНОВНОГО приложения: .chat-input внутри плавающего
-         окна чата (`.aw-win`) может стоять посреди экрана — из-за него аватар
-         «съезжал» в середину. Если поле не внизу экрана, встаём по центру снизу. */
-      const input = document.querySelector('#app .chat-input');
-      const inputR = input ? input.getBoundingClientRect() : null;
-      const nearBottom = inputR && inputR.width > 0
-        && inputR.top > window.innerHeight * 0.45
-        && inputR.top < window.innerHeight;
-      if (nearBottom){
-        left = Math.round(inputR.left + inputR.width/2 - aw/2);
-        top = Math.max(gap, Math.min(window.innerHeight - aw - gap, Math.round(inputR.top) - aw));
-      } else {
-        left = Math.round(window.innerWidth/2 - aw/2);
-        top = window.innerHeight - 64 - aw;
-      }
-    } else {
-      left = (corner==='tl'||corner==='bl') ? gap : window.innerWidth - aw - gap;
-      top = (corner==='tl'||corner==='tr') ? gap : window.innerHeight - aw - gap;
-    }
+    /* Плавающий аватар в полноэкранном режиме всегда стоит в одном из
+       четырёх углов экрана. Позиция «низ по центру» (bc) больше не
+       используется: визуально это и было «аватар посередине». */
+    const c = (corner === 'tl' || corner === 'tr' || corner === 'bl' || corner === 'br') ? corner : 'br';
+    const left = (c === 'tl' || c === 'bl') ? gap : window.innerWidth - aw - gap;
+    const top = (c === 'tl' || c === 'tr') ? gap : window.innerHeight - aw - gap;
     zenAvatar.style.left = left + 'px';
     zenAvatar.style.top = top + 'px';
     /* Иначе вместе с CSS bottom:12px кнопка растягивается по высоте
        (top+bottom без height) и аватар уезжает/перекрывает поле ввода. */
     zenAvatar.style.bottom = 'auto';
     zenAvatar.style.right = 'auto';
-    zenAvatar.style.transform = ''; /* bc: без сдвига центрируем через left */
+    zenAvatar.style.transform = '';
     if (animate){
       zenAvatar.style.transition = 'left .32s var(--ease), top .32s var(--ease), opacity .25s var(--ease), transform .25s var(--ease)';
     } else {
@@ -1450,8 +1432,8 @@ ex.innerHTML = avatarHTML(user(), '');
     }
     zenAvatar.style.opacity = '.35';
     zenAvatar.style.cursor = 'grab';
-    zenAvatar.dataset.pos = corner;
-    document.body.classList.toggle('zen-corner-br', corner === 'br');
+    zenAvatar.dataset.pos = c;
+    document.body.classList.toggle('zen-corner-br', c === 'br');
     if (animate) setTimeout(() => { if (zenAvatar) zenAvatar.style.transition = ''; }, 380);
   }
 
@@ -1470,13 +1452,16 @@ ex.innerHTML = avatarHTML(user(), '');
         highlightDropZone(corner);
       }
     });
-    document.addEventListener('mouseup', () => {
+    /* Завершение перетаскивания: возвращаем аватар в ближайший угол.
+       Вызывается и по mouseup, и по blur/visibilitychange/pointercancel —
+       иначе отпущенная вне окна мышь оставляла аватар посреди экрана. */
+    function endZenDrag(){
       if (!zenDrag || !zenAvatar) return;
       const wasMoved = zenDrag.moved;
       zenDrag = null;
       zenAvatar.classList.remove('zen-avatar--drag');
       document.body.classList.remove('zen-dragging');
-      hideDropZones();
+      try { hideDropZones(); } catch(e){}
       if (wasMoved){
         zenSuppressClick = true;
         setTimeout(() => { zenSuppressClick = false; }, 100);
@@ -1486,27 +1471,22 @@ ex.innerHTML = avatarHTML(user(), '');
         prefsFor().zenAvatarPos = corner; saveState();
         snapToCorner(corner, true);
       } else {
-snapToCorner(prefsFor().zenAvatarPos || 'bc', false);
+        snapToCorner(prefsFor().zenAvatarPos || 'br', false);
       }
-    });
+    }
+    document.addEventListener('mouseup', endZenDrag);
+    window.addEventListener('blur', endZenDrag);
+    document.addEventListener('mouseleave', endZenDrag);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) endZenDrag(); });
+    document.addEventListener('pointercancel', endZenDrag);
   }
 
   /* При изменении размеров окна или входе/выходе из полноэкранного режима
      позиция zen-аватара пересчитывается — иначе он «зависает» не в углу. */
   if (!window.__zenResizeBound){
     window.__zenResizeBound = true;
-    const re = () => { if (zenAvatar && !zenDrag) snapToCorner(prefsFor().zenAvatarPos || 'bc', false); };
+    const re = () => { if (zenAvatar && !zenDrag) snapToCorner(prefsFor().zenAvatarPos || 'br', false); };
     window.addEventListener('resize', re, { passive: true });
-    /* Перетаскивание, прерванное потерей фокуса (отпустили мышь вне окна):
-       не оставляем аватар там, куда его затащили, — возвращаем в угол/к полю. */
-    window.addEventListener('blur', ()=>{
-      if (!zenDrag || !zenAvatar) return;
-      zenDrag = null;
-      zenAvatar.classList.remove('zen-avatar--drag');
-      document.body.classList.remove('zen-dragging');
-      try { hideDropZones(); } catch(e){}
-      snapToCorner(prefsFor().zenAvatarPos || 'bc', true);
-    });
     ['fullscreenchange', 'webkitfullscreenchange'].forEach(ev => document.addEventListener(ev, re));
   }
   function showDropZones(){
@@ -2405,7 +2385,7 @@ snapToCorner(prefsFor().zenAvatarPos || 'bc', false);
       }
       /* В zen аватар привязан к полю ввода — пересчитать позицию, если
          раскладка/высота поля изменились (иначе он отрывается от поля). */
-      try { if (zen) snapToCorner(prefsFor().zenAvatarPos || 'bc', false); } catch(e){}
+      try { if (zen) snapToCorner(prefsFor().zenAvatarPos || 'br', false); } catch(e){}
       /* Пады только что сдвинули сообщения — пересчитать «естественные»
          позиции дат. Кэш, снятый ДО syncChatPads, устаревает (на перезагрузке
          пады ещё дефолтные) — и дата в чате перестаёт закрепляться. */
