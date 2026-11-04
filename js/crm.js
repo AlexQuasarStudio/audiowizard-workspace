@@ -68,6 +68,130 @@ const CRM = (() => {
     }
   }
 
+  /* ---------- Инлайн-редактирование по клику ----------
+     Заменяет содержимое элемента на input/select, сохраняет по Enter/blur,
+     отменяет по Esc. Без модальных окон: данные правятся прямо в списке. */
+  let __crmInline = null;
+  function inlineField(el, { value, type='text', options=null, placeholder='', wide=false, onSave }){
+    if (!el) return;
+    if (__crmInline){ try { __crmInline.cancel(); } catch(e){} }
+    const prev = el.innerHTML;
+    const inp = document.createElement(type === 'select' ? 'select' : 'input');
+    inp.className = 'input inline-input' + (wide ? ' inline-input--wide' : '');
+    if (type === 'select'){
+      (options||[]).forEach(o=>{ const op=document.createElement('option'); op.value=o.value; op.textContent=o.label; inp.appendChild(op); });
+      inp.value = value==null ? '' : String(value);
+    } else {
+      inp.type = type;
+      inp.value = value==null ? '' : String(value);
+      if (placeholder) inp.placeholder = placeholder;
+    }
+    const initial = inp.value;
+    el.innerHTML = '';
+    el.appendChild(inp);
+    el.classList.add('inline-editing');
+    inp.focus();
+    if (inp.select) { try { inp.select(); } catch(e){} }
+    let done = false;
+    const finish = (save)=>{
+      if (done) return; done = true;
+      const val = inp.value;
+      el.classList.remove('inline-editing');
+      el.innerHTML = prev;
+      __crmInline = null;
+      if (save && onSave && val !== initial) onSave(val);
+    };
+    inp.addEventListener('keydown', e=>{
+      if (e.key === 'Escape'){ e.preventDefault(); finish(false); }
+      else if (e.key === 'Enter'){ e.preventDefault(); finish(true); }
+    });
+    inp.addEventListener('blur', ()=>finish(true));
+    if (type === 'select') inp.addEventListener('change', ()=>finish(true));
+    __crmInline = { cancel: ()=>finish(false) };
+  }
+  function dateVal(ts){
+    if (!ts) return '';
+    const d = new Date(ts);
+    const m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+    return d.getFullYear()+'-'+m+'-'+day;
+  }
+  function dateTs(v, keepTs){
+    if (!v) return null;
+    const d = new Date(v + 'T00:00:00');
+    if (isNaN(d.getTime())) return null;
+    /* Сохраняем время суток исходной даты: правка дня не должна менять 00:00 на полдень */
+    if (keepTs){
+      const b = new Date(keepTs);
+      d.setHours(b.getHours(), b.getMinutes(), 0, 0);
+    }
+    return d.getTime();
+  }
+
+  /* Мультивыбор без модалки: поповер с поиском и чекбоксами (клиенты,
+     исполнители). Живёт поверх страницы, чтобы не обрезался скроллом таблицы. */
+  function inlinePicker(el, { items, selected, onSave, placeholder='Поиск…' }){
+    if (!el) return;
+    if (__crmInline){ try { __crmInline.cancel(); } catch(e){} }
+    const chosen = new Set(selected || []);
+    const box = document.createElement('div');
+    box.className = 'inline-pick';
+    const rows = (items||[]).map(it=>`<label class="inline-pick__row"><input type="checkbox" value="${esc(it.value)}" ${chosen.has(it.value)?'checked':''}><span>${esc(it.label)}</span></label>`).join('')
+      || '<div class="small faint" style="padding:6px 8px">Ничего нет</div>';
+    box.innerHTML = `<input class="input inline-pick__search" placeholder="${esc(placeholder)}" autocomplete="off">
+      <div class="inline-pick__list">${rows}</div>
+      <div class="row" style="gap:6px;justify-content:flex-end;margin-top:6px">
+        <button type="button" class="btn btn--ghost btn--sm" data-pick-cancel>Отмена</button>
+        <button type="button" class="btn btn--primary btn--sm" data-pick-ok>Готово</button>
+      </div>`;
+    const r = el.getBoundingClientRect();
+    box.style.top = Math.min(r.bottom + 4, innerHeight - 300) + 'px';
+    box.style.left = Math.max(8, Math.min(r.left, innerWidth - 308)) + 'px';
+    document.body.appendChild(box);
+    el.classList.add('inline-editing');
+    const q = box.querySelector('.inline-pick__search');
+    const list = box.querySelector('.inline-pick__list');
+    q.focus();
+    q.addEventListener('input', ()=>{
+      const t = q.value.trim().toLowerCase();
+      list.querySelectorAll('.inline-pick__row').forEach(row=>{
+        row.style.display = !t || row.textContent.toLowerCase().includes(t) ? '' : 'none';
+      });
+    });
+    let done = false;
+    const finish = (save)=>{
+      if (done) return; done = true;
+      document.removeEventListener('mousedown', onDoc, true);
+      if (save && onSave){
+        onSave([...box.querySelectorAll('.inline-pick__list input:checked')].map(i=>i.value));
+      }
+      box.remove();
+      el.classList.remove('inline-editing');
+      __crmInline = null;
+    };
+    const onDoc = e=>{ if (!box.contains(e.target)) finish(true); };
+    box.addEventListener('click', e=>e.stopPropagation());
+    box.querySelector('[data-pick-ok]').addEventListener('click', e=>{ e.stopPropagation(); finish(true); });
+    box.querySelector('[data-pick-cancel]').addEventListener('click', e=>{ e.stopPropagation(); finish(false); });
+    box.addEventListener('keydown', e=>{
+      if (e.key === 'Escape'){ e.preventDefault(); finish(false); }
+      else if (e.key === 'Enter' && e.target.tagName !== 'INPUT'){ e.preventDefault(); finish(true); }
+    });
+    setTimeout(()=>{ if (!done) document.addEventListener('mousedown', onDoc, true); }, 0);
+    __crmInline = { cancel: ()=>finish(false) };
+  }
+
+  /* После сохранения инлайна не перерисовываем список сразу: иначе клик по
+     соседней ячейке приходит в уже удалённый DOM и второй редактор не
+     открывается. Ждём, пока закроется активный редактор, и обновляем вид. */
+  function inlineRefresh(renderFn){
+    let tries = 0;
+    const tick = ()=>{
+      if (__crmInline && tries++ < 120){ setTimeout(tick, 120); return; }
+      renderFn();
+    };
+    setTimeout(tick, 0);
+  }
+
   async function setStatus(o, to, { silent=false } = {}){
     const user = me();
     const chk = canStatus(o.status, to);
@@ -288,14 +412,14 @@ const CRM = (() => {
         </td>
         <td data-l="Заказ" class="o-main">
           <span class="order-id" data-copy="${o.order_id}" title="Скопировать ID">${o.order_id}</span>
-          <div class="cell-sub o-ell">${nicheChip(o.nish_id)}${o.project_id ? ' · ' + esc((S.projects.find(p=>p.id===o.project_id)||{}).name || '') : ''}</div>
+          <div class="cell-sub o-ell"><span data-inline="niche">${nicheChip(o.nish_id)}</span>${o.project_id ? ' · <span data-inline="project">' + esc((S.projects.find(p=>p.id===o.project_id)||{}).name || '') + '</span>' : ' · <span data-inline="project" class="faint">+ проект</span>'}</div>
         </td>
-        <td data-l="Клиент"><span class="cell-main o-ell" title="${esc(clList.map(x=>x.full_name).join(', '))}">${clList.length ? esc(clList.map(x=>x.full_name).join(', ')) : '—'}</span></td>
-        <td data-l="Исполнители" class="o-ex">${exShow.length ? `<span class="ex-stack" title="${esc(exTitle)}">${exShow.map(e=>avatarHTML(e,'avatar--sm ex-av')).join('')}${exRest>0?`<span class="ex-more">+${exRest}</span>`:''}</span>` : '<span class="faint">—</span>'}</td>
-        <td data-l="Начало" class="deadline-cell">${start?fmtDT(start):'—'}</td>
-        <td data-l="Дедлайн" class="deadline-cell ${dlCls}">${dl?fmtDT(dl):'—'}</td>
-        <td data-l="Итого" class="pay-cell">${fmtMoney(o.total)}</td>
-        <td data-l="Статус">${statusChip(o.status)}</td>
+        <td data-l="Клиент" data-inline="client"><span class="cell-main o-ell" title="${esc(clList.map(x=>x.full_name).join(', '))}">${clList.length ? esc(clList.map(x=>x.full_name).join(', ')) : '—'}</span></td>
+        <td data-l="Исполнители" class="o-ex" data-inline="executors">${exShow.length ? `<span class="ex-stack" title="${esc(exTitle)}">${exShow.map(e=>avatarHTML(e,'avatar--sm ex-av')).join('')}${exRest>0?`<span class="ex-more">+${exRest}</span>`:''}</span>` : '<span class="faint">—</span>'}</td>
+        <td data-l="Начало" class="deadline-cell" data-inline="start">${start?fmtDT(start):'—'}</td>
+        <td data-l="Дедлайн" class="deadline-cell ${dlCls}" data-inline="deadline">${dl?fmtDT(dl):'—'}</td>
+        <td data-l="Итого" class="pay-cell" data-inline="total">${fmtMoney(o.total)}</td>
+        <td data-l="Статус" data-inline="status">${statusChip(o.status)}</td>
         <td data-l="" class="o-act">${staff?`<button class="iconbtn row-menu" data-oid="${o.id}" title="Действия">${icon('more')}</button>`:''}</td>
       </tr>`;
     }
@@ -430,19 +554,112 @@ const CRM = (() => {
           ${staff||u.role==='client'?`<input type="checkbox" class="row-sel" value="${o.id}" ${sel.has(o.id)?'checked':''} aria-label="Выбрать ${o.order_id}">`:''}
           <span class="order-id" data-copy="${o.order_id}" title="Скопировать ID">${o.order_id}</span>
           <span class="spacer"></span>
-          ${statusChip(o.status)}
+          <span data-inline="status">${statusChip(o.status)}</span>
         </div>
-        <div class="o-card__client">${clName}</div>
-        <div class="o-card__sub">${nicheChip(o.nish_id)}${o.tariff ? ' ' + tariffChip(o.tariff) : ''}${o.project_id ? ' · ' + esc((S.projects.find(p=>p.id===o.project_id)||{}).name || '') : ''}</div>
+        <div class="o-card__client" data-inline="client">${clName}</div>
+        <div class="o-card__sub"><span data-inline="niche">${nicheChip(o.nish_id)}</span> <span data-inline="tariff">${o.tariff ? tariffChip(o.tariff) : '<span class="faint">+ тариф</span>'}</span>${o.project_id ? ' · <span data-inline="project">' + esc((S.projects.find(p=>p.id===o.project_id)||{}).name || '') + '</span>' : ' · <span data-inline="project" class="faint">+ проект</span>'}</div>
         <div class="o-card__meta">
-          <span title="Начало">${icon('clock','ico-sm')} ${start?fmtDT(start):'—'}</span>
-          <span class="${dlCls}" title="Дедлайн">${icon('calendar','ico-sm')} ${dl?fmtDT(dl):'—'}</span>
+          <span title="Начало" data-inline="start">${icon('clock','ico-sm')} ${start?fmtDT(start):'—'}</span>
+          <span class="${dlCls}" title="Дедлайн" data-inline="deadline">${icon('calendar','ico-sm')} ${dl?fmtDT(dl):'—'}</span>
           <span title="Исполнители">${exShow.length?icon('users','ico-sm')+' '+exShow.length+(exRest?`+${exRest}`:''):''}</span>
         </div>
-        <div class="o-card__foot"><b class="mono">${fmtMoney(o.total)}</b>
+        <div class="o-card__foot"><b class="mono" data-inline="total">${fmtMoney(o.total)}</b>
           <span class="o-card__audio">${orderTotalAudio(o)?icon('play','ico-sm')+' '+fmtDur(orderTotalAudio(o)):''}</span>
         </div>
       </div>`;
+    }
+
+    /* Инлайн-правка данных заказа прямо в списке: без модалки, без ухода
+       со страницы. Сложные поля (клиенты, исполнители) — поповер с поиском. */
+    function openOrderInline(el){
+      if (!staff) return;
+      const host = el.closest('[data-ctx="order"]');
+      const o = S.orders.find(x => x.id === host.dataset.oid);
+      if (!o || o.demo) return;
+      const f = el.dataset.inline;
+      const done = msg => { saveState(); try { logAudit(msg, 'Заказы'); } catch(e){} inlineRefresh(() => render(false)); };
+      if (f === 'client'){
+        inlinePicker(el, {
+          items: S.users.filter(x => x.role === 'client').map(c => ({ value:c.id, label:c.full_name })),
+          selected: (o.client_ids && o.client_ids.length ? o.client_ids : [o.client_id]).filter(Boolean),
+          placeholder: 'Найти клиента…',
+          onSave: ids => {
+            if (!ids.length){ toast('У заказа должен остаться хотя бы один клиент', 'err'); return; }
+            o.client_ids = ids; o.client_id = ids[0];
+            done('Клиенты заказа ' + o.order_id + ' изменены');
+          }
+        });
+        return;
+      }
+      if (f === 'executors'){
+        inlinePicker(el, {
+          items: S.users.filter(x => x.role === 'executor').map(c => ({ value:c.id, label:c.full_name })),
+          selected: (o.executors||[]).map(e => e.uid),
+          placeholder: 'Найти исполнителя…',
+          onSave: ids => {
+            const prev = new Map((o.executors||[]).map(e => [e.uid, e]));
+            o.executors = ids.map(uid => prev.get(uid) || { uid, amount:0, is_paid:false });
+            done('Исполнители заказа ' + o.order_id + ' изменены');
+          }
+        });
+        return;
+      }
+      if (f === 'niche'){
+        inlineField(el, { type:'select', value:o.nish_id, options:[{value:'', label:'— без ниши —'}].concat(S.niches.map(n => ({ value:n.id, label:n.name }))), onSave:v => {
+          if (v === o.nish_id) return;
+          o.nish_id = v; done('Ниша заказа ' + o.order_id + ' изменена');
+        }});
+        return;
+      }
+      if (f === 'tariff'){
+        inlineField(el, { type:'select', value:o.tariff, options:[{value:'', label:'— без тарифа —'}].concat(TARIFFS.map(t => ({ value:t.id, label:t.label }))), onSave:v => {
+          if (v === (o.tariff||'')) return;
+          o.tariff = v; done('Тариф заказа ' + o.order_id + ' изменён');
+        }});
+        return;
+      }
+      if (f === 'project'){
+        inlineField(el, { type:'select', value:o.project_id, options:[{value:'', label:'— без проекта —'}].concat((S.projects||[]).map(p => ({ value:p.id, label:p.name }))), onSave:v => {
+          if (v === (o.project_id||'')) return;
+          o.project_id = v; done('Проект заказа ' + o.order_id + ' изменён');
+        }});
+        return;
+      }
+      if (f === 'status'){
+        const opts = Object.keys(STATUS_META)
+          .filter(k => k !== 'archived' || o.status === 'archived')
+          .filter(k => k === o.status || canStatus(o.status, k).ok)
+          .map(k => ({ value:k, label:STATUS_META[k].label }));
+        inlineField(el, { type:'select', value:o.status, options:opts, wide:true, onSave:v => {
+          if (v === o.status) return;
+          Promise.resolve(setStatus(o, v)).then(ok => { if (ok) inlineRefresh(() => render(false)); });
+        }});
+        return;
+      }
+      if (f === 'total'){
+        inlineField(el, { type:'number', value:o.total||0, onSave:v => {
+          const n = Math.max(0, Math.round(Number(v) || 0));
+          if (n === o.total) return;
+          o.total = n; done('Сумма заказа ' + o.order_id + ' изменена');
+        }});
+        return;
+      }
+      if (f === 'start'){
+        inlineField(el, { type:'date', value:dateVal(o.start_date || o.order_date), wide:true, onSave:v => {
+          const t = dateTs(v, o.start_date || o.order_date); if (t == null) return;
+          o.start_date = t; if (!o.order_date) o.order_date = t;
+          done('Начало заказа ' + o.order_id + ' изменено');
+        }});
+        return;
+      }
+      if (f === 'deadline'){
+        inlineField(el, { type:'date', value:dateVal(o.deadline), wide:true, onSave:v => {
+          if (!v){ o.deadline = null; done('Дедлайн заказа ' + o.order_id + ' снят'); return; }
+          const t = dateTs(v, o.deadline); if (t == null) return;
+          o.deadline = t; done('Дедлайн заказа ' + o.order_id + ' изменён');
+        }});
+        return;
+      }
     }
 
     function updateBulk(){
@@ -649,7 +866,7 @@ const CRM = (() => {
         if (e.button !== 0) return;
         const row = e.target.closest('[data-ctx="order"]');
         if (!row) return;
-        if (e.target.closest('button,a,input,select,label,.row-menu,[data-copy]')) return;
+        if (e.target.closest('button,a,input,select,label,.row-menu,[data-copy],[data-inline]')) return;
         dragSelMoved = false;
         dragSel = { start: [...wrap.querySelectorAll('[data-ctx="order"]')].indexOf(row) };
       });
@@ -685,6 +902,13 @@ const CRM = (() => {
         if (copy){ e.stopPropagation(); navigator.clipboard && navigator.clipboard.writeText(copy.dataset.copy); toast(`ID «${copy.dataset.copy}» скопирован`, 'ok'); return; }
         const menu = e.target.closest('.row-menu');
         if (menu){ const r = menu.getBoundingClientRect(); orderContextMenu(menu.dataset.oid, r.left, r.bottom + 4); return; }
+        const inl = e.target.closest('[data-inline]');
+        if (inl && staff){
+          if (e.target.closest('.inline-input,.inline-pick')) return;
+          e.stopPropagation();
+          openOrderInline(inl);
+          return;
+        }
         const head = e.target.closest('td.o-head');
         if (head){
           const tr = head.closest('tr');
@@ -1662,7 +1886,7 @@ updatePeopleBulk();
              но не от интерактивных элементов. */
           const row = e.target.closest('.person-card') || e.target.closest('tr[data-uid]');
           if (!row) return;
-          if (e.target.closest('button,a,input,select,label,[data-copy]')) return;
+          if (e.target.closest('button,a,input,select,label,[data-copy],[data-inline]')) return;
           dragSelPlMoved = false;
           dragSelPl = { start: [...wrap.querySelectorAll('.person-card, tr[data-uid]')].indexOf(row) };
         });
@@ -1758,8 +1982,62 @@ updatePeopleBulk();
       const bulk = root.querySelector('#pl-bulk');
       if (bulk) bulk.innerHTML = '';
     };
+    /* Инлайн-правка человека: имя, email, специализации, рабочий статус —
+       прямо в карточке/строке, без открытия профиля. */
+    function openPersonInline(el){
+      if (!staff) return;
+      const host = el.closest('[data-uid]');
+      const p = S.users.find(x => x.id === host.dataset.uid);
+      if (!p || p.demo) return;
+      p.ext = p.ext || {};
+      const f = el.dataset.inline;
+      const done = msg => { saveState(); try { logAudit(msg, 'Люди'); } catch(e){} inlineRefresh(() => render()); };
+      if (f === 'name'){
+        inlineField(el, { value:p.full_name, onSave:v => {
+          const t = v.trim(); if (!t){ toast('Имя не может быть пустым', 'err'); return; }
+          if (t === p.full_name) return;
+          p.full_name = t; done('Имя «' + t + '» изменено');
+        }});
+        return;
+      }
+      if (f === 'email'){
+        inlineField(el, { type:'email', value:p.email, onSave:v => {
+          const t = v.trim(); if (t === (p.email||'')) return;
+          p.email = t; done('Email «' + p.full_name + '» изменён');
+        }});
+        return;
+      }
+      if (f === 'specs'){
+        const cur = (p.ext.specializations && p.ext.specializations.length) ? p.ext.specializations : Object.keys(p.ext.qualification || {});
+        inlineField(el, { value:cur.join(', '), placeholder:'Специализации через запятую', onSave:v => {
+          const arr = [...new Set(v.split(',').map(x => x.trim()).filter(Boolean))];
+          const oldQ = p.ext.qualification || {};
+          const q = {};
+          arr.forEach(sp => { q[sp] = oldQ[sp] || 3; });
+          p.ext.specializations = arr; p.ext.qualification = q;
+          done('Специализации «' + p.full_name + '» обновлены');
+        }});
+        return;
+      }
+      if (f === 'workStatus'){
+        if (p.ext.status === 'blacklisted') return;
+        inlineField(el, { type:'select', value:p.ext.workStatus || 'working', options:[{value:'working', label:'Работаю'},{value:'not_working', label:'Не работаю'}], onSave:v => {
+          if (v === (p.ext.workStatus || 'working')) return;
+          p.ext.workStatus = v; done('Статус «' + p.full_name + '» изменён');
+        }});
+        return;
+      }
+    }
+
     root.addEventListener('click', e => {
       if (dragSelPlMoved) return; /* был drag-выделение группы, а не клик */
+      const inl = e.target.closest('[data-inline]');
+      if (inl && staff){
+        if (e.target.closest('.inline-input,.inline-pick')) return;
+        e.stopPropagation();
+        openPersonInline(inl);
+        return;
+      }
       const card = e.target.closest('.person-card');
       if (card){ if (e.target.closest('button')) return; openPersonCard(card.dataset.uid, role); return; }
       const row = e.target.closest('tr[data-uid]');
@@ -1807,12 +2085,12 @@ updatePeopleBulk();
       return `<tr class="${bl?'c-row--bl':''}" data-uid="${p.id}">
         <td><input type="checkbox" class="row-sel" value="${p.id}" ${psel.has(p.id)?'checked':''} aria-label="Выбрать ${esc(p.full_name)}"></td>
         <td class="pl-num" title="${p.ext&&p.ext.num?'№ '+p.ext.num:(p.ext.xlsxRow?'Строка '+p.ext.xlsxRow+' из таблицы':'№ '+num)}">${personDisplayNum(p, num)}</td>
-        <td><span class="row row--start" style="gap:10px">${avatarHTML(p)}<span style="min-width:0"><b class="small" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.full_name)}</b><span class="small faint">${esc(p.username||'')}</span></span></span></td>
+        <td><span class="row row--start" style="gap:10px">${avatarHTML(p)}<span style="min-width:0"><b class="small" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" data-inline="name">${esc(p.full_name)}</b><span class="small faint">${esc(p.username||'')}</span></span></span></td>
         ${role==='executor'
-          ? `<td class="small muted">${p.ext.qualification && Object.keys(p.ext.qualification).length ? esc(Object.keys(p.ext.qualification).join(', ')) : '—'}</td>
+          ? `<td class="small muted" data-inline="specs">${p.ext.qualification && Object.keys(p.ext.qualification).length ? esc(Object.keys(p.ext.qualification).join(', ')) : '—'}</td>
              <td class="mono">${mt.orders}</td><td class="mono">${mt.done}</td><td class="mono">${fmtMoney(p.ext.earned)}</td>
-             <td>${bl?'<span class="badge c-red">ЧС</span>':'<span class="badge '+(p.ext.workStatus==='working'?'c-green':'c-gray')+'">'+(p.ext.workStatus==='working'?'Работаю':'Не работаю')+'</span>'}</td>`
-          : `<td class="small muted">${esc(p.email)}</td>
+             <td><span data-inline="workStatus">${bl?'<span class="badge c-red">ЧС</span>':'<span class="badge '+(p.ext.workStatus==='working'?'c-green':'c-gray')+'">'+(p.ext.workStatus==='working'?'Работаю':'Не работаю')+'</span>'}</span></td>`
+          : `<td class="small muted" data-inline="email">${esc(p.email)}</td>
              <td class="mono">${mt.orders}</td><td class="mono">${fmtMoney(mt.sum)}</td>
              <td>${bl?'<span class="badge c-red">ЧС</span>':mt.overdue?'<span class="badge c-orange">просрочки</span>':'<span class="badge c-green">активен</span>'}</td>
              <td></td>`}
@@ -1828,20 +2106,20 @@ updatePeopleBulk();
         <span class="x-num" title="${p.ext&&p.ext.num?'№ '+p.ext.num:(p.ext.xlsxRow?'Строка '+p.ext.xlsxRow+' из таблицы':'№ '+num)}">${personDisplayNum(p, num)}</span>
         ${avatarHTML(p)}
         <div style="flex:1;min-width:0">
-          <b class="small" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.full_name)}</b>
-          <span class="small faint">${esc(p.email)}</span>
+          <b class="small" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" data-inline="name">${esc(p.full_name)}</b>
+          <span class="small faint" data-inline="email">${esc(p.email)}</span>
         </div>
         ${bl?'<span class="badge c-red">ЧС</span>':''}
       </div>
       ${role==='executor'?`
-        <div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap">${starsHTML(p.ext.qualOverall||0)}<span class="small faint">${p.ext.qualification && Object.keys(p.ext.qualification).length ? esc(Object.keys(p.ext.qualification).join(', ')) : 'нет специализаций'}</span></div>
+        <div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap">${starsHTML(p.ext.qualOverall||0)}<span class="small faint" data-inline="specs">${p.ext.qualification && Object.keys(p.ext.qualification).length ? esc(Object.keys(p.ext.qualification).join(', ')) : 'нет специализаций'}</span></div>
         <div class="cols-3 grid small" style="gap:6px;margin-top:12px">
           <div class="stat-mini"><b>${mt.orders}</b><span>заказов</span></div>
           <div class="stat-mini"><b>${mt.done}</b><span>выполнено</span></div>
           <div class="stat-mini"><b>${fmtMoney(p.ext.earned)}</b><span>заработано</span></div>
         </div>
         <div class="row small" style="margin-top:10px;gap:6px;flex-wrap:wrap">
-          <span class="badge ${p.ext.workStatus==='working'?'c-green':'c-gray'}">${p.ext.workStatus==='working'?'Работаю':'Не работаю'}</span>
+          <span data-inline="workStatus"><span class="badge ${p.ext.workStatus==='working'?'c-green':'c-gray'}">${p.ext.workStatus==='working'?'Работаю':'Не работаю'}</span></span>
           ${mt.overdue?`<span class="badge c-red">просрочек: ${mt.overdue}</span>`:''}
           ${mt.revision?`<span class="badge c-orange">доработок: ${mt.revision}</span>`:''}
         </div>`

@@ -172,6 +172,8 @@ select{cursor:pointer}
 /* ---------- Значки / бейджи / чипы ---------- */
 .badge{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:99px;font-size:11.5px;font-weight:650;white-space:nowrap;line-height:1.6}
 .badge .ico{width:12px;height:12px}
+/* Пустая точка внутри бейджа давала 5px-зазор и сдвигала текст вправо */
+.badge .dot{display:none}
 .c-green{background:var(--green-soft);color:var(--green)}
 .c-red{background:var(--red-soft);color:var(--red)}
 .c-yellow{background:var(--yellow-soft);color:var(--yellow)}

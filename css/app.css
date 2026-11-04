@@ -1260,6 +1260,22 @@ body.menu-dragging .main .theme-card:hover{box-shadow:none!important;transform:n
 .aw-win__body{position:relative;flex:1;overflow:auto;min-height:0;background:var(--bg);padding:14px}
 .aw-win__foot{display:flex;gap:8px;justify-content:flex-end;align-items:center;padding:10px 14px;border-top:1px solid var(--border);background:var(--bg-2);flex:none}
 /* Дудлы в плавающем окне: тот же холст и то же смещение, что у фона приложения */
+/* Инлайн-редактирование по клику на данные (заказы/клиенты/исполнители) */
+[data-inline]{cursor:text;border-radius:6px;transition:background-color .15s var(--ease),box-shadow .15s var(--ease)}
+[data-inline]:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.inline-editing{padding:0!important}
+.inline-input{width:100%;min-width:64px;height:28px;padding:3px 7px;font-size:12.5px;border-radius:7px}
+/* select.input специфичнее .inline-input, поэтому задаём отдельно: иначе
+   остаются паддинги 9px/32px и текст выбранного статуса обрезается по высоте */
+select.inline-input{padding:3px 30px 3px 8px;background-position:right 8px center}
+.inline-input--wide{min-width:132px}
+.inline-pick{position:fixed;z-index:4300;width:300px;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 18px 40px rgba(0,0,0,.22);padding:8px}
+.inline-pick__search{height:30px;font-size:12.5px}
+.inline-pick__list{max-height:200px;overflow:auto;margin:6px 0}
+.inline-pick__row{display:flex;gap:8px;align-items:center;padding:5px 7px;border-radius:6px;font-size:12.5px;cursor:pointer}
+.inline-pick__row:hover{background:var(--panel-2)}
+.inline-pick__row input{margin:0;flex:0 0 auto}
+td .inline-input{min-width:96px}
 .aw-snap-guide{position:fixed;z-index:2990;background:var(--accent-soft);border:2px dashed var(--accent);border-radius:12px;display:none;pointer-events:none}
 .aw-snap-guide--corner{border-style:solid;border-radius:16px;background:color-mix(in srgb,var(--accent) 12%,transparent)}
 /* Уголок окна чата: компактная панель у угла экрана */
