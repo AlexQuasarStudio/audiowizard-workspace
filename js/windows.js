@@ -936,6 +936,20 @@ const Windows = (() => {
     win.__cornerTop = null;
     win.__cornerDetached = false;
     win.classList.add('aw-win--corner', 'aw-win--animating');
+    /* Перенос из угла в угол не разворачивает свёрнутый чат: ставим геометрию
+       свёрнутого уголка сразу, без анимации из полной высоты. */
+    if (win.__cornerWasMin){
+      win.__cornerWasMin = false;
+      const head = win.querySelector('.aw-win__head');
+      const hh = head ? Math.round(head.offsetHeight) : 53;
+      win.__cornerHeight = rc.height;
+      win.__cornerTop = rc.top;
+      win.classList.add('aw-win--corner-min');
+      win.style.height = hh + 'px';
+      if (p.includes('b')) win.style.top = (rc.top + rc.height - hh) + 'px';
+      const minBtn = win.querySelector('.aw-win__min');
+      if (minBtn) minBtn.title = 'Развернуть';
+    }
     setTimeout(() => win.classList.remove('aw-win--animating'), 320);
     focusWin(win);
     syncSplitClasses();
@@ -975,6 +989,7 @@ const Windows = (() => {
   }
   function exitCorner(win){
     if (!win || !win.classList.contains('aw-win--corner')) return;
+    win.__cornerWasMin = false;
     win.classList.remove('aw-win--corner', 'aw-win--corner-min');
     const mb0 = win.querySelector('.aw-win__min');
     if (mb0) mb0.title = 'Свернуть';
@@ -1009,6 +1024,9 @@ const Windows = (() => {
            показываем, пока окно не отъедет, иначе оно липнет обратно */
         win.__cornerGuard = win.__cornerPos || null;
         win.classList.remove('aw-win--corner');
+        /* Свёрнутый уголок остаётся свёрнутым и после переноса в другой угол:
+           на время драга окно разворачиваем, а состояние запоминаем. */
+        win.__cornerWasMin = win.classList.contains('aw-win--corner-min');
         if (win.classList.contains('aw-win--corner-min')){
           win.classList.remove('aw-win--corner-min');
           const mb1 = win.querySelector('.aw-win__min');
@@ -1308,6 +1326,8 @@ const Windows = (() => {
         });
         syncSplitClasses();
       }
+      /* Бросили не в уголок — прежняя свёрнутость больше не действует */
+      if (!win.classList.contains('aw-win--corner')) win.__cornerWasMin = false;
       const g = document.querySelector('.aw-snap-guide');
       if (g){ g.style.display = 'none'; g.classList.remove('aw-snap-guide--corner'); }
       /* Магнитное прилипание на дропе: окно, унесённое почти встык к краю

@@ -1134,7 +1134,8 @@ body.zen .bal-panel{top:10px}
 hr{border:0;height:1px;width:100%;background:var(--border);margin:14px 0}
 
 /* Кнопка «Наверх» для длинных списков */
-.to-top{position:fixed;right:18px;bottom:18px;z-index:900;width:42px;height:42px;border-radius:12px;border:1px solid var(--border-2);background:var(--panel);color:var(--text-2);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(8px);transition:opacity .3s var(--ease),transform .3s var(--ease),visibility .3s var(--ease),background .25s var(--ease);box-shadow:var(--sh-1)}
+/* Кнопка «наверх» — над окнами и плашками: уголок чата её больше не перекрывает */
+.to-top{position:fixed;right:18px;bottom:18px;z-index:4290;width:42px;height:42px;border-radius:12px;border:1px solid var(--border-2);background:var(--panel);color:var(--text-2);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(8px);transition:opacity .3s var(--ease),transform .3s var(--ease),visibility .3s var(--ease),background .25s var(--ease);box-shadow:var(--sh-1)}
 body.zen-corner-br .to-top{right:auto;left:18px}
 .to-top.show{opacity:.4;visibility:visible;pointer-events:auto;transform:translateY(0)}
 .to-top.show:hover{opacity:1;transform:translateY(-3px);color:var(--accent);border-color:var(--accent)}
