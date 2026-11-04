@@ -514,7 +514,7 @@ const CRM = (() => {
             <input class="input" id="oi-id" placeholder="ID (пусто = авто AW-N)" style="font-family:var(--mono);max-width:150px">
             <input class="input" id="oi-client" placeholder="Клиент (ФИО/название)" style="min-width:170px">
             <input class="input" id="oi-total" placeholder="Сумма, ₽" type="number" min="0" style="max-width:120px">
-            <input class="input input--date" id="oi-deadline" type="date" title="Дедлайн" style="max-width:150px">
+            <input class="input" id="oi-deadline" placeholder="дд.мм.гггг" title="Дедлайн" style="max-width:150px"${window.matchMedia && window.matchMedia('(max-width:960px)').matches ? ' type="date"' : ''}>
             <button class="btn btn--primary btn--sm" id="oi-save" title="Создать заказ">${icon('check-c','ico-sm')}</button>
             <button class="iconbtn" id="oi-cancel" title="Отмена">${icon('x','ico-sm')}</button>
           </div>
@@ -791,7 +791,11 @@ const CRM = (() => {
         /* Нативный выбор даты отдаёт ISO (ГГГГ-ММ-ДД); пустая строка — сброс */
         const iso = (el.value || '').trim();
         ofilter[key] = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : '';
-        animateFilterChange(root, () => render(false));
+        /* Пересоздавать всю страницу нельзя: поле даты теряло каретку и ввод
+           начинался заново с первого сегмента. Обновляем только список. */
+        list = computeList();
+        shown = 0;
+        animateFilterChange(root, () => { fillRows(0); updateCount(); updateBulk(); });
       };
       ff && (ff.onchange = () => applyDate(ff, 'dateFrom'));
       ft && (ft.onchange = () => applyDate(ft, 'dateTo'));
@@ -843,8 +847,15 @@ const CRM = (() => {
           const id = sanitizeOrderId(root.querySelector('#oi-id').value);
           const cl = (root.querySelector('#oi-client').value||'').trim();
           const total = parseFloat(root.querySelector('#oi-total').value)||0;
-          const dlRaw = root.querySelector('#oi-deadline').value;
+          const dlRaw = (root.querySelector('#oi-deadline').value || '').trim();
+          const dlTs = dlRaw ? parseDateText(dlRaw) : null;
           if (!cl){ toast('Укажите клиента', 'warn'); return; }
+          if (dlRaw && dlTs == null){
+            toast('Дедлайн в формате дд.мм.гггг', 'err');
+            const f = root.querySelector('#oi-deadline');
+            if (f){ f.classList.add('is-bad'); f.focus(); }
+            return;
+          }
           const client = S.users.find(x => x.role==='client' && (norm(x.full_name)===norm(cl) || norm(x.email)===norm(cl)));
           if (!client){ toast('Клиент не найден. Сначала добавьте его в список (кнопка «Добавить клиента»)','warn'); return; }
           let oid = id || generateOrderId();
@@ -855,7 +866,7 @@ const CRM = (() => {
             return;
           }
           const now = Date.now();
-          const no = { id: uid(), order_id: oid, client_id: client.id, order_date: now, deadline: dlRaw ? new Date(dlRaw).getTime() : null,
+          const no = { id: uid(), order_id: oid, client_id: client.id, order_date: now, deadline: dlTs,
             status: 'waiting', total, certification_amount: 0, need_cert:false, start_date: now, manager_id: me().id,
             comment:'', project_id:'', folder_id:'', nish_id:'', executors:[], audio:0, files:[], proposed_price:0, paid_amount:0,
             forbid_download:false, portfolio_ban:true, nda:false, history:[{ t: now, txt:'Заказ создан (инлайн)' }], created_at: now };
