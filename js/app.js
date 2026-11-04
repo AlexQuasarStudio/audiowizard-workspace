@@ -5653,8 +5653,24 @@ const cm = root.querySelector('.chat-main');
         </div>
         <div id="set-body" class="stack"></div>
       </div>`;
-    $$('[data-sec]', root).forEach(b=>b.onclick=()=>{ section=b.dataset.sec; settingsSection=section; $$('[data-sec]',root).forEach(x=>x.classList.toggle('on', x===b)); renderSec(); });
+    $$('[data-sec]', root).forEach(b=>b.onclick=()=>{
+      /* «О приложении» — отдельное окно поверх настроек: справку о версии
+         открывают ненадолго, терять текущий раздел при этом не нужно. */
+      if (b.dataset.sec === 'about'){ openAboutWin(); return; }
+      section=b.dataset.sec; settingsSection=section; $$('[data-sec]',root).forEach(x=>x.classList.toggle('on', x===b)); renderSec();
+    });
     renderSec();
+
+    let aboutWin = null;
+    function openAboutWin(){
+      if (aboutWin && aboutWin.el && aboutWin.el.isConnected) return;
+      aboutWin = openWinModal({
+        title:'О приложении', icon:'info', wide:true, route:'settings',
+        body:`<div class="stack about-body" id="about-win">${aboutHTML()}</div>`,
+        onMount:(el)=>{ bindSection('about', el); },
+        onClose:()=>{ aboutWin = null; }
+      });
+    }
 
     function profileHTML(u2){
       return `<div class="card card-pad"><h3 style="margin-bottom:14px">Профиль</h3>

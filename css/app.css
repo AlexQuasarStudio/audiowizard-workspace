@@ -984,6 +984,9 @@ body:not(.zen) .side{position:fixed;top:7px;left:12px;bottom:7px;height:auto;tra
   .head__pill--balance .sep{margin-left:3px;height:24px}
   .head__pill--balance #btn-bell{width:24px;height:26px}
   .head__search .kbd{display:none}
+  /* Окна не должны вылезать за правый край на 320px: их min-width 320px
+     шире экрана за вычетом отступов. */
+  body .aw-win{min-width:min(320px, calc(100vw - 16px))}
   /* Узкие экраны (320–360): заголовок карточки и герой переносятся,
      иначе плашка-подпись и спарклайн вылезали за край на 16px. */
   .card-h{flex-wrap:wrap}
@@ -1515,6 +1518,14 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
 
 /* Смена вида таблица/карточки: мягкое появление */
 .view-anim{animation:viewIn .22s var(--ease)}
+/* «О приложении» в узком окне: шапка с кнопками переносится,
+   иначе «Пройти тур» / «Проверить обновления» уезжали за край. */
+@media (max-width:700px){
+  .about-body .card-pad.row{flex-wrap:wrap;row-gap:10px}
+  .about-body .card-pad.row>.spacer{display:none}
+  .about-body .card-pad.row .btn{flex:1 1 auto;justify-content:center}
+  .about-body .ver-item{flex-wrap:wrap}
+}
 /* Фильтр-плашки: список перерисовывается сразу и мягко «оседает» —
    так клик отзывается без паузы и без мигания в пустоту. */
 .list-swap{animation:listSwap .18s var(--ease)}
