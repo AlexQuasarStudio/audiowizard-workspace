@@ -1236,6 +1236,10 @@ body.menu-dragging .main .theme-card:hover{box-shadow:none!important;transform:n
 .aw-win__foot{display:flex;gap:8px;justify-content:flex-end;align-items:center;padding:10px 14px;border-top:1px solid var(--border);background:var(--bg-2);flex:none}
 /* Дудлы в плавающем окне: тот же холст и то же смещение, что у фона приложения */
 .aw-snap-guide{position:fixed;z-index:2990;background:var(--accent-soft);border:2px dashed var(--accent);border-radius:12px;display:none;pointer-events:none}
+.aw-snap-guide--corner{border-style:solid;border-radius:16px;background:color-mix(in srgb,var(--accent) 12%,transparent)}
+/* Уголок окна чата: компактная панель у угла экрана */
+.aw-win--corner{border-radius:16px;box-shadow:var(--sh-2)}
+.aw-win--corner .aw-win__max{display:none}
 body.win-dragging *{user-select:none!important}
 
 /* Закрытие окон: плавное затухание */

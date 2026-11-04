@@ -34,6 +34,8 @@ const Windows = (() => {
         width: (hp ? hp.width : s.width) || '',
         height: (hp ? hp.height : s.height) || '',
         minimized: !!r.minimized,
+        corner: r.win.__cornerPos || null,
+        cornerPrev: r.win.__cornerPrev || null,
         max: r.win._prevRect ? { left: r.win._prevRect.left, top: r.win._prevRect.top, width: r.win._prevRect.width, height: r.win._prevRect.height } : null };
     }).filter(Boolean);
     try { localStorage.setItem(WS_KEY, JSON.stringify(arr.slice(-12))); } catch(e){}
@@ -55,6 +57,8 @@ const Windows = (() => {
           if (s.width) win.style.width = s.width;
           if (s.height) win.style.height = s.height;
           if (s.right) win.style.right = s.right;
+          if (s.corner){ win.__cornerPos = s.corner; win.classList.add('aw-win--corner'); }
+          if (s.cornerPrev) win.__cornerPrev = s.cornerPrev;
           if (s.max){
             win._prevRect = { left: s.max.left, top: s.max.top, width: s.max.width, height: s.max.height };
             const mb = win.querySelector('.aw-win__max');
@@ -695,14 +699,20 @@ const Windows = (() => {
       if (win.__lastDragEnd && Date.now() - win.__lastDragEnd < 500) { e.preventDefault(); return; }
       e.preventDefault();
       if (typeof contextMenu !== 'function') return;
-      contextMenu(e.clientX, e.clientY, [
+      const menuItems = [
         { label:'Слева (½ экрана)', icon:'split-h', onClick:()=>splitWin('left') },
         { label:'Справа (½ экрана)', icon:'split-h', onClick:()=>splitWin('right') },
         { label:'Сверху', icon:'split-v', onClick:()=>splitWin('tl') },
         '-',
         { label:'По центру', icon:'center', onClick:()=>splitWin('center') },
         { label:'На весь экран', icon:'expand', onClick:()=>splitWin('max') },
-      ]);
+      ];
+      if (isChatWin(win)){
+        menuItems.push('-', win.classList.contains('aw-win--corner')
+          ? { label:'Выйти из уголка', icon:'shrink', onClick:()=>exitCorner(win) }
+          : { label:'В уголок', icon:'app', onClick:()=>enterCorner(win, win.__cornerPos || 'br') });
+      }
+      contextMenu(e.clientX, e.clientY, menuItems);
     });
 
     /* Переключение раздела прямо в шапке окна: содержимое меняется,
@@ -787,11 +797,21 @@ const Windows = (() => {
 
     /* --- Drag за заголовок (общий слой) --- */
     head.addEventListener('mousedown', e => {
+      if (e.button !== 0) return; /* ПКМ — только контекстное меню, не drag */
       if (e.target.closest('.aw-win__close') || e.target.closest('.aw-win__max')) return;
       if (e.target.closest('.aw-win__min')) return;
       e.preventDefault();
       const r = win.getBoundingClientRect();
+      /* Геометрия ДО драга: если окно уронят в уголок, вернём его сюда. */
+      win.__dragStartRect = { left: win.style.left || (r.left + 'px'), top: win.style.top || (r.top + 'px'),
+        width: win.style.width || (r.width + 'px'), height: win.style.height || (r.height + 'px') };
       win.__inSplit = null; /* перетащили окно — оно больше не в сплите */
+      if (win.classList.contains('aw-win--corner')){
+        /* Вытащили из уголка — окно становится обычным, размер сохраняем. */
+        win.classList.remove('aw-win--corner');
+        win.__cornerPrev = null;
+        win.__cornerPos = null;
+      }
       active = { kind:'drag', win:win, sx:e.clientX, sy:e.clientY, ox:r.left, oy:r.top, moved:false };
       win.classList.add('aw-win--dragging');
       document.body.classList.add('win-dragging');
@@ -803,6 +823,7 @@ const Windows = (() => {
       if (e.target.closest('.aw-win__close') || e.target.closest('.aw-win__max') || e.target.closest('.aw-win__min')) return;
       if (Date.now() - (win.__lastDragEnd || 0) < 400) return;
       e.preventDefault();
+      if (win.classList.contains('aw-win--corner')){ exitCorner(win); return; }
       const maxBtn = win.querySelector('.aw-win__max');
       if (maxBtn) toggleMax(win, maxBtn);
     });
@@ -870,6 +891,64 @@ const Windows = (() => {
       default:      return null;
     }
   }
+  /* ---------- Уголок окна чата (эксклюзивный режим) ---------- */
+  const CORNER_W = 360, CORNER_H = 520, CORNER_GAP = 16;
+  function isChatWin(win){ return !!(win && (win._route === 'chats' || win.querySelector('.chats-layout'))); }
+  function cornerRectFor(pos){
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const w = Math.min(CORNER_W, vw - CORNER_GAP * 2);
+    const h = Math.min(CORNER_H, vh - CORNER_GAP * 2);
+    return {
+      left: pos.includes('r') ? vw - w - CORNER_GAP : CORNER_GAP,
+      top: pos.includes('b') ? vh - h - CORNER_GAP : CORNER_GAP,
+      width: w, height: h
+    };
+  }
+  function enterCorner(win, pos){
+    if (!win) return;
+    const p = ['tl','tr','bl','br'].includes(pos) ? pos : 'br';
+    if (!win.__cornerPrev){
+      win.__cornerPrev = win.__dragStartRect || { left: win.style.left, top: win.style.top, width: win.style.width, height: win.style.height };
+    }
+    win.__dragStartRect = null;
+    /* Развёрнутое окно сначала возвращаем в обычный размер. */
+    if (win._prevRect){
+      const mb = win.querySelector('.aw-win__max');
+      if (mb) toggleMax(win, mb);
+    }
+    const rc = cornerRectFor(p);
+    win.__inSplit = null;
+    win.style.left = rc.left + 'px';
+    win.style.top = rc.top + 'px';
+    win.style.width = rc.width + 'px';
+    win.style.height = rc.height + 'px';
+    win.style.right = ''; win.style.bottom = '';
+    win.style.minWidth = '0'; win.style.minHeight = '0';
+    win.__cornerPos = p;
+    win.classList.add('aw-win--corner', 'aw-win--animating');
+    setTimeout(() => win.classList.remove('aw-win--animating'), 320);
+    focusWin(win);
+    syncSplitClasses();
+    try { win._chatNarrow && win._chatNarrow(); } catch(e){}
+    try { persistWins(); } catch(e){}
+  }
+  function exitCorner(win){
+    if (!win || !win.classList.contains('aw-win--corner')) return;
+    win.classList.remove('aw-win--corner');
+    const p = win.__cornerPrev;
+    if (p){
+      win.style.left = p.left || '';
+      win.style.top = p.top || '';
+      win.style.width = p.width || '';
+      win.style.height = p.height || '';
+    }
+    win.__cornerPrev = null;
+    win.__cornerPos = null;
+    win.classList.add('aw-win--animating');
+    setTimeout(() => win.classList.remove('aw-win--animating'), 320);
+    try { win._chatNarrow && win._chatNarrow(); } catch(e){}
+    try { persistWins(); } catch(e){}
+  }
   document.addEventListener('mousemove', e => {
     if (!active) return;
     const dx = e.clientX - active.sx, dy = e.clientY - active.sy;
@@ -883,13 +962,32 @@ const Windows = (() => {
       y = Math.max(0, Math.min(y, window.innerHeight - 40));
       win.style.left = x + 'px';
       win.style.top = y + 'px';
-      let snap = null;
-      if (x < 26) snap = (y < 26 ? 'tl' : 'left');        /* левая половина */
-      else if (x + w > window.innerWidth - 26) snap = (y < 26 ? 'tr' : 'right'); /* правая */
-      else if (y < 26) snap = 'top';                     /* верхняя половина на всю ширину */
-      else if (y + h > window.innerHeight - 26) snap = 'bottom'; /* нижняя половина */
+      let snap = null, cornerDrop = null;
+      /* Эксклюзивно для окон чатов: у самого угла экрана — «режим уголка». */
+      if (isChatWin(win)){
+        const zone = 96;
+        const nearL = e.clientX <= zone, nearR = e.clientX >= window.innerWidth - zone;
+        const nearT = e.clientY <= zone, nearB = e.clientY >= window.innerHeight - zone;
+        if (nearL && nearT) cornerDrop = 'tl';
+        else if (nearR && nearT) cornerDrop = 'tr';
+        else if (nearL && nearB) cornerDrop = 'bl';
+        else if (nearR && nearB) cornerDrop = 'br';
+      }
+      if (!cornerDrop){
+        if (x < 26) snap = (y < 26 ? 'tl' : 'left');        /* левая половина */
+        else if (x + w > window.innerWidth - 26) snap = (y < 26 ? 'tr' : 'right'); /* правая */
+        else if (y < 26) snap = 'top';                     /* верхняя половина на всю ширину */
+        else if (y + h > window.innerHeight - 26) snap = 'bottom'; /* нижняя половина */
+      }
+      win.__cornerDrop = cornerDrop;
       let g = document.querySelector('.aw-snap-guide');
-      if (snap){
+      if (cornerDrop){
+        const gm = cornerRectFor(cornerDrop);
+        if (!g){ g = document.createElement('div'); g.className = 'aw-snap-guide'; document.body.appendChild(g); }
+        g.classList.add('aw-snap-guide--corner');
+        g.style.cssText = `left:${gm.left}px;top:${gm.top}px;width:${gm.width}px;height:${gm.height}px;display:block`;
+      } else if (snap){
+        if (g) g.classList.remove('aw-snap-guide--corner');
         if (!g){ g = document.createElement('div'); g.className = 'aw-snap-guide'; document.body.appendChild(g); }
         /* Прямоугольник-подсветка под целевое «прилипание»: берём из единого
            справочника snapRectFor — правые зоны показывают правую половину,
@@ -898,8 +996,8 @@ const Windows = (() => {
            сторону, «выделение правой половины терялось»). */
         const gm = snapRectFor(snap) || { left:0, top:0, width:1600, height:1000 };
         g.style.cssText = `left:${gm.left}px;top:${gm.top}px;width:${gm.width}px;height:${gm.height}px;display:block`;
-      } else if (g){ g.style.display = 'none'; }
-      win.__lastSnap = snap; /* магнит к краю: применим на mouseup */
+      } else if (g){ g.style.display = 'none'; g.classList.remove('aw-snap-guide--corner'); }
+      win.__lastSnap = cornerDrop ? null : snap; /* магнит к краю: применим на mouseup */
     } else if (active.kind === 'resize'){
       const d = active.dir;
       let L = active.ox, T = active.oy, W = active.ow, H = active.oh;
@@ -1071,7 +1169,12 @@ const Windows = (() => {
          унесённое вплотную к краю окно прилипает к половине экрана. */
       const snapDir = win.__lastSnap || null;
       let snapped = false;
-      if (snapDir){
+      if (win.__cornerDrop){
+        snapped = true;
+        const cd = win.__cornerDrop;
+        win.__cornerDrop = null;
+        enterCorner(win, cd);
+      } else if (snapDir){
         snapped = true;
         /* Пиксельная геометрия (left/top/width/height), без auto —
            иначе окно «телепортируется» вместо плавного прилипания.
@@ -1107,7 +1210,7 @@ const Windows = (() => {
         syncSplitClasses();
       }
       const g = document.querySelector('.aw-snap-guide');
-      if (g) g.style.display = 'none';
+      if (g){ g.style.display = 'none'; g.classList.remove('aw-snap-guide--corner'); }
       /* Магнитное прилипание на дропе: окно, унесённое почти встык к краю
          соседа или экрана, прилипает вплотную (с анимацией). Ресайз при этом
          остаётся независимым — это не «сплит», а лишь выравнивание на дропе. */
@@ -1188,6 +1291,7 @@ const Windows = (() => {
         allWins().forEach(rec => { rec.win.__origLeft = null; rec.win.__origRight = null; rec.win.__origGap = null; rec.win.__origGapE = null; rec.win.__origGapW = null; rec.win.__origGapN = null; rec.win.__origGapS = null; rec.win.__origTop = null; rec.win.__origBottom = null; });
       }
       if (active.kind === 'drag' && active.moved) active.win.__lastDragEnd = Date.now();
+      if (active.kind === 'drag') active.win.__dragStartRect = null;
       active.win.__lastSnap = null; /* сброс магнита после дропа */
       active.win.classList.remove('aw-win--dragging');
       document.body.classList.remove('win-dragging');
