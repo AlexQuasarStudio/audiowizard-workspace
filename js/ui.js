@@ -419,11 +419,15 @@ function closeDropdown(){
   }
 }
 
-function contextMenu(x, y, items){
+function contextMenu(x, y, items, anchor){
+  /* anchor — кнопка, по которой кликнули (например «…» в строке таблицы).
+     С ним showDropdown понимает повторный клик и закрывает плашку, а не
+     открывает её заново. Без anchor (правый клик) работаем от невидимой точки. */
   const fake = document.createElement('div');
   fake.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0';
   document.body.appendChild(fake);
-  const dd = showDropdown(fake, items, { x, y });
+  const host = anchor && anchor.isConnected ? anchor : fake;
+  const dd = showDropdown(host, items, { x, y });
   const obs = new MutationObserver(()=>{ if (!document.body.contains(dd)){ obs.disconnect(); fake.remove(); } });
   obs.observe(document.body, { childList:true });
 }

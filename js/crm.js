@@ -774,8 +774,8 @@ const CRM = (() => {
       const inlineBox = root.querySelector('#o-inline');
       if (ni && inlineBox){
         ni.onclick = ()=>{
-          if (!inlineBox.hidden){ inlineHide(inlineBox); return; }
-          inlineBox.hidden = false;
+          if (!inlineBox.hidden){ inlineClose(inlineBox, root); return; }
+          inlineOpen(inlineBox, root, 'orders');
           {
             const id = root.querySelector('#oi-id'); if (id) id.value = '';
             const cl = root.querySelector('#oi-client'); if (cl) cl.value = '';
@@ -814,7 +814,7 @@ const CRM = (() => {
           }
         };
         root.querySelector('#oi-save').onclick = saveInline;
-        root.querySelector('#oi-cancel').onclick = () => { inlineHide(inlineBox); };
+        root.querySelector('#oi-cancel').onclick = () => { inlineClose(inlineBox, root); };
         /* ID заказа: только латиница, цифры и дефис; всегда капсом */
         root.querySelector('#oi-id').addEventListener('input', e=>{
           const el = e.target;
@@ -919,7 +919,7 @@ const CRM = (() => {
         const copy = e.target.closest('[data-copy]');
         if (copy){ e.stopPropagation(); navigator.clipboard && navigator.clipboard.writeText(copy.dataset.copy); toast(`ID «${copy.dataset.copy}» скопирован`, 'ok'); return; }
         const menu = e.target.closest('.row-menu');
-        if (menu){ const r = menu.getBoundingClientRect(); orderContextMenu(menu.dataset.oid, r.left, r.bottom + 4); return; }
+        if (menu){ const r = menu.getBoundingClientRect(); orderContextMenu(menu.dataset.oid, r.left, r.bottom + 4, menu); return; }
         const inl = e.target.closest('[data-inline]');
         if (inl && staff){
           if (e.target.closest('.inline-input,.inline-pick')) return;
@@ -994,10 +994,10 @@ const CRM = (() => {
       }});
       items.push({ label:'Редактировать', icon:'edit', onClick:()=>openPersonForm(role, p) });
     }
-    contextMenu(x, y, items.filter(Boolean));
+    contextMenu(x, y, items.filter(Boolean), anchor);
   }
 
-  function orderContextMenu(oid, x, y){
+  function orderContextMenu(oid, x, y, anchor){
     const o = S.orders.find(v=>v.id===oid); if (!o) return;
     const staffCanDelete = ['draft','waiting'].includes(o.status);
     const items = [
@@ -1013,7 +1013,7 @@ const CRM = (() => {
       ...(o.status!=='archived' ? [{ label:'В архив', icon:'archive', onClick:()=>setStatus(o,'archived') }] : [{ label:'Из архива', icon:'archive', onClick:()=>setStatus(o, o.history.some(h=>h.txt.includes('Выполнено'))?'done':'work') }]),
       { label:'Удалить', icon:'trash', danger:true, onClick:()=>staffCanDelete?deleteOrder(o):toast('Удаление доступно только для статусов «Черновик» и «В ожидании»','err') }
     ];
-    contextMenu(x, y, items.filter(Boolean));
+    contextMenu(x, y, items.filter(Boolean), anchor);
   }
 
   /* ---------- Форма заказа ---------- */
@@ -1665,6 +1665,67 @@ const CRM = (() => {
            root.querySelector('.pl-wrap') || root.querySelector('.tbl-wrap') || root.querySelector('#o-rows');
   }
 
+  /* Инлайн-добавление показываем прямо в списке: первой строкой таблицы
+     или карточкой в сетке карточек — чтобы новая запись появлялась там,
+     где ей место, а не отдельной плашкой над фильтрами. */
+  function inlineOpen(box, root, kind){
+    if (!box) return;
+    const wrap = root.querySelector(kind === 'orders' ? '.o-wrap' : '.pl-wrap');
+    if (!box.__home) box.__home = { parent: box.parentNode, next: box.nextSibling };
+    box.hidden = false;
+    box.style.cssText = '';
+    box.classList.remove('closing','inline-add--row','inline-add--card');
+    if (!wrap){ box.classList.add('inline-show'); return; }
+    const grid = wrap.querySelector('.o-cards, .person-grid');
+    if (grid){
+      box.classList.add('inline-add--card');
+      grid.prepend(box);
+      return;
+    }
+    const table = wrap.querySelector('table.tbl');
+    if (table){
+      let tr = wrap.querySelector('tr.inl-tr');
+      if (!tr){
+        tr = document.createElement('tr');
+        tr.className = 'inl-tr';
+        const td = document.createElement('td');
+        td.colSpan = (table.tHead && table.tHead.rows[0]) ? table.tHead.rows[0].cells.length : 1;
+        tr.appendChild(td);
+        if (table.tHead) table.tHead.insertAdjacentElement('afterend', tr);
+        else table.insertBefore(tr, table.firstChild);
+      }
+      box.classList.add('inline-add--row');
+      tr.firstChild.appendChild(box);
+    }
+  }
+
+  /* Закрытие: сначала плавно схлопываем строку, потом убираем её из списка
+     и возвращаем плашку на исходное место в разметке. */
+  function inlineClose(box, root, cb){
+    if (!box || box.hidden){ cb && cb(); return; }
+    const tr = box.closest('tr.inl-tr');
+    const h = box.offsetHeight;
+    box.style.overflow = 'hidden';
+    box.style.maxHeight = h + 'px';
+    box.classList.add('closing');
+    requestAnimationFrame(()=>{
+      box.style.maxHeight = '0px';
+      box.style.opacity = '0';
+      box.style.paddingTop = '0px';
+      box.style.paddingBottom = '0px';
+      box.style.marginTop = '0px';
+      box.style.marginBottom = '0px';
+    });
+    setTimeout(()=>{
+      box.classList.remove('closing','inline-add--row','inline-add--card');
+      box.style.cssText = '';
+      if (box.__home && box.__home.parent && box.__home.parent.isConnected) box.__home.parent.insertBefore(box, box.__home.next);
+      box.hidden = true;
+      if (tr && tr.isConnected) tr.remove();
+      cb && cb();
+    }, 210);
+  }
+
   /* Смена содержимого по плашкам-фильтрам («Выполнено», «В работе»,
      «Активные», «Чёрный список»): список перерисовывается сразу (клик
      отзывается мгновенно) и мягко «оседает» на место — сдвиг на пару
@@ -1856,8 +1917,8 @@ const CRM = (() => {
       $$('[data-inline-add]', root).forEach(b=>b.onclick = ()=>{
         const box = root.querySelector('#pl-inline');
         if (!box) return;
-        if (!box.hidden){ inlineHide(box); return; }
-        box.hidden = false;
+        if (!box.hidden){ inlineClose(box, root); return; }
+        inlineOpen(box, root, 'people');
         { const f = root.querySelector('#pi-name'); if (f) f.focus(); }
       });
       const piSave = root.querySelector('#pi-save');
@@ -1891,7 +1952,7 @@ const CRM = (() => {
           }
         };
         piSave.onclick = savePerson;
-        root.querySelector('#pi-cancel').onclick = ()=> { inlineHide(root.querySelector('#pl-inline')); };
+        root.querySelector('#pi-cancel').onclick = ()=> { inlineClose(root.querySelector('#pl-inline'), root); };
         ['#pi-name','#pi-email','#pi-phone'].forEach(sel=>{
           const el = root.querySelector(sel);
           if (el) el.addEventListener('keydown', e=>{ if (e.key==='Enter') savePerson(); });
