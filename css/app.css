@@ -398,6 +398,8 @@ tr.inl-tr{animation:inlRowIn .2s var(--ease)}
 /* Клиенты/исполнители: контент растягивается вниз на всю доступную полосу
    (как заказы), пагинация — внутренний скролл через observer */
 .pl-wrap{height:calc(100dvh - var(--head-h) - 135px);overflow-y:auto;overscroll-behavior:contain}
+/* «…» в конце строки клиента/исполнителя — как в таблице заказов */
+.pl-act{width:40px;text-align:right}
 /* Карточный вид людей тоже растягивается вниз (как карточки заказов) */
 .pl-wrap--cards{border:none!important;background:transparent!important}
 .person-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;box-shadow:var(--sh-1);cursor:pointer;transition:border-color var(--dur),transform var(--dur)}

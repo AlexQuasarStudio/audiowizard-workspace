@@ -976,7 +976,7 @@ const CRM = (() => {
     };
   }
 
-  function personContextMenu(uid, role, x, y){
+  function personContextMenu(uid, role, x, y, anchor){
     const p = userById(uid); if (!p) return;
     const u = me(); const staff = isStaff(u.role);
     const bl = p.ext.status === 'blacklisted';
@@ -2140,6 +2140,13 @@ updatePeopleBulk();
 
     root.addEventListener('click', e => {
       if (dragSelPlMoved) return; /* был drag-выделение группы, а не клик */
+      const rmenu = e.target.closest('.row-menu');
+      if (rmenu){
+        e.stopPropagation();
+        const r = rmenu.getBoundingClientRect();
+        personContextMenu(rmenu.dataset.uid, role, r.left, r.bottom + 4, rmenu);
+        return;
+      }
       const inl = e.target.closest('[data-inline]');
       if (inl && staff){
         if (e.target.closest('.inline-input,.inline-pick')) return;
@@ -2179,8 +2186,12 @@ updatePeopleBulk();
       const thNum = `<th class="pl-num-h" style="width:34px;text-align:left;color:var(--faint)">№</th>`;
       const th = (key, label) => `<th class="sortable${psort.key===key?' sort-on':''}${psort.key===key&&psort.dir<0?' sort-desc':''}" data-psort="${key}">${label}</th>`;
       return role==='executor'
-        ? `<thead><tr>${thSel}${thNum}${th('name','Исполнитель')}<th>Специализации</th>${th('orders','Заказы')}<th>Выполнено</th>${th('earned','Заработано')}<th>Статус</th></tr></thead>`
-        : `<thead><tr>${thSel}${thNum}${th('name','Клиент')}<th>Контакт</th>${th('orders','Заказы')}${th('sum','Сумма')}<th>Статус</th><th></th></tr></thead>`;
+        ? `<thead><tr>${thSel}${thNum}${th('name','Исполнитель')}<th>Специализации</th>${th('orders','Заказы')}<th>Выполнено</th>${th('earned','Заработано')}<th>Статус</th><th class="pl-act"></th></tr></thead>`
+        : `<thead><tr>${thSel}${thNum}${th('name','Клиент')}<th>Контакт</th>${th('orders','Заказы')}${th('sum','Сумма')}<th>Статус</th><th class="pl-act"></th></tr></thead>`;
+    }
+    /* «…» в конце строки — те же действия, что по правому клику (как в заказах) */
+    function rowMenuCell(p, staff){
+      return `<td class="pl-act">${staff?`<button class="iconbtn row-menu" data-uid="${p.id}" title="Действия">${icon('more')}</button>`:''}</td>`;
     }
     function personRow(p, role, staff, num){
     const bl = p.ext.status==='blacklisted';
@@ -2198,11 +2209,12 @@ updatePeopleBulk();
         ${role==='executor'
           ? `<td class="small muted" data-inline="specs">${p.ext.qualification && Object.keys(p.ext.qualification).length ? esc(Object.keys(p.ext.qualification).join(', ')) : '—'}</td>
              <td class="mono">${mt.orders}</td><td class="mono">${mt.done}</td><td class="mono">${fmtMoney(p.ext.earned)}</td>
-             <td><span data-inline="workStatus">${bl?'<span class="badge c-red">ЧС</span>':'<span class="badge '+(p.ext.workStatus==='working'?'c-green':'c-gray')+'">'+(p.ext.workStatus==='working'?'Работаю':'Не работаю')+'</span>'}</span></td>`
+             <td><span data-inline="workStatus">${bl?'<span class="badge c-red">ЧС</span>':'<span class="badge '+(p.ext.workStatus==='working'?'c-green':'c-gray')+'">'+(p.ext.workStatus==='working'?'Работаю':'Не работаю')+'</span>'}</span></td>
+             ${rowMenuCell(p, staff)}`
           : `<td class="small muted" data-inline="email">${esc(p.email)}</td>
              <td class="mono">${mt.orders}</td><td class="mono">${fmtMoney(mt.sum)}</td>
              <td>${bl?'<span class="badge c-red">ЧС</span>':mt.overdue?'<span class="badge c-orange">просрочки</span>':'<span class="badge c-green">активен</span>'}</td>
-             <td></td>`}
+             ${rowMenuCell(p, staff)}`}
       </tr>`;
     }
 
