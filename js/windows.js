@@ -702,7 +702,7 @@ const Windows = (() => {
       const menuItems = [
         { label:'Слева (½ экрана)', icon:'split-left', onClick:()=>splitWin('left') },
         { label:'Справа (½ экрана)', icon:'split-right', onClick:()=>splitWin('right') },
-        { label:'Сверху', icon:'split-top', onClick:()=>splitWin('tl') },
+        { label:'Сверху', icon:'split-quarter', onClick:()=>splitWin('tl') },
         '-',
         { label:'По центру', icon:'center', onClick:()=>splitWin('center') },
         { label:'На весь экран', icon:'expand', onClick:()=>splitWin('max') },
