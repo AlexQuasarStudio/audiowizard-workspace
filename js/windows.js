@@ -976,6 +976,8 @@ const Windows = (() => {
   function exitCorner(win){
     if (!win || !win.classList.contains('aw-win--corner')) return;
     win.classList.remove('aw-win--corner', 'aw-win--corner-min');
+    const mb0 = win.querySelector('.aw-win__min');
+    if (mb0) mb0.title = 'Свернуть';
     win.__cornerHeight = null;
     win.__cornerTop = null;
     const p = win.__cornerPrev;
@@ -1006,6 +1008,8 @@ const Windows = (() => {
         win.classList.remove('aw-win--corner');
         if (win.classList.contains('aw-win--corner-min')){
           win.classList.remove('aw-win--corner-min');
+          const mb1 = win.querySelector('.aw-win__min');
+          if (mb1) mb1.title = 'Свернуть';
           const ch = win.__cornerHeight || 520;
           const hh2 = win.offsetHeight;
           const curTop = parseFloat(win.style.top) || win.getBoundingClientRect().top;
