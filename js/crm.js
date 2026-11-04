@@ -138,49 +138,68 @@ const CRM = (() => {
 
   /* Мультивыбор без модалки: поповер с поиском и чекбоксами (клиенты,
      исполнители). Живёт поверх страницы, чтобы не обрезался скроллом таблицы. */
-  function inlinePicker(el, { items, selected, onSave, placeholder='Поиск…' }){
+  function inlinePicker(el, { items, selected, onSave, placeholder='Поиск…', single=false }){
     if (!el) return;
     if (__crmInline){ try { __crmInline.cancel(); } catch(e){} }
     const chosen = new Set(selected || []);
     const box = document.createElement('div');
-    box.className = 'inline-pick';
-    const rows = (items||[]).map(it=>`<label class="inline-pick__row"><input type="checkbox" value="${esc(it.value)}" ${chosen.has(it.value)?'checked':''}><span>${esc(it.label)}</span></label>`).join('')
-      || '<div class="small faint" style="padding:6px 8px">Ничего нет</div>';
-    box.innerHTML = `<input class="input inline-pick__search" placeholder="${esc(placeholder)}" autocomplete="off">
-      <div class="inline-pick__list">${rows}</div>
-      <div class="row" style="gap:6px;justify-content:flex-end;margin-top:6px">
+    box.className = 'inline-pick' + (single ? ' inline-pick--single' : '');
+    let picked = single ? (chosen.size ? [...chosen][0] : '') : null;
+    const rows = single
+      ? ((items||[]).map(it=>`<button type="button" class="inline-pick__row inline-pick__row--opt${chosen.has(it.value)?' on':''}" data-v="${esc(it.value)}"><span>${esc(it.label)}</span>${icon('check','ico-sm')}</button>`).join('')
+        || '<div class="small faint" style="padding:6px 8px">Ничего нет</div>')
+      : ((items||[]).map(it=>`<label class="inline-pick__row"><input type="checkbox" value="${esc(it.value)}" ${chosen.has(it.value)?'checked':''}><span>${esc(it.label)}</span></label>`).join('')
+        || '<div class="small faint" style="padding:6px 8px">Ничего нет</div>');
+    box.innerHTML = (single ? '' : `<input class="input inline-pick__search" placeholder="${esc(placeholder)}" autocomplete="off">`)
+      + `<div class="inline-pick__list">${rows}</div>`
+      + (single ? '' : `<div class="row" style="gap:6px;justify-content:flex-end;margin-top:6px">
         <button type="button" class="btn btn--ghost btn--sm" data-pick-cancel>Отмена</button>
         <button type="button" class="btn btn--primary btn--sm" data-pick-ok>Готово</button>
-      </div>`;
+      </div>`);
     const r = el.getBoundingClientRect();
-    box.style.top = Math.min(r.bottom + 4, innerHeight - 300) + 'px';
-    box.style.left = Math.max(8, Math.min(r.left, innerWidth - 308)) + 'px';
+    const bw = single ? 240 : 300;
+    const bh = Math.min(box.offsetHeight || (single ? 210 : 300), innerHeight - 16);
+    box.style.top = Math.max(8, Math.min(r.bottom + 4, innerHeight - bh - 12)) + 'px';
+    box.style.left = Math.max(8, Math.min(r.left, innerWidth - bw - 8)) + 'px';
     document.body.appendChild(box);
     el.classList.add('inline-editing');
     const q = box.querySelector('.inline-pick__search');
     const list = box.querySelector('.inline-pick__list');
-    q.focus();
-    q.addEventListener('input', ()=>{
-      const t = q.value.trim().toLowerCase();
-      list.querySelectorAll('.inline-pick__row').forEach(row=>{
-        row.style.display = !t || row.textContent.toLowerCase().includes(t) ? '' : 'none';
+    if (q){
+      q.focus();
+      q.addEventListener('input', ()=>{
+        const t = q.value.trim().toLowerCase();
+        list.querySelectorAll('.inline-pick__row').forEach(row=>{
+          row.style.display = !t || row.textContent.toLowerCase().includes(t) ? '' : 'none';
+        });
       });
-    });
+    }
     let done = false;
     const finish = (save)=>{
       if (done) return; done = true;
       document.removeEventListener('mousedown', onDoc, true);
       if (save && onSave){
-        onSave([...box.querySelectorAll('.inline-pick__list input:checked')].map(i=>i.value));
+        const vals = single ? (picked ? [picked] : []) : [...box.querySelectorAll('.inline-pick__list input:checked')].map(i=>i.value);
+        if (!single || vals.length) onSave(vals);
       }
       box.remove();
       el.classList.remove('inline-editing');
       __crmInline = null;
     };
     const onDoc = e=>{ if (!box.contains(e.target)) finish(true); };
-    box.addEventListener('click', e=>e.stopPropagation());
-    box.querySelector('[data-pick-ok]').addEventListener('click', e=>{ e.stopPropagation(); finish(true); });
-    box.querySelector('[data-pick-cancel]').addEventListener('click', e=>{ e.stopPropagation(); finish(false); });
+    box.addEventListener('click', e=>{
+      e.stopPropagation();
+      if (!single) return;
+      const opt = e.target.closest('.inline-pick__row--opt');
+      if (!opt) return;
+      picked = opt.dataset.v;
+      list.querySelectorAll('.inline-pick__row--opt').forEach(b=>b.classList.toggle('on', b === opt));
+      setTimeout(()=>finish(true), 90);
+    });
+    const okBtn = box.querySelector('[data-pick-ok]');
+    const cancelBtn = box.querySelector('[data-pick-cancel]');
+    if (okBtn) okBtn.addEventListener('click', e=>{ e.stopPropagation(); finish(true); });
+    if (cancelBtn) cancelBtn.addEventListener('click', e=>{ e.stopPropagation(); finish(false); });
     box.addEventListener('keydown', e=>{
       if (e.key === 'Escape'){ e.preventDefault(); finish(false); }
       else if (e.key === 'Enter' && e.target.tagName !== 'INPUT'){ e.preventDefault(); finish(true); }
@@ -639,8 +658,9 @@ const CRM = (() => {
           .filter(k => k !== 'archived' || o.status === 'archived')
           .filter(k => k === o.status || canStatus(o.status, k).ok)
           .map(k => ({ value:k, label:STATUS_META[k].label }));
-        inlineField(el, { type:'select', value:o.status, options:opts, wide:true, onSave:v => {
-          if (v === o.status) return;
+        inlinePicker(el, { items:opts, selected:[o.status], single:true, onSave:ids => {
+          const v = ids[0];
+          if (!v || v === o.status) return;
           Promise.resolve(setStatus(o, v)).then(ok => { if (ok) inlineRefresh(() => render(false)); });
         }});
         return;
@@ -1691,8 +1711,8 @@ const CRM = (() => {
         const td = document.createElement('td');
         td.colSpan = (table.tHead && table.tHead.rows[0]) ? table.tHead.rows[0].cells.length : 1;
         tr.appendChild(td);
-        if (table.tHead) table.tHead.insertAdjacentElement('afterend', tr);
-        else table.insertBefore(tr, table.firstChild);
+        const tbody = table.tBodies[0] || table.appendChild(document.createElement('tbody'));
+        tbody.insertBefore(tr, tbody.firstChild);
       }
       box.classList.add('inline-add--row');
       tr.firstChild.appendChild(box);
