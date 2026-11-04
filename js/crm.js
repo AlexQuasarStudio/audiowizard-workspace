@@ -109,22 +109,31 @@ const CRM = (() => {
     if (type === 'select') inp.addEventListener('change', ()=>finish(true));
     __crmInline = { cancel: ()=>finish(false) };
   }
-  function dateVal(ts){
+  /* Даты в инлайне вводим обычным текстом «дд.мм.гггг»: нативный input[type=date]
+     сегментный, и при клике в центр фокус попадает в год — цифры дописываются
+     в него, не давая нормально набрать дату. */
+  function dateText(ts){
     if (!ts) return '';
     const d = new Date(ts);
-    const m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
-    return d.getFullYear()+'-'+m+'-'+day;
+    return String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + d.getFullYear();
   }
-  function dateTs(v, keepTs){
-    if (!v) return null;
-    const d = new Date(v + 'T00:00:00');
-    if (isNaN(d.getTime())) return null;
+  function parseDateText(v, keepTs){
+    const s = String(v||'').trim();
+    if (!s) return null;
+    let m = s.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{2,4})$/);
+    let y, mo, d;
+    if (m){ d = +m[1]; mo = +m[2]; y = +m[3]; if (y < 100) y += 2000; }
+    else if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))){ y = +m[1]; mo = +m[2]; d = +m[3]; }
+    else return null;
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+    const dt = new Date(y, mo - 1, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
     /* Сохраняем время суток исходной даты: правка дня не должна менять 00:00 на полдень */
     if (keepTs){
       const b = new Date(keepTs);
-      d.setHours(b.getHours(), b.getMinutes(), 0, 0);
+      dt.setHours(b.getHours(), b.getMinutes(), 0, 0);
     }
-    return d.getTime();
+    return dt.getTime();
   }
 
   /* Мультивыбор без модалки: поповер с поиском и чекбоксами (клиенты,
@@ -645,17 +654,20 @@ const CRM = (() => {
         return;
       }
       if (f === 'start'){
-        inlineField(el, { type:'date', value:dateVal(o.start_date || o.order_date), wide:true, onSave:v => {
-          const t = dateTs(v, o.start_date || o.order_date); if (t == null) return;
+        inlineField(el, { value:dateText(o.start_date || o.order_date), wide:true, placeholder:'дд.мм.гггг', onSave:v => {
+          if (!v.trim()) return;
+          const t = parseDateText(v, o.start_date || o.order_date);
+          if (t == null){ toast('Дата в формате дд.мм.гггг', 'err'); return; }
           o.start_date = t; if (!o.order_date) o.order_date = t;
           done('Начало заказа ' + o.order_id + ' изменено');
         }});
         return;
       }
       if (f === 'deadline'){
-        inlineField(el, { type:'date', value:dateVal(o.deadline), wide:true, onSave:v => {
-          if (!v){ o.deadline = null; done('Дедлайн заказа ' + o.order_id + ' снят'); return; }
-          const t = dateTs(v, o.deadline); if (t == null) return;
+        inlineField(el, { value:dateText(o.deadline), wide:true, placeholder:'дд.мм.гггг', onSave:v => {
+          if (!v.trim()){ o.deadline = null; done('Дедлайн заказа ' + o.order_id + ' снят'); return; }
+          const t = parseDateText(v, o.deadline);
+          if (t == null){ toast('Дата в формате дд.мм.гггг', 'err'); return; }
           o.deadline = t; done('Дедлайн заказа ' + o.order_id + ' изменён');
         }});
         return;
