@@ -336,6 +336,17 @@ function migrateDemoMarks(){
   }
   /* Дудл-фон по умолчанию: для старых сохранений без явного поля включаем дудлы */
   if (S.settings && S.settings.appBgDoodles === undefined) S.settings.appBgDoodles = true;
+  /* Настройки интерфейса теперь хранятся у аккаунта (u.prefs): глобальные
+     значения переносим только текущему пользователю и без zen-состояния,
+     чтобы полноэкранный режим и позиция аватара не переходили между аккаунтами. */
+  if (S.draftPrefs && S.currentUserId){
+    const cu = (S.users||[]).find(x => x.id === S.currentUserId);
+    if (cu && !cu.prefs){
+      cu.prefs = Object.assign({}, S.draftPrefs);
+      delete cu.prefs.zen;
+      delete cu.prefs.zenAvatarPos;
+    }
+  }
   /* Первый вход: приветствие показываем каждому, пока он его не прошёл.
      Одноразово снимаем старые отметки «тур пройден» — иначе демо-аккаунты
      и пользователи из старых сохранений не увидели бы онбординг. */

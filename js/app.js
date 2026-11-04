@@ -46,7 +46,7 @@ const APP = (() => {
   function navFor(user){
     if (!user) return [];
     const hidden = (isProd() && S.settings.hiddenRoutes) || [];
-    const custom = S.draftPrefs.navCustomOrder;
+    const custom = prefsFor().navCustomOrder;
     if (custom){
       /* Полностью кастомный порядок (перетаскивание) хранит СНИМОК ролей на момент
          настройки. Берём роли из NAV_DEFAULT по маршруту, иначе после расширения
@@ -92,6 +92,16 @@ const APP = (() => {
   /* ---------- Рендер оболочки ---------- */
   function user(){ return me(); }
 
+  /* Настройки интерфейса — у каждого аккаунта свои: zen-режим, позиция
+     плавающего аватара, свёрнутость меню и черновики не переходят между
+     пользователями. До входа используем общий fallback. */
+  function prefsFor(u2){
+    u2 = u2 || user();
+    if (!u2) return S.draftPrefs || (S.draftPrefs = {});
+    if (!u2.prefs) u2.prefs = {};
+    return u2.prefs;
+  }
+
   function unreadTotal(){
     const u = user(); if (!u) return 0;
     let n = noDemo(S.notifs).filter(x=>!x.owner_id || (u && x.owner_id===u.id)).filter(x=>!(x.read||{})[u.id]).length;
@@ -103,7 +113,7 @@ const APP = (() => {
   function renderShell(content){
     const u = user();
     const isMobile = window.matchMedia('(max-width:960px)').matches;
-    document.body.classList.toggle('side-collapsed', !!S.draftPrefs.sideCollapsed && !isMobile);
+    document.body.classList.toggle('side-collapsed', !!prefsFor().sideCollapsed && !isMobile);
     document.body.classList.toggle('no-anim', !!(S.settings && S.settings.noAnim));
     const collapsed = document.body.classList.contains('side-collapsed');
     const nav = navFor(u);
@@ -123,7 +133,7 @@ const APP = (() => {
             <button class="iconbtn side__burger" id="burger" aria-label="Меню" title="Свернуть/развернуть меню">${icon('menu')}</button>
           </div>
           <nav class="side__nav" data-tour="nav">
-            ${nav.map(sec=>`<div class="side__sec ${S.draftPrefs.closedSecs && S.draftPrefs.closedSecs.includes(sec.sec)?'closed':''}" data-sec-title="${esc(sec.sec)}">${esc(sec.sec)}<svg class="ico ico-sm sec-arrow"><use href="#i-chev-d"/></svg></div><div class="side__sec-items" data-sec-items="${esc(sec.sec)}">${sec.items.map(it=>`
+            ${nav.map(sec=>`<div class="side__sec ${prefsFor().closedSecs && prefsFor().closedSecs.includes(sec.sec)?'closed':''}" data-sec-title="${esc(sec.sec)}">${esc(sec.sec)}<svg class="ico ico-sm sec-arrow"><use href="#i-chev-d"/></svg></div><div class="side__sec-items" data-sec-items="${esc(sec.sec)}">${sec.items.map(it=>`
               ${(() => {
                 /* Единый индикатор: точка окна и точка непрочитанных — одна и та же.
                    Раньше это были две разные точки в разных углах, и при закрытии
@@ -379,7 +389,7 @@ const APP = (() => {
       const mainEl = $('#main');
       mainEl.classList.remove('view-in'); void mainEl.offsetWidth; mainEl.classList.add('view-in');
     }
-    if (S.draftPrefs.zen) applyZen(true, { skipFullscreen:true });
+    if (prefsFor().zen) applyZen(true, { skipFullscreen:true });
     $('#burger').onclick = ()=>{
       if (window.matchMedia('(max-width:960px)').matches){
         $('#side').classList.add('open');
@@ -391,7 +401,7 @@ const APP = (() => {
         const on = !document.body.classList.contains('side-collapsed');
         document.body.classList.toggle('side-collapsed', on);
         document.querySelector('.shell').classList.toggle('shell--collapsed', on);
-        S.draftPrefs.sideCollapsed = on;
+        prefsFor().sideCollapsed = on;
         saveState();
         /* без render(): класс сам переводит рельс, CSS-анимация ширины не обрывается */
       }
@@ -403,7 +413,7 @@ const APP = (() => {
     $('#brand-click').onclick = ()=>showAboutModal();
     $('#brand-click').onkeydown = e=>{ if (e.key==='Enter') showAboutModal(); };
     const sc2 = $('#side-collapse');
-    sc2 && (sc2.onclick = e=>{ e.stopPropagation(); document.body.classList.toggle('side-collapsed'); document.querySelector('.shell').classList.toggle('shell--collapsed', document.body.classList.contains('side-collapsed')); S.draftPrefs.sideCollapsed = document.body.classList.contains('side-collapsed'); saveState(); });
+    sc2 && (sc2.onclick = e=>{ e.stopPropagation(); document.body.classList.toggle('side-collapsed'); document.querySelector('.shell').classList.toggle('shell--collapsed', document.body.classList.contains('side-collapsed')); prefsFor().sideCollapsed = document.body.classList.contains('side-collapsed'); saveState(); });
     { const sw = $('#open-search'), si = $('#head-search-input');
       if (sw && si){
         /* Поиск свёрнут в иконку и распахивается по клику (как раньше) */
@@ -516,10 +526,10 @@ const APP = (() => {
         if (items){ items.style.overflow = 'hidden';
           if (sec.classList.contains('closed')){ items.style.maxHeight = '0px'; } else { items.style.maxHeight = items.scrollHeight + 'px'; setTimeout(()=>{ items.style.maxHeight = 'none'; }, 320); }
         }
-        S.draftPrefs.closedSecs = S.draftPrefs.closedSecs || [];
+        prefsFor().closedSecs = prefsFor().closedSecs || [];
         const title = sec.dataset.secTitle;
-        if (sec.classList.contains('closed')){ if (!S.draftPrefs.closedSecs.includes(title)) S.draftPrefs.closedSecs.push(title); }
-        else S.draftPrefs.closedSecs = S.draftPrefs.closedSecs.filter(x => x !== title);
+        if (sec.classList.contains('closed')){ if (!prefsFor().closedSecs.includes(title)) prefsFor().closedSecs.push(title); }
+        else prefsFor().closedSecs = prefsFor().closedSecs.filter(x => x !== title);
         saveState();
       });
     });
@@ -1151,7 +1161,7 @@ const QUICK_BY_ROLE = {
     /* Полноэкранный режим запоминается между входами: если был включён,
        возвращаемся в него В ЖЕСТЕ входа (клик — это user gesture для requestFullscreen).
        render() затем просто применит класс zen, не запрашивая fullscreen дважды. */
-    if (S.draftPrefs && S.draftPrefs.zen){
+    if (prefsFor(u2).zen){
       try { if (typeof requestFs === 'function') requestFs(); } catch(e){}
     }
     toast(`Добро пожаловать, ${u2.full_name.split(' ')[0]}!`, 'ok');
@@ -1396,7 +1406,7 @@ ex.innerHTML = avatarHTML(user(), '');
     });
     zenAvatar = ex;
     document.body.appendChild(ex);
-    snapToCorner(S.draftPrefs.zenAvatarPos || 'bc', false);
+    snapToCorner(prefsFor().zenAvatarPos || 'bc', false);
   }
 
   function snapToCorner(corner, animate){
@@ -1463,10 +1473,10 @@ ex.innerHTML = avatarHTML(user(), '');
         const left = parseFloat(zenAvatar.style.left), top = parseFloat(zenAvatar.style.top);
         const cx = (isNaN(left) ? 12 : left) + 21, cy = (isNaN(top) ? 12 : top) + 21;
         const corner = cx < window.innerWidth/2 ? (cy < window.innerHeight/2 ? 'tl' : 'bl') : (cy < window.innerHeight/2 ? 'tr' : 'br');
-        S.draftPrefs.zenAvatarPos = corner; saveState();
+        prefsFor().zenAvatarPos = corner; saveState();
         snapToCorner(corner, true);
       } else {
-snapToCorner(S.draftPrefs.zenAvatarPos || 'bc', false);
+snapToCorner(prefsFor().zenAvatarPos || 'bc', false);
       }
     });
   }
@@ -1475,7 +1485,7 @@ snapToCorner(S.draftPrefs.zenAvatarPos || 'bc', false);
      позиция zen-аватара пересчитывается — иначе он «зависает» не в углу. */
   if (!window.__zenResizeBound){
     window.__zenResizeBound = true;
-    const re = () => { if (zenAvatar && !zenDrag) snapToCorner(S.draftPrefs.zenAvatarPos || 'bc', false); };
+    const re = () => { if (zenAvatar && !zenDrag) snapToCorner(prefsFor().zenAvatarPos || 'bc', false); };
     window.addEventListener('resize', re, { passive: true });
     ['fullscreenchange', 'webkitfullscreenchange'].forEach(ev => document.addEventListener(ev, re));
   }
@@ -1509,7 +1519,7 @@ snapToCorner(S.draftPrefs.zenAvatarPos || 'bc', false);
   }
   function toggleZen(){
     const on = !document.body.classList.contains('zen');
-    S.draftPrefs.zen = on; saveState();
+    prefsFor().zen = on; saveState();
     applyZen(on);
     toast(on ? 'Полноэкранный режим: Esc — выход' : 'Обычный режим', 'info');
   }
@@ -1535,7 +1545,7 @@ snapToCorner(S.draftPrefs.zenAvatarPos || 'bc', false);
       if (ev && ev.type === 'pointerdown' && ev.target && ev.target.closest && ev.target.closest('.zen-avatar, .dd, .modal-mask')) return;
       setTimeout(()=>{
         disarm();
-        if (!document.body.classList.contains('zen') || !S.draftPrefs.zen || fsEl()) return;
+        if (!document.body.classList.contains('zen') || !prefsFor().zen || fsEl()) return;
         requestFs();
       }, 0);
     };
@@ -1560,7 +1570,7 @@ snapToCorner(S.draftPrefs.zenAvatarPos || 'bc', false);
     setTimeout(() => { try { if (window.__fitChatsHandler) window.__fitChatsHandler(); } catch(e){} }, 120);
     setTimeout(() => { try { if (window.__fitChatsHandler) window.__fitChatsHandler(); } catch(e){} }, 320);
     if (overlayOpen() || (Date.now() - (window.__escLayerAt || 0)) < 450){ armFsRestore(); return; }
-    S.draftPrefs.zen = false; saveState();
+    prefsFor().zen = false; saveState();
     applyZen(false, { skipFullscreen:true });
     toast('Обычный режим', 'info');
   };
@@ -2375,7 +2385,7 @@ snapToCorner(S.draftPrefs.zenAvatarPos || 'bc', false);
       }
       /* В zen аватар привязан к полю ввода — пересчитать позицию, если
          раскладка/высота поля изменились (иначе он отрывается от поля). */
-      try { if (zen) snapToCorner(S.draftPrefs.zenAvatarPos || 'bc', false); } catch(e){}
+      try { if (zen) snapToCorner(prefsFor().zenAvatarPos || 'bc', false); } catch(e){}
       /* Пады только что сдвинули сообщения — пересчитать «естественные»
          позиции дат. Кэш, снятый ДО syncChatPads, устаревает (на перезагрузке
          пады ещё дефолтные) — и дата в чате перестаёт закрепляться. */
@@ -5607,11 +5617,11 @@ const cm = root.querySelector('.chat-main');
         <div class="row row--between" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
           <div><b class="small">Черновики заказов</b>
             <div class="small faint">Незаполненная форма заказа сохраняется локально и предлагается при следующем открытии.</div></div>
-          <label class="check" title="Автосохранять черновик"><input type="checkbox" id="draft-auto" ${S.draftPrefs.autoDraft!==false?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span></label>
+          <label class="check" title="Автосохранять черновик"><input type="checkbox" id="draft-auto" ${prefsFor().autoDraft!==false?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span></label>
         </div>
         <div class="row row--between" style="margin-top:10px;padding-left:2px">
           <div class="small muted" style="flex:1;min-width:0">Спрашивать «Сохранить черновик?» при закрытии формы</div>
-          <label class="check" title="Показывать вопрос при закрытии"><input type="checkbox" id="draft-ask" ${S.draftPrefs.noAskDraft?'':'checked'}><span class="box"><svg><use href="#i-check-c"/></svg></span></label>
+          <label class="check" title="Показывать вопрос при закрытии"><input type="checkbox" id="draft-ask" ${prefsFor().noAskDraft?'':'checked'}><span class="box"><svg><use href="#i-check-c"/></svg></span></label>
         </div>
         <div class="row" style="margin-top:10px;gap:8px" id="draft-actions" hidden>
           <span class="small faint" id="draft-last" style="align-self:center"></span>
@@ -6266,7 +6276,7 @@ const cm = root.querySelector('.chat-main');
         const draftAuto = $('#draft-auto', el);
         if (draftAuto){
           draftAuto.addEventListener('change', ()=>{
-            S.draftPrefs.autoDraft = draftAuto.checked;
+            prefsFor().autoDraft = draftAuto.checked;
             if (!draftAuto.checked){ try { if (window.DraftsDB) DraftsDB.del('order-form'); else if (DraftsDB) DraftsDB.del('order-form'); } catch(e){ } }
             logAudit('Черновики заказов: '+(draftAuto.checked?'вкл':'выкл'), 'Настройки');
             saveState(); renderDraftStatus();
@@ -6276,7 +6286,7 @@ const cm = root.querySelector('.chat-main');
         const draftAsk = $('#draft-ask', el);
         if (draftAsk){
           draftAsk.addEventListener('change', ()=>{
-            S.draftPrefs.noAskDraft = !draftAsk.checked;
+            prefsFor().noAskDraft = !draftAsk.checked;
             logAudit('Вопрос о черновике: '+(draftAsk.checked?'вкл':'выкл'), 'Настройки');
             saveState();
             toast(draftAsk.checked ? 'Вопрос при закрытии включён' : 'Вопрос отключён — черновик сохраняется всегда', 'ok');
@@ -6680,7 +6690,7 @@ const cm = root.querySelector('.chat-main');
         if (mres) mres.onclick = () => {
           NAV = JSON.parse(JSON.stringify(NAV_DEFAULT));
           window.NAV = NAV;
-          delete S.draftPrefs.navCustom; delete S.draftPrefs.navCustomOrder;
+          delete prefsFor().navCustom; delete prefsFor().navCustomOrder;
           saveState(); toast('Меню сброшено к заводским настройкам','ok'); APP.render();
         };
         $('#dt-backup', el).onclick = ()=>{
@@ -7301,8 +7311,8 @@ function initPWA(){
   /* Экспортируем хелперы персистентности для NavDrag */
   window.APP = {
     _persistNav: () => {
-      S.draftPrefs.navCustom = true;
-      S.draftPrefs.navCustomOrder = JSON.parse(JSON.stringify(NAV.map(s => ({ sec:s.sec, items:s.items.map(it => ({ route:it.route, title:it.title, icon:it.icon, roles:it.roles })) }))));
+      prefsFor().navCustom = true;
+      prefsFor().navCustomOrder = JSON.parse(JSON.stringify(NAV.map(s => ({ sec:s.sec, items:s.items.map(it => ({ route:it.route, title:it.title, icon:it.icon, roles:it.roles })) }))));
       saveState(); render();
     },
     _navCtx: e => {
@@ -7325,7 +7335,7 @@ function initPWA(){
         items.push({ label:'Закрыть все окна', icon:'x', onClick:()=>{ try { Windows.closeAll(); } catch(err){} } });
       }
       items.push('-');
-      items.push({ label:'Сбросить меню по умолчанию', icon:'archive', onClick:()=>{ NAV = JSON.parse(JSON.stringify(NAV_DEFAULT)); window.NAV = NAV; delete S.draftPrefs.navCustom; delete S.draftPrefs.navCustomOrder; saveState(); toast('Меню сброшено','ok'); render(); } });
+      items.push({ label:'Сбросить меню по умолчанию', icon:'archive', onClick:()=>{ NAV = JSON.parse(JSON.stringify(NAV_DEFAULT)); window.NAV = NAV; delete prefsFor().navCustom; delete prefsFor().navCustomOrder; saveState(); toast('Меню сброшено','ok'); render(); } });
       showDropdown(e.target, items, { x:e.clientX, y:e.clientY });
     }
   };
