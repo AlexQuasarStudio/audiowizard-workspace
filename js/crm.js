@@ -715,7 +715,7 @@ const CRM = (() => {
     }
 
     function bindControls(){
-      const fm = root.querySelector('#f-manager'); fm && (fm.onchange = e=>{ ofilter.manager = e.target.value; render(true); });
+      const fm = root.querySelector('#f-manager'); fm && (fm.onchange = e=>{ ofilter.manager = e.target.value; animateFilterChange(root, () => render(false)); });
             const q = root.querySelector('#f-q');
       q && q.addEventListener('input', () => liveSearch(() => {
         ofilter.q = q.value;
@@ -728,24 +728,30 @@ const CRM = (() => {
         updateBulk();
       }));
       const fn = root.querySelector('#f-niche');
-      fn && fn.addEventListener('change', () => { ofilter.niche = fn.value; render(false); });
+      fn && fn.addEventListener('change', () => { ofilter.niche = fn.value; animateFilterChange(root, () => render(false)); });
       const fp = root.querySelector('#f-project');
-      fp && fp.addEventListener('change', () => { ofilter.project = fp.value; render(false); });
+      fp && fp.addEventListener('change', () => { ofilter.project = fp.value; animateFilterChange(root, () => render(false)); });
       const ff = root.querySelector('#f-from'), ft = root.querySelector('#f-to');
       const applyDate = (el, key) => {
         /* Нативный выбор даты отдаёт ISO (ГГГГ-ММ-ДД); пустая строка — сброс */
         const iso = (el.value || '').trim();
         ofilter[key] = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : '';
-        render(false);
+        animateFilterChange(root, () => render(false));
       };
       ff && (ff.onchange = () => applyDate(ff, 'dateFrom'));
       ft && (ft.onchange = () => applyDate(ft, 'dateTo'));
       const fa = root.querySelector('#f-arch');
-      fa && fa.addEventListener('click', () => { ofilter.archived = !ofilter.archived; ofilter.statuses.clear(); render(false); });
+      fa && fa.addEventListener('click', () => {
+        ofilter.archived = !ofilter.archived; ofilter.statuses.clear();
+        fa.classList.toggle('on', ofilter.archived);
+        $$('#f-status .chip', root).forEach(c => c.classList.remove('on'));
+        animateFilterChange(root, () => render(false));
+      });
       $$('#f-status .chip', root).forEach(ch => ch.addEventListener('click', () => {
         const st = ch.dataset.st;
         ofilter.statuses.has(st) ? ofilter.statuses.delete(st) : ofilter.statuses.add(st);
-        render(false);
+        ch.classList.toggle('on', ofilter.statuses.has(st));
+        animateFilterChange(root, () => render(false));
       }));
       const vw = root.querySelector('#o-view');
       if (vw) vw.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
@@ -1652,6 +1658,23 @@ const CRM = (() => {
     host.classList.add('view-anim');
   }
 
+  /* Плавная смена содержимого при переключении фильтров-плашек: старый список
+     коротко гаснет, после перерисовки новый проявляется (fade+slide). */
+  let listFadeTimer = 0;
+  function animateFilterChange(root, renderFn){
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const host = root.querySelector('#o-rows') || root.querySelector('.person-grid, .tbl-wrap');
+    if (!host || reduce){ renderFn(); return; }
+    if (listFadeTimer) clearTimeout(listFadeTimer);
+    host.classList.add('list-fading');
+    listFadeTimer = setTimeout(()=>{
+      listFadeTimer = 0;
+      renderFn();
+      const h = root.querySelector('#o-rows') || root.querySelector('.person-grid, .tbl-wrap');
+      if (h){ h.classList.remove('view-anim'); void h.offsetWidth; h.classList.add('view-anim'); }
+    }, 110);
+  }
+
   function peopleView(root, role){
     const u = me(); const staff = isStaff(u.role);
     /* Миграция к стабильным номерам: записи без ext.num получают следующий
@@ -1814,8 +1837,16 @@ const CRM = (() => {
       qq.addEventListener('input', ()=>liveSearch(()=>{ q=qq.value; render(); }));
       const ps = $('#pl-sort', root);
       ps && (ps.onchange = () => { psort.key = ps.value; psort.dir = 1; render(); });
-      $('#pl-active', root).onclick = ()=>{ onlyBl=false; render(); };
-      $('#pl-bl', root).onclick = ()=>{ onlyBl=true; render(); };
+      $('#pl-active', root).onclick = ()=>{
+        onlyBl=false;
+        $('#pl-active', root).classList.add('on'); $('#pl-bl', root).classList.remove('on');
+        animateFilterChange(root, () => render());
+      };
+      $('#pl-bl', root).onclick = ()=>{
+        onlyBl=true;
+        $('#pl-bl', root).classList.add('on'); $('#pl-active', root).classList.remove('on');
+        animateFilterChange(root, () => render());
+      };
       $$('[data-add]', root).forEach(b=>b.onclick = ()=>openPersonForm(role, null));
       $$('[data-inline-add]', root).forEach(b=>b.onclick = ()=>{
         const box = root.querySelector('#pl-inline');
