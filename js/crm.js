@@ -487,6 +487,7 @@ const CRM = (() => {
       </tr>`;
     }
     function render(useSkeleton){
+      const flip0 = flipSnap(root);
       /* Перерисовка root пересоздаёт поле поиска. Запоминаем фокус и каретку,
          чтобы ввод не сбрасывался по мере набора. */
       const ae = document.activeElement;
@@ -546,6 +547,7 @@ const CRM = (() => {
       bindTable();
       fillRows(0);
       updateBulk();
+      flipPlay(root, flip0);
       if (keep){
         const q2 = root.querySelector('#'+keep.id);
         if (q2){ q2.focus(); try { if (typeof q2.setSelectionRange === 'function') q2.setSelectionRange(keep.s, keep.e); } catch(e){} }
@@ -772,7 +774,7 @@ const CRM = (() => {
     function bindControls(){
       const fm = root.querySelector('#f-manager'); fm && (fm.onchange = e=>{ ofilter.manager = e.target.value; animateFilterChange(root, () => render(false)); });
             const q = root.querySelector('#f-q');
-      q && q.addEventListener('input', () => liveSearch(() => {
+      q && q.addEventListener('input', () => liveSearch(() => refillList(root, () => {
         ofilter.q = q.value;
         /* Полный render(false) пересоздаёт всю страницу и список мигал при вводе.
            Обновляем точечно: только таблицу/карточки + счётчик + bulk-панель. */
@@ -781,7 +783,7 @@ const CRM = (() => {
         fillRows(0);
         updateCount();
         updateBulk();
-      }));
+      })));
       const fn = root.querySelector('#f-niche');
       fn && fn.addEventListener('change', () => { ofilter.niche = fn.value; animateFilterChange(root, () => render(false)); });
       const fp = root.querySelector('#f-project');
@@ -795,7 +797,7 @@ const CRM = (() => {
            начинался заново с первого сегмента. Обновляем только список. */
         list = computeList();
         shown = 0;
-        animateFilterChange(root, () => { fillRows(0); updateCount(); updateBulk(); });
+        animateFilterChange(root, () => refillList(root, () => { fillRows(0); updateCount(); updateBulk(); }));
       };
       ff && (ff.onchange = () => applyDate(ff, 'dateFrom'));
       ft && (ft.onchange = () => applyDate(ft, 'dateTo'));
@@ -1911,10 +1913,73 @@ const CRM = (() => {
     setTimeout(()=>lb.classList.remove('label-swap'), 320);
   }
 
+  /* FLIP для списков. Перерисовка пересобирает таблицу целиком, поэтому
+     исчезнувшая строка не «схлопывается», а просто выпадает: всё, что ниже,
+     прыгает на её высоту. Запоминаем позиции строк ДО отрисовки и даём
+     оставшимся съехать на новые места. */
+  const FLIP_SEL = '.o-wrap tbody > tr[data-oid], .o-wrap .o-cards > [data-oid], ' +
+                   '.pl-wrap tbody > tr[data-uid], .pl-wrap .person-grid > [data-uid]';
+
+  function flipSnap(root){
+    const m = new Map();
+    if (!root) return m;
+    root.querySelectorAll(FLIP_SEL).forEach(el => {
+      const k = el.dataset.oid || el.dataset.uid;
+      if (k && !m.has(k)) m.set(k, el.getBoundingClientRect().top);
+    });
+    return m;
+  }
+
+  function flipPlay(root, before){
+    if (!root || !before || !before.size) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const after = new Map();
+    root.querySelectorAll(FLIP_SEL).forEach(el => {
+      const k = el.dataset.oid || el.dataset.uid;
+      if (k) after.set(k, el);
+    });
+    /* Ради исчезнувших строк анимация и нужна: нет их — нет и движения. */
+    let gone = false;
+    before.forEach((_, k) => { if (!after.has(k)) gone = true; });
+    if (!gone) return;
+    const moves = [];
+    let far = 0;
+    after.forEach((el, k) => {
+      const y0 = before.get(k);
+      if (y0 == null) return;
+      const dy = Math.round(y0 - el.getBoundingClientRect().top);
+      if (Math.abs(dy) < 2) return;
+      moves.push([el, dy]);
+      if (Math.abs(dy) > Math.abs(far)) far = dy;
+    });
+    /* Совсем другой список (фильтр сменил почти всё) — строки через пол-
+       таблицы не гоняем: там уместнее общий мягкий сдвиг хоста. */
+    if (Math.abs(far) > 320) return;
+    root.__flipMoved = true;
+    if (!moves.length) return;
+    const dur = Math.round(Math.min(280, 150 + Math.abs(far) * 0.5));
+    moves.forEach(([el, dy]) => { el.style.transition = 'none'; el.style.transform = 'translateY(' + dy + 'px)'; });
+    void root.offsetWidth;
+    moves.forEach(([el]) => { el.style.transition = 'transform ' + dur + 'ms var(--ease)'; el.style.transform = 'translateY(0px)'; });
+    setTimeout(() => moves.forEach(([el]) => { el.style.transition = ''; el.style.transform = ''; }), dur + 120);
+  }
+
+  /* Точечная перерисовка списка (поиск, даты) идёт мимо render():
+     снимаем позиции строк до и доигрываем после. */
+  function refillList(root, fn){
+    const snap = flipSnap(root);
+    fn();
+    flipPlay(root, snap);
+  }
+
   function animateFilterChange(root, renderFn){
     const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    root.__flipMoved = false;
     renderFn();
     if (reduce) return;
+    /* Строки уже съехали FLIP-анимацией — общий сдвиг хоста поверх неё
+       читается как дрожь, поэтому second-эффект не включаем. */
+    if (root.__flipMoved) return;
     const h = listHost(root);
     if (!h) return;
     h.classList.remove('list-swap');
@@ -1974,6 +2039,7 @@ const CRM = (() => {
     };
 
     const render = ()=>{
+      const flip0 = flipSnap(root);
       const ae2 = document.activeElement;
       const keep2 = (ae2 && ae2.id === 'pl-q') ? { s:ae2.selectionStart, e:ae2.selectionEnd } : null;
       const cardsView = (S.settings.peopleView || 'cards') === 'cards';
@@ -2022,6 +2088,7 @@ const CRM = (() => {
           : `<div class="tbl-wrap pl-wrap" style="margin-top:2px"><table class="tbl">${personHead(role, psort)}<tbody id="pl-rows"></tbody></table></div>`}`;
       bindPeople();
       fillPeople(0);
+      flipPlay(root, flip0);
       /* Пересчёт «до конца экрана» после отрисовки (высота шапки/футера
          зависит от вида и экрана) — и в следующем кадре, когда вёрстка осядет. */
       requestAnimationFrame(fitPeople);
