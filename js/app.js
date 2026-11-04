@@ -4067,7 +4067,14 @@ const cm = root.querySelector('.chat-main');
       if (backBtn) backBtn.onclick = () => {
         const hostWin = root.closest('.aw-win');
         if (hostWin && hostWin.classList.contains('aw-win--narrow-chats')){
-          hostWin.classList.add('aw-win--chat-list');
+          /* Плавно: лента гаснет и уезжает влево, затем выезжает список. */
+          if (hostWin.classList.contains('aw-win--chat-list')) return;
+          hostWin.classList.add('aw-win--pane-out');
+          clearTimeout(hostWin.__paneTimer);
+          hostWin.__paneTimer = setTimeout(() => {
+            hostWin.classList.remove('aw-win--pane-out');
+            hostWin.classList.add('aw-win--chat-list');
+          }, 160);
           return;
         }
         try { mobilePane(true); } catch(e){}

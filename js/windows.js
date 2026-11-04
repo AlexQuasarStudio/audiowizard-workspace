@@ -493,6 +493,10 @@ const Windows = (() => {
     const applyChatNarrow = () => {
       if (route === 'chats' || win.querySelector('.chats-layout')){
         win.classList.toggle('aw-win--narrow-chats', win.offsetWidth < 520);
+        /* В широком окне режим списка не нужен — показываем чат. */
+        if (win.offsetWidth >= 520){
+          win.classList.remove('aw-win--chat-list', 'aw-win--pane-out');
+        }
       }
       /* После смены ширины шапка чата может переноситься и становиться выше —
          пересчитываем отступ ленты, иначе первое сообщение уходит под шапку. */
