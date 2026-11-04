@@ -1,7 +1,8 @@
 {
   "name": "Audiowizard Workspace",
   "short_name": "Audiowizard",
-  "description": "Внутренняя CRM и клиентский портал сервиса обработки контента: заказы, исполнители, чаты, аналитика.",
+  "description": "Прототип 0.1 — внутренняя CRM и клиентский портал сервиса обработки контента: заказы, исполнители, чаты, аналитика.",
+  "version": "0.1.0",
   "id": "audiowizard-workspace",
   "start_url": "./index.html",
   "scope": "./",
