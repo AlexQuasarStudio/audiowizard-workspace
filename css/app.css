@@ -221,7 +221,7 @@ body.pills-move .head__ops{-webkit-backdrop-filter:none!important;backdrop-filte
 .page-actions{display:flex;gap:8px;flex-wrap:wrap}
 
 /* ---------- Авторизация ---------- */
-.auth{min-height:100vh;min-height:100dvh;height:auto;display:flex;align-items:flex-start;justify-content:center;padding:20px;position:relative;overflow:hidden;background:var(--bg);isolation:isolate}
+.auth{height:100vh;height:100dvh;display:flex;align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden;background:var(--bg);isolation:isolate}
 
 
 .auth__aurora{position:absolute;inset:-20%;background:
@@ -232,14 +232,14 @@ body.pills-move .head__ops{-webkit-backdrop-filter:none!important;backdrop-filte
  radial-gradient(45% 45% at 68.6% 32.9%,rgba(122,149,196,.09),transparent 100%),
  radial-gradient(55% 55% at 51.4% 73.6%,rgba(143,120,176,.10),transparent 100%);
  pointer-events:none}
-.auth__card{position:relative;width:100%;max-width:430px;max-height:none;overflow:visible;margin:auto;background:color-mix(in srgb,var(--panel) 62%,transparent);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid color-mix(in srgb,var(--border-2) 86%,transparent);border-radius:22px;box-shadow:var(--sh-2);padding:26px;animation:popIn 0.56s var(--ease)}
+.auth__card{position:relative;width:100%;max-width:430px;max-height:calc(100dvh - 40px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;background:color-mix(in srgb,var(--panel) 62%,transparent);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid color-mix(in srgb,var(--border-2) 86%,transparent);border-radius:22px;box-shadow:var(--sh-2);padding:26px;animation:popIn 0.56s var(--ease)}
 /* Тёмная тема: тёмное гало */
 html[data-theme^='dark'] .auth__card{box-shadow:var(--sh-2)}
 .auth__card--fit{overflow:visible;overscroll-behavior:auto}
 /* Малые экраны: компактные отступы, НИЧЕГО не скрываем.
    Если карточка не влезает — скроллится она сама; если влезла — без скролла. */
 @media (max-height: 820px){
-  .auth__card{padding:16px 20px}
+  .auth__card{max-height:calc(100dvh - 32px);padding:16px 20px}
   .auth__logo{width:38px;height:38px;margin-bottom:6px}
   .auth__sub{margin:2px 0 8px}
   .auth__demo{margin-top:8px;padding-top:7px}
