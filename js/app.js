@@ -2278,6 +2278,10 @@ ex.innerHTML = avatarHTML(user(), '');
   };
   /* Ответ на сообщение (сохраняется между перерисовками чата) */
   let chatReplyTo = null;
+  /* Окно, в течение которого плашка считается «только что открытой»: чат
+     перерисовывается повторно (фокус, прокрутка), и класс анимации не должен
+     теряться между рендерами. */
+  const chatBarAnimUntil = { reply:0, edit:0 };
   let chatEditMsg = null;  /* редактируемое сообщение (как в ТГ) */
   let chatSel = { set: new Set(), mode:false };  /* групповое выделение сообщений (как в ТГ) */
   /* Esc полностью снимает выделение сообщений */
@@ -3156,9 +3160,21 @@ const cm = root.querySelector('.chat-main');
          чата без истории скролла — по умолчанию в самый низ (последнее сообщение). */
       const mem = chatScrollMap[c.id];
       let savedScroll = mem ? mem.scrollTop : 0, savedScrollHeight = mem ? mem.scrollHeight : 0;
+      /* Плашки ответа/редактирования: запоминаем, была ли плашка на экране до
+         перерисовки, чтобы анимировать только первое появление и плавное
+         исчезновение, а не каждый рендер. */
+      const sameChatBefore = lastRenderedChat === c.id;
+      const oldReplyBar = sameChatBefore ? root.querySelector('.chat-main #chat-reply') : null;
+      const oldEditBar = sameChatBefore ? root.querySelector('.chat-main #chat-edit') : null;
+      const replyBarSrc = (chatReplyTo && chatReplyTo.chat_id === c.id) ? chatReplyTo : null;
+      const editBarSrc = (chatEditMsg && chatEditMsg.chat_id === c.id) ? chatEditMsg : null;
+      const replyBarIn = !!replyBarSrc && (!oldReplyBar || Date.now() < chatBarAnimUntil.reply);
+      const editBarIn = !!editBarSrc && (!oldEditBar || Date.now() < chatBarAnimUntil.edit);
+      if (replyBarSrc && !oldReplyBar) chatBarAnimUntil.reply = Date.now() + 420;
+      if (editBarSrc && !oldEditBar) chatBarAnimUntil.edit = Date.now() + 420;
       const replySrc = (chatReplyTo && chatReplyTo.chat_id === c.id) ? chatReplyTo : null;
       const replyAuthor = replySrc ? userById(replySrc.user_id) : null;
-      const replyPrev = replySrc ? `<div class="chat-reply" id="chat-reply">
+      const replyPrev = replySrc ? `<div class="chat-reply${replyBarIn ? ' chat-reply--in' : ''}" id="chat-reply">
           <span class="chat-reply__bar"></span>
           <div class="chat-reply__txt"><b>${esc(replyAuthor?replyAuthor.full_name:'—')}</b><span class="${replySrc.replyText?'chat-reply__quote':''}">${esc((replySrc.replyText || replySrc.text || '').slice(0,110))}</span></div>
           <button class="iconbtn" id="chat-reply-x" title="Отменить ответ">${icon('x')}</button>
@@ -3171,7 +3187,7 @@ const cm = root.querySelector('.chat-main');
           <button class="btn btn--ghost btn--sm btn--danger" id="chat-sel-del">${icon('trash','ico-sm')} Удалить</button>
           <button class="iconbtn" id="chat-sel-x" title="Снять выделение">${icon('x','ico-sm')}</button>
         </div>` : '';
-      const editPrev = editSrc ? `<div class="chat-edit" id="chat-edit" title="Нажмите, чтобы перейти к сообщению">
+      const editPrev = editSrc ? `<div class="chat-edit${editBarIn ? ' chat-reply--in' : ''}" id="chat-edit" title="Нажмите, чтобы перейти к сообщению">
           <span class="chat-reply__bar chat-edit__bar"></span>
           <div class="chat-reply__txt"><b>Редактирование</b><span>${esc((editSrc.text||'').slice(0,110))}</span></div>
           <button class="iconbtn" id="chat-edit-x" title="Отменить редактирование">${icon('x')}</button>
@@ -3208,6 +3224,21 @@ const cm = root.querySelector('.chat-main');
             <span class="chat-send-ic chat-send-ic--plane" id="send-ic-plane" title="Отправить">${icon('send')}</span>
           </button>
         </div>`;
+      /* Закрытую плашку не выдёргиваем мгновенно: возвращаем её новым слоем и
+         гасим тем же движением, что и появление. */
+      (() => {
+        const cm2 = root.querySelector('.chat-main');
+        if (!cm2) return;
+        [['#chat-reply', oldReplyBar], ['#chat-edit', oldEditBar]].forEach(([sel, old]) => {
+          if (!old || cm2.querySelector(sel)) return;
+          old.removeAttribute('id');
+          old.classList.remove('chat-reply--in');
+          old.classList.add('chat-reply--ghost');
+          cm2.appendChild(old);
+          requestAnimationFrame(() => old.classList.add('chat-reply--out'));
+          setTimeout(() => old.remove(), 280);
+        });
+      })();
       const box = $('#chat-msgs', root);
       const hideUntilReady = box && lastRenderedChat !== c.id;
       if (box) lastRenderedChat = c.id;

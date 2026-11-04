@@ -770,6 +770,17 @@ body.zen .day-sep.on-scroll{top:0}
 .btn--danger{color:var(--red)!important}
 .btn--danger:hover{background:var(--red-soft)!important}
 .msg{display:flex;gap:8px;width:fit-content;max-width:min(560px,100%);min-width:0;margin-bottom:8px;align-self:flex-start;position:relative}
+/* Переход к сообщению по цитате/счётчику ответов: мягкая волна подсветки.
+   Раньше класс msg--flash добавлялся и снимался, но стиля для него не было. */
+.msg__bubble{transition:box-shadow .2s var(--ease)}
+.msg--flash .msg__bubble{animation:msgFlash 1.5s var(--ease)}
+@keyframes msgFlash{
+  0%{box-shadow:0 0 0 0 transparent}
+  14%{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 46%,transparent),0 6px 18px -6px color-mix(in srgb,var(--accent) 40%,transparent)}
+  65%{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent),0 4px 12px -8px transparent}
+  100%{box-shadow:0 0 0 0 transparent}
+}
+@media (prefers-reduced-motion:reduce){.msg--flash .msg__bubble{animation:none;box-shadow:0 0 0 2px var(--accent)}}
 /* Аватар сообщения: снизу, у индикаторов; при скролле прилипает к низу
    области сообщений (к полю ввода) и уезжает, когда блок прокручен. */
 /* Системные строки-действия: «X закрепил сообщение», «X присоединился» */
@@ -1369,7 +1380,7 @@ select.inline-input{padding:3px 30px 3px 8px;background-position:right 8px cente
 @media (prefers-reduced-motion:reduce){.inline-pick{animation:none}}
 td .inline-input{min-width:96px}
 .aw-snap-guide{position:fixed;z-index:4380;background:var(--accent-soft);border:2px dashed var(--accent);border-radius:12px;display:none;pointer-events:none;transition:opacity .12s var(--ease)}
-.aw-snap-guide--corner{border-style:solid;border-radius:16px;background:color-mix(in srgb,var(--accent) 15%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 35%,transparent),0 12px 40px color-mix(in srgb,var(--accent) 18%,transparent)}
+.aw-snap-guide--corner{border:2px dashed var(--accent);border-radius:16px;background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:0 12px 40px color-mix(in srgb,var(--accent) 16%,transparent)}
 .aw-snap-guide--corner::after{content:"Уголок";position:absolute;left:50%;top:12px;transform:translateX(-50%);font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);opacity:.9}
 /* Уголок окна чата: компактная панель у угла экрана */
 .aw-win--corner{border-radius:16px;box-shadow:var(--sh-2)}
@@ -1878,6 +1889,14 @@ html[data-splash-no-doodles] #splash .splash__doodles{display:none}
 
 /* --- Ответ / редактирование --- */
 .chat-reply{display:flex;align-items:center;gap:9px;padding:7px 12px;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:var(--sh-1)}
+/* Плашка над полем ввода не «прыгает»: появляется со сдвигом и прозрачностью,
+   а при закрытии/отправке гаснет тем же движением (фантомный слой). */
+.chat-reply--in{animation:chatReplyIn .24s var(--ease)}
+.chat-reply--ghost{pointer-events:none;z-index:6}
+.chat-reply--out{animation:chatReplyOut .22s var(--ease) forwards}
+@keyframes chatReplyIn{from{opacity:0;transform:translateY(9px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes chatReplyOut{from{opacity:1;transform:none}to{opacity:0;transform:translateY(7px) scale(.99)}}
+@media (prefers-reduced-motion:reduce){.chat-reply--in,.chat-reply--out{animation:none}}
 .chat-reply__bar{width:3px;align-self:stretch;border-radius:3px;background:var(--accent);flex:none}
 .chat-edit__bar{background:var(--yellow)}
 .chat-reply__txt{display:flex;flex-direction:column;min-width:0;flex:1;font-size:12px;line-height:1.35}
