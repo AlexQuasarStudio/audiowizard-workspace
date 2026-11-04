@@ -1005,6 +1005,9 @@ const Windows = (() => {
          шапке должен сворачивать/разворачивать, а не откреплять окно. */
       if (win.classList.contains('aw-win--corner') && !win.__cornerDetached){
         win.__cornerDetached = true;
+        /* Запомним, из какого уголка вытащили: подсветку этого же уголка не
+           показываем, пока окно не отъедет, иначе оно липнет обратно */
+        win.__cornerGuard = win.__cornerPos || null;
         win.classList.remove('aw-win--corner');
         if (win.classList.contains('aw-win--corner-min')){
           win.classList.remove('aw-win--corner-min');
@@ -1048,15 +1051,26 @@ const Windows = (() => {
       win.style.left = x + 'px';
       win.style.top = y + 'px';
       let snap = null, cornerDrop = null;
-      /* Эксклюзивно для окон чатов: у самого угла экрана — «режим уголка». */
+      /* Эксклюзивно для окон чатов: у самого угла экрана — «режим уголка».
+         Считаем не только по курсору, но и по самому окну: окно тащат за
+         шапку, и курсор физически не доходит до края экрана, пока угол окна
+         уже стоит в углу. Иначе подсветка не появлялась никогда. */
       if (isChatWin(win)){
-        const zone = 96;
-        const nearL = e.clientX <= zone, nearR = e.clientX >= window.innerWidth - zone;
-        const nearT = e.clientY <= zone, nearB = e.clientY >= window.innerHeight - zone;
-        if (nearL && nearT) cornerDrop = 'tl';
-        else if (nearR && nearT) cornerDrop = 'tr';
-        else if (nearL && nearB) cornerDrop = 'bl';
-        else if (nearR && nearB) cornerDrop = 'br';
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const cands = [
+          { p:'tl', d: Math.min(Math.hypot(x, y), Math.hypot(e.clientX, e.clientY)) },
+          { p:'tr', d: Math.min(Math.hypot(x + w - vw, y), Math.hypot(vw - e.clientX, e.clientY)) },
+          { p:'bl', d: Math.min(Math.hypot(x, y + h - vh), Math.hypot(e.clientX, vh - e.clientY)) },
+          { p:'br', d: Math.min(Math.hypot(x + w - vw, y + h - vh), Math.hypot(vw - e.clientX, vh - e.clientY)) }
+        ];
+        const best = cands.reduce((a, b) => (b.d < a.d ? b : a));
+        if (best.d <= 120) cornerDrop = best.p;
+        /* Окно только что вытащили из этого уголка — не ловим его снова,
+           пока оно не отъедет от угла хотя бы на полторы зоны */
+        if (win.__cornerGuard){
+          if (cornerDrop === win.__cornerGuard && best.d < 170) cornerDrop = null;
+          else if (cornerDrop !== win.__cornerGuard || best.d >= 170) win.__cornerGuard = null;
+        }
       }
       if (!cornerDrop){
         if (x < 26) snap = (y < 26 ? 'tl' : 'left');        /* левая половина */

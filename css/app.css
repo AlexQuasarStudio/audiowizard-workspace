@@ -1345,8 +1345,9 @@ select.inline-input{padding:3px 30px 3px 8px;background-position:right 8px cente
 @keyframes pickIn{from{opacity:0;transform:translateY(-4px) scale(.985)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.inline-pick{animation:none}}
 td .inline-input{min-width:96px}
-.aw-snap-guide{position:fixed;z-index:2990;background:var(--accent-soft);border:2px dashed var(--accent);border-radius:12px;display:none;pointer-events:none}
-.aw-snap-guide--corner{border-style:solid;border-radius:16px;background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.aw-snap-guide{position:fixed;z-index:4380;background:var(--accent-soft);border:2px dashed var(--accent);border-radius:12px;display:none;pointer-events:none;transition:opacity .12s var(--ease)}
+.aw-snap-guide--corner{border-style:solid;border-radius:16px;background:color-mix(in srgb,var(--accent) 15%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 35%,transparent),0 12px 40px color-mix(in srgb,var(--accent) 18%,transparent)}
+.aw-snap-guide--corner::after{content:"Уголок";position:absolute;left:50%;top:12px;transform:translateX(-50%);font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);opacity:.9}
 /* Уголок окна чата: компактная панель у угла экрана */
 .aw-win--corner{border-radius:16px;box-shadow:var(--sh-2)}
 .aw-win--corner .aw-win__max{width:0;opacity:0;transform:scale(.6);pointer-events:none;margin:0;padding:0;border:0;overflow:hidden}
