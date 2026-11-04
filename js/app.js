@@ -1634,6 +1634,13 @@ snapToCorner(S.draftPrefs.zenAvatarPos || 'bc', false);
             <div class="seg" id="ob-mode">${MODE_LIST.map(m=>`<button data-m="${m}" class="${(u2.mode||'system')===m?'on':''}">${MODE_LABEL[m]}</button>`).join('')}</div>
             <div class="chips" id="ob-accent" style="margin-top:8px">${ACCENT_LIST.map(a=>`<span class="chip ${(u2.accent||'violet')===a?'on':''}" data-a="${a}">${ACCENT_LABEL[a]}</span>`).join('')}</div>
           </div>
+          <div class="field"><label>Фон приложения</label>
+            <div class="seg" id="ob-appbg" style="flex-wrap:wrap">
+              ${[['doodle','Дудлы'],['none','Без фона']]
+                .map(([v,label])=>`<button data-bg="${v}" class="${(S.settings.appBg!=='none'?'doodle':'none')===v?'on':''}">${label}</button>`).join('')}
+            </div>
+            <div class="tiny faint" style="margin-top:6px">Мягкий рукописный узор за интерфейсом — можно сменить позже в настройках.</div>
+          </div>
         </div>`,
       footer:`<button class="btn btn--ghost" data-skip>Пропустить</button><button class="btn btn--primary" data-go>Сохранить и начать тур</button>`,
       onMount:(m2,c2)=>{
@@ -1655,6 +1662,13 @@ snapToCorner(S.draftPrefs.zenAvatarPos || 'bc', false);
         m2.querySelectorAll('#ob-accent .chip').forEach(ch=>ch.onclick=()=>{
           m2.querySelectorAll('#ob-accent .chip').forEach(x=>x.classList.remove('on')); ch.classList.add('on');
           u2.accent = ch.dataset.a; applyTheme(u2.mode, u2.accent);
+        });
+        m2.querySelectorAll('#ob-appbg [data-bg]').forEach(btn=>btn.onclick=()=>{
+          const v = btn.dataset.bg;
+          S.settings.appBg = v;
+          S.settings.appBgDoodles = (v === 'doodle');
+          applyAppBg();
+          m2.querySelectorAll('#ob-appbg [data-bg]').forEach(b=>b.classList.toggle('on', b.dataset.bg===v));
         });
         m2.querySelector('[data-skip]').onclick = ()=>{ u2.tour_completed = true; saveState(); c2(); toast('Профиль сохранён. Тур можно запустить позже из профиля', 'info'); };
         m2.querySelector('[data-go]').onclick = ()=>{
