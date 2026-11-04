@@ -227,6 +227,7 @@ body.pills-move .head__ops{-webkit-backdrop-filter:none!important;backdrop-filte
 .page-head h2{font-size:21px}
 .page-head .sub{color:var(--muted);font-size:13px;margin-top:3px}
 .page-actions{display:flex;gap:8px;flex-wrap:wrap}
+.bc-short{display:none}
 
 /* ---------- Авторизация ---------- */
 .auth{height:100vh;height:100dvh;display:flex;align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden;background:var(--bg);isolation:isolate}
@@ -989,6 +990,11 @@ body:not(.zen) .side{position:fixed;top:7px;left:12px;bottom:7px;height:auto;tra
 .head__burger{display:inline-flex;flex:none}
   .side__burger{display:none}
   .side__close{display:inline-flex}
+  /* Кнопка рассылки на телефоне: короткий текст, чтобы ряд действий не переносился
+     и не обрезался ограничением max-height у шапки чатов */
+  .bc-full{display:none}
+  .bc-short{display:inline}
+  .view--chats > .page-head{max-height:220px}
 }
 body:not(.zen) .head{position:sticky;top:0}
 body.zen .shell{grid-template-rows:0fr 1fr 0fr;grid-template-columns:1fr}

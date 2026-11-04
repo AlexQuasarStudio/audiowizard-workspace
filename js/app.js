@@ -4940,7 +4940,7 @@ const cm = root.querySelector('.chat-main');
           <button class="iconbtn qa-iconbtn" id="btn-chat-search" title="Поиск по сообщениям">${icon('search')}</button>
           <button class="iconbtn qa-iconbtn" id="btn-new-chat" title="Новый чат">${icon('user-plus')}</button>
           <button class="iconbtn qa-iconbtn" id="btn-new-group" title="Новая группа">${icon('users')}</button>
-          <button class="btn btn--primary" id="btn-broadcast" style="display:none">${icon('send')} Массовое сообщение</button>
+          <button class="btn btn--primary" id="btn-broadcast" style="display:none">${icon('send')} <span class="bc-full">Массовое сообщение</span><span class="bc-short">Рассылка</span></button>
         </div></div>
       <div class="chat-search-panel" id="chat-search-panel" hidden>
         <div class="chat-search-row">
