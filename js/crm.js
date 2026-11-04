@@ -735,14 +735,14 @@ const CRM = (() => {
       const host = root.querySelector('#o-bulk');
       if (!host) return;
       const n = sel.size;
-      if (!n){ host.innerHTML = ''; return; }
+      if (!n){ setBulk(host, ''); return; }
       const osum = [...sel].reduce((acc,id) => { const o = S.orders.find(x => x.id === id); return acc + (o ? o.total : 0); }, 0);
-      host.innerHTML = `<div class="card card-pad row wrap" style="padding:10px 14px;margin-bottom:12px;border-color:var(--accent)">
+      setBulk(host, `<div class="card card-pad row wrap" style="padding:10px 14px;margin-bottom:12px;border-color:var(--accent)">
           <b>Выбрано: ${n} · на сумму ${fmtMoney(osum)}</b><span class="spacer"></span>
           <button class="btn btn--ghost btn--sm" data-bulk="status">${icon('refresh')} Статус</button>
           ${staff?'<button class="btn btn--ghost btn--sm" data-bulk="pay">'+icon('card')+' Оплатить</button>':''}
           <button class="btn btn--danger btn--sm" data-bulk="del">${icon('trash')} Удалить</button>
-        </div>`;
+        </div>`);
       $$('[data-bulk]', host).forEach(b=>b.addEventListener('click', () => bulkAction(b.dataset.bulk)));
     }
 
@@ -1964,6 +1964,47 @@ const CRM = (() => {
     setTimeout(() => moves.forEach(([el]) => { el.style.transition = ''; el.style.transform = ''; }), dur + 120);
   }
 
+  /* Плашка массовых действий: раскрывается по высоте при первом выбранном
+     элементе и так же плавно уходит, когда выделение снято. Раньше она
+     вставлялась и стиралась одним innerHTML — список прыгал на её высоту. */
+  function setBulk(host, html){
+    if (!host) return;
+    const open = host.dataset.open === '1';
+    if (html){
+      host.innerHTML = html;
+      /* Уже раскрыта: меняем только содержимое (счётчик), высота по контенту,
+         анимация появления не перезапускается. */
+      if (open){ host.style.height = ''; return; }
+      host.dataset.open = '1';
+      host.classList.remove('bulk-out');
+      host.style.height = 'auto';
+      const h = host.offsetHeight;
+      host.style.height = '0px';
+      void host.offsetHeight;
+      host.classList.add('bulk-in');
+      host.style.height = h + 'px';
+      /* Класс снимаем после проявления: иначе каждое новое выделение
+         перезапускало бы анимацию появления плашки. */
+      clearTimeout(host.__bulkT);
+      host.__bulkT = setTimeout(() => { host.style.height = ''; host.classList.remove('bulk-in'); host.__bulkT = null; }, 260);
+      return;
+    }
+    if (!open) return;
+    clearTimeout(host.__bulkT);
+    host.dataset.open = '0';
+    host.classList.remove('bulk-in');
+    host.style.height = host.offsetHeight + 'px';
+    void host.offsetHeight;
+    host.classList.add('bulk-out');
+    host.style.height = '0px';
+    host.__bulkT = setTimeout(() => {
+      host.innerHTML = '';
+      host.classList.remove('bulk-out');
+      host.style.height = '';
+      host.__bulkT = null;
+    }, 240);
+  }
+
   /* Точечная перерисовка списка (поиск, даты) идёт мимо render():
      снимаем позиции строк до и доигрываем после. */
   function refillList(root, fn){
@@ -2303,20 +2344,20 @@ updatePeopleBulk();
       const host = root.querySelector('#pl-bulk');
       if (!host) return;
       const n = psel.size;
-      if (!n){ host.innerHTML = ''; return; }
+      if (!n){ setBulk(host, ''); return; }
       const sum = [...psel].reduce((acc,id) => {
         const p = list.find(x => x.id === id);
         if (!p) return acc;
         const mt = role==='executor' ? executorMetrics(p) : clientMetrics(p);
         return acc + (mt.sum || 0);
       }, 0);
-      host.innerHTML = `<div class="card card-pad row wrap" style="padding:10px 14px;margin-bottom:12px;border-color:var(--accent)">
+      setBulk(host, `<div class="card card-pad row wrap" style="padding:10px 14px;margin-bottom:12px;border-color:var(--accent)">
           <b>Выбрано: ${n} · на сумму ${fmtMoney(sum)}</b><span class="spacer"></span>
           <button class="btn btn--ghost btn--sm" data-pbulk="status">${icon('refresh')} Статус</button>
           <button class="btn btn--ghost btn--sm" data-pbulk="manager">${icon('user-plus')} Менеджер</button>
           ${role==='executor'?`<button class="btn btn--ghost btn--sm" data-pbulk="work">${icon('refresh')} Рабочий статус</button>`:''}
           <button class="btn btn--danger btn--sm" data-pbulk="del">${icon('trash')} Удалить</button>
-        </div>`;
+        </div>`);
       $$('[data-pbulk]', host).forEach(b=>b.addEventListener('click', () => peopleBulkAction(b.dataset.pbulk)));
     }
 

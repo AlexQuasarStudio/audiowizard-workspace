@@ -1600,6 +1600,20 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
    так клик отзывается без паузы и без мигания в пустоту. */
 .list-swap{animation:listSwap .18s var(--ease)}
 @keyframes listSwap{from{transform:translateY(4px)}to{transform:none}}
+
+/* Плашка массовых действий (заказы/люди): раскрывается по высоте, когда
+   что-то выбрано, и так же уходит при снятии выделения — список не прыгает
+   на её высоту. */
+#o-bulk,#pl-bulk{overflow:hidden;transition:height .22s var(--ease)}
+#o-bulk>.card,#pl-bulk>.card{transition:opacity .18s var(--ease),transform .22s var(--ease)}
+#o-bulk.bulk-in>.card,#pl-bulk.bulk-in>.card{animation:bulkIn .24s var(--ease)}
+#o-bulk.bulk-out>.card,#pl-bulk.bulk-out>.card{opacity:0;transform:translateY(-6px)}
+@keyframes bulkIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){
+  #o-bulk,#pl-bulk{transition:none}
+  #o-bulk.bulk-in>.card,#pl-bulk.bulk-in>.card{animation:none}
+  #o-bulk.bulk-out>.card,#pl-bulk.bulk-out>.card{opacity:1;transform:none}
+}
 @keyframes viewIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 /* Дудл-фон на авторизации: мягкий узор-«подсветка» акцентного тона.
