@@ -729,6 +729,7 @@ const Windows = (() => {
     const switchBtn = win.querySelector('.aw-win__title--sw');
     if (switchBtn){
       switchBtn.onclick = (ev) => {
+        if (win.classList.contains('aw-win--corner')) return;
         if (typeof showDropdown !== 'function') return;
         const items = [];
         for (const sec of NAV_SRC){

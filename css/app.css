@@ -1240,6 +1240,11 @@ body.menu-dragging .main .theme-card:hover{box-shadow:none!important;transform:n
 /* Уголок окна чата: компактная панель у угла экрана */
 .aw-win--corner{border-radius:16px;box-shadow:var(--sh-2)}
 .aw-win--corner .aw-win__max{width:0;opacity:0;transform:scale(.6);pointer-events:none;margin:0;padding:0;border:0;overflow:hidden}
+/* В уголке раздел не меняем: стрелка плавно гаснет, заголовок некликабелен.
+   При выходе из уголка стрелка так же плавно возвращается. */
+.aw-win__title--sw .ico{transition:opacity .2s var(--ease),transform .2s var(--ease)}
+.aw-win--corner .aw-win__title--sw{pointer-events:none;cursor:default}
+.aw-win--corner .aw-win__title--sw .ico:last-child{opacity:0;transform:translateY(-3px) scale(.8)}
 /* Свёрнутый уголок: окно сжимается до своей шапки, тело плавно прячется
    за границей (overflow:hidden), разворот — обратной анимацией высоты. */
 .aw-win--corner-min{min-height:0!important}
