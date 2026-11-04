@@ -814,8 +814,10 @@ body.zen .chat-msgs{
 .o-tbl tbody tr td:first-child,.o-tbl tbody tr td:last-child{border-radius:0}
 .o-tbl tbody tr:hover td{background:var(--panel-2)}
 .o-tbl thead th{background:var(--panel-2);border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;white-space:nowrap}
-.o-tbl thead th:first-child{border-radius:12px 0 0 12px}
-.o-tbl thead th:last-child{border-radius:0 12px 12px 0}
+/* Как у клиентов/исполнителей: у шапки скруглены только верхние углы,
+   нижняя кромка прямая — иначе она «отрывается» от первой строки. */
+.o-tbl thead th:first-child{border-radius:12px 0 0 0}
+.o-tbl thead th:last-child{border-radius:0 12px 0 0}
 .o-tbl td.o-head{display:none}
 
 .o-tbl .o-ell{max-width:100%}
