@@ -1599,7 +1599,7 @@ const CRM = (() => {
           const normE = norm(email);
           if (S.users.some(x=>x.role===role && ((x.email && norm(x.email)===normE) || (x.phone && x.phone===phone)))){ toast('Такой контакт уже существует','err'); return; }
           const nu = { id: uid(), username: normE.split('@')[0] || 'user'+Date.now(), email, pw:'inline123', role,
-            full_name: name, phone, about:'', theme:'system', is_online:false, avatar:'', consent_marketing:false, tour_completed:true, created_at: Date.now(),
+            full_name: name, phone, about:'', theme:'system', is_online:false, avatar:'', consent_marketing:false, tour_completed:false, created_at: Date.now(),
             ext: { specializations: [], qualification:{}, qualOverall:0, earned:0, status:'active', workStatus:'working', comment:'',
               managerId: me().id, xlsxRow: null, num: nextPersonNum() } };
           S.users.push(nu);
@@ -1873,7 +1873,7 @@ updatePeopleBulk();
   }
 
   function openPersonForm(role, editPerson){
-    const p = editPerson || { id:uid(), username:'', email:'', pw:'', role, full_name:'', phone:'', about:'', mode:'system', accent:'violet', is_online:true, avatar:'', consent_marketing:true, tour_completed:true, created_at:Date.now(), ext:{ specializations:[], qualification:{}, qualOverall:0, earned:0, status:'active', workStatus:'working', comment:'', commentPersonal:'', managerId:'' } };
+    const p = editPerson || { id:uid(), username:'', email:'', pw:'', role, full_name:'', phone:'', about:'', mode:'system', accent:'violet', is_online:true, avatar:'', consent_marketing:true, tour_completed:false, created_at:Date.now(), ext:{ specializations:[], qualification:{}, qualOverall:0, earned:0, status:'active', workStatus:'working', comment:'', commentPersonal:'', managerId:'' } };
     const isNew = !editPerson;
     const manOpts = S.users.filter(x=>['manager','top_manager'].includes(x.role)).map(m=>'<option value="'+m.id+'" '+(p.ext.managerId===m.id?'selected':'')+'>'+esc(m.full_name)+'</option>').join('');
     openWinModal({
@@ -2732,7 +2732,7 @@ updatePeopleBulk();
           if ((email && clientKeys.has('e:' + norm(email))) || (phone && clientKeys.has('p:' + phone))){
             logBuf.push([`[${j.sheet}] Строка ${rowNo}: дубликат (${fio}) — пропущен`, 'warn']); mark(j,'skipped',1); skipped++; return;
           }
-          const nu = { id: uid(), username: norm(email).split('@')[0] || 'user' + rowNo, email: email || '', pw: 'import123', role: 'client', full_name: fio, phone, about: '', theme: 'system', is_online: false, avatar: '', consent_marketing: false, tour_completed: true, created_at: Date.now(),
+          const nu = { id: uid(), username: norm(email).split('@')[0] || 'user' + rowNo, email: email || '', pw: 'import123', role: 'client', full_name: fio, phone, about: '', theme: 'system', is_online: false, avatar: '', consent_marketing: false, tour_completed: false, created_at: Date.now(),
             ext: { company: /^(ооо|ао|ип|зао)\b/i.test(fio) ? fio : '', roleIn: '', comment, discountApplied: false, managerId: me().id, status: 'active', requisites: {}, consentNews: false, xlsxRow: j.rowNo, num: nextPersonNum() } };
           applyRules('client', ruleContext('client', nu, null, j.rowNo), nu, null, n => { addLog(`[${j.sheet}] ` + n, 'rule'); ruled++; });
           S.users.push(nu); _imp.clients[j.rowNo] = nu.id; if (nu.email) clientKeys.add('e:' + norm(nu.email)); if (nu.phone) clientKeys.add('p:' + nu.phone); mark(j,'added',1); added++;
@@ -2750,7 +2750,7 @@ updatePeopleBulk();
             const exists = S.specializations.some(x => norm(x.name) === norm(sp2));
             if (!exists) S.specializations.push({ id: uid(), nish_id: null, name: sp2, from_import: true });
           });
-          const nu = { id: uid(), username: norm(email).split('@')[0] || 'user' + rowNo, email: email || '', pw: 'import123', role: 'executor', full_name: fio, phone, about: '', theme: 'system', is_online: false, avatar: '', consent_marketing: false, tour_completed: true, created_at: Date.now(),
+          const nu = { id: uid(), username: norm(email).split('@')[0] || 'user' + rowNo, email: email || '', pw: 'import123', role: 'executor', full_name: fio, phone, about: '', theme: 'system', is_online: false, avatar: '', consent_marketing: false, tour_completed: false, created_at: Date.now(),
             ext: { specializations: specs, qualification: {}, qualOverall: specs.length ? 1 : 0, earned, status: 'active', workStatus: 'working', comment, commentPersonal: '', managerId: me().id, xlsxRow: j.rowNo, num: nextPersonNum() } };
           S.users.push(nu); _imp.executors[j.rowNo] = nu.id; if (nu.email) execKeys.add('e:' + norm(nu.email)); if (nu.phone) execKeys.add('p:' + nu.phone); mark(j,'added',1); added++;
           logBuf.push([`[${j.sheet}] Строка ${rowNo}: + исполнитель ${fio}${earned ? ' · ' + fmtMoney(earned) : ''}`, 'ok']);
