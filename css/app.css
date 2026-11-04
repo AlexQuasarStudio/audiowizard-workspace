@@ -1647,7 +1647,7 @@ html[data-splash-no-doodles] #splash .splash__doodles{display:none}
 .react-av{width:14px;height:14px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:7px;font-weight:800;color:#fff;border:1px solid var(--panel);margin-left:-4px;flex:none;overflow:hidden;background-size:cover;background-position:center}
 .react-av:first-child{margin-left:0}
 .react-n{font-size:10.5px;font-weight:700;color:var(--text-2)}
-.react-face{display:inline-flex;align-items:center}
+.react-face{display:inline-flex;align-items:center;position:relative}
 @keyframes reactIn{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:none}}
 @keyframes reactPop{0%{transform:scale(.85)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
 @keyframes reactFade{to{opacity:0;transform:scale(.9)}}
