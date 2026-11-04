@@ -32,7 +32,7 @@ const AI = (() => {
     initState();
     const tabs = [['ai-transcribe','Стенограммы','mic'],['ai-texts','Копирайтинг','edit'],['ai-translate','Переводы','globe']];
     return `<div class="page-head"><div><h2>${title}</h2><div class="sub">${sub}</div></div>
-      <div class="page-actions">${((S.product||{}).beta !== false) ? '<span class="beta-badge">Beta</span>' : ''}<span class="badge c-accent">${icon('sparkle','ico-sm')} ИИ-движок</span></div></div>
+      <div class="page-actions"><span class="badge c-accent">${icon('sparkle','ico-sm')} ИИ-движок</span></div></div>
       <div class="tabs" style="margin-bottom:16px">${tabs.map(([r,t,ic])=>`<button class="tab ${active===r?'on':''}" data-ai-tab="${r}">${icon(ic,'ico-sm')} ${t}</button>`).join('')}</div>`;
   }
   function bindTabs(root){
@@ -41,7 +41,7 @@ const AI = (() => {
   function attachToOrder(kind, filename, text){
     const orders = ordersFor(me()).filter(o=>o.status!=='archived');
     if (!orders.length){ toast('Нет доступных заказов для прикрепления','warn'); return; }
-    openModal({
+    openWinModal({
       narrow:true, title:`Прикрепить к заказу`,
       body:`<div class="field"><label>Заказ</label><select class="input" id="at-order">${orders.map(o=>`<option value="${o.id}">${o.order_id} · ${(clientById(o.client_id)||{}).full_name||''}</option>`).join('')}</select></div>
         <p class="small faint" style="margin-top:10px">Файл появится в карточке заказа: <b>${esc(filename)}</b></p>`,
@@ -306,7 +306,11 @@ const AI = (() => {
 
     function drawWave(){
       const cv = g('#ai-wave'); if (!cv) return;
-      const W = Math.max(160, cv.parentElement.clientWidth - 4), H = 56;
+      /* clientWidth включает padding карточки — вычитаем его, иначе волна
+         рисуется шире контента и подрезается overflow:hidden. */
+      const par = cv.parentElement;
+      const pcs = getComputedStyle(par);
+      const W = Math.max(160, par.clientWidth - (parseFloat(pcs.paddingLeft)||0) - (parseFloat(pcs.paddingRight)||0) - 4), H = 56;
       cv.width = W * devicePixelRatio; cv.height = H * devicePixelRatio;
       cv.style.width = W+'px';
       const ctx = cv.getContext('2d'); ctx.scale(devicePixelRatio, devicePixelRatio);
@@ -401,7 +405,7 @@ const AI = (() => {
             const m0 = w.t.match(/^(.*?)([.,!?;:…]*)$/);
             const base = m0[1]||w.t;
             const punct = m0[2]||'';
-            openModal({
+            openWinModal({
               narrow:true, title:'Свой вариант слова',
               body:`<p class="small muted" style="margin-bottom:10px">Заменить «<b>${esc(base)}</b>» на:</p>
                 <div class="field"><input class="input" id="own-word" value="${esc(base)}"></div>`,
@@ -448,7 +452,7 @@ const AI = (() => {
       if (spk){
         const idv = spk.dataset.spk;
         const cur = S.aiSpeakers[idv] || AI_DATA.speakers[idv];
-        openModal({
+        openWinModal({
           narrow:true, title:'Имя спикера',
           body:`<div class="field"><label>Спикер ${idv}</label><input class="input" id="spk-name" value="${esc(cur)}"></div>`,
           footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-save>Сохранить</button>`,

@@ -7,6 +7,42 @@
 const CRM = (() => {
 
   /* ==================== ЗАКАЗЫ ==================== */
+  /* Групповое выделение персон (клиенты/исполнители): живущее на уровне модуля,
+     т.к. personRow/personCard определяются вне peopleView. */
+  const psel = new Set();
+  /* Состояние drag-выделения таблиц/карточек. Живёт на уровне модуля, чтобы
+     сбрасываться ОДНИМ постоянным обработчиком mouseup и по Esc.
+     Раньше mouseup-слушатели вешались с {once:true}: после первого отпускания
+     мыши они удалялись, drag-состояние больше не очищалось — и после Esc
+     строки снова «сами» выделялись при движении мыши. */
+  let dragSel = null, dragSelMoved = false;      /* заказы */
+  let dragSelPl = null, dragSelPlMoved = false;  /* клиенты/исполнители */
+  const clearDragSel = () => { dragSel = null; dragSelMoved = false; dragSelPl = null; dragSelPlMoved = false; };
+  /* Постоянный сброс на отпускание мыши (без once — иначе работает один раз) */
+  document.addEventListener('mouseup', clearDragSel);
+  document.addEventListener('touchend', clearDragSel, { passive:true });
+  document.addEventListener('dragend', clearDragSel);
+  window.addEventListener('blur', clearDragSel);
+  /* Esc снимает выделение во всех таблицах (если оно есть) */
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const had = !!document.querySelector('.row-sel:checked');
+    /* Всегда отпускаем drag-выделение, даже если галочки уже сняты */
+    clearDragSel();
+    if (!had) return;
+    e.preventDefault(); e.stopPropagation();
+    try { CRM._ordersSelClear && CRM._ordersSelClear(); } catch(err){}
+    try { CRM._peopleSelClear && CRM._peopleSelClear(); } catch(err){}
+  });
+  /* Тарифы SaaS: «ИИ», «ИИ + человек», «Человек» */
+  const TARIFFS = [
+    { id:'ai',       label:'ИИ' },
+    { id:'ai_human', label:'ИИ + человек' },
+    { id:'human',    label:'Человек' }
+  ];
+  const tariffLabel = id => (TARIFFS.find(t => t.id === id) || {}).label || '';
+  const tariffChip = id => id ? `<span class="badge badge--outline tariff-chip tariff-chip--${esc(id)}">${esc(tariffLabel(id))}</span>` : '';
+
   const canStatus = (from, to, user) => {
     if (from === to) return { ok:false, why:'Статус не изменён' };
     if (to === 'waiting'){
@@ -68,6 +104,22 @@ const CRM = (() => {
     if (to === 'archived' || to !== 'archived' && o.status !== 'archived') {}
     if (to !== 'archived') o.archived_at = o.status==='archived' ? o.archived_at : null;
     if (to === 'done' && !o._accrued){ applyAccrual(o, +1); o.history.push({t:Date.now(), txt:'Начислен заработок исполнителям'}); }
+    /* Реферальная программа: процент пригласившему за выполненный заказ */
+    if (to === 'done'){
+      try {
+        const rec = accrueReferral(o);
+        if (rec && rec.amount > 0){
+          const ref = userById(rec.referrerId);
+          if (ref){
+            S.notifs = S.notifs || [];
+            S.notifs.unshift({ id:uid(), icon:'i-card', title:'Реферальное начисление',
+              text:`${fmtMoney(rec.amount)} за заказ ${o.order_id} (${rec.percent}% от ${fmtMoney(rec.base)}${(rec.first && Number(refConfig().fixedBonus)) ? ' + бонус за первый заказ' : ''})`,
+              t:Date.now(), read:{}, owner_id: ref.id });
+            saveState();
+          }
+        }
+      } catch(e){ console.error(e); }
+    }
     logAudit(`Статус заказа ${o.order_id}: ${STATUS_META[to].label}`, 'Заказ');
     notifyParticipants(o, `Заказ ${o.order_id}: ${STATUS_META[to].label}`);
     saveState();
@@ -120,13 +172,48 @@ const CRM = (() => {
     return `AW-${max + 1}`;
   }
 
+  /* Номер заказа — только латиница: кириллические двойники переводим
+     в латиницу, остальные недопустимые символы убираем. */
+  const CYR_ID_MAP = { 'А':'A','В':'B','С':'C','Е':'E','Н':'H','К':'K','М':'M','О':'O','Р':'P','Т':'T','Х':'X','У':'Y' };
+  function sanitizeOrderId(v){
+    return String(v || '')
+      .toUpperCase()
+      .split('')
+      .map(ch => CYR_ID_MAP[ch] || ch)
+      .join('')
+      .replace(/[^A-Z0-9-]/g, '')
+      .replace(/-{2,}/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
   /* ---------- Таблица заказов ---------- */
-  const ofilter = { q:'', statuses:new Set(), niche:'', project:'', manager:'', archived:false, sortKey:'start_date', sortDir:1 };
+  const ofilter = { q:'', statuses:new Set(), niche:'', project:'', manager:'', archived:false,
+    dateFrom:'', dateTo:'', sortKey:'start_date', sortDir:1 };
+    const iso2ru = iso => { if (!iso) return ''; const [y,m,d] = iso.split('-'); return d+'.'+m+'.'+y; };
+    const ru2iso = s => {
+      s = (s||'').trim(); if (!s) return '';
+      let m;
+      if ((m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/))) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+      if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+      if ((m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2})$/))) return '20'+m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+      return null;
+    };
 
   /* ---------- Таблица заказов: skeleton + прогрессивная подгрузка ---------- */
   const O_CHUNK = 80;
 
+  /* Окно — самостоятельный экземпляр: его фильтры/поиск не должны
+     менять состояние раздела на странице. Ключ — сам контейнер root. */
+  const oFilterFor = (root)=>{
+    if (root && root.closest && root.closest('.aw-win')){
+      if (!root.__oFilter) root.__oFilter = { q:'', statuses:new Set(), niche:'', project:'', manager:'', archived:false, dateFrom:'', dateTo:'', sortKey:'start_date', sortDir:1 };
+      return root.__oFilter;
+    }
+    return ofilter;
+  };
+
   function ordersView(root){
+    const ofilter = oFilterFor(root);
     const u = me();
     const staff = isStaff(u.role);
     const all = ordersFor(u);
@@ -134,8 +221,14 @@ const CRM = (() => {
     let shown = Math.min(window.__ordersShownMem || O_CHUNK, 100000);
     let tblScrollX = window.__ordersTblScrollX || 0;
     let sel = new Set();
+    let lastSelSel = null; /* последний чекбокс для Shift-диапазона */
     let io = null;
     let firstEntry = true;
+    /* Базовый список для «Всего заказов»: как и строки, учитывает переключатель
+       «Архив», но НЕ остальные фильтры (поиск/статус/менеджер/даты). Раньше тут
+       стоял noDemo(S.orders) целиком — при выключенном «Архив» счётчик показывал
+       больше, чем «из N» в строке («Всего заказов: 1536 … показано 80 из 1534»). */
+    const totalBase = () => noDemo(S.orders).filter(o => ofilter.archived ? o.status === 'archived' : o.status !== 'archived');
 
     function computeList(){
       const arr = all.filter(o => {
@@ -145,6 +238,13 @@ const CRM = (() => {
         if (ofilter.statuses.size && !ofilter.statuses.has(o.status)) return false;
         if (ofilter.niche && o.nish_id !== ofilter.niche) return false;
         if (ofilter.project && o.project_id !== ofilter.project) return false;
+        /* Диапазон дат (по дате начала заказа) */
+        if (ofilter.dateFrom || ofilter.dateTo){
+          const d = o.start_date || o.order_date || o.created_at;
+          if (!d) return false;
+          if (ofilter.dateFrom && d < new Date(new Date(ofilter.dateFrom).setHours(0,0,0,0)).getTime()) return false;
+          if (ofilter.dateTo && d > new Date(new Date(ofilter.dateTo).setHours(23,59,59,999)).getTime()) return false;
+        }
         if (ofilter.q){
           const q = norm(ofilter.q);
           const hay = `${o.order_id} ${(clientById(o.client_id)||{}).full_name} ${o.comment} ${nicheName(o.nish_id)}`;
@@ -155,7 +255,9 @@ const CRM = (() => {
       const k = ofilter.sortKey, d = ofilter.sortDir;
       arr.sort((a,b)=>{
         let va, vb;
-        if (k === 'deadline'){ va = a.deadline || Infinity; vb = b.deadline || Infinity; }
+        if (k === 'order_id'){ va = a.order_id || ''; vb = b.order_id || ''; return String(va).localeCompare(String(vb)) * d; }
+        else if (k === 'start_date'){ va = a.start_date || a.order_date || 0; vb = b.start_date || b.order_date || 0; }
+        else if (k === 'deadline'){ va = a.deadline || Infinity; vb = b.deadline || Infinity; }
         else if (k === 'total'){ va = a.total; vb = b.total; }
         else if (k === 'client'){ va = (clientById(a.client_id)||{}).full_name || ''; vb = (clientById(b.client_id)||{}).full_name || ''; return va.localeCompare(vb) * d; }
         else { va = a.created_at; vb = b.created_at; }
@@ -181,7 +283,6 @@ const CRM = (() => {
         <td class="o-head" data-l="">
           <span class="order-id" data-copy="${o.order_id}" title="Скопировать ID">${o.order_id}</span>
           <span class="cell-main o-ell" title="${esc(clList.map(x=>x.full_name).join(', '))}">${esc(clList.map(x=>x.full_name).join(', ')||'—')}</span>
-          ${statusChip(o.status)}
           <span class="o-head-total">${fmtMoney(o.total)}</span>
           <svg class="ico ico-sm o-head-arrow"><use href="#i-chev-r"/></svg>
         </td>
@@ -191,32 +292,56 @@ const CRM = (() => {
         </td>
         <td data-l="Клиент"><span class="cell-main o-ell" title="${esc(clList.map(x=>x.full_name).join(', '))}">${clList.length ? esc(clList.map(x=>x.full_name).join(', ')) : '—'}</span></td>
         <td data-l="Исполнители" class="o-ex">${exShow.length ? `<span class="ex-stack" title="${esc(exTitle)}">${exShow.map(e=>avatarHTML(e,'avatar--sm ex-av')).join('')}${exRest>0?`<span class="ex-more">+${exRest}</span>`:''}</span>` : '<span class="faint">—</span>'}</td>
-        <td data-l="Статус">${statusChip(o.status)}</td>
         <td data-l="Начало" class="deadline-cell">${start?fmtDT(start):'—'}</td>
         <td data-l="Дедлайн" class="deadline-cell ${dlCls}">${dl?fmtDT(dl):'—'}</td>
         <td data-l="Итого" class="pay-cell">${fmtMoney(o.total)}</td>
+        <td data-l="Статус">${statusChip(o.status)}</td>
         <td data-l="" class="o-act">${staff?`<button class="iconbtn row-menu" data-oid="${o.id}" title="Действия">${icon('more')}</button>`:''}</td>
       </tr>`;
     }
-    const skelRow = () => `<tr>${'<td><div class="skel" style="height:13px"></div></td>'.repeat(9)}</tr>`;
-
     function render(useSkeleton){
+      /* Перерисовка root пересоздаёт поле поиска. Запоминаем фокус и каретку,
+         чтобы ввод не сбрасывался по мере набора. */
+      const ae = document.activeElement;
+      const keep = (ae && (ae.id === 'f-q' || ae.id === 'f-from' || ae.id === 'f-to')) ? { s:ae.selectionStart, e:ae.selectionEnd, id:ae.id } : null;
       list = computeList();
-      const useSkel = useSkeleton && list.length > O_CHUNK;
+      const cardsView = (S.settings.ordersView || 'table') === 'cards';
+      /* Скелетон не показываем: контент рендерится из localStorage мгновенно.
+         Даже при большом списке строки подставляются сразу (порциями для плавности). */
       root.innerHTML = `
         <div class="page-head">
-          <div><h2>Заказы</h2><div class="sub" id="o-count">Всего заказов: ${noDemo(S.orders).length}</div></div>
+          <div><h2>Заказы</h2><div class="sub" id="o-count">Всего заказов: ${noDemo(S.orders).filter(o => ofilter.archived ? o.status === 'archived' : o.status !== 'archived').length} · на сумму ${fmtMoney(noDemo(S.orders).filter(o => ofilter.archived ? o.status === 'archived' : o.status !== 'archived').reduce((a,o)=>a+o.total,0))}</div></div>
           <div class="page-actions">
+            <div class="seg view-seg" id="o-view">
+              <button data-view="table" class="${cardsView?'':'on'}" title="Таблица" aria-label="Таблица">${icon('table','ico-sm')}</button>
+              <button data-view="cards" class="${cardsView?'on':''}" title="Карточки" aria-label="Карточки">${icon('cards-view','ico-sm')}</button>
+            </div>
             <button class="btn btn--ghost" id="btn-tools">${icon('import')} Импорт / экспорт</button>
+            ${staff?`<button class="btn btn--soft" id="btn-inline-order" title="Добавить строку прямо в список">${icon('plus')} Строка</button>`:''}
             ${staff?`<button class="btn btn--primary" id="btn-new-order">${icon('plus')} Новый заказ</button>`:''}
           </div>
         </div>
         <div id="o-bulk"></div>
+        <div class="inline-add" id="o-inline" hidden>
+          <div class="inline-add__row">
+            <input class="input" id="oi-id" placeholder="ID (пусто = авто AW-N)" style="font-family:var(--mono);max-width:150px">
+            <input class="input" id="oi-client" placeholder="Клиент (ФИО/название)" style="min-width:170px">
+            <input class="input" id="oi-total" placeholder="Сумма, ₽" type="number" min="0" style="max-width:120px">
+            <input class="input input--date" id="oi-deadline" type="date" title="Дедлайн" style="max-width:150px">
+            <button class="btn btn--primary btn--sm" id="oi-save" title="Создать заказ">${icon('check-c','ico-sm')}</button>
+            <button class="iconbtn" id="oi-cancel" title="Отмена">${icon('x','ico-sm')}</button>
+          </div>
+          <div class="small faint" id="oi-hint">ID сгенерируется автоматически, если оставить поле пустым</div>
+        </div>
+        <p class="small faint" style="margin:0 0 8px">Правый клик по строке — контекстное меню · двойной клик — карточка заказа</p>
         <div class="filters">
           <div class="input-wrap">${icon('search')}<input class="input" id="f-q" placeholder="Поиск: ID, клиент, комментарий…" value="${esc(ofilter.q)}"></div>
         <select class="input" id="f-manager" style="width:auto;min-width:150px"><option value="">Все менеджеры</option>${S.users.filter(x=>isStaff(x.role)).map(x=>`<option value="${x.id}" ${ofilter.manager===x.id?'selected':''}>${esc(x.full_name)}</option>`).join('')}</select>
           <select class="input" id="f-niche"><option value="">Все ниши</option>${S.niches.map(n=>`<option value="${n.id}" ${ofilter.niche===n.id?'selected':''}>${esc(n.name)}</option>`).join('')}</select>
           <select class="input" id="f-project"><option value="">Все проекты</option>${S.projects.map(p=>`<option value="${p.id}" ${ofilter.project===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
+          <label class="small faint" style="display:inline-flex;align-items:center;gap:6px">с
+            <input class="input input--date" type="date" id="f-from" value="${ofilter.dateFrom||''}" title="Начало периода" style="width:auto;max-width:150px"> по
+            <input class="input input--date" type="date" id="f-to" value="${ofilter.dateTo||''}" title="Конец периода" style="width:auto;max-width:150px"></label>
           <label class="chip ${ofilter.archived?'on':''}" id="f-arch" style="cursor:pointer">${icon('archive','ico-sm')} Архив</label>
         </div>
         <div class="filters" style="margin-top:-4px">
@@ -224,50 +349,60 @@ const CRM = (() => {
             ${Object.entries(STATUS_META).filter(([st])=>st!=='archived'||ofilter.archived).map(([st,m])=>`<span class="chip ${ofilter.statuses.has(st)?'on':''}" data-st="${st}">${m.label}</span>`).join('')}
           </div>
         </div>
-        <div class="tbl-wrap card o-wrap" style="border-radius:var(--r-lg)">
-          <table class="tbl o-tbl">
-            <thead><tr>
-              <th style="width:34px">${staff||u.role==='client'?`<input type="checkbox" id="sel-all" title="Выбрать загруженные строки">`:''}</th>
-              <th class="sortable" data-sort="client">Заказ</th><th data-l="Клиент">Клиент</th>
-              <th>Исполнители</th>
-              <th>Статус</th><th class="sortable" data-sort="start_date">Начало</th><th class="sortable" data-sort="deadline">Дедлайн</th><th class="sortable" data-sort="total">Итого</th><th></th>
-            </tr></thead>
-            <tbody id="otb">${useSkel ? skelRow().repeat(10) : ''}</tbody>
-          </table>
+        <div class="tbl-wrap o-wrap ${cardsView?'o-wrap--cards':''}" style="border-radius:var(--r-lg)">
+          <div id="o-rows"></div>
+          <button class="o-to-top" type="button" hidden aria-label="Наверх">${icon('chev-d')}</button>
         </div>
-        <p class="small faint" style="margin-top:10px">Правый клик по строке — контекстное меню · двойной клик — карточка заказа</p>`;
+`;
 
       bindControls();
       bindTable();
-      if (useSkel){
-        setTimeout(()=>{ if (root.querySelector('#otb') && root.isConnected) fillRows(0); }, 200);
-      } else {
-        fillRows(0);
-      }
+      fillRows(0);
       updateBulk();
+      if (keep){
+        const q2 = root.querySelector('#'+keep.id);
+        if (q2){ q2.focus(); try { if (typeof q2.setSelectionRange === 'function') q2.setSelectionRange(keep.s, keep.e); } catch(e){} }
+      }
       requestAnimationFrame(()=>{ const tw = root.querySelector('.tbl-wrap'); if (tw){ tw.scrollLeft = tblScrollX; tw.addEventListener('scroll', ()=>{ window.__ordersTblScrollX = tw.scrollLeft; }, { passive:true }); } });
     }
 
     function updateCount(){
       const el = root.querySelector('#o-count');
       if (!el) return;
+      const base = totalBase();
       el.textContent = list.length
-        ? `Всего заказов: ${noDemo(S.orders).length} · показано ${Math.min(shown, list.length)} из ${list.length}`
+        ? `Всего заказов: ${base.length} · на сумму ${fmtMoney(base.reduce((a,o)=>a+o.total,0))} · показано ${Math.min(shown, list.length)} из ${list.length}`
         : 'Заказов пока нет';
     }
 
     function fillRows(startIdx){
-      const tb = root.querySelector('#otb');
-      if (!tb) return;
-      if (startIdx === 0){ tb.innerHTML = ''; if (io){ io.disconnect(); io = null; } }
+      const host = root.querySelector('#o-rows');
+      if (!host) return;
+      const cards = (S.settings.ordersView || 'table') === 'cards';
+      if (startIdx === 0){
+        host.innerHTML = cards
+          ? '<div class="o-cards"></div>'
+          : `<table class="tbl o-tbl"><thead><tr>
+               <th style="width:34px">${staff||u.role==='client'?`<input type="checkbox" id="sel-all" title="Выбрать все" aria-label="Выбрать все">`:''}</th>
+               <th class="sortable${ofilter.sortKey==='order_id'?' sort-on':''}${ofilter.sortKey==='order_id'&&ofilter.sortDir<0?' sort-desc':''}" data-sort="order_id">Заказ</th>
+               <th class="sortable${ofilter.sortKey==='client'?' sort-on':''}${ofilter.sortKey==='client'&&ofilter.sortDir<0?' sort-desc':''}" data-sort="client">Клиент</th><th>Исполнители</th>
+               <th class="sortable${ofilter.sortKey==='start_date'?' sort-on':''}${ofilter.sortKey==='start_date'&&ofilter.sortDir<0?' sort-desc':''}" data-sort="start_date">Начало</th>
+               <th class="sortable${ofilter.sortKey==='deadline'?' sort-on':''}${ofilter.sortKey==='deadline'&&ofilter.sortDir<0?' sort-desc':''}" data-sort="deadline">Дедлайн</th>
+               <th class="sortable${ofilter.sortKey==='total'?' sort-on':''}${ofilter.sortKey==='total'&&ofilter.sortDir<0?' sort-desc':''}" data-sort="total">Итого</th><th>Статус</th>
+               <th style="width:44px"></th>
+             </tr></thead><tbody></tbody></table>`;
+        if (io){ io.disconnect(); io = null; }
+      }
       const end = Math.min(startIdx + O_CHUNK, list.length);
-      tb.insertAdjacentHTML('beforeend', list.slice(startIdx, end).map(rowHTML).join(''));
+      const docs = list.slice(startIdx, end).map(cards ? cardHTML : rowHTML).join('');
+      const target = cards ? host.querySelector('.o-cards') : host.querySelector('tbody');
+      if (target) target.insertAdjacentHTML('beforeend', docs);
       shown = end;
       window.__ordersShownMem = shown;
       const oldSent = root.querySelector('#o-sentinel');
       oldSent && oldSent.remove();
       if (end < list.length){
-        tb.insertAdjacentHTML('beforeend', `<tr id="o-sentinel"><td colspan="10" style="text-align:center;color:var(--faint);padding:10px">${icon('refresh','ico-sm spin')} Подгружаем ещё заказы…</td></tr>`);
+        host.insertAdjacentHTML('beforeend', `<div id="o-sentinel" class="faint" style="text-align:center;padding:10px">${icon('refresh','ico-sm spin')} Подгружаем ещё заказы…</div>`);
         const sent = root.querySelector('#o-sentinel');
         io = new IntersectionObserver(entries => {
           if (entries.some(e => e.isIntersecting)){ io.disconnect(); io = null; fillRows(end); }
@@ -279,13 +414,45 @@ const CRM = (() => {
       if (wrap) requestAnimationFrame(() => { wrap.scrollTop = +(localStorage.getItem('ordersScrollTop') || 0); });
     }
 
+    function cardHTML(o){
+      const clList = clientsOf(o);
+      const cl = clList[0] || {};
+      const dl = o.deadline;
+      const dlCls = !dl ? '' : (dl < Date.now() && !['done','archived'].includes(o.status) ? 'overdue' : (dl - Date.now() < DAY && o.status === 'work' ? 'today' : ''));
+      const start = o.start_date || o.order_date;
+      const exs = o.executors.map(e => userById(e.uid)).filter(Boolean);
+      const exShow = exs.slice(0, 3);
+      const exRest = exs.length - exShow.length;
+      const exTitle = exs.map(e => { const t = o.executors.find(x => x.uid === e.id); return `${e.full_name}${t && t.amount ? ' — ' + fmtMoney(t.amount) : ''}`; }).join('\n');
+      const clName = cl.full_name ? esc(cl.full_name) : '<span class="faint">—</span>';
+      return `<div class="o-card ${STATUS_META[o.status].row}" data-oid="${o.id}" data-ctx="order">
+        <div class="o-card__top">
+          ${staff||u.role==='client'?`<input type="checkbox" class="row-sel" value="${o.id}" ${sel.has(o.id)?'checked':''} aria-label="Выбрать ${o.order_id}">`:''}
+          <span class="order-id" data-copy="${o.order_id}" title="Скопировать ID">${o.order_id}</span>
+          <span class="spacer"></span>
+          ${statusChip(o.status)}
+        </div>
+        <div class="o-card__client">${clName}</div>
+        <div class="o-card__sub">${nicheChip(o.nish_id)}${o.tariff ? ' ' + tariffChip(o.tariff) : ''}${o.project_id ? ' · ' + esc((S.projects.find(p=>p.id===o.project_id)||{}).name || '') : ''}</div>
+        <div class="o-card__meta">
+          <span title="Начало">${icon('clock','ico-sm')} ${start?fmtDT(start):'—'}</span>
+          <span class="${dlCls}" title="Дедлайн">${icon('calendar','ico-sm')} ${dl?fmtDT(dl):'—'}</span>
+          <span title="Исполнители">${exShow.length?icon('users','ico-sm')+' '+exShow.length+(exRest?`+${exRest}`:''):''}</span>
+        </div>
+        <div class="o-card__foot"><b class="mono">${fmtMoney(o.total)}</b>
+          <span class="o-card__audio">${orderTotalAudio(o)?icon('play','ico-sm')+' '+fmtDur(orderTotalAudio(o)):''}</span>
+        </div>
+      </div>`;
+    }
+
     function updateBulk(){
       const host = root.querySelector('#o-bulk');
       if (!host) return;
       const n = sel.size;
       if (!n){ host.innerHTML = ''; return; }
+      const osum = [...sel].reduce((acc,id) => { const o = S.orders.find(x => x.id === id); return acc + (o ? o.total : 0); }, 0);
       host.innerHTML = `<div class="card card-pad row wrap" style="padding:10px 14px;margin-bottom:12px;border-color:var(--accent)">
-          <b>Выбрано: ${n}</b><span class="spacer"></span>
+          <b>Выбрано: ${n} · на сумму ${fmtMoney(osum)}</b><span class="spacer"></span>
           <button class="btn btn--ghost btn--sm" data-bulk="status">${icon('refresh')} Статус</button>
           ${staff?'<button class="btn btn--ghost btn--sm" data-bulk="pay">'+icon('card')+' Оплатить</button>':''}
           <button class="btn btn--danger btn--sm" data-bulk="del">${icon('trash')} Удалить</button>
@@ -321,11 +488,29 @@ const CRM = (() => {
     function bindControls(){
       const fm = root.querySelector('#f-manager'); fm && (fm.onchange = e=>{ ofilter.manager = e.target.value; render(true); });
             const q = root.querySelector('#f-q');
-      q && q.addEventListener('input', () => liveSearch(() => { ofilter.q = q.value; render(false); }));
+      q && q.addEventListener('input', () => liveSearch(() => {
+        ofilter.q = q.value;
+        /* Полный render(false) пересоздаёт всю страницу и список мигал при вводе.
+           Обновляем точечно: только таблицу/карточки + счётчик + bulk-панель. */
+        list = computeList();
+        shown = 0;
+        fillRows(0);
+        updateCount();
+        updateBulk();
+      }));
       const fn = root.querySelector('#f-niche');
       fn && fn.addEventListener('change', () => { ofilter.niche = fn.value; render(false); });
       const fp = root.querySelector('#f-project');
       fp && fp.addEventListener('change', () => { ofilter.project = fp.value; render(false); });
+      const ff = root.querySelector('#f-from'), ft = root.querySelector('#f-to');
+      const applyDate = (el, key) => {
+        /* Нативный выбор даты отдаёт ISO (ГГГГ-ММ-ДД); пустая строка — сброс */
+        const iso = (el.value || '').trim();
+        ofilter[key] = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : '';
+        render(false);
+      };
+      ff && (ff.onchange = () => applyDate(ff, 'dateFrom'));
+      ft && (ft.onchange = () => applyDate(ft, 'dateTo'));
       const fa = root.querySelector('#f-arch');
       fa && fa.addEventListener('click', () => { ofilter.archived = !ofilter.archived; ofilter.statuses.clear(); render(false); });
       $$('#f-status .chip', root).forEach(ch => ch.addEventListener('click', () => {
@@ -333,18 +518,82 @@ const CRM = (() => {
         ofilter.statuses.has(st) ? ofilter.statuses.delete(st) : ofilter.statuses.add(st);
         render(false);
       }));
-      $$('th.sortable', root).forEach(th => th.addEventListener('click', () => {
-        const key = th.dataset.sort;
-        if (ofilter.sortKey === key) ofilter.sortDir *= -1; else { ofilter.sortKey = key; ofilter.sortDir = 1; }
+      const vw = root.querySelector('#o-view');
+      if (vw) vw.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
+        S.settings.ordersView = b.dataset.view;
+        saveState();
+        vw.querySelectorAll('[data-view]').forEach(x => x.classList.toggle('on', x === b));
         render(false);
+        animateViewSwitch(root);
       }));
-      const sa = root.querySelector('#sel-all');
-      sa && sa.addEventListener('change', () => {
-        root.querySelectorAll('.row-sel').forEach(c => { c.checked = sa.checked; c.checked ? sel.add(c.value) : sel.delete(c.value); });
+      /* Делегируем change: шапка с #sel-all пересоздаётся в fillRows()
+         (порционная подгрузка), прямой listener прикреплялся к старому элементу */
+      root.addEventListener('change', (ev) => {
+        if (ev.target.id !== 'sel-all') return;
+        root.querySelectorAll('.row-sel').forEach(c => { c.checked = ev.target.checked; c.checked ? sel.add(c.value) : sel.delete(c.value); });
         updateBulk();
       });
       const nb = root.querySelector('#btn-new-order');
       nb && (nb.onclick = () => openOrderForm());
+      const ni = root.querySelector('#btn-inline-order');
+      const inlineBox = root.querySelector('#o-inline');
+      if (ni && inlineBox){
+        ni.onclick = ()=>{
+          if (!inlineBox.hidden){ inlineHide(inlineBox); return; }
+          inlineBox.hidden = false;
+          {
+            const id = root.querySelector('#oi-id'); if (id) id.value = '';
+            const cl = root.querySelector('#oi-client'); if (cl) cl.value = '';
+            const tot = root.querySelector('#oi-total'); if (tot) tot.value = '';
+            const dl = root.querySelector('#oi-deadline'); if (dl) dl.value = '';
+            const f = root.querySelector('#oi-id'); if (f) f.focus();
+          }
+        };
+        const saveInline = () => {
+          const id = sanitizeOrderId(root.querySelector('#oi-id').value);
+          const cl = (root.querySelector('#oi-client').value||'').trim();
+          const total = parseFloat(root.querySelector('#oi-total').value)||0;
+          const dlRaw = root.querySelector('#oi-deadline').value;
+          if (!cl){ toast('Укажите клиента', 'warn'); return; }
+          const client = S.users.find(x => x.role==='client' && (norm(x.full_name)===norm(cl) || norm(x.email)===norm(cl)));
+          if (!client){ toast('Клиент не найден. Сначала добавьте его в список (кнопка «Добавить клиента»)','warn'); return; }
+          let oid = id || generateOrderId();
+          if (id && S.orders.some(x=>x.order_id===id)){ oid = id + '-' + (1 + Math.floor(Math.random()*90)+10); toast(`ID занят — назначен ${oid}`,'warn'); }
+          const now = Date.now();
+          const no = { id: uid(), order_id: oid, client_id: client.id, order_date: now, deadline: dlRaw ? new Date(dlRaw).getTime() : null,
+            status: 'waiting', total, certification_amount: 0, need_cert:false, start_date: now, manager_id: me().id,
+            comment:'', project_id:'', folder_id:'', nish_id:'', executors:[], audio:0, files:[], proposed_price:0, paid_amount:0,
+            forbid_download:false, portfolio_ban:true, nda:false, history:[{ t: now, txt:'Заказ создан (инлайн)' }], created_at: now };
+          if (no.deadline && no.start_date && no.deadline < no.start_date){ toast('Дедлайн раньше даты создания — исправьте','err'); return; }
+          S.orders.unshift(no);
+          logAudit(`Создан заказ ${oid} (инлайн)`, 'Заказ');
+          saveState();
+          toast(`Заказ ${oid} создан`,'ok');
+          inlineBox.hidden = true;
+          render(false);
+          /* Плавное появление новой строки/карточки посреди таблицы */
+          const newRow = root.querySelector(`[data-oid="${no.id}"]`);
+          if (newRow){
+            newRow.classList.add('inline-in');
+            setTimeout(()=>newRow.classList.remove('inline-in'), 400);
+          }
+        };
+        root.querySelector('#oi-save').onclick = saveInline;
+        root.querySelector('#oi-cancel').onclick = () => { inlineHide(inlineBox); };
+        /* ID заказа: только латиница, цифры и дефис; всегда капсом */
+        root.querySelector('#oi-id').addEventListener('input', e=>{
+          const el = e.target;
+          const clean = sanitizeOrderId(el.value);
+          if (el.value !== clean){
+            const pos = Math.min(el.selectionStart || 0, clean.length);
+            el.value = clean;
+            try { el.setSelectionRange(pos, pos); } catch(err){}
+          }
+        });
+        root.querySelector('#oi-id').addEventListener('keydown', e=>{ if (e.key==='Enter') saveInline(); });
+        root.querySelector('#oi-client').addEventListener('keydown', e=>{ if (e.key==='Enter') saveInline(); });
+        root.querySelector('#oi-total').addEventListener('keydown', e=>{ if (e.key==='Enter') saveInline(); });
+      }
       const bt = root.querySelector('#btn-tools');
       bt && (bt.onclick = () => APP.go('tools'));
     }
@@ -355,21 +604,83 @@ const CRM = (() => {
       const memKey = 'ordersScrollTop';
       requestAnimationFrame(() => { wrap.scrollTop = +(localStorage.getItem(memKey) || 0); });
       wrap.addEventListener('scroll', ()=>{ localStorage.setItem(memKey, String(wrap.scrollTop)); }, { passive:true });
-      if (!wrap.querySelector('.o-to-top')){
-        const tt = document.createElement('button');
-        tt.className = 'to-top o-to-top';
-        tt.hidden = true;
-        tt.innerHTML = icon('chev-d');
-        tt.style.transform = 'rotate(180deg)';
+      const tt = wrap.querySelector('.o-to-top');
+      if (tt){
         tt.onclick = () => wrap.scrollTo({ top: 0, behavior: 'smooth' });
-        wrap.appendChild(tt);
-        wrap.addEventListener('scroll', ()=>{ tt.hidden = wrap.scrollTop < 300; }, { passive:true });
+        /* Порог относительный: у коротких списков максимум прокрутки меньше 300px,
+           и жёсткий порог не давал кнопке появиться никогда. */
+        const sync = () => {
+          const room = Math.max(0, wrap.scrollHeight - wrap.clientHeight);
+          const need = Math.min(300, Math.max(60, room * 0.3));
+          tt.hidden = wrap.scrollTop < need;
+        };
+        sync();
+        wrap.addEventListener('scroll', sync, { passive:true });
       }
+      wrap.addEventListener('mouseover', e => {
+        if (!dragSel) return;
+        const c = e.target.closest('.row-sel');
+        if (!c) return;
+        /* Выделяем весь диапазон от стартовой строки до текущей — как в табличных редакторах */
+        const boxes = [...wrap.querySelectorAll('.row-sel')];
+        const idx = boxes.indexOf(c);
+        const a = Math.min(dragSel.start, idx), b2 = Math.max(dragSel.start, idx);
+        boxes.slice(a, b2+1).forEach(bx => { bx.checked = true; sel.add(bx.value); });
+        updateBulk();
+      });
       wrap.addEventListener('change', e => {
         const c = e.target.closest('.row-sel');
-        if (c){ c.checked ? sel.add(c.value) : sel.delete(c.value); updateBulk(); }
+        if (!c) return;
+        const boxes = [...wrap.querySelectorAll('.row-sel')];
+        const idx = boxes.indexOf(c);
+        if (e.shiftKey && lastSelSel !== null && lastSelSel !== idx){
+          const [a,b] = [Math.min(lastSelSel,idx), Math.max(lastSelSel,idx)];
+          boxes.slice(a,b+1).forEach(bx => { bx.checked = c.checked; c.checked ? sel.add(bx.value) : sel.delete(bx.value); });
+        } else {
+          c.checked ? sel.add(c.value) : sel.delete(c.value);
+        }
+        lastSelSel = idx;
+        updateBulk();
+      });
+      /* Клик по строке (не по интерактивным элементам) — выделение строки */
+      /* Драг-выделение группы: зажали ЛКМ на ЛЮБОЙ части строки/карточки и
+         ведём мышь — область захватывает и выделяет строчки (не только по чекбоксу). */
+      wrap.addEventListener('mousedown', e => {
+        if (e.button !== 0) return;
+        const row = e.target.closest('[data-ctx="order"]');
+        if (!row) return;
+        if (e.target.closest('button,a,input,select,label,.row-menu,[data-copy]')) return;
+        dragSelMoved = false;
+        dragSel = { start: [...wrap.querySelectorAll('[data-ctx="order"]')].indexOf(row) };
+      });
+      wrap.addEventListener('mousemove', e => {
+        if (!dragSel) return;
+        const dx = e.clientX - (dragSel._x || e.clientX), dy = e.clientY - (dragSel._y || e.clientY);
+        if (!dragSel._init){ dragSel._x = e.clientX; dragSel._y = e.clientY; dragSel._init = true; return; }
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragSelMoved = true;
+      });
+      wrap.addEventListener('mouseover', e => {
+        if (!dragSel) return;
+        const row = e.target.closest('[data-ctx="order"]');
+        if (!row) return;
+        if (!dragSelMoved) return; /* без движения — не выделяем (клик откроет карточку) */
+        const rows = [...wrap.querySelectorAll('[data-ctx="order"]')];
+        const idx = rows.indexOf(row);
+        if (idx < 0) return;
+        const a = Math.min(dragSel.start, idx), b = Math.max(dragSel.start, idx);
+        rows.slice(a, b+1).forEach(r => { const cb = r.querySelector('.row-sel'); if (cb){ cb.checked = true; sel.add(cb.value); } });
+        updateBulk();
       });
       wrap.addEventListener('click', e => {
+        /* Сортировка по клику на заголовок (делегирование: thead создаётся
+           после bindControls, прямой bind не находил элементы). */
+        const sth = e.target.closest('th.sortable[data-sort]');
+        if (sth){
+          const key = sth.dataset.sort;
+          if (ofilter.sortKey === key) ofilter.sortDir *= -1; else { ofilter.sortKey = key; ofilter.sortDir = 1; }
+          render(false);
+          return;
+        }
         const copy = e.target.closest('[data-copy]');
         if (copy){ e.stopPropagation(); navigator.clipboard && navigator.clipboard.writeText(copy.dataset.copy); toast(`ID «${copy.dataset.copy}» скопирован`, 'ok'); return; }
         const menu = e.target.closest('.row-menu');
@@ -384,22 +695,64 @@ const CRM = (() => {
             return;
           }
         }
+        /* Одиночный клик по строке/карточке заказа (не по интерактивным
+           элементам) — открыть карточку заказа, как было раньше */
+        const ordRow = e.target.closest('[data-ctx="order"]');
+        if (ordRow && ordRow.dataset.oid){
+          if (e.target.closest('button,a,input,select,label,.row-menu,.row-sel,[data-copy]')) return;
+          if (dragSelMoved) return; /* был drag-выделение, а не клик */
+          openOrderDetail(ordRow.dataset.oid);
+        }
       });
       wrap.addEventListener('dblclick', e => {
-        const tr = e.target.closest('tr[data-ctx="order"]');
-        tr && openOrderDetail(tr.dataset.oid);
+        /* Двойной клик по строке ИЛИ карточке заказа — всегда модалка */
+        const row = e.target.closest('[data-ctx="order"]');
+        if (!row) return;
+        if (e.target.closest('button,a,input,select,label,.row-menu,.row-sel,[data-copy]')) return;
+        openOrderDetail(row.dataset.oid);
       });
-      if (staff) wrap.addEventListener('contextmenu', e => {
-        const tr = e.target.closest('tr[data-ctx="order"]');
-        if (!tr) return;
+      /* ПКМ по заказу — своё меню приложения и для строк таблицы (tr),
+         и для карточек (.o-card): раньше селектор ловил только tr,
+         и на карточках открывалось нативное меню браузера. */
+      wrap.addEventListener('contextmenu', e => {
+        const row = e.target.closest('[data-ctx="order"]');
+        if (!row || !row.dataset.oid) return;
         e.preventDefault();
-        orderContextMenu(tr.dataset.oid, e.clientX, e.clientY);
+        if (staff) orderContextMenu(row.dataset.oid, e.clientX, e.clientY);
       });
     }
 
     render(firstEntry);
     firstEntry = false;
     CRM._ordersRerender = () => render(false);
+    /* Esc: снять всё выделение в таблице заказов */
+    CRM._ordersSelClear = () => {
+      sel.clear();
+      try { lastSelSel = null; } catch(e){}
+      root.querySelectorAll('.row-sel').forEach(cb => { cb.checked = false; });
+      updateBulk();
+    };
+  }
+
+  function personContextMenu(uid, role, x, y){
+    const p = userById(uid); if (!p) return;
+    const u = me(); const staff = isStaff(u.role);
+    const bl = p.ext.status === 'blacklisted';
+    const items = [
+      { label:'Открыть профиль', icon:'file', onClick:()=>openPersonCard(uid, role) },
+      ...(u.id !== p.id ? [{ label:'Написать лично', icon:'chats', onClick:()=>{ if (typeof window.openDirectChat==='function') window.openDirectChat(p.id); } }] : []),
+      { label:'Копировать ID', icon:'copy', onClick:()=>{ navigator.clipboard&&navigator.clipboard.writeText(p.id); toast('ID скопирован','ok'); } },
+    ];
+    if (staff){
+      items.push('-');
+      items.push({ label: bl ? 'Убрать из ЧС' : 'Добавить в ЧС', icon:'x-c', danger:!bl, onClick:()=>{
+        p.ext.status = bl ? 'active' : 'blacklisted';
+        logAudit(`${bl?'Убран из ЧС':'Добавлен в ЧС'}: ${p.full_name}`,'Безопасность');
+        saveState(); toast(bl?'Разблокирован':'Добавлен в ЧС','ok'); APP.render();
+      }});
+      items.push({ label:'Редактировать', icon:'edit', onClick:()=>openPersonForm(role, p) });
+    }
+    contextMenu(x, y, items.filter(Boolean));
   }
 
   function orderContextMenu(oid, x, y){
@@ -422,21 +775,23 @@ const CRM = (() => {
   }
 
   /* ---------- Форма заказа ---------- */
-  async function openOrderForm(editId){
+  async function openOrderForm(editId, prefill=0){
     const u = me();
     const isEdit = !!editId;
     const o = isEdit ? S.orders.find(x=>x.id===editId) : {
       id:uid(), order_id:'', client_id:'', order_date:Date.now(), deadline:null, status:'draft',
       total:0, certification_amount:0, need_cert:false, comment:'', manager_id:u.id, project_id:'',
       folder_id:'', nish_id:'', executors:[], audio:0, files:[], proposed_price:0, paid_amount:0,
-      forbid_download:false, portfolio_ban:true, nda:false, history:[], created_at:Date.now()
+      forbid_download:false, portfolio_ban:true, nda:false, history:[], created_at:Date.now(),
+      /* Дата начала работ по умолчанию — сегодня (для нового заказа) */
+      start_date: Date.now()
     };
     const clients = S.users.filter(x=>x.role==='client' && x.ext.status!=='blacklisted');
     const executors = S.users.filter(x=>x.role==='executor' && x.ext.status!=='blacklisted' && x.ext.workStatus==='working');
     const form = { executors: [...o.executors], files: [...(o.files||[])], calcSum: 0 };
 
-    const m = openModal({
-      wide:true, title: isEdit ? `Заказ ${o.order_id}` : 'Новый заказ',
+    const m = openWinModal({
+      wide:true, title: isEdit ? `Заказ ${o.order_id}` : 'Новый заказ', route:'orders',
       body: `<div class="order-form">
         <div class="stack" style="gap:13px">
           <div class="cols-2 grid" style="gap:13px">
@@ -458,6 +813,9 @@ const CRM = (() => {
             <div class="field"><label>Статус</label><select class="input" id="of-status">
               ${Object.entries(STATUS_META).map(([st,mt])=>`<option value="${st}" ${o.status===st?'selected':''}>${mt.label}</option>`).join('')}</select></div>
           </div>
+          <div class="field"><label>Тариф</label><select class="input" id="of-tariff">
+            <option value="">— не указан —</option>
+            ${TARIFFS.map(t=>`<option value="${t.id}" ${o.tariff===t.id?'selected':''}>${esc(t.label)}</option>`).join('')}</select></div>
           <div class="cols-2 grid" style="gap:13px">
             <div class="field"><label>Дата начала работ</label><input type="date" class="input" id="of-start"></div>
             <div class="field"><label>Дедлайн</label><input type="datetime-local" class="input" id="of-deadline"></div>
@@ -466,13 +824,20 @@ const CRM = (() => {
             <div class="field"><label>Проект</label><select class="input" id="of-project"><option value="">—</option></select></div>
             <div class="field"><label>Папка</label><select class="input" id="of-folder"><option value="">—</option></select></div>
           </div>
-          <div class="field"><label>Итого, ₽ *</label><input type="number" class="input" id="of-total" min="0" value="${o.total||''}" placeholder="0"></div>
+          <div class="field"><label>Итого, ₽ *</label><input type="number" class="input" id="of-total" min="0" value="${prefill ? prefill : (o.total||'')}" placeholder="0"></div>
           <div class="field"><label>Предоплата: <b id="of-prepay-val">50</b>%</label>
-            <input type="range" id="of-prepay" min="0" max="100" step="5" value="50">
+            <div class="seg prepay-seg" id="of-prepay-seg">
+              <button type="button" data-prepay="50" class="">50%</button>
+              <button type="button" data-prepay="100" class="">100%</button>
+              <button type="button" data-prepay="custom" class="">Своё…</button>
+            </div>
+            <input type="number" class="input" id="of-prepay-custom" min="0" max="100" placeholder="% предоплаты" style="display:none;margin-top:6px">
+            <input type="hidden" id="of-prepay" value="50">
             <div class="small" id="of-prepay-hint" style="color:var(--muted)"></div></div>
           <div class="cols-2 grid" style="gap:13px">
             <div class="field"><label>Заверение, ₽</label>
-              <div class="row"><input type="checkbox" id="of-need-cert" style="accent-color:var(--accent);width:16px;height:16px" ${o.need_cert?'checked':''}>
+              <div class="row">
+              <label class="check" style="margin-top:4px" title="Заверить у нотариуса"><input type="checkbox" id="of-need-cert" ${o.need_cert?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span></label>
               <input type="number" class="input" id="of-cert" min="0" value="${o.certification_amount||''}" placeholder="Сумма заверения" ${o.need_cert?'':'disabled'}></div></div>
             <div class="field"><label>Предложенная цена заказчиком</label><input type="number" class="input" id="of-proposed" min="0" value="${o.proposed_price||''}" placeholder="Для текстов и переводов"></div>
           </div>
@@ -540,6 +905,16 @@ const CRM = (() => {
         renderChips(); syncPf();
 
         g('#of-gen').onclick = ()=>{ g('#of-id').value = generateOrderId(); };
+        /* ID заказа: только латиница, цифры и дефис; всегда капсом */
+        g('#of-id').addEventListener('input', e=>{
+          const el = e.target;
+          const clean = sanitizeOrderId(el.value);
+          if (el.value !== clean){
+            const pos = Math.min(el.selectionStart || 0, clean.length);
+            el.value = clean;
+            try { el.setSelectionRange(pos, pos); } catch(err){}
+          }
+        });
         g('#of-need-cert').addEventListener('change', e=>{ g('#of-cert').disabled = !e.target.checked; });
         const prepayHint = ()=> {
           const v = +g('#of-prepay').value;
@@ -548,7 +923,64 @@ const CRM = (() => {
             ? `<span style="color:var(--yellow)">⚠ Предоплата менее ${S.settings.minPrepay}% — требуется электронный договор <span class="badge c-gray">модуль в разработке</span></span>`
             : `<span style="color:var(--green)">✓ Договор не требуется (достаточно оферты)</span>`;
         };
-        g('#of-prepay').addEventListener('input', prepayHint); prepayHint();
+        const syncPrepay = ()=>{
+          const v = +g('#of-prepay').value;
+          const custom = g('#of-prepay-custom');
+          const seg = g('#of-prepay-seg');
+          seg.querySelectorAll('[data-prepay]').forEach(b=>{
+            const isCustom = b.dataset.prepay === 'custom';
+            const on = isCustom ? false : (+b.dataset.prepay === v);
+            b.classList.toggle('on', on);
+            if (isCustom) b.classList.toggle('on', v !== 50 && v !== 100);
+          });
+          custom.style.display = (v !== 50 && v !== 100) ? '' : 'none';
+          if (v !== 50 && v !== 100) custom.value = v;
+          prepayHint();
+        };
+        g('#of-prepay-seg').addEventListener('click', e=>{
+          const b = e.target.closest('[data-prepay]');
+          if (!b) return;
+          const custom = g('#of-prepay-custom');
+          if (b.dataset.prepay === 'custom'){
+            /* Клик по «Своё…»: открыть поле и подсветить кнопку, НЕ схлопывать.
+               syncPrepay() после этого не вызываем — он по значению #of-prepay
+               скрыл бы поле снова. */
+            const cur = +custom.value;
+            if (cur > 0 && cur <= 100) g('#of-prepay').value = cur;
+            custom.style.display = ''; custom.focus();
+            const segEl = g('#of-prepay-seg');
+            segEl.querySelectorAll('[data-prepay]').forEach(x=>{
+              x.classList.toggle('on', x === b);
+            });
+            g('#of-prepay-val').textContent = g('#of-prepay').value;
+          } else {
+            g('#of-prepay').value = b.dataset.prepay;
+            syncPrepay();
+          }
+        });
+        g('#of-prepay-custom').addEventListener('input', ()=>{
+          const raw = +g('#of-prepay-custom').value || 0;
+          /* Значение >100 не «схлопывает» режим «Своё…»: пользователь видит свой
+             ввод и предупреждение, а в расчёт идёт 100 (максимум предоплаты).
+             Раньше min(100,…) сразу писал в #of-prepay число 100, syncPrepay
+             переводил плашку на «100%» и скрывал поле — кнопка «Своё…» после
+             этого «не кликалась» (клик открывал поле снова с 100). */
+          const v = Math.max(0, Math.min(100, raw));
+          g('#of-prepay').value = v;
+          const custom = g('#of-prepay-custom');
+          const seg = g('#of-prepay-seg');
+          seg.querySelectorAll('[data-prepay]').forEach(b=>{
+            b.classList.toggle('on', b.dataset.prepay === 'custom');
+          });
+          custom.style.display = '';
+          g('#of-prepay-val').textContent = v;
+          g('#of-prepay-hint').innerHTML = raw > 100
+            ? `<span style="color:var(--yellow)">⚠ Предоплата не может быть больше 100% — в расчёт пойдёт 100%</span>`
+            : (v < S.settings.minPrepay
+              ? `<span style="color:var(--yellow)">⚠ Предоплата менее ${S.settings.minPrepay}% — требуется электронный договор <span class="badge c-gray">модуль в разработке</span></span>`
+              : `<span style="color:var(--green)">✓ Договор не требуется (достаточно оферты)</span>`);
+        });
+        syncPrepay();
 
         /* исполнители: поиск + выбор */
         const listEl = g('#of-exec-list');
@@ -560,13 +992,45 @@ const CRM = (() => {
               const idv = el.dataset.uid;
               const has = form.executors.find(x=>x.uid===idv);
               if (has) form.executors = form.executors.filter(x=>x.uid!==idv);
-              else form.executors.push({ uid:idv, amount:0, is_paid:false });
+              else { form.executors.push({ uid:idv, amount:0, is_paid:false }); splitShares(); }
               renderExecList(); updExecSum();
             });
-            const amt = el.querySelector('.executor-pick__amount input');
+            const amt = el.querySelector('.ex-amount');
             amt && amt.addEventListener('input', ()=>{ const row = form.executors.find(x=>x.uid===el.dataset.uid); if (row) row.amount = +amt.value||0; updExecSum(); });
+            const share = el.querySelector('.ex-share');
+            share && share.addEventListener('input', ()=>{ const row = form.executors.find(x=>x.uid===el.dataset.uid); if (row) row.share = Math.min(100, Math.max(0, +share.value||0)); updExecSum(); });
           });
         }
+        /* Объёмы работ: «поровну» делит 100% между всеми, пользователь может
+           править проценты, сумма автоматически пересчитывается от «Итого» */
+        const splitShares = ()=>{
+          const n = form.executors.length;
+          if (!n) return;
+          const base = Math.floor(100/n);
+          let left = 100;
+          form.executors.forEach((row,i)=>{
+            row.share = i === n-1 ? left : base;
+            left -= base;
+          });
+        };
+        const fld = g('#of-total');
+        const updExecSum = ()=>{
+          const total = +fld.value || 0;
+          const sum = form.executors.reduce((a,e)=>a+(e.amount||0),0);
+          const hasShares = form.executors.some(e=>e.share!=null);
+          /* Авторасчёт от объёма: если «Итого» есть и проценты заданы */
+          if (hasShares && total > 0 && !form.executors.some(e=>(e.amount||0)>0)){
+            form.executors.forEach(e=>{ e.amount = Math.round(total * (e.share||0) / 100); });
+          }
+          const parts = form.executors.map(e=>{
+            const sh = e.share!=null ? e.share : (total ? Math.round((e.amount||0)/total*100) : 0);
+            return `${(userById(e.uid)||{}).full_name.split(' ')[0]}${(e.amount||0)?': '+fmtMoney(e.amount):''}${sh?` (${sh}%)`:''}`;
+          }).join(' · ');
+          g('#of-exec-sum').innerHTML = form.executors.length
+            ? `<div>Назначено ${form.executors.length} · сумма: <b>${fmtMoney(sum)}</b></div><div class="tiny faint">${esc(parts)}</div>`
+            : 'Никто не назначен';
+        };
+        if (fld) fld.addEventListener('input', ()=>{ updExecSum(); });
         const execSearch = debounce(()=>{
           const q = norm(g('#of-ex-search').value);
           $$('#of-exec-list .executor-pick__item', mask).forEach(el=>{
@@ -574,10 +1038,6 @@ const CRM = (() => {
           });
         });
         g('#of-ex-search').addEventListener('input', execSearch);
-        function updExecSum(){
-          const sum = form.executors.reduce((a,e)=>a+(e.amount||0),0);
-          g('#of-exec-sum').textContent = form.executors.length ? `Назначено ${form.executors.length} · сумма исполнителям: ${fmtMoney(sum)}` : 'Никто не назначен';
-        }
         renderExecList(); updExecSum();
 
         /* файлы */
@@ -633,12 +1093,14 @@ const CRM = (() => {
         mask.addEventListener('input', markDirty);
         const autoTimer = setInterval(()=>{
           if (!dirty || !document.body.contains(mask)) { if(!document.body.contains(mask)) clearInterval(autoTimer); return; }
+          /* Автосохранение по таймеру уважает настройку «Черновики заказов» */
+          if (S.draftPrefs.autoDraft === false) return;
           DraftsDB.put('order-form', collect());
         }, 5000);
 
         function collect(){
           return {
-            order_id:g('#of-id').value, client_id:g('#of-client').value, client_ids:[...selClients], nish_id:g('#of-niche').value,
+            order_id:sanitizeOrderId(g('#of-id').value), client_id:g('#of-client').value, client_ids:[...selClients], nish_id:g('#of-niche').value, tariff:g('#of-tariff').value,
             status:g('#of-status').value, deadline:g('#of-deadline').value||null, start:g('#of-start').value||null, total:+g('#of-total').value||0,
             prepay:+g('#of-prepay').value, cert:g('#of-cert').value, need_cert:g('#of-need-cert').checked,
             comment:g('#of-comment').value, project_id:g('#of-project').value, folder_id:g('#of-folder').value,
@@ -650,11 +1112,23 @@ const CRM = (() => {
         /* закрытие — предложение черновика */
         mask.querySelector('[data-c]').onclick = async ()=>{
           if (dirty && !isEdit){
+            const autoDraft = S.draftPrefs.autoDraft !== false;
             const dontAsk = S.draftPrefs.noAskDraft;
-            if (!dontAsk){
+            if (autoDraft && !dontAsk){
+              /* Спросить один раз: «Сохранить черновик?» (+ чекбокс «не спрашивать») */
               const okSave = await confirmModal({ title:'Сохранить черновик?', text:'Вы закрываете форму с незаполненными данными.', okText:'Сохранить черновик', checkbox:'Больше не спрашивать' });
-              if (okSave){ S.draftPrefs.noAskDraft = okSave === true && $('#cf-chk') && $('#cf-chk').checked || S.draftPrefs.noAskDraft; saveState(); DraftsDB.put('order-form', collect()); toast('Черновик сохранён локально','ok'); }
-              else { DraftsDB.del('order-form'); }
+              if (okSave){
+                S.draftPrefs.noAskDraft = !!(okSave === true && $('#cf-chk') && $('#cf-chk').checked) || S.draftPrefs.noAskDraft;
+                saveState();
+                DraftsDB.put('order-form', collect());
+                toast('Черновик сохранён локально','ok');
+              } else {
+                DraftsDB.del('order-form');
+              }
+            } else if (autoDraft && dontAsk){
+              /* «Не спрашивать»: черновик ВСЕГДА сохраняется — данные не теряются */
+              DraftsDB.put('order-form', collect());
+              toast('Черновик сохранён локально','ok');
             }
           }
           clearInterval(autoTimer); close();
@@ -699,10 +1173,11 @@ const CRM = (() => {
       }
     });
 
-    /* восстановление офлайн-черновика */
+    /* восстановление офлайн-черновика (уважает настройку «Черновики заказов») */
     DraftsDB.get('order-form').then(d=>{
+      if (S.draftPrefs.autoDraft === false){ if (d && d.val) try { DraftsDB.del('order-form'); } catch(e){} return; }
       if (d && d.val && !isEdit && !o.order_id){
-        openModal({ narrow:true, title:'Найден черновик', body:`<p class="small muted">Локальный черновик заказа от ${fmtDT(d.t)}. Восстановить данные?</p>`,
+        openWinModal({ narrow:true, title:'Найден черновик', route:'orders', body:`<p class="small muted">Локальный черновик заказа от ${fmtDT(d.t)}. Восстановить данные?</p>`,
           footer:`<button class="btn btn--ghost" data-x>Удалить</button><button class="btn btn--primary" data-r>Восстановить</button>`,
           onMount:(mm, cc)=>{
             mm.querySelector('[data-r]').onclick = ()=>{ cc(); setTimeout(()=>applyDraft(d.val), 60); };
@@ -729,9 +1204,10 @@ const CRM = (() => {
   function execPickItem(e, form){
     const sel = form.executors.find(x=>x.uid===e.id);
     return `<div class="executor-pick__item ${sel?'sel':''}" data-uid="${e.id}" data-name="${esc(e.full_name+' '+e.ext.specializations.join(' '))}">
-      ${avatarHTML(e,'avatar--sm')}<span style="flex:1;min-width:0"><b style="font-size:12.5px">${esc(e.full_name)}</b><br><span class="faint" style="font-size:11px">${esc(e.ext.specializations.join(', '))}</span></span>
+      ${avatarHTML(e,'avatar--sm')}<span style="flex:1;min-width:0"><b style="font-size:12.5px">${esc(e.full_name)}</b><br><span class="faint executor-pick__spec" style="font-size:11px">${esc(e.ext.specializations.join(', '))}</span></span>
       ${starsHTML(e.ext.qualOverall||0)}
-      <span class="executor-pick__amount">${sel?`<input type="number" class="input" value="${sel.amount||''}" placeholder="₽">`:''}</span></div>`;
+      <span class="executor-pick__amount">${sel?`<input type="number" class="ex-amount input" value="${sel.amount||''}" placeholder="₽">`:''}</span>
+      ${sel?`<span class="executor-pick__share"><input type="number" class="ex-share input" min="0" max="100" value="${sel.share!=null?sel.share:''}" placeholder="%"> <span class="tiny faint">%</span></span>`:''}</div>`;
   }
 
   /* ---------- Деталь заказа ---------- */
@@ -761,16 +1237,27 @@ const CRM = (() => {
           :`<button class="btn btn--ghost btn--sm" data-dl="${i}" style="margin-left:auto;flex:none">Скачать</button>`}</div>`;
     }).join('') : `<div class="empty">${icon('clip')}<span>Файлов нет</span></div>`;
 
-    openModal({
-      wide:true, title:`Заказ ${o.order_id}`,
+    /* Гонорар менеджера: процент от суммы, потолок задаёт админ */
+    const feeCeil = S.settings.feeCeilings || {};
+    const feePct = +(o.manager_fee || 0);
+    const feeCap = u.role==='admin' ? 100 : u.role==='top_manager' ? (feeCeil.top_manager ?? 25) : (feeCeil.manager ?? 25);
+    const feeBlock = staff ? `<div class="card card-pad"><div class="row row--between"><b class="small">Гонорар менеджера</b>
+        <span class="badge c-gray">потолок ${feeCap}%</span></div>
+        <div class="row row--between small" style="margin-top:8px"><span class="muted">Ставка</span><b>${feePct ? feePct + '%' : 'не задан'}</b></div>
+        <div class="row row--between small"><span class="muted">Сумма</span><b>${feePct ? fmtMoney(Math.round((o.total||0)*feePct/100)) : '—'}</b></div>
+        <button class="btn btn--ghost btn--sm" data-fee-edit style="margin-top:10px">Изменить гонорар</button></div>` : '';
+
+    openWinModal({
+      wide:true, title:`Заказ ${o.order_id}`, route:'orders',
       body: `
         <div class="row wrap" style="gap:7px;margin-bottom:14px">
-          ${statusChip(o.status)} ${nicheChip(o.nish_id)}
+          ${statusChip(o.status)} ${nicheChip(o.nish_id)} ${o.tariff ? tariffChip(o.tariff) : ''}
           ${o.nda?'<span class="badge c-violet">NDA</span>':''}
           ${o.forbid_download?'<span class="badge c-red">Запрет скачивания</span>':''}
           ${o.certification_amount?'<span class="badge c-blue">Заверение '+fmtMoney(o.certification_amount)+'</span>':''}
           ${o.proposed_price?'<span class="badge c-yellow">Предложено клиентом: '+fmtMoney(o.proposed_price)+'</span>':''}
         </div>
+        ${feeBlock}
         <div class="cols-2 grid" style="gap:14px">
           <div class="stack" style="gap:14px">
             <div class="card card-pad">
@@ -792,7 +1279,7 @@ const CRM = (() => {
             ${paymentBlock}
             <div class="card card-pad"><b class="small">Исполнители</b>
               <div class="stack" style="gap:9px;margin-top:9px">
-                ${o.executors.map(e=>{const ex=userById(e.uid); return ex?`<div class="row">${avatarHTML(ex,'avatar--sm')}<span style="flex:1;min-width:0"><b class="small">${esc(ex.full_name)}</b><br><span class="faint" style="font-size:11px">${esc(ex.ext.specializations.join(', '))}</span></span><b class="small">${fmtMoney(e.amount)}</b>${staff&&o.status==='done'?`<button class="btn btn--sm ${e.is_paid?'btn--ghost':'btn--soft'}" data-pay="${e.uid}">${e.is_paid?'Оплачен':'Оплатить'}</button>`:''}
+                ${o.executors.map(e=>{const ex=userById(e.uid); return ex?`<div class="row">${avatarHTML(ex,'avatar--sm')}<span style="flex:1;min-width:0"><b class="small">${esc(ex.full_name)}</b><br><span class="faint" style="font-size:11px">${esc(ex.ext.specializations.join(', '))}</span></span><b class="small" style="flex:none;white-space:nowrap">${fmtMoney(e.amount)}</b>${staff&&o.status==='done'?`<button class="btn btn--sm ${e.is_paid?'btn--ghost':'btn--soft'}" data-pay="${e.uid}" style="flex:none;white-space:nowrap">${e.is_paid?'Оплачен':'Оплатить'}</button>`:''}
                 ${staff&&u.role==='admin'&&(e.amount||0)>30000&&!e.approved_by_admin&&!e.is_paid?`<button class="btn btn--sm btn--ghost" data-approve="${e.uid}" title="Согласовать превышение">${icon('check-c')} Согласовать</button>`:''}</div>`:''}).join('') || '<span class="faint small">Не назначены</span>'}
               </div>
             </div>
@@ -801,6 +1288,7 @@ const CRM = (() => {
                 ${o.history.slice().reverse().map(h=>`<div class="row" style="gap:8px"><span class="dot" style="background:var(--accent);flex:none;margin-top:5px"></span><span><b>${esc(h.txt)}</b><br><span class="faint" style="font-size:11px">${fmtDT(h.t)}</span></span></div>`).join('')}
               </div>
             </div>
+            <button class="btn btn--primary btn--block" data-order-chat>${icon('chats')} Чат по заказу</button>
             <button class="btn btn--ghost btn--block" data-ticket>${icon('tickets')} Сообщить о проблеме</button>
           </div>
         </div>`,
@@ -813,9 +1301,33 @@ const CRM = (() => {
         : (u.role==='executor' && o.status==='work' ? `<span class="spacer"></span><button class="btn btn--primary" data-st="done">Сдать работу</button>` : ''),
       onMount: (mask, close)=>{
         mask.addEventListener('click', async e=>{
-          const t = e.target.closest('[data-st],[data-pay],[data-dl],[data-pay-client],[data-ticket],[data-edit],[data-del],[data-arch]');
+          const t = e.target.closest('[data-st],[data-pay],[data-dl],[data-pay-client],[data-ticket],[data-edit],[data-del],[data-arch],[data-fee-edit]');
           if (!t) return;
           if (t.dataset.st) { await setStatus(o, t.dataset.st); close(); APP.render(); }
+          if ('feeEdit' in t.dataset){
+            const ceil = u.role==='admin' ? 100 : u.role==='top_manager' ? (feeCeil.top_manager ?? 10) : (feeCeil.manager ?? 15);
+            openWinModal({ narrow:true, title:'Гонорар менеджера',
+              body:`<div class="field"><label>Ставка, % от суммы (потолок ${ceil}%)</label><input type="number" class="input" id="fee-v" min="0" max="${ceil}" value="${o.manager_fee||0}"></div>
+                <p class="small faint" style="margin-top:8px">Сумма: <b id="fee-sum">${fmtMoney(Math.round((o.total||0)*(o.manager_fee||0)/100))}</b></p>`,
+              footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-fee-save>Сохранить</button>`,
+              onMount:(m2, close2)=>{
+                const inp = m2.querySelector('#fee-v');
+                const sumEl = m2.querySelector('#fee-sum');
+                inp.oninput = ()=>{ sumEl.textContent = fmtMoney(Math.round((o.total||0)*(+inp.value||0)/100)); };
+                const x = m2.querySelector('[data-x]'); if (x) x.onclick = ()=>close2();
+                m2.querySelector('[data-fee-save]').onclick = ()=>{
+                  let v = Math.max(0, +inp.value || 0);
+                  if (v > ceil){ v = ceil; toast('Ставка ограничена потолком ' + ceil + '%', 'warn'); }
+                  o.manager_fee = v;
+                  logAudit('Гонорар по ' + o.order_id + ': ' + v + '%', 'Заказы');
+                  saveState();
+                  close2 && close2(); close();
+                  openOrderDetail(o.id);
+                  toast('Гонорар сохранён','ok');
+                };
+              }});
+            return;
+          }
           if (t.dataset.approve){
             const ex = o.executors.find(x=>x.uid===t.dataset.approve);
             ex.approved_by_admin = true;
@@ -823,9 +1335,9 @@ const CRM = (() => {
             saveState(); toast('Превышение согласовано — менеджер может провести оплату', 'ok');
             close(); APP.render();
           }
-          if (t.dataset.pay){ payOrder(o, o.executors.find(x=>x.uid===t.dataset.pay)); close(); APP.render(); }
-          if (t.dataset.payClient){
-            openModal({ narrow:true, title:'Отметить платёж',
+          if ('pay' in t.dataset){ payOrder(o, o.executors.find(x=>x.uid===t.dataset.pay)); close(); APP.render(); }
+          if ('payClient' in t.dataset){
+            openWinModal({ narrow:true, title:'Отметить платёж',
               body:`<div class="field"><label>Сумма платежа, ₽ (остаток ${fmtMoney(rest)})</label><input type="number" class="input" id="pay-v" value="${rest}" min="0" max="${o.total}"></div>`,
               footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-pay-save>Отметить</button>`,
               onMount:(m2, close2)=>{
@@ -840,17 +1352,40 @@ const CRM = (() => {
           if (t.dataset.dl !== undefined && t.tagName==='BUTTON'){
             showDownloadGuard(o, o.files[+t.dataset.dl]);
           }
-          if (t.dataset.ticket){ close(); CRM.openTicket(o.order_id); }
-          if (t.dataset.edit){ close(); openOrderForm(o.id); }
-          if (t.dataset.del){ await deleteOrder(o); close(); APP.render(); }
-          if (t.dataset.arch){ await setStatus(o, o.status==='archived' ? (o.history.some(h=>h.txt.includes('Выполнено'))?'done':'work') : 'archived'); close(); APP.render(); }
+          if ('ticket' in t.dataset){ close(); CRM.openTicket(o.order_id); }
+          if ('orderChat' in t.dataset){ close(); ensureOrderChat(o); }
+          if ('edit' in t.dataset){ close(); openOrderForm(o.id); }
+          if ('del' in t.dataset){ await deleteOrder(o); close(); APP.render(); }
+          if ('arch' in t.dataset){ await setStatus(o, o.status==='archived' ? (o.history.some(h=>h.txt.includes('Выполнено'))?'done':'work') : 'archived'); close(); APP.render(); }
         });
       }
     });
   }
 
+  /* Чат по заказу: у каждого заказа есть общий чат с его менеджером, куда
+     менеджер может приглашать исполнителей. Создаётся по первому открытию
+     (если ещё не создан). */
+  function ensureOrderChat(o){
+    if (!o) return;
+    let ch = noDemo(S.chats).find(c => c.type==='order' && c.order_id === o.id && c.is_active !== false);
+    if (!ch){
+      const cid = (o.client_ids && o.client_ids[0]) || o.client_id || null;
+      const parts = [o.manager_id, cid, ...(o.executors||[]).map(e=>e.uid)].filter(Boolean);
+      const uniq = [...new Set(parts)];
+      ch = { id: uid(), type:'order', name:'Заказ ' + (o.order_id || '—'),
+        description:'Менеджер, заказчик и исполнители заказа',
+        order_id:o.id, client_id: cid, member_ids: uniq, participants: uniq,
+        created_at: Date.now(), is_active:true, unread:{} };
+      S.chats.push(ch);
+      saveState();
+    }
+    if (typeof window.openChatAt === 'function') window.openChatAt(ch.id);
+    else if (typeof go === 'function') go('chats');
+    else { location.hash = '#/chats'; }
+  }
+
   function showDownloadGuard(o, f){
-    openModal({
+    openWinModal({
       narrow:true, title:'Конфиденциальные материалы',
       body:`<div class="stack small" style="gap:12px;color:var(--text-2)">
         <p>${icon('alert')} Данные материалы являются конфиденциальными и принадлежат заказчику. Передача их третьим лицам без предварительного письменного согласия заказчика запрещена и является нарушением законодательства РФ (ст. 183 УК РФ — незаконное получение и разглашение сведений, составляющих коммерческую тайну).</p>
@@ -870,60 +1405,427 @@ const CRM = (() => {
     });
   }
 
-  function prompt2(label, val){
-    const v = window.prompt(label, val);
-    return v;
-  }
 
   /* ==================== ЛЮДИ: клиенты и исполнители ==================== */
+  /* Простая анимация смены вида таблица/карточки: fade+slide нового контейнера. */
+  function animateViewSwitch(root){
+    const host = root.querySelector('#o-rows') || root.querySelector('.person-grid, .tbl-wrap');
+    if (!host) return;
+    host.classList.remove('view-anim');
+    void host.offsetWidth;
+    host.classList.add('view-anim');
+  }
+
   function peopleView(root, role){
     const u = me(); const staff = isStaff(u.role);
+    /* Миграция к стабильным номерам: записи без ext.num получают следующий
+       монотонный номер (по порядку в списке). Повторный вход не дублирует
+       счётчик: номера уже стоят у записей, так что nextPersonNum вызывается
+       только для тех, у кого его нет. */
+    noDemo(S.users.filter(x=>x.role===role)).forEach(p => {
+      if (p && p.ext && p.ext.num == null) p.ext.num = nextPersonNum();
+    });
     const list = noDemo(S.users.filter(x=>x.role===role));
+    const P_CHUNK = 60;
     let q = '', onlyBl = false;
+    let psort = { key:'name', dir:1 };
+    let io = null;
 
-    const render = ()=>{
-      const filtered = list.filter(p=>{
+    /* Высота списка = «до конца экрана», как у заказов: контейнер доходит
+       до самого низа окна. Фиксированный calc(100dvh - …) не подходил: на
+       разных экранах/видах (карточки/таблица) шапка разной высоты, и список
+       не доходил до низа. Считаем от фактического верха обёртки до низа окна. */
+    const fitPeople = () => {
+      if (!document.body.contains(root)) return;
+      const wrapEl = root.querySelector('.pl-wrap');
+      if (!wrapEl) return;
+      const top = wrapEl.getBoundingClientRect().top;
+      const avail = Math.round(window.innerHeight - top);
+      if (avail > 0) wrapEl.style.height = Math.max(240, avail) + 'px';
+    };
+    if (window.__fitPeopleHandler) window.removeEventListener('resize', window.__fitPeopleHandler);
+    window.__fitPeopleHandler = fitPeople;
+    window.addEventListener('resize', fitPeople);
+
+    const filteredAll = ()=>{
+      const arr = list.filter(p=>{
         if (onlyBl !== (p.ext.status==='blacklisted')) return false;
         if (q && !norm(`${p.full_name} ${p.username} ${p.email} ${p.phone} ${p.ext.xlsxRow||''}`).includes(norm(q))) return false;
         return true;
       });
+      const k = psort.key, d = psort.dir;
+      const meta = p => role==='executor' ? executorMetrics(p) : clientMetrics(p);
+      arr.sort((a,b)=>{
+        let va, vb;
+        if (k === 'orders'){ va = meta(a).orders; vb = meta(b).orders; }
+        else if (k === 'sum'){ va = meta(a).sum || 0; vb = meta(b).sum || 0; }
+        else if (k === 'earned'){ va = a.ext.earned || 0; vb = b.ext.earned || 0; }
+        else if (k === 'created'){ va = a.created_at || 0; vb = b.created_at || 0; }
+        else { return String(a.full_name||'').localeCompare(String(b.full_name||'')) * d; }
+        return (va > vb ? 1 : va < vb ? -1 : 0) * d;
+      });
+      return arr;
+    };
+
+    const render = ()=>{
+      const ae2 = document.activeElement;
+      const keep2 = (ae2 && ae2.id === 'pl-q') ? { s:ae2.selectionStart, e:ae2.selectionEnd } : null;
+      const cardsView = (S.settings.peopleView || 'cards') === 'cards';
+      const filtered = filteredAll();
       root.innerHTML = `
         <div class="page-head">
           <div><h2>${role==='client'?'Клиенты':'Исполнители'}</h2>
-          <div class="sub">${filtered.length} записей · ${list.filter(p=>p.ext.status==='blacklisted').length} в чёрном списке</div></div>
+          <div class="sub" id="pl-count">${filtered.length} записей · ${list.filter(p=>p.ext.status==='blacklisted').length} в чёрном списке · на сумму ${fmtMoney(list.reduce((a,p)=>a+(role==='executor'?executorMetrics(p).sum:clientMetrics(p).sum),0))}</div></div>
           <div class="page-actions">
+            <div class="seg view-seg" id="pl-view">
+              <button data-view="table" class="${cardsView?'':'on'}" title="Таблицей">${icon('table','ico-sm')}</button>
+              <button data-view="cards" class="${cardsView?'on':''}" title="Карточками">${icon('cards-view','ico-sm')}</button>
+            </div>
             <button class="btn btn--ghost" data-exp>${icon('export')} Экспорт</button>
+            <button class="btn btn--ghost" data-inv>${icon('user-plus')} Приглашения</button>
+            ${staff?`<button class="btn btn--soft" data-inline-add title="Добавить строку прямо в список">${icon('plus')} Строка</button>`:''}
             ${staff?`<button class="btn btn--primary" data-add>${icon('user-plus')} ${role==='executor'?'Добавить исполнителя':'Добавить клиента'}</button>`:''}
           </div>
+        </div>
+        <div id="pl-bulk"></div>
+        <div class="inline-add" id="pl-inline" hidden>
+          <div class="inline-add__row">
+            <input class="input" id="pi-name" placeholder="${role==='executor'?'ФИО исполнителя *':'ФИО / Компания *'}" style="min-width:180px">
+            <input class="input" id="pi-email" placeholder="Email" style="min-width:160px">
+            <input class="input" id="pi-phone" placeholder="Телефон" style="min-width:130px">
+            <button class="btn btn--primary btn--sm" id="pi-save" title="Добавить">${icon('check-c','ico-sm')}</button>
+            <button class="iconbtn" id="pi-cancel" title="Отмена">${icon('x','ico-sm')}</button>
+          </div>
+          <div class="small faint">Нужно имя и хотя бы один контакт; номер присвоится автоматически</div>
         </div>
         <div class="filters">
           <div class="input-wrap">${icon('search')}<input class="input" id="pl-q" placeholder="Поиск: имя, логин, email, телефон…" value="${esc(q)}"></div>
           <label class="chip ${onlyBl?'':'on'}" id="pl-active">${icon('check-c','ico-sm')} Активные</label>
           <label class="chip ${onlyBl?'on':''}" id="pl-bl">${icon('x-c','ico-sm')} Чёрный список</label>
+          <select class="input" id="pl-sort" style="width:auto;min-width:150px" title="Сортировка">
+            <option value="name" ${psort.key==='name'?'selected':''}>По имени</option>
+            <option value="orders" ${psort.key==='orders'?'selected':''}>По числу заказов</option>
+            ${role==='executor'
+              ? `<option value="earned" ${psort.key==='earned'?'selected':''}>По заработку</option>`
+              : `<option value="sum" ${psort.key==='sum'?'selected':''}>По сумме заказов</option>`}
+            <option value="created" ${psort.key==='created'?'selected':''}>По дате добавления</option>
+          </select>
         </div>
-        <div class="person-grid">
-          ${filtered.map(p=>personCard(p, role, staff)).join('') || `<div class="empty" style="grid-column:1/-1">${icon('clients')}<span>Никого не найдено</span></div>`}
-        </div>`;
+        ${cardsView
+          ? `<div class="tbl-wrap pl-wrap pl-wrap--cards" style="margin-top:2px"><div class="person-grid" id="pl-rows"></div></div>`
+          : `<div class="tbl-wrap pl-wrap" style="margin-top:2px"><table class="tbl">${personHead(role, psort)}<tbody id="pl-rows"></tbody></table></div>`}`;
+      bindPeople();
+      fillPeople(0);
+      /* Пересчёт «до конца экрана» после отрисовки (высота шапки/футера
+         зависит от вида и экрана) — и в следующем кадре, когда вёрстка осядет. */
+      requestAnimationFrame(fitPeople);
+      if (keep2){
+        const q3 = root.querySelector('#pl-q');
+        if (q3){ q3.focus(); try { q3.setSelectionRange(keep2.s, keep2.e); } catch(e){} }
+      }
+    };
+
+    function updateCount(shown){
+      const el = root.querySelector('#pl-count');
+      if (!el) return;
+      const all = filteredAll().length;
+      el.textContent = all
+        ? `${all} записей · ${list.filter(p=>p.ext.status==='blacklisted').length} в чёрном списке · на сумму ${fmtMoney(list.reduce((a,p)=>a+(role==='executor'?executorMetrics(p).sum:clientMetrics(p).sum),0))} · показано ${Math.min(shown, all)} из ${all}`
+        : 'Никого не найдено';
+    }
+
+    function fillPeople(startIdx){
+      const host = root.querySelector('#pl-rows');
+      if (!host) return;
+      const cardsView = (S.settings.peopleView || 'cards') === 'cards';
+      const filtered = filteredAll();
+      if (startIdx === 0){
+        host.innerHTML = '';
+        if (io){ io.disconnect(); io = null; }
+        if (!filtered.length){
+          host.innerHTML = cardsView
+            ? `<div class="empty" style="grid-column:1/-1">${icon('clients')}<span>Никого не найдено</span></div>`
+            : `<tr><td colspan="6" class="faint" style="text-align:center;padding:14px">Никого не найдено</td></tr>`;
+          updateCount(0);
+          return;
+        }
+      }
+      const end = Math.min(startIdx + P_CHUNK, filtered.length);
+      const docs = filtered.slice(startIdx, end).map((p,i) => cardsView ? personCard(p, role, staff, startIdx + i + 1) : personRow(p, role, staff, startIdx + i + 1)).join('');
+      host.insertAdjacentHTML('beforeend', docs);
+      const oldSent = root.querySelector('#pl-sentinel');
+      oldSent && oldSent.remove();
+      if (end < filtered.length){
+        host.insertAdjacentHTML('beforeend', cardsView ? `<div id="pl-sentinel" class="faint" style="grid-column:1/-1;text-align:center;padding:10px">${icon('refresh','ico-sm spin')} Подгружаем…</div>` : `<tr id="pl-sentinel"><td colspan="6" class="faint" style="text-align:center;padding:10px">${icon('refresh','ico-sm spin')} Подгружаем…</td></tr>`);
+        const sent = root.querySelector('#pl-sentinel');
+        io = new IntersectionObserver(entries => {
+          if (entries.some(e => e.isIntersecting)){ io.disconnect(); io = null; fillPeople(end); }
+        }, { root: root.querySelector('.tbl-wrap'), rootMargin: '140px' });
+        io.observe(sent);
+      }
+      updateCount(end);
+    }
+
+    function bindPeople(){
+      const pv = $('#pl-view', root);
+      if (pv) pv.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
+        S.settings.peopleView = b.dataset.view; saveState();
+        pv.querySelectorAll('[data-view]').forEach(x => x.classList.toggle('on', x === b));
+        render();
+        animateViewSwitch(root);
+      }));
       const qq = $('#pl-q', root);
       qq.addEventListener('input', ()=>liveSearch(()=>{ q=qq.value; render(); }));
+      const ps = $('#pl-sort', root);
+      ps && (ps.onchange = () => { psort.key = ps.value; psort.dir = 1; render(); });
       $('#pl-active', root).onclick = ()=>{ onlyBl=false; render(); };
       $('#pl-bl', root).onclick = ()=>{ onlyBl=true; render(); };
       $$('[data-add]', root).forEach(b=>b.onclick = ()=>openPersonForm(role, null));
-      $$('[data-exp]', root).forEach(b=>b.onclick = ()=>exportPeople(role));
-      $$('.person-card', root).forEach(c=>c.onclick = e=>{
-        if (e.target.closest('button')) return;
-        openPersonCard(c.dataset.uid, role);
+      $$('[data-inline-add]', root).forEach(b=>b.onclick = ()=>{
+        const box = root.querySelector('#pl-inline');
+        if (!box) return;
+        if (!box.hidden){ inlineHide(box); return; }
+        box.hidden = false;
+        { const f = root.querySelector('#pi-name'); if (f) f.focus(); }
       });
+      const piSave = root.querySelector('#pi-save');
+      if (piSave){
+        const savePerson = () => {
+          const name = (root.querySelector('#pi-name').value||'').trim();
+          const email = (root.querySelector('#pi-email').value||'').trim();
+          const phone = (root.querySelector('#pi-phone').value||'').trim();
+          if (!name){ toast('Укажите имя', 'warn'); return; }
+          if (!email && !phone){ toast('Нужен email или телефон', 'warn'); return; }
+          const normE = norm(email);
+          if (S.users.some(x=>x.role===role && ((x.email && norm(x.email)===normE) || (x.phone && x.phone===phone)))){ toast('Такой контакт уже существует','err'); return; }
+          const nu = { id: uid(), username: normE.split('@')[0] || 'user'+Date.now(), email, pw:'inline123', role,
+            full_name: name, phone, about:'', theme:'system', is_online:false, avatar:'', consent_marketing:false, tour_completed:true, created_at: Date.now(),
+            ext: { specializations: [], qualification:{}, qualOverall:0, earned:0, status:'active', workStatus:'working', comment:'',
+              managerId: me().id, xlsxRow: null, num: nextPersonNum() } };
+          S.users.push(nu);
+          /* list — копия S.users на входе в раздел; синхронизируем, иначе
+             новая персона не попадёт в рендер и класс появления не навесится */
+          list.push(nu);
+          logAudit(`${role==='executor'?'Исполнитель':'Клиент'} ${name} добавлен (инлайн)`, 'Люди');
+          saveState();
+          toast(`${name} добавлен`,'ok');
+          root.querySelector('#pl-inline').hidden = true;
+          render();
+          /* Плавное появление новой строки/карточки посреди списка */
+          const newPerson = root.querySelector(`[data-uid="${nu.id}"]`);
+          if (newPerson){
+            newPerson.classList.add('inline-in');
+            setTimeout(()=>newPerson.classList.remove('inline-in'), 400);
+          }
+        };
+        piSave.onclick = savePerson;
+        root.querySelector('#pi-cancel').onclick = ()=> { inlineHide(root.querySelector('#pl-inline')); };
+        ['#pi-name','#pi-email','#pi-phone'].forEach(sel=>{
+          const el = root.querySelector(sel);
+          if (el) el.addEventListener('keydown', e=>{ if (e.key==='Enter') savePerson(); });
+        });
+      }
+      $$('[data-inv]', root).forEach(b=>b.onclick = ()=>openInvites());
+      $$('[data-exp]', root).forEach(b=>b.onclick = ()=>exportPeople(role));
+      $$('th[data-psort]', root).forEach(th => th.addEventListener('click', () => {
+        const key = th.dataset.psort;
+        if (psort.key === key) psort.dir *= -1; else { psort.key = key; psort.dir = 1; }
+        render();
+      }));
+      const sa = root.querySelector('#pl-sel-all');
+      if (sa) sa.addEventListener('change', () => {
+        root.querySelectorAll('.row-sel').forEach(c => { c.checked = sa.checked; c.checked ? psel.add(c.value) : psel.delete(c.value); });
+        updatePeopleBulk();
+      });
+const wrap = root.querySelector('.pl-wrap');
+      if (wrap){
+        let lastSelPl = null;
+        const applyRange = (boxes, a, b, checked) => {
+          boxes.slice(a, b+1).forEach(bx => { bx.checked = checked; checked ? psel.add(bx.value) : psel.delete(bx.value); });
+        };
+        wrap.addEventListener('change', e => {
+          const c = e.target.closest('.row-sel');
+          if (!c) return;
+          const boxes = [...wrap.querySelectorAll('.row-sel')];
+          const idx = boxes.indexOf(c);
+          if (e.shiftKey && lastSelPl !== null && lastSelPl !== idx){
+            applyRange(boxes, Math.min(lastSelPl,idx), Math.max(lastSelPl,idx), c.checked);
+          } else {
+            c.checked ? psel.add(c.value) : psel.delete(c.value);
+          }
+          lastSelPl = idx;
+updatePeopleBulk();
+        });
+        wrap.addEventListener('mousedown', e => {
+          if (e.button !== 0) return;
+          /* Старт drag-выделения от ЛЮБОЙ части строки/карточки человека,
+             но не от интерактивных элементов. */
+          const row = e.target.closest('.person-card') || e.target.closest('tr[data-uid]');
+          if (!row) return;
+          if (e.target.closest('button,a,input,select,label,[data-copy]')) return;
+          dragSelPlMoved = false;
+          dragSelPl = { start: [...wrap.querySelectorAll('.person-card, tr[data-uid]')].indexOf(row) };
+        });
+        wrap.addEventListener('mouseover', e => {
+          if (!dragSelPl) return;
+          const row = e.target.closest('.person-card') || e.target.closest('tr[data-uid]');
+          if (!row || !dragSelPlMoved) return;
+          const rows = [...wrap.querySelectorAll('.person-card, tr[data-uid]')];
+          const idx = rows.indexOf(row);
+          if (idx < 0) return;
+          const a = Math.min(dragSelPl.start, idx), b = Math.max(dragSelPl.start, idx);
+          rows.slice(a, b+1).forEach(r => { const cb = r.querySelector('.row-sel'); if (cb){ cb.checked = true; psel.add(cb.value); } });
+          updatePeopleBulk();
+        });
+        wrap.addEventListener('mousemove', e => {
+          if (!dragSelPl) return;
+          if (!dragSelPl._init){ dragSelPl._x = e.clientX; dragSelPl._y = e.clientY; dragSelPl._init = true; return; }
+          if (Math.abs(e.clientX - dragSelPl._x) > 3 || Math.abs(e.clientY - dragSelPl._y) > 3) dragSelPlMoved = true;
+        });
+        wrap.addEventListener('click', e => {
+          const c = e.target.closest('.row-sel');
+          if (!c) return;
+          e.stopPropagation(); /* не открывать карточку персоны по клику в чекбокс */
+        });
+      }
+      $$('[data-pbulk]', root).forEach(b=>b.addEventListener('click', () => peopleBulkAction(b.dataset.pbulk)));
+    }
+
+    function updatePeopleBulk(){
+      const host = root.querySelector('#pl-bulk');
+      if (!host) return;
+      const n = psel.size;
+      if (!n){ host.innerHTML = ''; return; }
+      const sum = [...psel].reduce((acc,id) => {
+        const p = list.find(x => x.id === id);
+        if (!p) return acc;
+        const mt = role==='executor' ? executorMetrics(p) : clientMetrics(p);
+        return acc + (mt.sum || 0);
+      }, 0);
+      host.innerHTML = `<div class="card card-pad row wrap" style="padding:10px 14px;margin-bottom:12px;border-color:var(--accent)">
+          <b>Выбрано: ${n} · на сумму ${fmtMoney(sum)}</b><span class="spacer"></span>
+          <button class="btn btn--ghost btn--sm" data-pbulk="status">${icon('refresh')} Статус</button>
+          <button class="btn btn--ghost btn--sm" data-pbulk="manager">${icon('user-plus')} Менеджер</button>
+          ${role==='executor'?`<button class="btn btn--ghost btn--sm" data-pbulk="work">${icon('refresh')} Рабочий статус</button>`:''}
+          <button class="btn btn--danger btn--sm" data-pbulk="del">${icon('trash')} Удалить</button>
+        </div>`;
+      $$('[data-pbulk]', host).forEach(b=>b.addEventListener('click', () => peopleBulkAction(b.dataset.pbulk)));
+    }
+
+    function peopleBulkAction(act){
+      const ids = [...psel];
+      if (!ids.length) return;
+      const people = ids.map(id => list.find(x => x.id === id)).filter(Boolean);
+      if (act === 'del'){
+        confirmModal({ title:`Удалить ${people.length} ${role==='executor'?'исполнителя(ей)':'клиента(ов)'}?`, okText:'Удалить', danger:true, text:'Записи будут удалены. Заказы не удаляются.' }).then(ok => {
+          if (!ok) return;
+          S.users = S.users.filter(x => !ids.includes(x.id));
+          logAudit(`Массовое удаление ${role==='executor'?'исполнителей':'клиентов'} (${people.length})`, 'Люди');
+          saveState(); psel.clear(); render(); toast('Удалено','ok');
+        });
+        return;
+      }
+      if (act === 'status'){
+        const opts = [
+          { label:'Активен', icon:'check-c', onClick:()=>{ people.forEach(p=>p.ext.status='active'); applyPsel('Статусы обновлены'); } },
+          { label:'Чёрный список', icon:'x-c', danger:true, onClick:()=>{ people.forEach(p=>p.ext.status='blacklisted'); applyPsel('Добавлены в ЧС'); } }
+        ];
+        showDropdown(root.querySelector('#pl-bulk'), opts);
+        return;
+      }
+      if (act === 'manager'){
+        const managers = S.users.filter(x=>['manager','top_manager'].includes(x.role));
+        showDropdown(root.querySelector('#pl-bulk'), managers.map(m=>({ label:`→ ${m.full_name}`, icon:'user-plus', onClick:()=>{ people.forEach(p=>p.ext.managerId=m.id); logAudit(`Массовый перевод (${people.length}) → ${m.full_name}`,'Люди'); applyPsel('Менеджер обновлён'); } })));
+        return;
+      }
+      if (act === 'work' && role==='executor'){
+        showDropdown(root.querySelector('#pl-bulk'), [
+          { label:'Работаю', icon:'check-c', onClick:()=>{ people.forEach(p=>{ p.ext.workStatus='working'; p.is_online=true; }); applyPsel('Статус: работают'); } },
+          { label:'Не работаю', icon:'x-c', onClick:()=>{ people.forEach(p=>{ p.ext.workStatus='not_working'; p.is_online=false; }); applyPsel('Статус: не работают'); } }
+        ]);
+      }
+    }
+
+    function applyPsel(msg){
+      logAudit(msg, 'Люди');
+      saveState(); psel.clear(); render(); toast(msg,'ok');
+    }
+
+    /* Esc: снять всё выделение в таблице людей */
+    CRM._peopleSelClear = () => {
+      psel.clear();
+      root.querySelectorAll('.row-sel').forEach(cb => { cb.checked = false; });
+      const bulk = root.querySelector('#pl-bulk');
+      if (bulk) bulk.innerHTML = '';
     };
+    root.addEventListener('click', e => {
+      if (dragSelPlMoved) return; /* был drag-выделение группы, а не клик */
+      const card = e.target.closest('.person-card');
+      if (card){ if (e.target.closest('button')) return; openPersonCard(card.dataset.uid, role); return; }
+      const row = e.target.closest('tr[data-uid]');
+      if (row) openPersonCard(row.dataset.uid, role);
+    });
+    /* Двойной клик по строке/карточке человека — та же модалка профиля */
+    root.addEventListener('dblclick', e => {
+      if (e.target.closest('button,a,input,select,label')) return;
+      const card = e.target.closest('.person-card');
+      const row = e.target.closest('tr[data-uid]');
+      const uid2 = card ? card.dataset.uid : (row ? row.dataset.uid : null);
+      if (uid2) openPersonCard(uid2, role);
+    });
+    /* Правая кнопка по строке/карточке клиента или исполнителя — собственное
+       контекстное меню (не глобальное браузерное). */
+    root.addEventListener('contextmenu', e => {
+      const card = e.target.closest('.person-card');
+      const row = e.target.closest('tr[data-uid]');
+      const uid = card ? card.dataset.uid : (row ? row.dataset.uid : null);
+      if (!uid) return;
+      e.preventDefault();
+      personContextMenu(uid, role, e.clientX, e.clientY);
+    });
+
     render();
   }
 
-  function personCard(p, role, staff){
+    function personHead(role, psort){
+      const thSel = `<th style="width:34px"><input type="checkbox" id="pl-sel-all" title="Выбрать все" aria-label="Выбрать все"></th>`;
+      const thNum = `<th class="pl-num-h" style="width:34px;text-align:left;color:var(--faint)">№</th>`;
+      const th = (key, label) => `<th class="sortable${psort.key===key?' sort-on':''}${psort.key===key&&psort.dir<0?' sort-desc':''}" data-psort="${key}">${label}</th>`;
+      return role==='executor'
+        ? `<thead><tr>${thSel}${thNum}${th('name','Исполнитель')}<th>Специализации</th>${th('orders','Заказы')}<th>Выполнено</th>${th('earned','Заработано')}<th>Статус</th></tr></thead>`
+        : `<thead><tr>${thSel}${thNum}${th('name','Клиент')}<th>Контакт</th>${th('orders','Заказы')}${th('sum','Сумма')}<th>Статус</th><th></th></tr></thead>`;
+    }
+    function personRow(p, role, staff, num){
+    const bl = p.ext.status==='blacklisted';
+    /* «Написать лично»: открываем ЛС с этим пользователем (функция из app.js) */
+    const dmBtn = ()=>{
+      if (u.id !== p.id && typeof window.openDirectChat === 'function' && userById(p.id)){
+        window.openDirectChat(p.id);
+      }
+    };
+      const mt = role==='executor' ? executorMetrics(p) : clientMetrics(p);
+      return `<tr class="${bl?'c-row--bl':''}" data-uid="${p.id}">
+        <td><input type="checkbox" class="row-sel" value="${p.id}" ${psel.has(p.id)?'checked':''} aria-label="Выбрать ${esc(p.full_name)}"></td>
+        <td class="pl-num" title="${p.ext&&p.ext.num?'№ '+p.ext.num:(p.ext.xlsxRow?'Строка '+p.ext.xlsxRow+' из таблицы':'№ '+num)}">${personDisplayNum(p, num)}</td>
+        <td><span class="row row--start" style="gap:10px">${avatarHTML(p)}<span style="min-width:0"><b class="small" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.full_name)}</b><span class="small faint">${esc(p.username||'')}</span></span></span></td>
+        ${role==='executor'
+          ? `<td class="small muted">${p.ext.qualification && Object.keys(p.ext.qualification).length ? esc(Object.keys(p.ext.qualification).join(', ')) : '—'}</td>
+             <td class="mono">${mt.orders}</td><td class="mono">${mt.done}</td><td class="mono">${fmtMoney(p.ext.earned)}</td>
+             <td>${bl?'<span class="badge c-red">ЧС</span>':'<span class="badge '+(p.ext.workStatus==='working'?'c-green':'c-gray')+'">'+(p.ext.workStatus==='working'?'Работаю':'Не работаю')+'</span>'}</td>`
+          : `<td class="small muted">${esc(p.email)}</td>
+             <td class="mono">${mt.orders}</td><td class="mono">${fmtMoney(mt.sum)}</td>
+             <td>${bl?'<span class="badge c-red">ЧС</span>':mt.overdue?'<span class="badge c-orange">просрочки</span>':'<span class="badge c-green">активен</span>'}</td>
+             <td></td>`}
+      </tr>`;
+    }
+
+  function personCard(p, role, staff, num){
     const bl = p.ext.status==='blacklisted';
     const mt = role==='executor' ? executorMetrics(p) : clientMetrics(p);
-    return `<div class="person-card ${bl?'bl':''}" data-uid="${p.id}">
+    return `<div class="person-card ${bl?'bl':''} ${psel.has(p.id)?'sel':''}" data-uid="${p.id}">
       <div class="row" style="gap:12px">
-        ${p.ext.xlsxRow?`<span class="x-num" title="Строка ${p.ext.xlsxRow} из таблицы">${p.ext.xlsxRow}</span>`:''}
+        <input type="checkbox" class="row-sel" value="${p.id}" ${psel.has(p.id)?'checked':''} aria-label="Выбрать ${esc(p.full_name)}">
+        <span class="x-num" title="${p.ext&&p.ext.num?'№ '+p.ext.num:(p.ext.xlsxRow?'Строка '+p.ext.xlsxRow+' из таблицы':'№ '+num)}">${personDisplayNum(p, num)}</span>
         ${avatarHTML(p)}
         <div style="flex:1;min-width:0">
           <b class="small" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.full_name)}</b>
@@ -952,11 +1854,29 @@ const CRM = (() => {
     </div>`;
   }
 
+  /* Стабильные номера людей (вариант 2): монотонный счётчик, каждой новой
+     записи номер присваивается один раз и не переиспользуется после удаления. */
+  function nextPersonNum(){
+    S.settings = S.settings || {};
+    S.settings._personSeq = S.settings._personSeq || 0;
+    S.settings._personSeq += 1;
+    const n = S.settings._personSeq;
+    saveState();
+    return n;
+  }
+  /* Номер человека для отображения: стабильный ext.num; для импортированных
+     без num используем номер строки книги (xlsxRow); иначе позиционный фолбэк. */
+  function personDisplayNum(p, fallback){
+    if (p && p.ext && p.ext.num) return p.ext.num;
+    if (p && p.ext && p.ext.xlsxRow) return p.ext.xlsxRow;
+    return fallback;
+  }
+
   function openPersonForm(role, editPerson){
     const p = editPerson || { id:uid(), username:'', email:'', pw:'', role, full_name:'', phone:'', about:'', mode:'system', accent:'violet', is_online:true, avatar:'', consent_marketing:true, tour_completed:true, created_at:Date.now(), ext:{ specializations:[], qualification:{}, qualOverall:0, earned:0, status:'active', workStatus:'working', comment:'', commentPersonal:'', managerId:'' } };
     const isNew = !editPerson;
     const manOpts = S.users.filter(x=>['manager','top_manager'].includes(x.role)).map(m=>'<option value="'+m.id+'" '+(p.ext.managerId===m.id?'selected':'')+'>'+esc(m.full_name)+'</option>').join('');
-    openModal({
+    openWinModal({
       narrow:true, title: isNew ? (role==='executor'?'Новый исполнитель':'Новый клиент') : 'Редактировать профиль',
       body: '<div class="stack" style="gap:12px">' +
         '<div class="field"><label>ФИО / Название *</label><input class="input" id="pf-name" value="'+esc(p.full_name)+'"></div>' +
@@ -967,6 +1887,11 @@ const CRM = (() => {
         (isNew ? '<div class="field"><label>Пароль</label><input class="input" id="pf-pw" value="'+esc(p.pw||'client123')+'"></div>' : '') +
         '<div class="field"><label>О себе</label><textarea class="input" id="pf-about" rows="2">'+esc(p.about||'')+'</textarea></div>' +
         (role==='executor' ? '<div class="field"><label>Менеджер</label><select class="input" id="pf-manager">'+manOpts+'</select></div>' : '') +
+        (role==='client' ? '<div class="row row--between" style="padding:10px 12px;background:var(--panel-2);border-radius:12px"><label class="check" style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="pf-thinking" '+((p.ext&&p.ext.thinking)?'checked':'')+'><span class="box"><svg><use href="#i-check-c"/></svg></span><span class="small"><b>Клиент «думает»</b><br><span class="faint">Напоминать менеджеру и удалить данные по сроку</span></span></label></div>' +
+          '<div class="cols-2 grid" style="gap:12px">' +
+            '<div class="field"><label>Удалить данные</label><input class="input" type="date" id="pf-del-at" value="'+(p.ext&&p.ext.thinking&&p.ext.thinking.deleteAt?new Date(p.ext.thinking.deleteAt).toISOString().slice(0,10):'')+'"></div>' +
+            '<div class="field"><label>Напомнить за (дней)</label><input class="input" type="number" min="0" max="30" id="pf-remind-before" value="'+((p.ext&&p.ext.thinking&&p.ext.thinking.remindBefore!=null)?p.ext.thinking.remindBefore:3)+'"></div>' +
+          '</div>' : '') +
       '</div>',
       footer: '<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-save>'+(isNew?'Добавить':'Сохранить')+'</button>',
       onMount: (mask, close)=>{
@@ -975,8 +1900,27 @@ const CRM = (() => {
           const name = mask.querySelector('#pf-name').value.trim();
           if (!name){ toast('Введите имя','warn'); return; }
           p.full_name = name; p.email = mask.querySelector('#pf-email').value.trim(); p.phone = mask.querySelector('#pf-phone').value.trim(); p.about = mask.querySelector('#pf-about').value.trim();
-          if (isNew){ p.pw = mask.querySelector('#pf-pw').value || 'client123'; p.username = 'user_'+uid().slice(0,5); S.users.push(p); }
+          if (isNew){ p.pw = mask.querySelector('#pf-pw').value || 'client123'; p.username = 'user_'+uid().slice(0,5); if (p.ext) p.ext.num = nextPersonNum(); S.users.push(p); }
           if (role==='executor'){ p.ext.managerId = mask.querySelector('#pf-manager').value; }
+          if (role==='client'){
+            p.ext = p.ext || {};
+            const thOn = !!(mask.querySelector('#pf-thinking') && mask.querySelector('#pf-thinking').checked);
+            const delVal = (mask.querySelector('#pf-del-at')||{}).value || '';
+            const rbVal = +(mask.querySelector('#pf-remind-before')||{}).value;
+            const prev = p.ext.thinking;
+            if (thOn){
+              const dt = delVal ? new Date(delVal + 'T12:00:00').getTime() : Date.now() + 7*86400000;
+              p.ext.thinking = {
+                since: prev && prev.since ? prev.since : Date.now(),
+                deleteAt: dt,
+                remindBefore: isNaN(rbVal) ? 3 : Math.max(0, rbVal),
+                lastRemind: prev && prev.lastRemind ? prev.lastRemind : 0
+              };
+              if (prev && prev.deleteAt !== dt) p.ext.thinking.lastRemind = 0; /* дата перенесена — напомним заново */
+            } else {
+              p.ext.thinking = null; /* «передумал» — данные остаются */
+            }
+          }
           if (isNew) logAudit('Добавлен ' + (role==='executor'?'исполнитель':'клиент') + ': ' + p.full_name, 'Люди');
           else logAudit('Профиль обновлён: ' + p.full_name, 'Люди');
           saveState(); close(); APP.render(); toast(isNew?((role==='executor'?'Исполнитель':'Клиент') + ' добавлен'):'Профиль обновлён','ok');
@@ -985,27 +1929,90 @@ const CRM = (() => {
     });
   }
 
+
+  /* Импортированный человек ещё не «в системе» (не приглашён/не входил)?
+     Маркер импорта — ext.xlsxRow; факт входа/приглашения — ext.invited либо созданный
+     для него invite (в invites ищем по email или по полю personId). */
+  function importedNeedsInvite(p){
+    if (!p || !p.ext || !p.ext.xlsxRow) return false;
+    if (p.ext.invited || p.ext.activated) return false;
+    if (p.email && (S.invites||[]).some(inv => inv.personId === p.id || inv.email && norm(inv.email) === norm(p.email))) return false;
+    return true;
+  }
+  function createInviteForPerson(p){
+    const u = me();
+    if (!u || !isStaff(u.role)) return null;
+    const role = p.role;
+    if (!canInviteRole(u.role, role)) return null;
+    const inv = { id: uid(), token: inviteToken(), role,
+      limit: 1, used: 0, usedBy: [], personId: p.id, email: p.email || '', targetName: p.full_name,
+      expiresAt: Date.now() + 30*86400000, createdAt: Date.now(), createdBy: u.id };
+    S.invites = S.invites || [];
+    S.invites.push(inv); saveState();
+    if (p.ext) p.ext.invited = true;
+    saveState();
+    logAudit('Приглашён импортированный: ' + p.full_name + ' (' + (ROLE_LABEL[role]||role) + ')', 'Приглашения');
+    toast('Ссылка-приглашение создана и скопирована','ok');
+    return inv;
+  }
   function openPersonCard(uidv, role){
     const p = userById(uidv); if (!p) return;
+    if (!p.ext) p.ext = { status:'active', workStatus:'working', specializations:[], qualification:{}, qualOverall:0, earned:0, comment:'', commentPersonal:'', managerId:'' };
+    /* Роль может не передаваться (например, клик по никнейму в чате):
+       определяем её по самой записи, чтобы карточка открывалась у всех. */
+    const roleEff = role || (p.role === 'executor' ? 'executor' : 'client');
+    const isStaffUser = !['client','executor'].includes(p.role);
     const u = me(); const staff = isStaff(u.role);
-    const mt = role==='executor' ? executorMetrics(p) : clientMetrics(p);
+    const mt = roleEff==='executor' ? executorMetrics(p) : clientMetrics(p);
     const managers = S.users.filter(x=>['manager','top_manager'].includes(x.role));
     const bl = p.ext.status==='blacklisted';
 
-    openModal({
-      wide:true, title: role==='executor'?'Профиль исполнителя':'Карточка клиента',
+    openWinModal({
+      wide:true, title: roleEff==='executor'?'Профиль исполнителя':(isStaffUser?'Профиль сотрудника':'Карточка клиента'),
       body:`<div class="cols-2 grid" style="gap:14px">
         <div class="stack" style="gap:14px">
           <div class="card card-pad">
-            <div class="row" style="gap:14px">${avatarHTML(p,'avatar--lg')}
-              <div><b style="font-size:16px">${esc(p.full_name)}</b><br>
-                <span class="small muted">${esc(p.email)} · ${esc(p.phone)}</span><br>
-                <span class="small faint">логин: <span class="mono">${esc(p.username)}</span> · с ${fmtDate(p.created_at)}</span></div>
+            <div class="row pf-head" style="gap:14px">${avatarHTML(p,'avatar--lg')}
+              <div class="pf-head__txt"><b style="font-size:16px">${esc(p.full_name)}</b>
+                <span class="badge c-violet" style="margin-left:6px">${esc(ROLE_LABEL[p.role]||p.role)}</span><br>
+                <span class="small muted"><span class="nowrap">${esc(p.email)}</span> · <span class="nowrap">${esc(p.phone)}</span></span><br>
+                <span class="small faint">Должность: <b style="color:var(--text-2)">${esc(ROLE_LABEL[p.role]||p.role)}</b> · логин: <span class="mono">${esc(p.username)}</span> · с ${fmtDate(p.created_at)}</span></div>
               <span class="spacer"></span>
               ${bl?'<span class="badge c-red">В чёрном списке</span>':`<span class="badge c-green">Активен</span>`}
-              ${staff?`<button class="btn btn--ghost btn--sm" data-pf-edit style="margin-top:8px">${icon('edit')} Редактировать</button>`:''}
+              <div class="pf-head__actions">
+                ${(u.id!==p.id)?`<button class="btn btn--primary btn--sm" data-pf-dm>${icon('chats','ico-sm')} Написать лично</button>`
+                  :`<button class="btn btn--primary btn--sm" data-pf-dm>${icon('star','ico-sm')} Избранное</button>`}
+                ${staff?`<button class="btn btn--ghost btn--sm" data-pf-edit>${icon('edit','ico-sm')} Редактировать</button>`:''}
+              </div>
             </div>
+            ${(canChangeRoles(u.role) && p.id !== u.id) ? `<div class="row" style="gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+              <span class="small faint">Роль в системе:</span>
+              <select class="input" id="pf-role" style="width:auto;min-width:150px">
+                ${['admin','top_manager','manager','executor','client'].map(r=>`<option value="${r}" ${p.role===r?'selected':''}>${ROLE_LABEL[r]||r}</option>`).join('')}
+              </select>
+              <button class="btn btn--ghost btn--sm" data-pf-role-save>${icon('shield','ico-sm')} Сменить роль</button>
+              <span class="small faint">Менять роли может только администратор</span>
+            </div>` : ''}
             ${p.about?`<p class="small" style="margin-top:12px;color:var(--text-2)">${esc(p.about)}</p>`:''}
+            ${(()=>{
+              const k = calcKarma(p);
+              const hist = (p.karmaAdj||[]).slice(0,4);
+              return `<hr>
+              <div class="karma">
+                <div class="row row--between" style="align-items:center">
+                  <b class="small">Карма · рейтинг лояльности</b>
+                  <span class="badge ${k.cls}">${k.score} · ${k.label}</span>
+                </div>
+                <div class="karma__bar" title="${k.score} из 100"><span style="width:${k.score}%"></span></div>
+                <div class="small faint" style="margin-top:6px">Выполнено: ${k.parts.done} · проблемы: ${k.parts.problems} · доработки: ${k.parts.revisions} · реакции: ${k.parts.reactions}${k.parts.adj?` · ручные: ${k.parts.adj>0?'+':''}${k.parts.adj}`:''}</div>
+                ${staff?`<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">
+                  <button class="btn btn--ghost btn--sm" data-karma="5">+5</button>
+                  <button class="btn btn--ghost btn--sm" data-karma="-5">−5</button>
+                  <button class="btn btn--ghost btn--sm" data-karma-custom>Изменить с причиной…</button>
+                </div>`:''}
+                ${hist.length?`<div class="small faint" style="margin-top:8px">${hist.map(x=>`${x.delta>0?'+':''}${x.delta} — ${esc(x.reason)}`).join('<br>')}</div>`:''}
+              </div>`;
+            })()}
             ${role==='executor'?`
               <hr>
               <div class="row row--between"><b class="small">Рабочий статус</b>
@@ -1054,6 +2061,7 @@ const CRM = (() => {
               <button class="btn btn--ghost btn--sm btn--block" data-transfer>${icon('user-plus')} Передать менеджеру</button>
               <button class="btn ${bl?'btn--ghost':'btn--danger'} btn--sm btn--block" data-bl>${bl?'Убрать из чёрного списка':'В чёрный список'}</button>
               <button class="btn btn--ghost btn--sm btn--block" data-fine>${icon('alert')} Штраф (демо)</button>
+              ${importedNeedsInvite(p)?`<button class="btn btn--primary btn--sm btn--block" data-invite-person>${icon('user-plus')} Пригласить в систему</button>`:''}
             </div>
           </div>`:''}
         </div>
@@ -1061,13 +2069,78 @@ const CRM = (() => {
       footer:`<button class="btn btn--ghost" data-x>Закрыть</button>`,
       onMount:(mask, close)=>{
         mask.querySelector('[data-x]').onclick = close;
+        const dmBtn = mask.querySelector('[data-pf-dm]');
+        if (dmBtn) dmBtn.onclick = ()=>{ close(); window.openDirectChat(p.id); };
+        const invPersonBtn = mask.querySelector('[data-invite-person]');
+        if (invPersonBtn) invPersonBtn.onclick = ()=>{
+          const inv = createInviteForPerson(p);
+          if (inv) {
+            try { navigator.clipboard.writeText(inviteLink(inv)); } catch(e){}
+            toast('Приглашение: '+inviteLink(inv),'info');
+            close(); openPersonCard(p.id, roleEff);
+          } else toast('Вы не можете пригласить с этой ролью','warn');
+        };
         const editBtn = mask.querySelector('[data-pf-edit]');
         if (editBtn) editBtn.onclick = () => { close(); openPersonForm(role, p); };
+        /* Смена роли — только админ; себе роль менять нельзя (защита от потери доступа) */
+        const roleSave = mask.querySelector('[data-pf-role-save]');
+        if (roleSave) roleSave.onclick = ()=>{
+          const sel = mask.querySelector('#pf-role');
+          const to = sel && sel.value;
+          if (!to || to === p.role) return;
+          if (!canChangeRoles(u.role)){ toast('Менять роли может только администратор','err'); return; }
+          if (p.id === u.id){ toast('Нельзя менять собственную роль','warn'); return; }
+          const from = p.role;
+          p.role = to;
+          if (to === 'executor' && !p.ext){
+            p.ext = { status:'active', workStatus:'working', specializations:[], qualification:{}, qualOverall:0, earned:0, comment:'', commentPersonal:'', managerId:'' };
+          }
+          logAudit(`Смена роли: ${p.full_name} — ${ROLE_LABEL[from]||from} → ${ROLE_LABEL[to]||to}`, 'Люди');
+          saveState();
+          close();
+          openPersonCard(p.id, to==='executor' ? 'executor' : 'client');
+          APP.render();
+          toast('Роль изменена: '+(ROLE_LABEL[to]||to), 'ok');
+        };
+        /* Карма: быстрые ±5 и правка с причиной (staff) */
+        const rerenderCard = () => { close(); openPersonCard(p.id, role); };
+        $$('[data-karma]', mask).forEach(b=>b.onclick = ()=>{
+          const delta = Number(b.dataset.karma) || 0;
+          karmaAdjust(p.id, delta, delta>0 ? 'Бонус от команды' : 'Снижение от команды');
+          logAudit(`Карма: ${p.full_name} ${delta>0?'+':''}${delta}`,'Карма');
+          toast(`Карма обновлена: ${calcKarma(p).score}`,'ok');
+          rerenderCard();
+        });
+        const kCustom = mask.querySelector('[data-karma-custom]');
+        if (kCustom) kCustom.onclick = ()=>{
+          openWinModal({ narrow:true, title:'Изменить карму',
+            body:`<div class="field"><label>Изменение (например, 5 или -10)</label><input class="input" id="km-delta" type="number" step="1" value="5"></div>
+              <div class="field" style="margin-top:10px"><label>Причина</label><input class="input" id="km-reason" placeholder="За что начисляем/списываем"></div>`,
+            footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-save>Применить</button>`,
+            onMount:(m2, c2)=>{
+              m2.querySelector('[data-x]').onclick = c2;
+              m2.querySelector('[data-save]').onclick = ()=>{
+                const d = Number(m2.querySelector('#km-delta').value) || 0;
+                const r = (m2.querySelector('#km-reason').value||'').trim();
+                if (!d){ toast('Укажите изменение кармы','warn'); return; }
+                karmaAdjust(p.id, d, r || 'Корректировка');
+                logAudit(`Карма: ${p.full_name} ${d>0?'+':''}${d} (${r||'без причины'})`,'Карма');
+                c2(); close(); openPersonCard(p.id, role);
+                toast('Карма обновлена','ok');
+              };
+            } });
+        };
         $$('[data-ct]', mask).forEach(t=>t.onclick = ()=>{
           $$('[data-ct]', mask).forEach(x=>x.classList.remove('on')); t.classList.add('on');
           mask.querySelectorAll('[data-cm]').forEach(p2=>p2.style.display = p2.dataset.cm===t.dataset.ct?'':'none');
         });
-        $$('[data-ws]', mask).forEach(b=>b.onclick = ()=>{ p.ext.workStatus = b.dataset.ws; logAudit(`Рабочий статус: ${p.full_name} → ${b.dataset.ws}`,'Исполнитель'); saveState(); close(); APP.render(); toast('Рабочий статус обновлён','ok'); });
+        $$('[data-ws]', mask).forEach(b=>b.onclick = ()=>{
+          p.ext.workStatus = b.dataset.ws;
+          /* Сетевой статус следует за рабочим: «Не работаю» = офлайн. */
+          p.is_online = (b.dataset.ws === 'working');
+          logAudit(`Рабочий статус: ${p.full_name} → ${b.dataset.ws}`,'Исполнитель');
+          saveState(); close(); APP.render(); toast('Рабочий статус обновлён','ok');
+        });
         const qa = mask.querySelector('[data-qual]');
         qa && (qa.onclick = ()=>changeQualification(p, close));
         const tr = mask.querySelector('[data-transfer]');
@@ -1078,7 +2151,7 @@ const CRM = (() => {
         blb && (blb.onclick = async ()=>{
           const toBl = !bl;
           if (toBl){
-            openModal({ narrow:true, title:'Добавить в чёрный список',
+            openWinModal({ narrow:true, title:'Добавить в чёрный список',
               body:`<div class="field"><label>Причина *</label><textarea class="input" id="bl-reason" rows="3" placeholder="Нарушение правил, срыв сроков…"></textarea></div>`,
               footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--danger" data-bl-save>В чёрный список</button>`,
               onMount:(m2, close2)=>{
@@ -1110,12 +2183,12 @@ const CRM = (() => {
   function changeQualification(p, closeCard){
     const u = me();
     const bypass = ['admin','top_manager'].includes(u.role);
-    openModal({
+    openWinModal({
       narrow:true, title:'Квалификация исполнителя',
       body:`<div class="stack" style="gap:10px">${Object.keys(p.ext.qualification||{}).map(s=>`
         <div class="row row--between"><span class="small">${esc(s)}</span>
         <div class="seg" data-q-spec="${esc(s)}">${[1,2,3].map(v=>`<button data-v="${v}" class="${p.ext.qualification[s]===v?'on':''}">${'★'.repeat(v)||v}</button>`).join('')}</div></div>`).join('')}
-        <p class="small faint">Изменение рейтинга требует одобрения всех менеджеров. Администратор и главный менеджер меняют без голосования.</p>
+        <p class="small faint">Изменение рейтинга требует одобрения всех менеджеров. Администратор и ТОП-менеджер меняют без голосования.</p>
       </div>`,
       footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-ok>Сохранить</button>`,
       onMount:(mask, close)=>{
@@ -1140,7 +2213,7 @@ const CRM = (() => {
   }
 
   function editComment(p, closeCard){
-    openModal({
+    openWinModal({
       narrow:true, title:'Редактировать комментарий',
       body:`<div class="stack" style="gap:12px">
         <div class="field"><label>Общий комментарий</label><textarea class="input" id="cm-pub">${esc(p.ext.comment||'')}</textarea></div>
@@ -1163,7 +2236,7 @@ const CRM = (() => {
   function showRequisites(p){
     const r = p.ext.requisites||{};
     const rows = [['ИНН',r.inn],['КПП',r.kpp],['Банк',r.bank],['Расчётный счёт',r.account],['Корр. счёт',r.corr],['БИК',r.bik],['Юр. адрес',r.address]];
-    openModal({ title:'Реквизиты', narrow:true,
+    openWinModal({ title:'Реквизиты', narrow:true, route:'clients',
       body: rows.every(x=>!x[1]) ? '<p class="muted small">Реквизиты не заполнены</p>' :
         `<div class="tbl-wrap"><table class="tbl" style="min-width:0">${rows.filter(x=>x[1]).map(x=>`<tr><td class="muted" style="border:0">${x[0]}</td><td style="border:0"><b class="mono small">${esc(x[1])}</b></td></tr>`).join('')}</table></div>`,
       footer:`<button class="btn btn--primary" data-x>Закрыть</button>`,
@@ -1374,7 +2447,7 @@ const CRM = (() => {
       const find = (...names) => H.findIndex(h => h && names.some(n => h.includes(n)));
       const m = {};
       if (entity === 'orders'){
-        m.id = find('id заказа','заказ'); m.clientnum = find('номер клиента','клиент');
+        m.id = find('id заказа','id','заказ'); m.clientnum = find('номер клиента','клиент');
         m.execs = find('номера исполнителей','исполнител'); m.date = find('дата заказа','дата');
         m.start = find('дата начала','дата старта','старт'); m.deadline = find('дедлайн','срок'); m.status = find('статус');
         m.total = find('итого','сумма'); m.cert = find('заверение'); m.comment = find('комментарий');
@@ -1432,14 +2505,22 @@ const CRM = (() => {
       return null;
     }
 
-    const parseMoney = s => { const raw = String(s||'').trim(); const n = raw.replace(/[^0-9.,]/g, ''); const lastComma = n.lastIndexOf(','); const lastDot = n.lastIndexOf('.'); let num = 0; if (lastComma > lastDot && lastComma > 0) num = parseFloat(n.replace(/\./g,'').replace(',','.')) || 0; else if (lastDot > -1) num = parseFloat(n) || 0; else num = parseFloat(n.replace(',','.')) || 0; return num; };
+    const parseMoney = s => { const raw = String(s==null?'':s).trim(); if (!raw) return 0; /* Пробел/неразрывный пробел — разделитель тысяч: «1 234 567,89» → 1234567.89 */ const n = raw.replace(/[\s\u00A0]/g,'').replace(/[^0-9.,-]/g,''); if (!n) return 0; const lastComma = n.lastIndexOf(','); const lastDot = n.lastIndexOf('.'); let num = 0; if (lastComma > lastDot && lastComma > 0) num = parseFloat(n.replace(/\./g,'').replace(',','.')) || 0; else if (lastDot > -1) num = parseFloat(n) || 0; else num = parseFloat(n.replace(',','.')) || 0; return Number.isFinite(num) ? num : 0; };
     function parseExecsRaw(v){
       const out = [];
       String(v||'').split(/[,;]/).forEach(tok=>{
         const t = tok.trim();
-        const m = t.match(/^\+?(\d+)\s*[—–\-=:]\s*([\d.,]+)/);
+        if (!t) return;
+        const m = t.match(/^\+?(\d+)\s*[—–\-=:]\s*([\d.,\s]+)/);
         if (m) out.push({ num: +m[1], amount: parseMoney(m[2]) });
-        else { const m2 = t.match(/(\d+)/); if (m2) out.push({ num: +m2[1], amount: 0 }); }
+        else {
+          /* «ФИО — 5000» или «ФИО: сумма»: число в конце → ссылка по имени, сумма справа */
+          const mName = t.match(/^(.+?)\s*[—–\-=:]\s*([\d.,\s]+)$/);
+          if (mName){ out.push({ num: mName[1].trim(), amount: parseMoney(mName[2]) }); return; }
+          const m2 = t.match(/(\d+)/);
+          if (m2) out.push({ num: +m2[1], amount: 0 });
+          else out.push({ num: t, amount: 0 });
+        }
       });
       return out;
     }
@@ -1489,7 +2570,7 @@ const CRM = (() => {
 
     function pickSheets(det){
       return new Promise(res => {
-        openModal({
+        openWinModal({
           title:'Выберите листы для импорта',
           body:`<p class="small muted" style="margin-bottom:10px">Отметьте нужные листы или импортируйте всю книгу. Тип определён по заголовкам (строка 1); нумерация строк в журнале — как в Excel, с 2.</p>
             <div class="stack" style="gap:8px" id="ps-list">
@@ -1605,9 +2686,24 @@ const CRM = (() => {
       const orderIdSet = new Set(S.orders.map(o => norm(o.order_id)));
       const baseClients = S.users.filter(x => x.role === 'client');
       const baseExecs = S.users.filter(x => x.role === 'executor');
-      /* «Номер клиента»/«Номер исполнителя» = номер строки книги (данные с 2) */
-      const clientByNum = n => (n != null && _imp.clients[n]) ? _imp.clients[n] : baseClients[(n||2)-2] || null;
-      const executorByNum = n => (n != null && _imp.executors[n]) ? _imp.executors[n] : baseExecs[(n||2)-2] || null;
+      /* «Номер клиента»/«Номер исполнителя» = номер строки книги (данные с 2).
+         Разрешение по цепочке: номер строки импорта → № строки (xlsxRow) у уже
+         существующих → имя/ФИО (если в ячейке не число) → позиция в списке. */
+      const resolveNum = (n, imp, base, all) => {
+        if (n == null || n === '') return null;
+        if (imp[n] != null) return imp[n];
+        const asNum = parseInt(String(n), 10);
+        if (!Number.isNaN(asNum)){
+          const byRow = all.find(x => x.ext && x.ext.xlsxRow === asNum);
+          if (byRow) return byRow.id;
+          if (base[asNum - 2]) return base[asNum - 2].id;
+        }
+        const byName = all.find(x => norm(x.full_name) === norm(String(n)));
+        if (byName) return byName.id;
+        return null;
+      };
+      const clientByNum = n => resolveNum(n, _imp.clients, baseClients, S.users.filter(x=>x.role==='client'));
+      const executorByNum = n => resolveNum(n, _imp.executors, baseExecs, S.users.filter(x=>x.role==='executor'));
 
       /* Прочерк (любой вид тире) = «данных нет»: превращаем в пустое значение */
       const DASH_RE = /^[\s\u00A0\-–—―−‒﹘﹣＿_]*$/;
@@ -1637,7 +2733,7 @@ const CRM = (() => {
             logBuf.push([`[${j.sheet}] Строка ${rowNo}: дубликат (${fio}) — пропущен`, 'warn']); mark(j,'skipped',1); skipped++; return;
           }
           const nu = { id: uid(), username: norm(email).split('@')[0] || 'user' + rowNo, email: email || '', pw: 'import123', role: 'client', full_name: fio, phone, about: '', theme: 'system', is_online: false, avatar: '', consent_marketing: false, tour_completed: true, created_at: Date.now(),
-            ext: { company: /^(ооо|ао|ип|зао)\b/i.test(fio) ? fio : '', roleIn: '', comment, discountApplied: false, managerId: me().id, status: 'active', requisites: {}, consentNews: false, xlsxRow: j.rowNo } };
+            ext: { company: /^(ооо|ао|ип|зао)\b/i.test(fio) ? fio : '', roleIn: '', comment, discountApplied: false, managerId: me().id, status: 'active', requisites: {}, consentNews: false, xlsxRow: j.rowNo, num: nextPersonNum() } };
           applyRules('client', ruleContext('client', nu, null, j.rowNo), nu, null, n => { addLog(`[${j.sheet}] ` + n, 'rule'); ruled++; });
           S.users.push(nu); _imp.clients[j.rowNo] = nu.id; if (nu.email) clientKeys.add('e:' + norm(nu.email)); if (nu.phone) clientKeys.add('p:' + nu.phone); mark(j,'added',1); added++;
           logBuf.push([`[${j.sheet}] Строка ${rowNo}: + клиент ${fio}`, 'ok']);
@@ -1655,11 +2751,11 @@ const CRM = (() => {
             if (!exists) S.specializations.push({ id: uid(), nish_id: null, name: sp2, from_import: true });
           });
           const nu = { id: uid(), username: norm(email).split('@')[0] || 'user' + rowNo, email: email || '', pw: 'import123', role: 'executor', full_name: fio, phone, about: '', theme: 'system', is_online: false, avatar: '', consent_marketing: false, tour_completed: true, created_at: Date.now(),
-            ext: { specializations: specs, qualification: {}, qualOverall: specs.length ? 1 : 0, earned, status: 'active', workStatus: 'working', comment, commentPersonal: '', managerId: me().id, xlsxRow: j.rowNo } };
+            ext: { specializations: specs, qualification: {}, qualOverall: specs.length ? 1 : 0, earned, status: 'active', workStatus: 'working', comment, commentPersonal: '', managerId: me().id, xlsxRow: j.rowNo, num: nextPersonNum() } };
           S.users.push(nu); _imp.executors[j.rowNo] = nu.id; if (nu.email) execKeys.add('e:' + norm(nu.email)); if (nu.phone) execKeys.add('p:' + nu.phone); mark(j,'added',1); added++;
           logBuf.push([`[${j.sheet}] Строка ${rowNo}: + исполнитель ${fio}${earned ? ' · ' + fmtMoney(earned) : ''}`, 'ok']);
         } else {
-          const oid = get(r,j.map,'id') || generateOrderId();
+          const oid = sanitizeOrderId(get(r,j.map,'id')) || generateOrderId();
           if (orderIdSet.has(norm(oid))){ logBuf.push([`[${j.sheet}] Строка ${rowNo}: дубликат ID ${oid} — пропущен`, 'warn']); mark(j,'skipped',1); skipped++; return; }
           orderIdSet.add(norm(oid));
           const clNum = parseInt(get(r,j.map,'clientnum'), 10);
@@ -1673,8 +2769,8 @@ const CRM = (() => {
           const dlRaw = String(get(r,j.map,'deadline'));
           const dlTs = dlRaw ? parseDateVal(dlRaw.replace(/^до\s*/i, '')) : null;
           const execs = parseExecsRaw(get(r,j.map,'execs')).map(e => {
-            const u2 = executorByNum(e.num);
-            return u2 ? { uid: u2.id, amount: e.amount, is_paid: false } : null;
+            const uid2 = executorByNum(e.num);
+            return uid2 ? { uid: uid2, amount: e.amount, is_paid: false } : null;
           }).filter(Boolean);
           const no = { id: uid(), order_id: oid, client_id: cl.id, order_date: dateTs, start_date: startTs, deadline: dlTs, executor_deadline: null, status, total: total2,
             certification_amount: cert, need_cert: cert > 0, comment: collectComments(r,j.map), manager_id: me().id, project_id: null, folder_id: null,
@@ -1727,15 +2823,42 @@ const CRM = (() => {
     function setSeg(btn){ btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); }
     const buildRows = (ent, nid) => {
       if (ent==='orders'){
-        return [['ID','Клиент','Ниша','Статус','Итого','Начало','Дедлайн','Менеджер'],
-          ...noDemo(S.orders.filter(o=>!nid||o.nish_id===nid)).map(o=>[o.order_id,(clientById(o.client_id)||{}).full_name||'',nicheName(o.nish_id),STATUS_META[o.status].label,o.total,o.start_date?fmtDate(o.start_date):'',o.deadline?fmtDT(o.deadline):'',(userById(o.manager_id)||{}).full_name||''])];
+        /* Колонки в ТОЧНОСТИ как у импорта (buildMapping orders):
+           ID заказа · Номер клиента · Номера исполнителей · Дата заказа ·
+           Дата начала · Дедлайн · Статус · Итого · Заверение · Комментарий.
+           «Номер клиента»/«Номер исполнителя» — номер строки книги (xlsxRow)
+           или позиция в списке + 2; импорт разрешает оба варианта обратно. */
+        const clList = noDemo(S.users.filter(x=>x.role==='client'));
+        const exList = noDemo(S.users.filter(x=>x.role==='executor'));
+        const clNum = id => { const i = clList.findIndex(x=>x.id===id); if (i<0) return ''; const c = clList[i]; return c.ext && c.ext.xlsxRow ? c.ext.xlsxRow : (i+2); };
+        const exNum = id => { const i = exList.findIndex(x=>x.id===id); if (i<0) return ''; const e = exList[i]; return e.ext && e.ext.xlsxRow ? e.ext.xlsxRow : (i+2); };
+        return [['ID заказа','Номер клиента','Номера исполнителей','Дата заказа','Дата начала','Дедлайн','Статус','Итого','Заверение','Комментарий'],
+          ...noDemo(S.orders.filter(o=>!nid||o.nish_id===nid)).map(o=>{
+            const execCell = (o.executors||[]).map(e=>{
+              const ex = userById(e.uid);
+              if (!ex) return '';
+              const num = exNum(e.uid);
+              return (num ? num + ' — ' : '') + (e.amount||0);
+            }).join(', ');
+            return [ o.order_id,
+              clNum(o.client_id),
+              execCell,
+              o.order_date ? fmtDate(o.order_date) : '',
+              o.start_date ? fmtDate(o.start_date) : '',
+              o.deadline ? fmtDT(o.deadline) : '',
+              STATUS_META[o.status].label,
+              o.total,
+              o.certification_amount || 0,
+              o.comment || ''
+            ];
+          })];
       }
       if (ent==='clients'){
         return [['ФИО/Компания','Логин','Email','Телефон','Комментарий','Статус','№ строки'],
-          ...noDemo(S.users.filter(x=>x.role==='client')).map(x=>[x.full_name,x.username,x.email,x.phone,x.ext.comment,x.ext.status,x.ext.xlsxRow||''])];
+          ...noDemo(S.users.filter(x=>x.role==='client')).map((x,i)=>[x.full_name,x.username,x.email,x.phone,x.ext.comment,x.ext.status,x.ext.xlsxRow||(i+2)])];
       }
       return [['ФИО','Логин','Email','Телефон','Специализации','Заработано','Статус','№ строки'],
-        ...noDemo(S.users.filter(x=>x.role==='executor')).map(x=>[x.full_name,x.username,x.email,x.phone,x.ext.specializations.join(', '),x.ext.earned,x.ext.status,x.ext.xlsxRow||''])];
+        ...noDemo(S.users.filter(x=>x.role==='executor')).map((x,i)=>[x.full_name,x.username,x.email,x.phone,x.ext.specializations.join(', '),x.ext.earned,x.ext.status,x.ext.xlsxRow||(i+2)])];
     };
     const emitCsv = (ent, nid) => {
       const rows2 = buildRows(ent, nid);
@@ -1770,7 +2893,7 @@ const CRM = (() => {
     const ruleEditor = (existing) => {
       const isNew = !existing;
       const rule = existing ? JSON.parse(JSON.stringify(existing)) : { id: uid(), entity: 'client', conditions: [{ field:'comment', op:'contains', value:'' }], action_type: 'discount', action_value: '' };
-      openModal({
+      openWinModal({
         title: isNew ? 'Новое правило импорта' : 'Правило импорта',
         wide: true,
         body:`<div class="stack" style="gap:12px">
@@ -1887,8 +3010,8 @@ const CRM = (() => {
   /* ==================== КАЛЬКУЛЯТОР ==================== */
   function openCalculator({ onResult=null } = {}){
     const staffView = isStaff(me().role);
-    const m = openModal({
-      narrow:true, title:'Калькулятор услуг',
+    const m = openWinModal({
+      narrow:true, title:'Калькулятор услуг', route:'orders',
       body:`<div class="calc-display"><div class="expr" id="cx-expr">введите выражение с клавиатуры</div><div class="val" id="cx-val">0</div></div>
         <div class="field" style="margin-top:12px"><label>Выражение</label>
           <input class="input mono" id="cx-in" placeholder="например: 2.5 × 1800 + 5600" autocomplete="off" spellcheck="false">
@@ -1899,7 +3022,7 @@ const CRM = (() => {
         <div class="calc-history" id="cx-hist" style="margin-top:12px">${S.calcHistory.slice(-6).reverse().map(h=>`<div data-h="${h.result}">${esc(h.expression)} = ${h.result}</div>`).join('')}</div>
         <div class="small faint" style="margin-top:12px">Отметьте услуги — их стоимость прибавится к результату.</div>
         <div id="cx-svcs" style="margin-top:8px"></div>`,
-      footer:`<button class="btn btn--ghost" data-x>Закрыть</button>${onResult?'<button class="btn btn--primary" data-apply2>Подставить</button>':''}`,
+      footer:`<button class="btn btn--ghost" data-x>Закрыть</button>${onResult?'<button class="btn btn--primary" data-apply2>Подставить</button>':''}<button class="btn btn--primary" data-create>${icon('plus')} Создать заказ</button>`,
       onMount:(mask, close)=>{
         const g2 = s=>mask.querySelector(s);
         let val = 0;
@@ -1946,6 +3069,13 @@ const CRM = (() => {
           toast(`Подставлено: ${fmtMoney(sum)}`, 'ok');
           close();
         };
+        /* Создать заказ из калькулятора: результат → сумма нового заказа */
+        const cr = mask.querySelector('[data-create]');
+        if (cr) cr.onclick = ()=>{
+          let sum = val + svcSum();
+          close();
+          openOrderForm(null, sum || 0);
+        };
       }
     });
   }
@@ -1978,7 +3108,7 @@ const CRM = (() => {
       $$('[data-b]', root).forEach(t=>t.onclick=()=>{ cur=t.dataset.b; render(); });
       $$('[data-new]', root).forEach(b=>b.onclick=()=>{
         const cols = S.kanbanBoards.find(x=>x.id===cur)?.columns || [];
-        openModal({ narrow:true, title:'Новая карточка',
+        openWinModal({ narrow:true, title:'Новая карточка',
           body:`<div class="stack" style="gap:12px">
             <div class="field"><label>Название *</label><input class="input" id="kc-title" placeholder="Что нужно сделать"></div>
             <div class="field"><label>Колонка</label><select class="input" id="kc-col">${cols.map(cn=>`<option>${esc(cn)}</option>`).join('')}</select></div>
@@ -1996,6 +3126,17 @@ const CRM = (() => {
           } });
       });
       const kb = $('#kb', root);
+      /* Двойной клик по карточке канбана — модалка с деталями */
+      kb.addEventListener('dblclick', e=>{
+        const card = e.target.closest('.kb-card');
+        if (!card) return;
+        const c = (S.kbCards || []).find(x=>x.id === card.dataset.card);
+        if (!c) return;
+        openWinModal({ narrow:true, title:'Карточка', route:'kanban',
+          body:`<div class="stack" style="gap:10px"><b>${esc(c.title)}</b>${c.order_id?`<span class="badge c-blue">${esc(c.order_id)}</span>`:''}${c.description?`<p class="small" style="white-space:pre-wrap;color:var(--text-2)">${esc(c.description)}</p>`:''}</div>`,
+          footer:`<button class="btn btn--primary" data-x>Закрыть</button>`,
+          onMount:(m2,c2)=>m2.querySelector('[data-x]').onclick=c2 });
+      });
       let dragged = null;
       kb.addEventListener('dragstart', e=>{
         const card = e.target.closest('.kb-card'); if (!card) return;
@@ -2028,21 +3169,48 @@ const CRM = (() => {
 
   /* ==================== ТИКЕТЫ ==================== */
   function openTicket(orderRef){
-    openModal({
+    openWinModal({
       narrow:true, title:'Сообщить о проблеме',
       body:`<div class="stack" style="gap:12px">
         <div class="field"><label>Тема</label><input class="input" id="tk-sub" placeholder="Коротко о проблеме"></div>
-        <div class="field"><label>Описание</label><textarea class="input" id="tk-msg" placeholder="Что случилось?"></textarea></div>
+        <div class="field"><label>Описание</label><textarea class="input" id="tk-msg" placeholder="Что случилось? Шаги, ожидание и факт"></textarea></div>
+        <div class="field">
+          <label>Скриншот или файл</label>
+          <label class="file-btn" for="tk-file">${icon('clip')} <span>Выбрать файл</span></label>
+          <input class="input" type="file" id="tk-file" accept="image/*,.pdf,.zip,.doc,.docx,.xls,.xlsx,.txt" multiple hidden>
+          <div id="tk-files" class="stack" style="gap:4px;margin-top:6px"></div>
+        </div>
         ${orderRef?`<p class="small faint">Привязка к заказу: <b>${esc(orderRef)}</b></p>`:''}
       </div>`,
       footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-send>Отправить</button>`,
       onMount:(mask, close)=>{
+        const files = [];
+        const fList = mask.querySelector('#tk-files');
+        const fInp = mask.querySelector('#tk-file');
+        if (fInp) fInp.addEventListener('change', ()=>{
+          [...(fInp.files||[])].forEach(f=>{
+            if (f.size > 4*1024*1024){ toast('Файл слишком большой (лимит 4 МБ)','warn'); return; }
+            const fr = new FileReader();
+            fr.onload = ()=>{
+              const item = { name: f.name, type: f.type, size: f.size, dataUrl: String(fr.result) };
+              files.push(item);
+              const row = document.createElement('div');
+              row.className = 'rp-file-row';
+              const preview = /^image\//.test(f.type) ? `<img src="${item.dataUrl}" alt="" style="max-width:56px;max-height:42px;border-radius:6px;object-fit:cover">` : '';
+              row.innerHTML = preview + `<span class="small" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span><button type="button" class="iconbtn" title="Убрать">${icon('x','ico-sm')}</button>`;
+              row.querySelector('button').onclick = ()=>{ row.remove(); files.splice(files.indexOf(item),1); };
+              fList.appendChild(row);
+            };
+            fr.readAsDataURL(f);
+          });
+          fInp.value = '';
+        });
         mask.querySelector('[data-x]').onclick = close;
         mask.querySelector('[data-send]').onclick = ()=>{
           const sub = mask.querySelector('#tk-sub').value.trim();
           if (!sub){ toast('Укажите тему','err'); return; }
-          S.tickets.unshift({ id:uid(), user_id:me().id, order_id:orderRef||null, subject:sub, message:mask.querySelector('#tk-msg').value, status:'new', created_at:Date.now(), resolved_at:null });
-          logAudit(`Создан тикет: ${sub}`, 'Тикет');
+          S.tickets.unshift({ id:uid(), user_id:me().id, order_id:orderRef||null, subject:sub, message:mask.querySelector('#tk-msg').value, status:'new', created_at:Date.now(), resolved_at:null, attachments: files.length ? files : undefined });
+          logAudit(`Создан тикет: ${sub}` + (files.length ? ` (+${files.length} файл(ов))` : ''), 'Тикет');
           saveState(); toast('Тикет создан — менеджеры увидят его в разделе «Тикеты»','ok');
           close(); APP.render();
         };
@@ -2050,6 +3218,209 @@ const CRM = (() => {
     });
   }
 
+  /* ---------- Приглашения ----------
+     Механика (как в ТГ): ссылка с токеном → регистрация по ней создаёт аккаунт
+     нужной роли. Одна ссылка — N человек (лимит), срок действия, автор, отзыв. */
+  function invRow(inv){
+    const st = inviteStatus(inv);
+    const stTxt = { active:'Активна', used:'Использована', expired:'Истекла', revoked:'Отозвана' }[st];
+    const stCls = { active:'c-green', used:'c-gray', expired:'c-yellow', revoked:'c-red' }[st];
+    const links = inv.usedBy || [];
+    const when = inv.expiresAt ? ('до ' + fmtDT(inv.expiresAt)) : 'бессрочно';
+    return `<div class="inv-row" data-token="${esc(inv.token)}" data-st="${st}">
+      <div class="inv-row__main">
+        <div class="inv-row__t"><b>${ROLE_LABEL[inv.role]||inv.role}</b>
+          <span class="badge ${stCls}">${stTxt}</span>
+          <span class="small faint">${links.length} из ${inv.limit} · ${when}${inv.email? ' · '+esc(inv.email):''}</span>
+        </div>
+        <div class="inv-row__link">${esc(inviteLink(inv))}</div>
+        ${links.length?`<div class="small faint">Вошли: ${links.map(l=>esc((userById(l.userId)||{}).full_name||l.userId)).join(', ')}</div>`:''}
+      </div>
+      <div class="inv-row__acts">
+        <button class="iconbtn" data-copy title="Копировать ссылку">${icon('copy','ico-sm')}</button>
+        <button class="iconbtn" data-mail title="Отправить на email">${icon('mail','ico-sm')}</button>
+        ${st==='active'?`<button class="iconbtn" data-revoke title="Отозвать">${icon('x','ico-sm')}</button>`:''}
+      </div>
+    </div>`;
+  }
+  function openInvites(){
+    const u = me();
+    if (!u) return;
+    /* Кто может приглашать: staff (админ/топ/менеджер) — роли executor/client;
+       исполнитель — только роль client (приглашает заказчиков). */
+    const isStaffU = isStaff(u.role);
+    /* Роли, доступные этому пользователю: админ — все (вкл. менеджеров/топов),
+       staff — исполнитель/заказчик, исполнитель — только заказчик */
+    const canRoles = INVITE_ROLES_ALL.filter(r => canInviteRole(u.role, r));
+    const renderInv = (m2)=>{
+      const host = m2.querySelector('#inv-list');
+      const invs = noDemo(S.invites||[]).slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+      host.innerHTML = invs.length
+        ? invs.map(invRow).join('')
+        : '<div class="empty" style="padding:18px">'+icon('user-plus')+'<span>Приглашений пока нет — создайте первое</span></div>';
+      /* Прогресс лимита */
+      host.querySelectorAll('[data-copy]').forEach(b=>b.onclick = ()=>{
+        const t = b.closest('.inv-row').dataset.token;
+        const inv = inviteById(t);
+        if (!inv) return;
+        try { navigator.clipboard.writeText(inviteLink(inv)); toast('Ссылка скопирована','ok'); }
+        catch(err){ toast('Не удалось скопировать','err'); }
+      });
+      host.querySelectorAll('[data-mail]').forEach(b=>b.onclick = ()=>{
+        const t = b.closest('.inv-row').dataset.token;
+        const inv = inviteById(t);
+        if (!inv) return;
+        if (inv.email){ /* уже отправляли — просто напоминаем */
+          toast('Приглашение отправлено на '+inv.email,'info'); return;
+        }
+        /* Спросим email */
+        openWinModal({ narrow:true, title:'Отправить приглашение',
+          body:`<div class="field"><label>Email получателя</label><input class="input" id="inv-mail" placeholder="name@example.com"></div>
+            <p class="small faint">Письмо с ссылкой придёт на этот адрес (демо: показать ссылку).</p>`,
+          footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-go>Отправить</button>`,
+          onMount:(m3,c3)=>{
+            m3.querySelector('[data-x]').onclick = c3;
+            m3.querySelector('[data-go]').onclick = ()=>{
+              const em = (m3.querySelector('#inv-mail').value||'').trim();
+              if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ toast('Некорректный email','warn'); return; }
+              inv.email = em; saveState();
+              /* демо: письмо = тост с ссылкой (как другие уведомления) */
+              toast('Письмо отправлено: '+inviteLink(inv),'info');
+              c3(); renderInv(m2);
+            };
+          } });
+      });
+      host.querySelectorAll('[data-revoke]').forEach(b=>b.onclick = ()=>{
+        const t = b.closest('.inv-row').dataset.token;
+        const inv = inviteById(t);
+        if (!inv) return;
+        inv.revoked = true; saveState();
+        renderInv(m2); toast('Ссылка отозвана','ok');
+      });
+    };
+    /* Личная реферальная ссылка + статистика (у всех пользователей) */
+    const stats = referralStats(u.id);
+    const cfg = refConfig();
+    const invitedRows = stats.invited.slice(0, 8).map(r=>{
+      const nu = userById(r.userId);
+      if (!nu) return '';
+      const earned = stats.accruals.filter(a=>a.userId===nu.id).reduce((sm,a)=>sm+(Number(a.amount)||0),0);
+      return `<div class="inv-row" style="padding:8px 6px"><div class="inv-row__main">
+        <div class="inv-row__t"><b>${esc(nu.full_name)}</b>
+          <span class="small faint">${esc(ROLE_LABEL[nu.role]||nu.role)} · ${new Date(r.at).toLocaleDateString('ru-RU')}${earned?` · ${fmtMoney(earned)}`:''}</span>
+        </div>
+      </div></div>`;
+    }).join('');
+    const personalBlock = `
+      <div class="ref-block">
+        <div class="row row--between" style="align-items:center">
+          <b class="small">Моя реферальная ссылка</b>
+          <span class="badge ${stats.total?'c-green':'c-gray'}">Приглашено: ${stats.total}${stats.activeCount?` · активных: ${stats.activeCount}`:''}</span>
+        </div>
+        <div class="ref-link">
+          <input class="input" id="ref-link" readonly value="${esc(refLink(u))}">
+          <button class="iconbtn" id="ref-copy" title="Копировать ссылку">${icon('copy','ico-sm')}</button>
+        </div>
+        <div class="small faint" style="margin-top:6px">Начислено по рефералам: <b style="color:var(--text-2)">${fmtMoney(stats.earned)}</b> · процент: ${cfg.percent}% от заказов${cfg.fixedBonus?`, бонус за первый заказ: ${fmtMoney(cfg.fixedBonus)}`:''}${cfg.karmaPerRef?`, карма: +${cfg.karmaPerRef}`:''}</div>
+        ${invitedRows?`<div class="small" style="margin-top:8px"><b>Мои рефералы</b></div><div class="inv-list">${invitedRows}</div>`:''}
+      </div>`;
+
+    const body = `
+      ${personalBlock}
+      <div class="field" style="margin-top:12px">
+        <div class="row row--between" style="align-items:flex-end">
+          <div style="flex:1"><label>Роль нового пользователя</label>
+            <div class="seg" id="inv-role" style="margin-top:4px">
+              ${canRoles.map((r,i)=>{
+                const ic = r==='client' ? 'clients' : (r==='executor' ? 'executor' : (r==='admin' ? 'shield' : 'clients'));
+                const lbl = { client:'Заказчик', executor:'Исполнитель', manager:'Менеджер', top_manager:'ТОП-менеджер', admin:'Администратор' }[r] || ROLE_LABEL[r] || r;
+                return `<button data-role="${r}" class="${i===0?'on':''}">${icon(ic,'ico-sm')} ${lbl}</button>`;
+              }).join('')}
+            </div>
+          </div>
+          <div style="width:120px"><label>Лимит</label>
+            <select class="input" id="inv-limit">
+              <option value="1">1 человек</option>
+              <option value="3">3 человека</option>
+              <option value="5">5 человек</option>
+              <option value="10">10 человек</option>
+              <option value="0">Без лимита</option>
+            </select>
+          </div>
+        </div>
+        <label style="margin-top:10px">Срок действия</label>
+        <select class="input" id="inv-exp">
+          <option value="0">Бессрочно</option>
+          <option value="1">1 день</option>
+          <option value="7" selected>7 дней</option>
+          <option value="30">30 дней</option>
+        </select>
+        <button class="btn btn--primary btn--block" id="inv-create" style="margin-top:12px">${icon('user-plus')} Создать ссылку-приглашение</button>
+      </div>
+      <div class="small faint" style="margin:10px 0 6px">Созданные приглашения</div>
+      <div class="inv-list" id="inv-list"></div>
+      ${u.role==='admin' ? `
+      <div class="small" style="margin:14px 0 6px"><b>Настройки реферальной программы</b></div>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <div style="width:120px"><label class="small faint">Процент</label><input class="input" id="ref-cfg-percent" type="number" min="0" max="50" value="${cfg.percent}"></div>
+        <div style="width:150px"><label class="small faint">Бонус за 1-й заказ</label><input class="input" id="ref-cfg-fixed" type="number" min="0" value="${cfg.fixedBonus}"></div>
+        <div style="width:110px"><label class="small faint">Карма за реферала</label><input class="input" id="ref-cfg-karma" type="number" min="0" value="${cfg.karmaPerRef}"></div>
+        <div style="width:130px"><label class="small faint">Роль по ссылке</label><select class="input" id="ref-cfg-role"><option value="client" ${cfg.role==='client'?'selected':''}>Заказчик</option><option value="executor" ${cfg.role==='executor'?'selected':''}>Исполнитель</option></select></div>
+      </div>
+      <button class="btn btn--ghost btn--sm" id="ref-cfg-save" style="margin-top:8px">${icon('check-c','ico-sm')} Сохранить настройки</button>` : ''}`;
+    openWinModal({ narrow:true, title:'Приглашения', icon:'user-plus',
+      body,
+      onMount:(m2,c2)=>{
+        /* Личная реферальная ссылка */
+        const refCopy = m2.querySelector('#ref-copy');
+        if (refCopy) refCopy.onclick = ()=>{
+          try { navigator.clipboard.writeText(refLink(u)); toast('Реферальная ссылка скопирована','ok'); }
+          catch(e){ toast('Не удалось скопировать','err'); }
+        };
+        const refInput = m2.querySelector('#ref-link');
+        if (refInput) refInput.onclick = ()=>{ try{ refInput.select(); }catch(e){} };
+        /* Настройки программы (только админ) */
+        const cfgSave = m2.querySelector('#ref-cfg-save');
+        if (cfgSave) cfgSave.onclick = ()=>{
+          const c2ref = refConfig();
+          c2ref.percent = Math.max(0, Math.min(50, Number(m2.querySelector('#ref-cfg-percent').value)||0));
+          c2ref.fixedBonus = Math.max(0, Number(m2.querySelector('#ref-cfg-fixed').value)||0);
+          c2ref.karmaPerRef = Math.max(0, Number(m2.querySelector('#ref-cfg-karma').value)||0);
+          c2ref.role = m2.querySelector('#ref-cfg-role').value || 'client';
+          saveState();
+          logAudit('Обновлены настройки реферальной программы','Рефералы');
+          toast('Настройки программы сохранены','ok');
+        };
+        let role = canRoles[0];
+        const seg = m2.querySelector('#inv-role');
+        if (seg) seg.querySelectorAll('[data-role]').forEach(b=>b.onclick=()=>{
+          seg.querySelectorAll('[data-role]').forEach(x=>x.classList.toggle('on',x===b));
+          role = b.dataset.role;
+        });
+        const invCreateBtn = m2.querySelector('#inv-create');
+        /* Клиентам разовые приглашения недоступны — прячем форму, оставляем личную ссылку */
+        if (!canRoles.length && invCreateBtn){
+          const f = invCreateBtn.closest('.field'); if (f) f.remove();
+        }
+        if (invCreateBtn) invCreateBtn.onclick = ()=>{
+          const limit = parseInt(m2.querySelector('#inv-limit').value||'1',10);
+          const days = parseInt(m2.querySelector('#inv-exp').value||'0',10);
+          const inv = { id:uid(), token:inviteToken(), role,
+            limit: limit || 0, used:0, usedBy:[],
+            expiresAt: days ? Date.now() + days*86400000 : null,
+            createdAt: Date.now(), createdBy: u.id };
+          S.invites = S.invites || [];
+          S.invites.push(inv); saveState();
+          logAudit('Создано приглашение: '+ROLE_LABEL[role],'Приглашения');
+          renderInv(m2);
+          /* сразу копируем ссылку */
+          try { navigator.clipboard.writeText(inviteLink(inv)); toast('Ссылка создана и скопирована','ok'); } catch(e){ toast('Ссылка создана','ok'); }
+        };
+        renderInv(m2);
+      } });
+  }
+  window.openInvites = openInvites;
+
   return { ordersView, openOrderForm, openOrderDetail, openCalculator, openTicket, orderContextMenu,
-    peopleView, projectsView, toolsView, kanbanView, setStatus, payOrder, generateOrderId };
+    peopleView, projectsView, toolsView, kanbanView, setStatus, payOrder, generateOrderId, openPersonForm, openPersonCard };
 })();

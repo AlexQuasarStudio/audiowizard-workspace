@@ -15,7 +15,7 @@ const STATUS_META = {
   archived: { label:'В архиве',    cls:'c-gray',   row:'tr-archived' }
 };
 const ROLE_LABEL = {
-  admin:'Администратор', top_manager:'Главный менеджер', manager:'Менеджер',
+  admin:'Администратор', top_manager:'ТОП-менеджер', manager:'Менеджер',
   executor:'Исполнитель', client:'Заказчик', marketing:'Маркетолог',
   security:'Служба безопасности', support:'Техподдержка'
 };
@@ -23,6 +23,17 @@ const MODE_LIST = ['system','dark','light'];
 const ACCENT_LIST = ['violet','blue','red','green','mono'];
 const MODE_LABEL = { system:'Системная', dark:'Тёмная', light:'Светлая' };
 const ACCENT_LABEL = { violet:'Фиолетовый', blue:'Синий', red:'Красный', green:'Зелёный', mono:'Монохром' };
+const BG_LABEL = { doodle:'Дудлы', photo:'Моё фото', none:'Без фона' };
+
+/* Горячие клавиши по умолчанию: id действия → строка-комбинация.
+   Формат: модификаторы через '+' + клавиша (lowercase). */
+const DEFAULT_KEYS = {
+  search: 'ctrl+k',
+  newOrder: 'ctrl+b',
+  settings: 'ctrl+,',
+  theme: 'ctrl+shift+y',
+  zen: 'ctrl+shift+z'
+};
 /* миграция старого поля theme → mode + accent */
 function migrateThemes(){
   if (!S) return;
@@ -173,9 +184,9 @@ function seedState(){
   const chats = [
     { id:'ch1', type:'corporate', name:'Корпоративный чат', description:'Общий чат для всех исполнителей и менеджеров', avatar:'', is_active:true, unread:{'u-admin':1,'u-manager':0} },
     { id:'ch2', type:'order', name:'Заказ AW-1042 — Подкаст', description:'Менеджер, заказчик и исполнители заказа', avatar:'', is_active:true, order_id:'o1', unread:{'u-manager':2} },
-    { id:'ch3', type:'manager', name:'Менеджеры и админ', description:'Управленческий состав', avatar:'', is_active:true, unread:{'u-top':0,'u-admin':0} },
+    { id:'ch3', type:'manager', name:'Менеджеры и админ', description:'Управленческий состав', avatar:'', is_active:true, system:true, unread:{'u-top':0,'u-admin':0} },
     { id:'ch4', type:'group', name:'Стенографисты', description:'Группа по специализации «Стенографирование»', avatar:'', is_active:true, unread:{} },
-    { id:'ch5', type:'company', name:'VoiceLab — команда', description:'Клиенты компании и менеджер', avatar:'', is_active:true, company:'Studio «VoiceLab»', unread:{} }
+    { id:'ch5', type:'company', name:'VoiceLab — команда', description:'Клиенты компании и менеджер', avatar:'', is_active:true, system:true, company:'Studio «VoiceLab»', unread:{} }
   ];
   const messages = [
     { id:'m1', chat_id:'ch1', user_id:'u-admin', text:'Коллеги, добро пожаловать в новый рабочий инструмент! Нашли баг или есть идея — раздел «Идеи» всегда открыт.', created_at:days(6)+3600000, reactions:{'👍':['u-manager','u-ex1','u-ex2']} },
@@ -222,11 +233,11 @@ function seedState(){
   ];
 
   const changelog = [
-    { id:'v0', version:'0.1-prototype', title:'Прототип Audiowizard Workspace', content:'Заказы, клиенты, исполнители, чаты с реакциями и опросами, тикеты, идеи, канбан, импорт/экспорт Excel, ИИ-стенограммы, копирайтинг и переводы, темы с кастомным акцентом, фоны приложения, полноэкранный режим и техработы.', created_at:Date.now()-3600000, is_published:true },
-    { id:'v4', version:'0.9.4-beta', title:'PWA-оболочка и финальная полировка', content:'Тосты, плавные модалки, глобальный поиск, офлайн-очередь, обновления через service worker.', created_at:days(1), is_published:true },
-    { id:'v1', version:'0.9.2-beta', title:'Онбординг, темы и калькулятор', content:'Обучающий тур для новых ролей, семь тем оформления (включая системную), калькулятор услуг встроен в форму заказа, автосохранение черновиков и очередь офлайн-операций.', created_at:days(2), is_published:true },
-    { id:'v2', version:'0.9.1-beta', title:'Чаты: реакции и опросы', content:'Реакции на сообщения, опросы с голосованием, массовые сообщения клиентам от менеджеров. Исправлена мелкая ошибка в таблице заказов.', created_at:days(6), is_published:true },
-    { id:'v3', version:'0.9.0-beta', title:'Первый бета-релиз', content:'Дашборды, заказы со статусами, клиенты и исполнители, импорт/экспорт, тикеты и идеи. Добро пожаловать в Audiowizard Workspace!', created_at:days(20), is_published:true }
+    { id:'v0', version:'0.1-prototype', title:'Прототип Audiowizard Workspace', content:'Первая версия приложения', created_at:Date.now()-3600000, is_published:true },
+    { id:'v4', version:'0.9.4-beta', title:'PWA-оболочка и финальная полировка', content:'Тосты, плавные модалки, глобальный поиск, офлайн-очередь, обновления через service worker.', created_at:days(1), is_published:true, demo:true },
+    { id:'v1', version:'0.9.2-beta', title:'Онбординг, темы и калькулятор', content:'Обучающий тур для новых ролей, пять тем оформления (включая системную), калькулятор услуг встроен в форму заказа, автосохранение черновиков и очередь офлайн-операций.', created_at:days(2), is_published:true, demo:true },
+    { id:'v2', version:'0.9.1-beta', title:'Чаты: реакции и опросы', content:'Реакции на сообщения, опросы с голосованием, массовые сообщения клиентам от менеджеров. Исправлена мелкая ошибка в таблице заказов.', created_at:days(6), is_published:true, demo:true },
+    { id:'v3', version:'0.9.0-beta', title:'Первый бета-релиз', content:'Дашборды, заказы со статусами, клиенты и исполнители, импорт/экспорт, тикеты и идеи. Добро пожаловать в Audiowizard Workspace!', created_at:days(20), is_published:true, demo:true }
   ];
 
   const importRules = [
@@ -281,8 +292,10 @@ const audit = getDemoAudit();
     _v:1,
     users, niches, specializations, projects, folders, orders, chats, messages, polls,
     tickets, ideas, kanbanBoards:kanban, kbCards, changelog, importRules, calcServices,
-    calcHistory:[], notifs, audit, backups:[], opQueue:[], importLogs, importLogLines,
-    settings:{ demoEnabled:true, minPrepay:50, selfDeleteDays:90, hiddenRoutes:[], balance: 100000 },
+    calcHistory:[], notifs, audit, backups:[], importLogs, importLogLines,
+    settings:{ demoEnabled:true, minPrepay:50, selfDeleteDays:90, hiddenRoutes:[], balance: 100000, appBgDoodles:true,
+      referral:{ enabled:true, percent:2, fixedBonus:0, karmaPerRef:2, role:'client' },
+      betaRoutes:['ai-transcribe','ai-texts','ai-translate'] },
     product:{ beta:true, version:'0.1-prototype', build:1, notes:['Прототип Audiowizard Workspace'] },
     featureUsage:[
       { name:'Заказы', share:34 }, { name:'Чаты', share:26 }, { name:'Дашборды', share:16 },
@@ -290,6 +303,8 @@ const audit = getDemoAudit();
     ],
     usageConsent:{}, cookiesAccepted:false,
     draftPrefs:{}, currentUserId:null, rememberedLogin:null,
+    invites:[] /* приглашения: { id, token, role, limit, used, expiresAt, createdBy, email?, note? } */,
+    keys:{ ...DEFAULT_KEYS },
     uiText:{} /* переопределения текстов интерфейса: {ключ: текст} (правит админ) */
   };
 }
@@ -299,7 +314,7 @@ let S;
 function loadState(){
   try{
     const raw = localStorage.getItem(LS_KEY);
-    if (raw){ S = JSON.parse(raw); if (S && S._v === 1){ migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); saveState(); return; } }
+    if (raw){ S = JSON.parse(raw); if (S && S._v === 1){ migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); migrateKeys(); saveState(); return; } }
   }catch(e){}
   S = seedState();
   saveState();
@@ -309,8 +324,23 @@ const SEED_DEMO_RE = /^(u-(manager|top|ex\d+|cl\d+)|(o|ch|m\d|n\d|nf\d|i\d|t\d|p
 function migrateDemoMarks(){
   /* Гарантия: баланс платформы есть для всех пользователей (и старых сохранений) */
   if (S.settings && S.settings.balance == null) S.settings.balance = 100000;
+  /* Реферальная программа: настройки по умолчанию и журналы */
+  if (S.settings){
+    S.settings.referral = Object.assign({ enabled:true, percent:2, fixedBonus:0, karmaPerRef:2, role:'client' }, S.settings.referral || {});
+  }
+  S.referrals = S.referrals || [];
+  S.referralAccruals = S.referralAccruals || [];
+  /* Beta-режим вкладок: какие разделы помечать значком Beta */
+  if (S.settings && !Array.isArray(S.settings.betaRoutes)){
+    S.settings.betaRoutes = ['ai-transcribe','ai-texts','ai-translate'];
+  }
+  /* Дудл-фон по умолчанию: для старых сохранений без явного поля включаем дудлы */
+  if (S.settings && S.settings.appBgDoodles === undefined) S.settings.appBgDoodles = true;
+  /* Патчноут прототипа: у v0 всегда есть описание «Первая версия приложения» */
+  (S.changelog || []).forEach(c => { if (c.id === 'v0' && !c.content) c.content = 'Первая версия приложения'; });
   if (S.__demoMarked) {
     (S.featureUsage || []).forEach(f => { if (!f.demo) f.demo = true; });
+    (S.changelog || []).forEach(c => { if (c.id === 'v0') delete c.demo; else if (!c.demo) c.demo = true; });
     if (!S.importLogs || !S.importLogs.length) S.importLogs = [
       { t:Date.now()-3*DAY, added:12, skipped:1, ruled:2, errs:0, warns:1, infos:2, file:'clients-2026.csv', entity:'clients' },
       { t:Date.now()-DAY, added:8, skipped:0, ruled:1, errs:1, warns:0, infos:1, file:'executors.xlsx', entity:'executors' }
@@ -338,22 +368,6 @@ function migrateDemoMarks(){
   (S.featureUsage || []).forEach(f => { f.demo = true; });
   S.__demoMarked = true;
 }
-function purgeDemoData(){
-  S.users = S.users.filter(u => !u.demo);
-  S.orders = S.orders.filter(o => !o.demo);
-  S.chats = (S.chats || []).filter(c => !c.demo);
-  S.messages = (S.messages || []).filter(m => !m.demo);
-  S.polls = (S.polls || []).filter(p => !p.demo);
-  S.notifs = (S.notifs || []).filter(n => !n.demo);
-  S.ideas = (S.ideas || []).filter(i => !i.demo);
-  S.tickets = (S.tickets || []).filter(t => !t.demo);
-  S.kbCards = (S.kbCards || []).filter(k => !k.demo);
-  S.projects = (S.projects || []).filter(p => !p.demo);
-  S.folders = (S.folders || []).filter(f => !f.demo);
-  S.audit = []; S.importLogs = []; S.importLogLines = []; S.calcHistory = []; S.backups = []; S.opQueue = [];
-  S.settings.demoEnabled = false;
-  S.featureUsage = [];
-}
 
 function migrateImportRulesSeed(){
   /* Обновить демонстрационные правила до актуальных (не трогает пользовательские) */
@@ -378,6 +392,16 @@ function migrateVioletDefault(){
 }
 function migrateUiText(){
   if (!S.uiText || typeof S.uiText !== 'object') S.uiText = {};
+}
+function migrateKeys(){
+  if (!S.keys || typeof S.keys !== 'object') S.keys = { ...DEFAULT_KEYS };
+  else {
+    // Конфликтные хоткеи заменяем на новые дефолты
+    if (S.keys.theme === 'ctrl+shift+t') S.keys.theme = DEFAULT_KEYS.theme;
+    if (S.keys.newOrder === 'ctrl+n' || S.keys.newOrder === 'ctrl+shift+enter') S.keys.newOrder = DEFAULT_KEYS.newOrder;
+    if (S.keys.zen === 'ctrl+shift+f') S.keys.zen = DEFAULT_KEYS.zen;
+    Object.keys(DEFAULT_KEYS).forEach(id => { if (!S.keys[id]) S.keys[id] = DEFAULT_KEYS[id]; });
+  }
 }
 function migrateRules(){
   (S.importRules || []).forEach(r => {
@@ -420,8 +444,9 @@ function executorMetrics(u){
   const overdue = mine.filter(o=>o.deadline && o.deadline < Date.now() && !['done','archived'].includes(o.status));
   const help = 2; // демо-метрика
   const total = mine.length || 1;
+  const sum = mine.reduce((a,o)=>a+o.total,0); // сумма заказов исполнителя
   return { orders:mine.length, done:done.length, revision:rev.length, overdue:overdue.length, help,
-    success: Math.round((done.length/total)*100) };
+    success: Math.round((done.length/total)*100), sum };
 }
 function clientMetrics(u){
   const mine = S.orders.filter(o=>o.client_id===u.id && o.status!=='archived');
@@ -429,17 +454,266 @@ function clientMetrics(u){
   return { orders:mine.length, sum };
 }
 function chatForUser(u){
+  const removed = (u && u.ext && Array.isArray(u.ext.chatRemoved)) ? u.ext.chatRemoved : [];
   return noDemo(S.chats.filter(c=>{
+    if (removed.includes(c.id) && !isSystemChat(c)) return false;
+    if (c.type === 'direct') return !!(c.member_ids || []).includes(u.id);
     if (isStaff(u.role)) return true;
     if (u.role==='executor') return ['corporate','order','group'].includes(c.type);
     if (u.role==='client') return ['corporate','company','order'].includes(c.type);
     return false;
   }));
 }
+/* Пустое ЛС удаляется при выходе из чата (как в ТГ): если в личном
+   сообщении нет ни одного сообщения, чат не имеет смысла оставаться
+   в списке. «Избранное» (ЛС с собой) не трогаем. */
+function pruneEmptyDirects(){
+  const u = me && me();
+  if (!u) return 0;
+  const emptyIds = [];
+  S.chats.forEach(c=>{
+    if (c.type !== 'direct' || c.isSelf) return;
+    if (!(c.member_ids||[]).includes(u.id)) return;
+    const hasMsg = (S.messages||[]).some(m=>m.chat_id===c.id && !(m.type==='system'));
+    if (!hasMsg) emptyIds.push(c.id);
+  });
+  if (!emptyIds.length) return 0;
+  S.chats = S.chats.filter(c=>!emptyIds.includes(c.id));
+  return emptyIds.length;
+}
+/* ---------- Карма: полуавтоматический рейтинг лояльности ----------
+   База 50 баллов + автоматические начисления за реальную работу
+   (выполненные заказы +, проблемы/доработки −, полученные реакции +)
+   + ручные корректировки staff с причиной. Диапазон 0..100.
+   Бонусы за карму — в будущем; сейчас только рейтинг и история. */
+const KARMA_LEVELS = [
+  { min:85, key:'excellent', label:'Отличная', cls:'c-green' },
+  { min:60, key:'good',      label:'Хорошая',  cls:'c-blue' },
+  { min:30, key:'normal',    label:'Обычная',  cls:'c-gray' },
+  { min:0,  key:'low',       label:'Низкая',   cls:'c-red' }
+];
+function karmaLevel(score){
+  return KARMA_LEVELS.find(l => score >= l.min) || KARMA_LEVELS[KARMA_LEVELS.length-1];
+}
+function calcKarma(u){
+  if (!u) return { score:50, ...karmaLevel(50), parts:{} };
+  const orders = (S.orders || []).filter(o=>{
+    if (u.role === 'executor') return (o.executors || []).some(e=>e.uid === u.id);
+    if (u.role === 'client') return o.client_id === u.id;
+    return false;
+  });
+  const done = orders.filter(o=>o.status === 'done').length;
+  const problems = orders.filter(o=>o.status === 'problem').length;
+  const revisions = orders.filter(o=>o.status === 'revision').length;
+  /* Реакции, которые пользователь получал на свои сообщения */
+  let reactions = 0;
+  (S.messages || []).forEach(m=>{
+    if (m.user_id !== u.id || !m.reactions) return;
+    Object.values(m.reactions).forEach(us=>{ if (Array.isArray(us) && us.length) reactions += us.length; });
+  });
+  const adjList = u.karmaAdj || [];
+  const adj = adjList.reduce((a, x) => a + (Number(x.delta) || 0), 0);
+  let score = 50;
+  score += Math.min(20, done * (u.role === 'executor' ? 2 : 1));
+  score -= problems * 3;
+  score -= revisions * 1;
+  score += Math.min(8, Math.round(reactions / 3));
+  score += adj;
+  score = Math.max(0, Math.min(100, Math.round(score)));
+  return { score, ...karmaLevel(score), parts:{ done, problems, revisions, reactions, adj } };
+}
+/* Ручная корректировка (staff): сохраняет историю с причиной */
+function karmaAdjust(userId, delta, reason){
+  const u = userById(userId);
+  if (!u) return null;
+  u.karmaAdj = u.karmaAdj || [];
+  u.karmaAdj.unshift({ delta:Number(delta)||0, reason:String(reason||'Корректировка'), at:Date.now(), by:(me()||{}).id || null });
+  saveState();
+  return calcKarma(u);
+}
+
+
+/* Архив чатов (как в ТГ): скрытые из основного списка, список хранится у пользователя */
+function archiveIds(u){
+  return (u && u.ext && Array.isArray(u.ext.chatArchive)) ? u.ext.chatArchive : [];
+}
+function isArchived(c, u){
+  return archiveIds(u).includes(c.id);
+}
+function setArchived(c, u, val){
+  if (!u || !c) return;
+  u.ext = u.ext || {};
+  const arr = archiveIds(u);
+  const i = arr.indexOf(c.id);
+  if (val && i < 0) arr.push(c.id);
+  if (!val && i >= 0) arr.splice(i, 1);
+  u.ext.chatArchive = arr;
+  saveState();
+}
+/* Системные чаты (по умолчанию) нельзя удалять и скрывать */
+function isSystemChat(c){
+  return !!(c && (c.system || c.type === 'corporate'));
+}
+
+/* Раздел помечен как Beta (управляется админом в настройках) */
+function isBetaRoute(route){
+  const list = (S.settings && S.settings.betaRoutes) || [];
+  return Array.isArray(list) && list.includes(route);
+}
+
+/* ---------- Реферальная программа ----------
+   У каждого пользователя — постоянный личный код и ссылка. Приглашённый
+   привязывается к рефереру (referredBy). За его заказы рефереру начисляется
+   процент (настраивается), возможен фикс-бонус за первый заказ и карма. */
+function refConfig(){
+  S.settings = S.settings || {};
+  S.settings.referral = Object.assign({ enabled:true, percent:2, fixedBonus:0, karmaPerRef:2, role:'client' }, S.settings.referral || {});
+  return S.settings.referral;
+}
+/* Постоянный личный код: генерируется один раз и сохраняется */
+function refCode(u){
+  if (!u) return '';
+  if (!u.refCode){
+    u.refCode = (String(u.username || 'ref').replace(/[^a-z0-9]/gi,'').slice(0,8) || 'ref').toLowerCase()
+      + '-' + Math.random().toString(36).slice(2,6);
+    try { saveState(); } catch(e){}
+  }
+  return u.refCode;
+}
+function refLink(u){
+  if (!u) return '';
+  const base = location.origin + location.pathname;
+  return base + '#/join?ref=' + encodeURIComponent(refCode(u));
+}
+function userByRefCode(code){
+  if (!code) return null;
+  const c = String(code).toLowerCase();
+  return (S.users || []).find(x => (x.refCode||'').toLowerCase() === c) || null;
+}
+/* Привязать нового пользователя к рефереру */
+function addReferral(newUserId, referrerId, via){
+  const nu = userById(newUserId), ref = userById(referrerId);
+  if (!nu || !ref || nu.id === ref.id) return null;
+  if (nu.referredBy) return null; /* уже привязан */
+  nu.referredBy = ref.id;
+  S.referrals = S.referrals || [];
+  S.referrals.unshift({ id:uid(), userId:nu.id, referrerId:ref.id, via:via||'link', at:Date.now() });
+  const cfg = refConfig();
+  if (cfg.karmaPerRef){
+    try { karmaAdjust(ref.id, cfg.karmaPerRef, 'Приглашён новый пользователь'); } catch(e){}
+  }
+  saveState();
+  return nu;
+}
+/* Начисление за выполненный заказ приглашённого */
+function accrueReferral(order){
+  if (!order || order.status !== 'done') return null;
+  const cfg = refConfig();
+  if (!cfg.enabled) return null;
+  /* Платим тому, кто привёл заказчика заказа */
+  const buyer = userById(order.client_id);
+  const referrer = buyer && buyer.referredBy ? userById(buyer.referredBy) : null;
+  if (!referrer) return null;
+  S.referralAccruals = S.referralAccruals || [];
+  /* Один заказ — одно начисление */
+  if (S.referralAccruals.some(a => a.orderId === order.id)) return null;
+  const firstOrder = !(S.referralAccruals.some(a => a.userId === buyer.id));
+  const base = Number(order.total) || 0;
+  const percent = Number(cfg.percent) || 0;
+  let amount = Math.round(base * percent / 100);
+  if (firstOrder && Number(cfg.fixedBonus)) amount += Number(cfg.fixedBonus);
+  if (amount <= 0) return null;
+  const rec = { id:uid(), referrerId:referrer.id, userId:buyer.id, orderId:order.id,
+    base, percent, amount, first:firstOrder, at:Date.now() };
+  S.referralAccruals.unshift(rec);
+  S.referralAccruals = S.referralAccruals.slice(0, 500);
+  referrer.refEarned = (Number(referrer.refEarned) || 0) + amount;
+  saveState();
+  return rec;
+}
+/* Статистика реферера */
+function referralStats(userId){
+  const invited = (S.referrals || []).filter(r => r.referrerId === userId);
+  const ids = invited.map(r => r.userId);
+  const accruals = (S.referralAccruals || []).filter(a => a.referrerId === userId);
+  const earned = accruals.reduce((s, a) => s + (Number(a.amount)||0), 0);
+  const active = ids.filter(id => {
+    const u2 = userById(id); if (!u2) return false;
+    return u2.is_online || (S.orders||[]).some(o => o.client_id === id || (o.executors||[]).some(e=>e.uid===id));
+  });
+  return { invited, ids, accruals, earned, activeCount: active.length, total: ids.length };
+}
+
+/* ---------- Приглашения ---------- */
+const INVITE_ROLES = ['executor','client']; /* базовые роли по ссылке: staff и исполнители */
+const INVITE_ROLES_ALL = ['top_manager','manager','executor','client']; /* полный набор для админа */
+/* Кто какую роль вправе раздавать приглашением */
+function canInviteRole(actorRole, targetRole){
+  if (!actorRole || !targetRole) return false;
+  if (actorRole === 'admin') return INVITE_ROLES_ALL.includes(targetRole);
+  if (isStaff(actorRole)) return INVITE_ROLES.includes(targetRole);
+  if (actorRole === 'executor') return targetRole === 'client';
+  return false;
+}
+/* Менять роли (повышать привилегии) может ТОЛЬКО админ */
+function canChangeRoles(actorRole){ return actorRole === 'admin'; }
+function inviteToken(){
+  /* Криптостойкий токен: длинная случайная строка, не угадывается */
+  const bytes = (typeof crypto!=='undefined' && crypto.getRandomValues)
+    ? crypto.getRandomValues(new Uint8Array(18))
+    : Array.from({length:18},()=>Math.floor(Math.random()*256));
+  return Array.from(bytes).map(b=>b.toString(36).padStart(2,'0')).join('');
+}
+/* Статус приглашения: active / used / expired / revoked */
+function inviteStatus(inv){
+  if (!inv) return 'revoked';
+  if (inv.revoked) return 'revoked';
+  if (inv.limit && inv.used != null && inv.used >= inv.limit) return 'used';
+  if (inv.expiresAt && Date.now() > inv.expiresAt) return 'expired';
+  return 'active';
+}
+function inviteValid(inv){
+  return !!inv && inviteStatus(inv) === 'active';
+}
+function inviteLink(inv){
+  const base = location.origin + location.pathname;
+  return base + '#/join?token=' + inv.token;
+}
+function inviteById(token){
+  return (S.invites||[]).find(i=>i.token===token);
+}
+/* Учесть использование приглашения (по токену). Возвращает true, если можно использовать. */
+function consumeInvite(token, newUserId){
+  const inv = inviteById(token);
+  if (!inviteValid(inv)) return false;
+  inv.used = (inv.used||0) + 1;
+  inv.usedBy = inv.usedBy || [];
+  inv.usedBy.push({ userId:newUserId, at:Date.now() });
+  saveState();
+  return true;
+}
+
 function unreadCount(chat, uidv){
   const lastRead = (chat.unread||{})[uidv];
   if (lastRead === undefined) return 0;
   return S.messages.filter(m=>m.chat_id===chat.id && m.created_at>lastRead && m.user_id!==uidv).length;
+}
+/* Отображение непрочитанного для пользователя:
+   - если после отметки есть ЧУЖИЕ сообщения — число (счётчик);
+   - если просрочены только СВОИ (чат помечен непрочитанным вручную) — просто точка.
+   Возвращает { count } или { dot:true }. */
+function chatUnreadUI(chat, uidv){
+  const lastRead = (chat.unread||{})[uidv];
+  if (lastRead === undefined) return { count: 0 };
+  const unread = S.messages.filter(m=>m.chat_id===chat.id && m.created_at>lastRead);
+  const otherN = unread.filter(m=>m.user_id!==uidv && m.type!=='system').length;
+  /* Упомянут: в непрочитанном есть сообщение, где я в mentions (включая ответ на моё) */
+  const mentioned = unread.some(m=>m.user_id!==uidv && ((m.mentions||[]).includes(uidv)
+    || (m.reply_to && (()=>{ const s=S.messages.find(x=>x.id===m.reply_to); return s && s.user_id===uidv; })())));
+  if (otherN > 0) return { count: otherN, mentioned };
+  const anyN = unread.length;
+  if (anyN > 0) return { dot:true, mentioned };
+  return { count: 0, mentioned: false };
 }
 
 /* Audit + ops queue */
@@ -448,18 +722,6 @@ function logAudit(action, entity){
   S.audit = S.audit.slice(0,200);
   saveState();
 }
-function queueOp(op){
-  S.opQueue.push({ id:uid(), ...op, t:Date.now() });
-  saveState();
-}
-function flushOps(){
-  if (!S.opQueue.length) return 0;
-  const n = S.opQueue.length;
-  S.opQueue = [];
-  saveState();
-  return n;
-}
-
 /* Draft autosave (IndexedDB) */
 const DraftsDB = (()=>{
   let dbp = null;

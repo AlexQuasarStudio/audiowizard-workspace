@@ -10,11 +10,26 @@ const NavDrag = (() => {
   let drag = null; /* { el, placeholder, guide, items: [...пары sec+el] } */
   let downTarget = null, downPos = null, suppressClick = false;
 
-  const itemsSel = '.side__link, .side__sec[data-sec-title]';
+  /* Источники драга — ТОЛЬКО боковое меню. Внутри страницы настроек есть свои
+     кнопки навигации с тем же классом .side__link (js/app.js:4986), их таскать
+     нельзя: сужаем до прямых контейнеров бокового меню, чтобы подменю настроек
+     не срывалось в драг. */
+  const itemsSel = '.side__nav > .side__sec, .side__nav .side__sec-items > .side__link';
   const guideSel = '.aw-win-guide';
 
   // Снимок видимого порядка пунктов меню (для восстановления при отмене)
   const snapshot = () => Array.from(document.querySelectorAll('.side__nav > *'));
+
+  /* Полный снимок меню до перестановки — для отката из тоста */
+  const orderSnapshot = () => {
+    try { return JSON.parse(JSON.stringify(window.NAV || [])); } catch(e){ return null; }
+  };
+  function restoreOrder(before){
+    const V = window.NAV || [];
+    if (!Array.isArray(before) || !before.length || !V.length) return false;
+    V.splice(0, V.length, ...before);
+    return true;
+  }
 
   const navRight = () => {
     const side = document.querySelector('.side');
@@ -75,11 +90,17 @@ const NavDrag = (() => {
     el.style.pointerEvents = 'none';
     el.style.margin = '0';
     el.style.boxSizing = 'border-box';
+    /* Перетаскиваемая плашка по ширине равна контейнеру меню-источника
+       (а не гид-зоне): иначе гост растягивается на 560px и выглядит чужим. */
+    /* Гость строго равен фактической ширине перетаскиваемого пункта в его
+       текущем (развёрнутом/свёрнутом) состоянии — а не ширине плейсхолдера,
+       которая может отличаться (свёрнутая колонка, отступы). */
+    el.style.width = Math.round(r.width) + 'px';
     const guide = document.createElement('div');
     guide.className = 'aw-win-guide';
     guide.hidden = true;
     document.body.appendChild(guide);
-    drag = { el, placeholder: ph, guide, _parent: parent };
+    drag = { el, placeholder: ph, guide, _parent: parent, _order: orderSnapshot() };
     const nav = document.querySelector('.side__nav');
     if (nav) nav.classList.add('menu-drag-active');
     document.body.classList.add('menu-dragging');
@@ -89,15 +110,16 @@ const NavDrag = (() => {
   function showGuide(x, y){
     const g = drag.guide;
     if (!g) return;
-    const gw = 560, gh = 440;
-    const W = window.innerWidth, H = window.innerHeight;
     const left = navRight() + 16;
-    const avail = Math.max(0, W - left - 12);
-    const wUse = Math.min(gw, avail), hUse = Math.min(gh, H - 20);
+    const avail = Math.max(0, window.innerWidth - left - 12);
+    /* Гост-обводка показывает реальный размер окна (см. Windows.W_DEF/H_DEF
+       в js/windows.js: 560×440), а не больше. Уменьшаем только когда место
+       справа от меню не вмещает габарит. */
+    const wUse = Math.min(560, avail), hUse = Math.min(440, window.innerHeight - 20);
     let gx = Math.max(left, x - wUse/2);
-    gx = Math.min(gx, W - wUse - 12);
+    gx = Math.min(gx, window.innerWidth - wUse - 12);
     let gy = Math.max(10, y - 24);
-    gy = Math.min(gy, H - hUse - 10);
+    gy = Math.min(gy, window.innerHeight - hUse - 10);
     g.style.left = gx + 'px';
     g.style.top = gy + 'px';
     g.style.width = wUse + 'px';
@@ -111,12 +133,18 @@ const NavDrag = (() => {
   }
 
   function dropTargetAt(cx, cy){
+    const nav = document.querySelector('.side__nav');
+    if (!nav) return null;
     const under = document.elementFromPoint(cx, cy);
     if (!under) return null;
+    /* Цель  дропа — только навигация слева (.side__nav). Пункты с тем же классом
+       .side__link вне меню (например, боковое подменю настроек) не являются
+       целями и не должны подсвечиваться при драге. */
+    if (!nav.contains(under)) return null;
     const link = under.closest('.side__link');
-    if (link && link !== drag.el) return link;
+    if (link && link !== drag.el && nav.contains(link)) return link;
     const sec = under.closest('.side__sec');
-    if (sec && sec !== drag.el) return sec;
+    if (sec && sec !== drag.el && nav.contains(sec)) return sec;
     return null;
   }
 
@@ -128,13 +156,18 @@ const NavDrag = (() => {
     el.style.top = Math.max(4, Math.min(cy - Math.round(eh/2) - 4, window.innerHeight - eh - 4)) + 'px';
     // подсветка цели
     document.querySelectorAll('.menu-drop-hover, .menu-drop-hover-sec').forEach(x => x.classList.remove('menu-drop-hover', 'menu-drop-hover-sec'));
+    const sEl = el.classList.contains('side__sec');
     const target = dropTargetAt(cx, cy);
     if (target){
       const tLink = target.classList.contains('side__link');
-      const sLink = el.classList.contains('side__link');
-      if (tLink === sLink) target.classList.add(tLink ? 'menu-drop-hover' : 'menu-drop-hover-sec');
+      /* Пункт можно нести в любой раздел: подсвечиваем и ссылки, и разделы.
+         Раздел-источник — только ссылки не принимает (цель-раздел допустима). */
+      if (sEl && !tLink){ target.classList.add('menu-drop-hover-sec'); }
+      if (!sEl && tLink){ target.classList.add('menu-drop-hover'); }
+      if (!sEl && !tLink){ /* пункт держим над разделом — показываем как цель вставки */ target.classList.add('menu-drop-hover-sec'); }
     }
-    if (!target && cx >= navRight()){
+    /* Ghost окна (зона справа) — только для пунктов: разделы во вьюпорт не переносятся */
+    if (!sEl && !target && cx >= navRight()){
       showGuide(cx, cy);
     } else {
       hideGuide();
@@ -151,13 +184,15 @@ const NavDrag = (() => {
       const sec = under.closest('.side__sec');
       target = (link && link !== src) ? link : (sec && sec !== src ? sec : null);
     }
-    // Валидация типа: link можно бросить только на link своего раздела, sec — только на sec
+    /* Валидация: пункт принимается любой ссылкой (в т.ч. из другого раздела)
+       и любым разделом (вставка в конец раздела); раздел — только разделом. */
     if (target){
       const tLink = target.classList.contains('side__link');
-      const sLink = src.classList.contains('side__link');
-      if (tLink !== sLink || (tLink && target.dataset.sec !== src.dataset.sec)) target = null;
+      const sSec = src.classList.contains('side__sec');
+      if (sSec && tLink) target = null;
     }
     let moved = false;
+    let reordered = false; /* порядок меню реально изменился (а не создано окно) */
     const V = window.NAV || [];
     const persist = () => { window.APP && window.APP._persistNav && window.APP._persistNav(); };
 
@@ -166,13 +201,33 @@ const NavDrag = (() => {
       if (src.classList.contains('side__sec')){
         const from = V.findIndex(x => x.sec === src.dataset.secTitle);
         const to = V.findIndex(x => x.sec === target.dataset.secTitle);
-        if (from >= 0 && to >= 0 && from !== to){ const [s] = V.splice(from, 1); V.splice(to, 0, s); moved = true; }
+        if (from >= 0 && to >= 0 && from !== to){ const [s] = V.splice(from, 1); V.splice(to, 0, s); moved = true; reordered = true; }
       } else if (src.classList.contains('side__link')){
-        const secObj = V.find(x => x.sec === src.dataset.sec);
-        if (secObj){
-          const fromIdx = secObj.items.findIndex(x => x.route === src.dataset.route);
-          const toIdx = secObj.items.findIndex(x => x.route === target.dataset.route);
-          if (fromIdx >= 0 && toIdx >= 0 && fromIdx !== toIdx){ const [m] = secObj.items.splice(fromIdx, 1); secObj.items.splice(toIdx, 0, m); moved = true; }
+        /* Переносим пункт в любой раздел: вынимаем из своего, вставляем в целевой */
+        const fromSec = V.find(x => x.sec === src.dataset.sec);
+        let item = null;
+        if (fromSec){
+          const fromIdx = fromSec.items.findIndex(x => x.route === src.dataset.route);
+          if (fromIdx >= 0){ const r = fromSec.items.splice(fromIdx, 1); item = r[0]; }
+        }
+        if (item){
+          if (target.classList.contains('side__link')){
+            const toSec = V.find(x => x.sec === target.dataset.sec);
+            const toIdx = toSec ? toSec.items.findIndex(x => x.route === target.dataset.route) : -1;
+            if (toSec && toIdx >= 0){
+              /* «Куда указал»: вставляем ДО или ПОСЛЕ цели по половине курсора.
+                 Курсор выше середины цели — пункт ставится перед ней, ниже — после. */
+              const tr = target.getBoundingClientRect();
+              const before = cy < (tr.top + tr.height / 2);
+              toSec.items.splice(before ? toIdx : toIdx + 1, 0, item);
+              moved = true; reordered = true;
+            }
+          } else {
+            /* бросок на раздел → в конец раздела */
+            const toSec = V.find(x => x.sec === target.dataset.secTitle);
+            if (toSec){ toSec.items.push(item); moved = true; reordered = true; }
+          }
+          if (!moved && fromSec) fromSec.items.push(item);
         }
       }
     } else if (cx >= navRight() && src.classList.contains('side__link')){
@@ -187,9 +242,15 @@ const NavDrag = (() => {
       if (drag.guide) drag.guide.remove();
       const nav = document.querySelector('.side__nav');
       if (nav) nav.classList.remove('menu-drag-active');
+      const beforeOrder = drag._order;
       persist();
       drag = null; downTarget = null; downPos = null;
       document.body.classList.remove('menu-dragging');
+      if (reordered && beforeOrder){
+        toast('Порядок меню обновлён', 'ok', '', { action: { label:'Отменить', onClick: () => {
+          if (restoreOrder(beforeOrder)) { persist(); toast('Порядок восстановлен', 'ok'); }
+        } } });
+      }
     } else {
       cancel();
     }
@@ -220,7 +281,13 @@ const NavDrag = (() => {
   });
   document.addEventListener('mouseup', e => {
     if (downTarget && !drag){ downTarget = null; downPos = null; return; }
-    if (drag) finish(e.clientX, e.clientY);
+    if (drag){
+      finish(e.clientX, e.clientY);
+      /* Сброс сразу после завершения жеста: клик, которым ПОДТВЕРЖДАЛСЯ дроп,
+         подавляется синхронно, а последующие клики (например, «Отменить» в тосте)
+         проходят в обычном режиме. */
+      setTimeout(() => { suppressClick = false; }, 0);
+    }
     else { downTarget = null; downPos = null; }
   });
   /* Подавить обычный click после фактического перетаскивания */

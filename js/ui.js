@@ -4,14 +4,35 @@
 'use strict';
 
 const icon = (name, cls='') => `<svg class="ico ${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+/* Градиентные аватары: цвет детерминированно по имени — один человек всегда
+   одного цвета, разные люди — разных. Для тех, у кого нет фото. */
+/* Пары подобраны так, чтобы белые инициалы держали контраст ≥4.5:1
+   на обоих краях градиента (проверено расчётом). */
+const AV_GRADS = [
+  ['#7958ae','#8567b6'], ['#5374ac','#5575ad'], ['#3e805e','#3f825f'],
+  ['#a66250','#a76351'], ['#8f6e36','#917036'], ['#3d7e7e','#3d7f7f'],
+  ['#634a9a','#7459af'], ['#9d4c88','#ad5597']
+];
+const avatarGrad = name => {
+  const str = String(name || '?');
+  /* Хэш ФНВ-1а: хорошо распределяет кириллицу, исключает коллизии
+     (старый h*31%9973 давал одинаковые цвета разным людям) */
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++){
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  const g = AV_GRADS[h % AV_GRADS.length];
+  return `background:linear-gradient(135deg, ${g[0]} 0%, ${g[1]} 100%)`;
+};
 const avatarHTML = (u, cls='') => {
   if (!u) return `<span class="avatar ${cls}">?</span>`;
   const st = u.role==='executor' && u.ext ? u.ext.status : 'active';
   const dot = u.is_online && st!=='blacklisted'
     ? `<span class="dot dot--online"></span>`
     : `<span class="dot dot--offline"></span>`;
-  const bg = u.avatar ? ` style="background-image:url('${u.avatar}')"` : '';
-  return `<span class="avatar ${cls}"${bg}>${u.avatar?'':initials(u.full_name)}${dot}</span>`;
+  const style = u.avatar ? `background-image:url('${u.avatar}')` : avatarGrad(u.full_name);
+  return `<span class="avatar ${cls}${u.avatar?'':' avatar--grad'}" style="${style}">${u.avatar?'':initials(u.full_name)}${dot}</span>`;
 };
 const starsHTML = (n, max=3) => {
   let h = '<span class="qual-stars">';
@@ -29,14 +50,28 @@ const roleBadge = r => {
 };
 
 /* ---------- Тосты ---------- */
-function toast(msg, kind='info', title=''){
+function toast(msg, kind='info', title='', opts={}){
   let host = $('.toasts');
   if (!host){ host = document.createElement('div'); host.className='toasts'; document.body.appendChild(host); }
   const icons = { ok:'check-c', err:'x-c', warn:'alert', info:'info' };
   const el = document.createElement('div');
-  el.className = `toast toast--${kind}`;
-  el.innerHTML = `${icon(icons[kind]||'info')}<div class="toast__body">${title?`<b class="toast__title">${esc(title)}</b>`:''}<span class="toast__msg">${msg}</span></div><button class="t-close" aria-label="Закрыть">${icon('x','ico-sm')}</button>`;
+  el.classList.add('toast', 'toast--' + kind);
+  if (title) el.classList.add('toast--has-title');
+  const action = opts && opts.action && opts.action.label ? opts.action : null;
+  /* Компактный тост в одну строку (как изначально): иконка, текст, кнопка
+     действия рядом с текстом, крестик закрытия справа по центру. */
+  el.innerHTML = `${icon(icons[kind]||'info')}<div class="toast__body">${
+    title?`<b class="toast__title">${esc(title)}</b>`:''}<span class="toast__msg">${msg}</span>${
+    action?`<button class="t-act">${icon('refresh','ico-sm')}${esc(action.label)}</button>`:''}</div>`
+    + `<button class="t-close" aria-label="Закрыть">${icon('x','ico-sm')}</button>`;
   host.appendChild(el);
+  if (action){
+    const tAct = el.querySelector('.t-act');
+    if (tAct) tAct.addEventListener('click', () => {
+      try { action.onClick && action.onClick(); } catch(e){ console.error(e); }
+      hide();
+    });
+  }
   let timer = setTimeout(hide, 4600);
   let paused = false;
   el.addEventListener('mouseenter', ()=>{ paused = true; clearTimeout(timer); });
@@ -180,6 +215,41 @@ function openAvatarCropper(file, onDone){
   img.src = url;
 }
 
+/* Окно в стиле окон меню (aw-win): перетаскивание, ресайз, кнопки окна.
+   Используется для виджетов (заказ, калькулятор и т.п.), которым нужен
+   такой же хром, как у окон элементов меню. */
+function openWinModal({ title='', icon='app', body='', footer='', wide=false, narrow=false, route='', onMount=null, onClose=null }){
+  closeDropdown && closeDropdown();
+  if (window.Windows && Windows.spawnCustom){
+    /* Модалка должна принадлежать ТЕКУЩЕМУ разделу: без route окно
+       регистрировалось под заглушкой __wN, которой нет в меню, и
+       сворачивались такие окна «в пустоту» — без точки и миниатюры. */
+    if (!route && window.__lastRouteName) route = window.__lastRouteName;
+    if (!route && window.__prevRoute) route = window.__prevRoute.name;
+    const win = Windows.spawnCustom({
+      title, icon, html: body, route,
+      width: wide ? 'min(940px, calc(100vw - 120px))' : narrow ? 'min(430px, calc(100vw - 60px))' : 'min(600px, calc(100vw - 80px))',
+      height: wide ? 'min(720px, calc(100vh - 90px))' : narrow ? 'min(430px, calc(100vh - 160px))' : 'min(660px, calc(100vh - 110px))',
+      onMount: (winEl, close) => { onMount && onMount(winEl, close); },
+      onClose
+    });
+    if (!win) return openModal({ title, body, footer, wide, onMount, onClose });
+    /* Футер — ОТДЕЛЬНЫЙ элемент окна (ребёнок .aw-win после body), а не часть
+       скроллируемого контента: кнопки не выезжают за пределы при малой высоте. */
+    if (footer){
+      const footEl = document.createElement('div');
+      footEl.className = 'aw-win__foot';
+      footEl.innerHTML = footer;
+      /* Кнопка «Отмена» (data-x) в футере закрывает окно по умолчанию;
+         конкретные onMount-обработчики могут переопределить её behaviour. */
+      footEl.querySelectorAll('[data-x]').forEach(x => x.addEventListener('click', () => win._close && win._close()));
+      win.appendChild(footEl);
+    }
+    return { el: win, close: () => { win._close && win._close(); } };
+  }
+  return openModal({ title, body, footer, wide, onMount, onClose });
+}
+
 function openModal({ title='', body='', footer='', wide=false, narrow=false, onClose=null, onMount=null }){
   const mask = document.createElement('div');
   mask.className = 'modal-mask';
@@ -245,11 +315,17 @@ function wipModal(name='Эта функция'){
 let openDD = null;
 function showDropdown(anchor, items, opts={}){
   /* повторный клик по тому же якорю: не открывать заново (тумблер) */
-  if (anchor && ddLastClose.anchor === anchor && Date.now() - ddLastClose.t < 400){ ddLastClose.t = 0; return null; }
+  if (!opts.force && anchor && ddLastClose.anchor === anchor && Date.now() - ddLastClose.t < 400){ ddLastClose.t = 0; return null; }
   closeDropdown();
   const dd = document.createElement('div');
   dd.className = 'dd';
-  dd.innerHTML = items.map(it => {
+  /* Строка быстрых смайликов (для меню сообщения): реакция одним кликом */
+  const emojis = opts.emojis || [];
+  const fullSet = opts.fullSet || [];
+  const emojiRow = emojis.length
+    ? `<div class="dd__emojis">${emojis.map(em=>`<button type="button" class="dd__emoji" data-emoji="${em}" title="Реакция ${em}">${em}</button>`).join('')}${fullSet.length?`<button type="button" class="dd__emoji dd__emoji--more" data-more-emoji title="Ещё реакции">+</button>`:''}</div>`
+    : '';
+  dd.innerHTML = emojiRow + items.map(it => {
     if (it === '-') return '<div class="dd__sep"></div>';
     if (it.label && it.header) return `<div class="dd__label">${esc(it.label)}</div>`;
     const check = it.checked ? icon('check-c','dd__check') : '';
@@ -259,11 +335,50 @@ function showDropdown(anchor, items, opts={}){
   const r = (anchor && anchor.getBoundingClientRect) ? anchor.getBoundingClientRect() : { left:0, top:0, right:0, bottom:0 };
   const ddW = dd.offsetWidth, ddH = dd.offsetHeight;
   let x = opts.x ?? r.left, y = opts.y ?? r.bottom + 6;
+  /* Свёрнутое меню: плашка открывается справа от панели, а не поверх неё */
+  const inCollapsedRail = document.body.classList.contains('side-collapsed') && anchor && anchor.closest && anchor.closest('.side');
+  if (inCollapsedRail){
+    const side = document.querySelector('#side');
+    if (side) x = side.getBoundingClientRect().right + 8;
+  }
   x = Math.max(10, Math.min(x, window.innerWidth - ddW - 10));
+  if (inCollapsedRail && anchor.closest('.side__foot')){
+    /* Аватар внизу рельса: плашку держим справа и на его уровне — прижимаем
+       к низу экрана, чтобы она была чуть пониже, а не улетала вверх. */
+    y = Math.max(8, window.innerHeight - ddH - 10);
+  } else if (y + ddH > window.innerHeight - 10){
+    /* Обычный случай: если снизу не хватает места — раскрываем НАД анкором */
+    const top = r.top - ddH - 6;
+    y = top >= 8 ? top : 8;
+  }
   y = Math.min(y, window.innerHeight - ddH - 10);
   if (opts.alignRight) x = r.right - ddW;
   dd.style.left = x+'px'; dd.style.top = y+'px';
   dd.addEventListener('click', e => {
+    const moreBtn = e.target.closest('[data-more-emoji]');
+    if (moreBtn){
+      const row = moreBtn.closest('.dd__emojis');
+      if (row){
+        if (row.dataset.expanded){ row.dataset.expanded=''; row.querySelectorAll('.dd__emoji').forEach(x=>x.hidden=x.dataset.more!==undefined && true); return; }
+        const cur = [...row.querySelectorAll('[data-emoji]')].map(x=>x.dataset.emoji);
+        row.dataset.expanded='1';
+        const all = fullSet.filter(em=>!cur.includes(em));
+        all.forEach(em=>{
+          const b = document.createElement('button');
+          b.type='button'; b.className='dd__emoji dd__emoji--full'; b.dataset.emoji=em; b.title='Реакция '+em; b.textContent=em;
+          row.insertBefore(b, moreBtn);
+        });
+        row.classList.add('dd__emojis--expanded');
+      }
+      return;
+    }
+    const emBtn = e.target.closest('[data-emoji]');
+    if (emBtn){
+      const em = emBtn.dataset.emoji;
+      closeDropdown();
+      opts.onEmoji && opts.onEmoji(em);
+      return;
+    }
     const b = e.target.closest('[data-i]');
     if (!b) return;
     const it = items[+b.dataset.i];
@@ -296,7 +411,9 @@ function closeDropdown(){
     if (ddEsc) document.removeEventListener('keydown', ddEsc);
     dd.__ddClose = null; dd.__ddEsc = null;
     dd.classList.add('closing');
-    setTimeout(() => { if (openDD === dd) { dd.remove(); openDD = null; } }, 180);
+    /* Удаляем безусловно: при вложенном showDropdown openDD уже новый,
+       иначе старый dd оставался бы в DOM навсегда (утечка) */
+    setTimeout(() => { dd.remove(); if (openDD === dd) openDD = null; }, 180);
     ddLastClose.t = Date.now();
     ddLastClose.anchor = dd.__anchor || null;
   }
@@ -326,6 +443,9 @@ function applyTheme(mode, accent){
   const tc = (THEME_TC[resolved] || THEME_TC.dark)[a] || THEME_TC.dark.violet;
   let meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', tc);
+  /* Inline-фон html держим в тон темы: иначе при overscroll (скролл за пределы)
+     просвечивает старая светлая подложка, заданная в index.html при загрузке. */
+  document.documentElement.style.background = tc;
   const cs = resolved === 'light' ? 'light' : 'dark';
   document.documentElement.style.colorScheme = cs;
   clearTimeout(applyTheme._t);
@@ -352,17 +472,45 @@ function buildPaletteItems(q){
   const add = (group, items) => { if (items.length) nav.push({ group, items }); };
   const match = s => norm(s).includes(q);
 
-  const navItems = APP.navFor(me()).flatMap(sec => sec.items.map(it => ({ label:it.title, icon:it.icon, hint:'Перейти', run:()=>APP.go(it.route) })));
+  const navItems = APP.navFor(me()).flatMap(sec => sec.items.map(it => ({ label:it.title, icon:it.icon, run:()=>APP.go(it.route) })));
   add('Разделы', q ? navItems.filter(i=>match(i.label)) : navItems);
 
+  /* Подсказки хоткеев берём из актуальных настроек (S.keys), а не хардкодом */
+  const keys = (typeof S!=='undefined' && S && S.keys) ? S.keys : (typeof DEFAULT_KEYS!=='undefined' ? DEFAULT_KEYS : {});
+  const fmtKeyLocal = combo => {
+    if (!combo) return '';
+    return String(combo).split('+').filter(Boolean).map(p => p === 'space' ? 'SPACE' : p.toUpperCase()).join(' ');
+  };
+  const kHint = id => fmtKeyLocal(keys[id] || (typeof DEFAULT_KEYS!=='undefined' ? DEFAULT_KEYS[id] : ''));
   const acts = [
-    { label:'Создать заказ', icon:'plus', hint:'Ctrl+N', run:()=>APP.go('orders') && CRM.openOrderForm() },
-    { label:'Переключить тему', icon:'palette', hint:'Ctrl+Shift+T', run:()=>APP.cycleTheme() },
+    { label:'Создать заказ', icon:'plus', hint:kHint('newOrder'), run:()=>APP.go('orders') && CRM.openOrderForm() },
+    { label:'Переключить тему', icon:'palette', hint:kHint('theme'), run:()=>APP.cycleTheme() },
+    { label:'Настройки', icon:'settings', hint:kHint('settings'), run:()=>APP.go('settings') },
+    { label:'Полноэкранный режим', icon:'expand', hint:kHint('zen'), run:()=>{ try{ APP.toggleZen && APP.toggleZen(); }catch(e){} } },
     { label:'Калькулятор услуг', icon:'calc', run:()=>CRM.openCalculator() },
     { label:'Демо: страницы ошибок', icon:'alert', run:()=>APP.go('err/404') },
     { label:'Проверить обновления', icon:'refresh', run:()=>APP.checkUpdates(true) }
   ];
   add('Действия', acts.filter(i=>!q||match(i.label)));
+
+  /* Глобальный поиск по чатам: названия + сообщения (как в ТГ) */
+  if (q){
+    const myChats = me() && typeof chatForUser==='function' ? chatForUser(me()) : [];
+    const chatHits = myChats.filter(c=>match(c.name)||match(c.description||'')).slice(0,5)
+      .map(c=>({ label:c.name, icon: c.type==='direct'?'chats':(c.type==='group'?'users':'chats'), hint:ROLE_LABEL[me()?.role]||'чат',
+        run:()=>window.openChatAt ? window.openChatAt(c.id) : APP.go('chats') }));
+    add('Чаты', chatHits);
+    const msgHits = [];
+    myChats.forEach(c=>{
+      noDemo(S.messages).forEach(m=>{
+        if (m.chat_id!==c.id || !m.text || !norm(m.text).includes(q)) return;
+        msgHits.push({ label:`${c.name}: ${String(m.text).replace(/\s+/g,' ').slice(0,60)}`, icon:'chats',
+          hint:fmtTime(m.created_at), run:()=>window.openChatAt ? window.openChatAt(c.id, m.id) : APP.go('chats') });
+      });
+    });
+    msgHits.slice(0,8);
+    add('Сообщения', msgHits.slice(0,8));
+  }
 
   if (q && isManagerLike(me()?.role)){
     const ord = noDemo(S.orders.filter(o=>norm(o.order_id).includes(q)||norm((clientById(o.client_id)||{}).full_name).includes(q))).slice(0,5)
@@ -382,7 +530,7 @@ function openPalette(){
   mask.className = 'palette-mask';
   mask.innerHTML = `
     <div class="palette" role="dialog" aria-label="Палетка команд">
-      <div class="palette__input">${icon('search')}<input id="pal-q" placeholder="Поиск и команды… (заказы, клиенты, темы)" autocomplete="off"></div>
+      <div class="palette__input">${icon('search')}<input id="pal-q" placeholder="Глобальный поиск…" autocomplete="off"></div>
       <div class="palette__list" id="pal-list"></div>
       <div class="palette__foot"><span class="kbd">↑↓</span> навигация <span class="kbd">Enter</span> выбрать <span class="kbd">Esc</span> закрыть</div>
     </div>`;
@@ -417,6 +565,114 @@ function renderPalette(){
 }
 function closePalette(){ if (paletteEl) { paletteEl.classList.add('closing'); setTimeout(() => { if (paletteEl) { paletteEl.remove(); paletteEl = null; } }, 180); } }
 
+/* ---------- Поиск в шапке: плашка списка под полем ---------- */
+let headerSearchEl = null;
+function openHeaderSearch(){
+  clearTimeout(window.__hsCloseTimer);
+  closeHeaderSearch(true);
+  const input = $('#head-search-input');
+  if (!input) return;
+  paletteSel = 0;
+  paletteItems = buildPaletteItems(input.value);
+  const dd = document.createElement('div');
+  dd.className = 'head-search-dd';
+  dd.innerHTML = renderPaletteItems();
+  document.body.appendChild(dd);
+  headerSearchEl = dd;
+  bindHeaderSearchItems(dd);
+  /* Меню и поле могут ещё анимироваться (раскрытие рельса, drawer):
+     держим плашку скрытой и показываем, когда геометрия поля стабилизировалась
+     на двух кадрах подряд — не «выезжает» раньше меню и не тянется за анимацией. */
+  waitStableHeaderSearch(dd, input);
+}
+function waitStableHeaderSearch(dd, input){
+  let lastSig = '';
+  let stable = 0;
+  const tick = () => {
+    if (headerSearchEl !== dd) return;
+    const search = input.closest('.head__search');
+    const r = (search || input).getBoundingClientRect();
+    const sig = [Math.round(r.left), Math.round(r.top), Math.round(r.width)].join('|');
+    if (sig === lastSig) stable++;
+    else { stable = 0; lastSig = sig; }
+    positionHeaderSearch(dd, input);
+    if (stable >= 2){ dd.classList.add('on'); return; }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+function closeHeaderSearch(instant){
+  const el = headerSearchEl;
+  if (!el) return;
+  el.classList.remove('on');
+  if (instant){ el.remove(); headerSearchEl = null; return; }
+  /* Плавное исчезновение: снимаем .on → opacity уходит в 0 (transition .12s),
+     удаляем по событию окончания перехода (запасной таймер — если переход
+     не стреляет). Открытие сбрасывает таймер защитой. */
+  headerSearchEl = null;
+  void el.offsetWidth;
+  let done = false;
+  const finish = () => { if (done) return; done = true; clearTimeout(window.__hsCloseTimer); el.remove(); };
+  window.__hsCloseTimer = setTimeout(finish, 220);
+  el.addEventListener('transitionend', finish, { once: true });
+}
+function positionHeaderSearch(dd, input){
+  const search = input.closest('.head__search');
+  const r = (search || input).getBoundingClientRect();
+  dd.style.left = r.left + 'px';
+  dd.style.top = (r.bottom + 6) + 'px';
+  /* Ширина плашки = ширине поля поиска (подстраивается при ресайзе) */
+  dd.style.width = Math.round(r.width) + 'px';
+}
+function renderPaletteItems(){
+  let idx = 0;
+  return paletteItems.map(g => `
+    <div class="palette__group">${g.group}</div>
+    ${g.items.map(it => `<div class="palette__item ${idx===paletteSel?'sel':''}" data-pi="${idx++}">${icon(it.icon||'arrow-r')}<span>${esc(it.label)}</span>${it.hint?`<span class="hint">${esc(it.hint)}</span>`:''}</div>`).join('')}
+  `).join('') || `<div class="empty">${icon('search')}<span>Ничего не найдено</span></div>`;
+}
+function bindHeaderSearch(){
+  const input = $('#head-search-input');
+  if (!input) return;
+  input.addEventListener('focus', () => openHeaderSearch());
+  input.addEventListener('input', () => {
+    if (!headerSearchEl) return;
+    paletteSel = 0;
+    paletteItems = buildPaletteItems(input.value);
+    headerSearchEl.innerHTML = renderPaletteItems();
+    bindHeaderSearchItems(headerSearchEl);
+    positionHeaderSearch(headerSearchEl, input);
+  });
+  input.addEventListener('keydown', e => {
+    const flat = paletteItems.flatMap(g=>g.items);
+    if (e.key === 'ArrowDown'){ e.preventDefault(); paletteSel = Math.min(paletteSel+1, flat.length-1); rerenderHeaderSearch(input); }
+    else if (e.key === 'ArrowUp'){ e.preventDefault(); paletteSel = Math.max(paletteSel-1, 0); rerenderHeaderSearch(input); }
+    else if (e.key === 'Enter'){ const it = flat[paletteSel]; if (it){ closeHeaderSearch(); it.run(); } }
+    else if (e.key === 'Escape'){ e.stopPropagation(); closeHeaderSearch(); input.blur(); }
+  });
+  document.addEventListener('mousedown', e => {
+    if (headerSearchEl && !headerSearchEl.contains(e.target) && e.target !== input && !input.contains(e.target)) closeHeaderSearch();
+  }, true);
+}
+function rerenderHeaderSearch(input){
+  if (!headerSearchEl) return;
+  headerSearchEl.innerHTML = renderPaletteItems();
+  bindHeaderSearchItems(headerSearchEl);
+  const sel = headerSearchEl.querySelector('.palette__item.sel');
+  sel && sel.scrollIntoView({ block:'nearest' });
+}
+function bindHeaderSearchItems(host){
+  host.querySelectorAll('.palette__item').forEach(el => {
+    el.onclick = () => {
+      const flat = paletteItems.flatMap(g=>g.items);
+      const it = flat[+el.dataset.pi];
+      closeHeaderSearch();
+      it && it.run();
+    };
+    el.onmouseenter = () => { paletteSel = +el.dataset.pi; host.querySelectorAll('.palette__item').forEach((e2,i)=>e2.classList.toggle('sel', i===paletteSel)); };
+  });
+}
+
 /* ---------- Живой поиск (задержка <200 мс) ---------- */
 const liveSearch = debounce(fn => fn(), 150);
 
@@ -440,4 +696,12 @@ function setFaviconFor(mode, accent){
     document.head.appendChild(link);
   }
   link.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+
+
+/* Скрыть инлайн-плашку добавления с плавным затуханием */
+function inlineHide(box, cb){
+  if (!box || box.hidden){ cb && cb(); return; }
+  box.classList.add('closing');
+  setTimeout(()=>{ box.hidden = true; box.classList.remove('closing'); cb && cb(); }, 160);
 }

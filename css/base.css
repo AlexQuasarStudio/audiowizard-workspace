@@ -5,6 +5,7 @@
 
 /* ---------- Сброс ---------- */
 *,*::before,*::after{box-sizing:border-box}
+html{background:var(--bg)}
 html,body{margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;font-size:14.5px;line-height:1.5;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
@@ -38,7 +39,7 @@ p{margin:0 0 10px}
   --sh-1:0 1px 2px rgba(0,0,0,.24),0 8px 24px -12px rgba(0,0,0,.4);
   --sh-2:0 24px 70px -18px rgba(0,0,0,.55);
   --r-md:12px; --r-lg:16px;
-  --head-h:60px; --side-w:264px; --side-w-c:64px;
+  --head-h:60px; --side-w:264px; --side-w-c:52px;
   --dur:.32s; --ease:cubic-bezier(.22,.61,.36,1);
   --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   --check-bg:var(--panel-3); --check-tick:#ffffff; --on-accent:#ffffff;
@@ -50,6 +51,22 @@ p{margin:0 0 10px}
 [data-theme="dark-red"]{--bg:#0d0e11;--bg-2:#141519;--panel:#191a1f;--panel-2:#202127;--panel-3:#282a32;--text:#f1ede9;--text-2:#cfc7c0;--muted:#a29892;--faint:#756c66;--border:#2a2830;--border-2:#3a3741;--accent:#c96f5e;--accent-soft:rgba(201,111,94,.15);--accent-2:#de8f7e;--red:#c96f5e;--red-soft:rgba(201,111,94,.15);--grad-brand:linear-gradient(135deg,var(--accent-2),var(--accent) 55%,#a55a4b)}
 [data-theme="dark-green"]{--bg:#0c0f0d;--bg-2:#121614;--panel:#171c19;--panel-2:#1e2420;--panel-3:#262e29;--text:#ebf0ec;--text-2:#c4cfc6;--muted:#93a297;--faint:#6a786e;--border:#242b26;--border-2:#333d36;--accent:#87ab93;--accent-soft:rgba(135,171,147,.14);--accent-2:#a5c7ae;--green:#87ab93;--green-soft:rgba(135,171,147,.14);--grad-brand:linear-gradient(135deg,var(--accent-2),var(--accent) 55%,#6d8f76);--on-accent:#0c0f0d}
 [data-theme="dark-mono"]{--bg:#0e0d0c;--bg-2:#161413;--panel:#1b1918;--panel-2:#231f1d;--panel-3:#2b2725;--text:#f0ede8;--text-2:#ccc8c1;--muted:#9c968c;--faint:#716c63;--border:#2b2825;--border-2:#3b3733;--accent:#f5f7fa;--accent-soft:rgba(245,247,250,.1);--accent-2:#dcd9d2;--blue:#b9b3a8;--violet:#dcd9d2;--green:#b9b3a8;--red:#d0c9be;--yellow:#d0c9be;--grad-brand:linear-gradient(135deg,#e8e4dc,#c9c4ba);--check-bg:#2a2c31;--check-tick:#0d0e11;--on-accent:#0d0e11}
+/* Тёмная монохромная: акцент почти белый, поэтому пузырь «своих» сообщений
+   иначе становится светло-серым с белым текстом (нечитаемо). Фиксируем тёмный
+   фон пузыря и контрастные светлые элементы поверх него. */
+[data-theme="dark-mono"] .msg--own .msg__bubble{background:linear-gradient(135deg,#3b3733 0%,#2a2725 100%);color:#f0ede8}
+[data-theme="dark-mono"] .msg--own .msg__bubble .txt{color:#f0ede8}
+[data-theme="dark-mono"] .msg--own .msg__bubble .time{color:rgba(240,237,232,.7)}
+[data-theme="dark-mono"] .msg--own .msg__bubble .react-pill{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2);color:#f0ede8}
+[data-theme="dark-mono"] .msg--own .msg__bubble .react-pill.on{background:rgba(255,255,255,.22);border-color:#f0ede8}
+[data-theme="dark-mono"] .msg--own .msg__bubble .poll,[data-theme="dark-mono"] .msg--own .msg__bubble .poll__opt{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16)}
+[data-theme="dark-mono"] .vn__play{background:#3b3733;color:#f0ede8}
+[data-theme="dark-mono"] .msg--own .vn__play{background:#f0ede8;color:#1b1918}
+[data-theme="dark-mono"] .msg--own .vn__wave i{background:rgba(240,237,232,.4)}
+[data-theme="dark-mono"] .msg--own .vn__wave i.on{background:#fcfaf6}
+[data-theme="dark-mono"] .msg--own .vn__time{color:rgba(240,237,232,.8)}
+[data-theme="dark-mono"] .msg--own .vn__speed{background:rgba(255,255,255,.14);color:#f0ede8}
+[data-theme="dark-mono"] .msg--own .vn__speed--fast{color:#fff}
 
 /* Светлые темы */
 [data-theme="light-violet"]{--bg:#f4f2f6;--bg-2:#ebe7f0;--panel:#ffffff;--panel-2:#f3f0f7;--panel-3:#e7e2ee;--text:#262130;--text-2:#4e4759;--muted:#756d85;--faint:#8a8296;--border:#e3dee9;--border-2:#cfc7d8;--accent:#7a6899;--accent-soft:rgba(122,104,153,.12);--accent-2:#9183b3;--violet:#7a6899;--violet-soft:rgba(122,104,153,.11);--grad-brand:linear-gradient(135deg,#9183b3,#7a6899 55%,#6a5a88);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f}
@@ -65,13 +82,18 @@ p{margin:0 0 10px}
 [data-theme="dark-mono"] .rank--1{background:var(--accent);color:#0d0e11}
 
 /* ---------- Аватары ---------- */
-.avatar{width:36px;height:36px;border-radius:50%;background:var(--panel-3);color:var(--text-2);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:none;position:relative;background-size:cover;background-position:center;border:1px solid var(--border)}
+.avatar{width:36px;height:36px;border-radius:50%;background:var(--panel-3);color:var(--text-2);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:none;position:relative;background-size:cover;background-position:center;border:1px solid var(--border);cursor:pointer}
+.avatar .av-in{font-style:normal;display:inline-flex;align-items:center;justify-content:center;width:100%;height:100%;border-radius:50%;background:color-mix(in srgb, currentColor 18%, transparent);font-weight:700}
+/* Инициалы на градиенте — белые, с лёгкой тенью для читаемости */
+.avatar--grad{color:#fff;border-color:rgba(255,255,255,.16);text-shadow:0 1px 2px rgba(0,0,0,.28)}
 .avatar--sm{width:26px;height:26px;font-size:10.5px}
+.avatar--xs{width:20px;height:20px;font-size:8.5px}
+.avatar--md{width:46px;height:46px;font-size:15.5px}
 .avatar--lg{width:48px;height:48px;font-size:16px}
-.avatar .dot{position:absolute;right:-2px;bottom:-2px;width:11px;height:11px;border-radius:50%;border:2px solid var(--panel);z-index:2}
+.avatar .dot{position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;border:1.5px solid var(--panel);z-index:2}
 .avatar--sm .dot{width:9px;height:9px;right:-1px;bottom:-1px;border-width:1.5px}
 .dot--online{background:var(--green)}
-.dot--offline{background:var(--faint);opacity:.65}
+.dot--offline{background:var(--faint);opacity:1}
 
 /* ---------- Кнопки ---------- */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 16px;border-radius:11px;border:1px solid var(--border-2);background:var(--panel-2);color:var(--text);font-weight:600;font-size:13.5px;cursor:pointer;transition:all var(--dur) var(--ease);white-space:nowrap;user-select:none;text-decoration:none}
@@ -103,7 +125,7 @@ p{margin:0 0 10px}
 textarea.input{resize:vertical;min-height:70px}
 select.input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;padding-right:32px;cursor:pointer}
 .input-wrap{position:relative}
-.input-wrap .ico{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--faint);pointer-events:none}
+.input-wrap>.ico{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--faint);pointer-events:none}
 .input-wrap .input{padding-left:34px}
 .input-wrap .kbd{position:absolute;right:9px;top:50%;transform:translateY(-50%)}
 .field{margin-bottom:13px}
@@ -114,15 +136,20 @@ select.input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xml
 kbd,.kbd{font-family:var(--mono);font-size:10.5px;background:var(--panel-2);border:1px solid var(--border);border-bottom-width:2px;border-radius:6px;padding:1px 6px;color:var(--muted);font-weight:600}
 
 /* ---------- Чекбоксы ---------- */
-.check{display:inline-flex;align-items:center;gap:9px;cursor:pointer;user-select:none;font-size:13.5px}
+.check{display:inline-flex;align-items:center;gap:10px;cursor:pointer;user-select:none;font-size:13.5px}
 .check input{position:absolute;opacity:0;width:0;height:0}
-.check .box{width:18px;height:18px;border-radius:6px;background:var(--check-bg,var(--panel-3));border:1.5px solid var(--border-2);display:inline-flex;align-items:center;justify-content:center;flex:none;transition:all var(--dur)}
-.check .box svg{width:11px;height:11px;stroke:var(--check-tick,#ffffff);stroke-width:3;fill:none;opacity:0;transform:scale(.5);transition:all var(--dur)}
+/* Курсоры интерактивных контролов должны откликаться */
+input[type=range]{cursor:grab}
+input[type=range]:active{cursor:grabbing}
+input[type=checkbox],input[type=radio],.check{cursor:pointer}
+select{cursor:pointer}
+.check .box{width:22px;height:22px;border-radius:7px;background:var(--check-bg,var(--panel-3));border:2px solid var(--border-2);display:inline-flex;align-items:center;justify-content:center;flex:none;transition:all var(--dur)}
+.check .box svg{width:14px;height:14px;stroke:var(--check-tick,#ffffff);stroke-width:3;fill:none;opacity:0;transform:scale(.5);transition:all var(--dur)}
 .check input:checked+.box{background:var(--accent);border-color:var(--accent)}
 .check input:checked+.box svg{opacity:1;transform:scale(1)}
 .check input:focus-visible+.box{outline:2px solid var(--accent);outline-offset:2px}
 .check--lg .box{width:22px;height:22px;border-radius:7px}
-.check--lg .box svg{width:13px;height:13px}
+.check--lg .box svg{width:14px;height:14px}
 
 /* ---------- Переключатели ---------- */
 .switch{position:relative;display:inline-block;width:38px;height:22px;flex:none}
@@ -160,7 +187,7 @@ button.chip,.chip[role="button"]{cursor:pointer}
 /* ---------- Таблицы ---------- */
 .tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--panel)}
 .tbl{width:100%;border-collapse:collapse;font-size:13px}
-.tbl th{position:sticky;top:0;z-index:2;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700;padding:10px 12px;background:var(--panel);border-bottom:1px solid var(--border);white-space:nowrap}
+.tbl th{position:sticky;top:0;z-index:6;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700;padding:10px 12px;background:var(--panel-2);border-bottom:1px solid var(--border);white-space:nowrap}
 .tbl td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle;min-width:0}
 .tbl tbody tr:last-child td{border-bottom:0}
 .tbl tbody tr{transition:background var(--dur)}
@@ -169,8 +196,11 @@ button.chip,.chip[role="button"]{cursor:pointer}
 .row{display:flex;align-items:center;gap:8px}
 
 /* ---------- Модалки ---------- */
-.modal-mask{position:fixed;inset:0;z-index:4200;background:rgba(4,6,10,.55);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;padding:24px 16px;animation:fadeIn .22s var(--ease)}
-.modal{width:100%;max-width:560px;max-height:82vh;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--border-2);border-radius:18px;box-shadow:var(--sh-2);animation:popIn .29s var(--ease);overflow:hidden}
+.modal-mask{position:fixed;inset:0;z-index:4200;background:rgba(4,6,10,.55);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;padding:24px 16px;animation:fadeIn .22s var(--ease);pointer-events:auto}
+.modal-mask--widget{background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;pointer-events:none;animation:none;padding:24px 16px}
+.modal{position:relative;width:100%;max-width:560px;max-height:82vh;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--border-2);border-radius:18px;box-shadow:var(--sh-2);animation:popIn .29s var(--ease);overflow:hidden;pointer-events:auto}
+/* Дудлы в окне: тот же холст, что и у фона приложения. Масштаб и смещение
+   подобраны так, чтобы линии продолжались сквозь границу окна (без перерисовки). */
 .modal--lg{max-width:760px}
 .modal__head{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border)}
 .modal__head h3{flex:1;font-size:16.5px}
@@ -182,12 +212,18 @@ button.chip,.chip[role="button"]{cursor:pointer}
 @keyframes fadeOut{to{opacity:0}}
 @keyframes popIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
 @keyframes popOut{to{opacity:0;transform:translateY(8px) scale(.99)}}
-.modal-mask.closing{animation:fadeOut .18s var(--ease) forwards}
+.modal-mask.closing{animation:none}
 .modal-mask.closing .modal{animation:popOut .18s var(--ease) forwards}
 
 /* ---------- Дропдаун-меню ---------- */
-.dd{position:fixed;z-index:4300;min-width:190px;background:var(--panel);border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--sh-2);padding:6px;animation:popIn .18s var(--ease)}
-.dd.closing{animation:popOut .16s var(--ease) forwards}
+.dd{position:fixed;z-index:4300;min-width:190px;max-height:min(70vh, 520px);overflow-y:auto;overscroll-behavior:contain;background:var(--panel);border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--sh-2);padding:6px;animation:popIn .18s var(--ease)}
+.dd.closing{animation:popOut .16s var(--ease) forwards;pointer-events:none}
+/* Данные о сообщении в контекстном меню (как в WhatsApp) */
+.dd__info{display:flex;flex-direction:column;gap:3px;padding:10px 12px;margin-bottom:6px;border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--panel-2) 55%,transparent);border-radius:10px 10px 0 0;font-size:11.5px;color:var(--text-2)}
+.dd__info-time{font-weight:700;color:var(--text)}
+.dd__info-row{display:flex;align-items:center;gap:6px;margin-top:5px;font-weight:650;color:var(--text-2)}
+.dd__info-row .ico{width:13px;height:13px;color:var(--accent)}
+.dd__info-names{color:var(--muted);line-height:1.4}
 .dd__item{display:flex;align-items:center;gap:9px;width:100%;padding:8px 11px;border-radius:9px;border:none;background:none;color:var(--text-2);font-size:13.5px;font-weight:550;cursor:pointer;text-align:left;transition:background var(--dur)}
 .dd__item:hover{background:var(--panel-2);color:var(--text)}
 .dd__item .ico{width:16px;height:16px;color:var(--muted)}
@@ -201,7 +237,7 @@ button.chip,.chip[role="button"]{cursor:pointer}
 /* ---------- Тосты (правый нижний угол) ---------- */
 .toasts{position:fixed;right:16px;bottom:16px;z-index:4400;display:flex;flex-direction:column;gap:9px;align-items:flex-end;pointer-events:none}
 body.zen-corner-br .toasts{right:auto;left:16px;align-items:flex-start}
-.toast{pointer-events:auto;display:flex;align-items:center;gap:10px;min-width:230px;max-width:360px;background:var(--panel);border:1px solid var(--border-2);border-left:3px solid var(--accent);border-radius:13px;padding:11px 14px;box-shadow:var(--sh-2);font-size:13.5px;font-weight:550;color:var(--text);animation:toastIn .4s var(--ease)}
+.toast{pointer-events:auto;display:flex;align-items:center;gap:9px;min-width:220px;max-width:430px;background:var(--panel);border:1px solid var(--border-2);border-left:3px solid var(--accent);border-radius:13px;padding:9px 13px;box-shadow:0 10px 30px -10px rgba(0,0,0,.28),0 2px 6px rgba(0,0,0,.08);font-size:13.5px;line-height:1.35;font-weight:550;color:var(--text);animation:toastIn .4s var(--ease)}
 .toast .ico{width:17px;height:17px;flex:none}
 .toast--ok{border-left-color:var(--green)}
 .toast--ok .ico{color:var(--green)}
@@ -210,12 +246,12 @@ body.zen-corner-br .toasts{right:auto;left:16px;align-items:flex-start}
 .toast--warn{border-left-color:var(--yellow)}
 .toast--warn .ico{color:var(--yellow)}
 .toast--info .ico{color:var(--accent)}
-.t-close{margin-left:auto;width:26px;height:26px;border-radius:8px;border:none;background:none;color:var(--faint);cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none;opacity:0;transition:opacity .15s var(--ease)}
-.toast:hover .t-close{opacity:1}
-.t-close:hover{background:var(--red-soft);color:var(--red)}
-.toast.out{animation:toastOut .26s var(--ease) forwards}
+.t-act:hover{background:var(--panel-3);border-color:var(--accent);color:var(--accent)}
+.t-act .ico{width:12px;height:12px}
 @keyframes toastIn{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
 @keyframes toastOut{to{opacity:0;transform:translateY(8px) scale(.97)}}
+/* Плавное исчезновение тоста: класс .out ставит JS перед remove() */
+.toast.out{animation:toastOut .26s var(--ease) forwards;pointer-events:none}
 
 /* ---------- Прогресс / скелетоны ---------- */
 .progress{height:9px;border-radius:99px;background:var(--panel-2);overflow:hidden;position:relative}
@@ -338,8 +374,12 @@ th.sortable.sorted-desc::after{content:"↓";opacity:1}
 .ps-row:hover{background:var(--panel-2)}
 .ps-row.on{background:var(--accent-soft)}
 .has-eye .input{padding-right:40px}
-.input-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:30px;height:30px;border-radius:8px;border:none;background:none;color:var(--faint);cursor:pointer;display:flex;align-items:center;justify-content:center}
-.input-eye:hover{background:var(--panel-2);color:var(--text)}
+.input-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:30px;height:30px;border-radius:9px;border:none;background:transparent;color:var(--faint);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:background-color .2s var(--ease),color .2s var(--ease),box-shadow .2s var(--ease)}
+.input-eye .ico{position:static;transform:none;width:16px;height:16px}
+/* Простая анимация зачёркивания: линия прочерчивается слева направо */
+.input-eye__slash{position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;fill:none;stroke:currentColor;stroke-width:1.35;stroke-linecap:round;stroke-dasharray:18;stroke-dashoffset:18;transition:stroke-dashoffset .22s var(--ease);pointer-events:none}
+.input-eye.is-off .input-eye__slash{stroke-dashoffset:0}
+.input-eye:hover{background:color-mix(in srgb,var(--panel-2) 55%,transparent);color:var(--text-2)}
 .crop-stage{user-select:none}
 .wbar{display:inline-block;width:3px;border-radius:2px;background:var(--accent);margin-right:2px}
 .sw-top{stop-color:var(--accent-2)}
@@ -369,9 +409,27 @@ th.sortable.sorted-desc::after{content:"↓";opacity:1}
 .sw-wave-bot{stop-color:var(--accent)}
 
 /* Тосты: заголовок и текст — отдельными строками */
-.toast__body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.toast__body{flex:1;min-width:0;display:flex;flex-direction:row;align-items:center;gap:8px}
+/* Тост с названием: заголовок сверху, текст переносится под ним */
+.toast--has-title .toast__body{flex-direction:column;align-items:flex-start;gap:2px}
+.toast--has-title .toast__msg{display:block}
 .toast__title{display:block;font-weight:700;font-size:13px;color:var(--text);line-height:1.35}
-.toast__msg{display:block;font-size:13px;font-weight:500;color:var(--text-2);line-height:1.4;word-wrap:break-word}
-.toast > .ico{margin-top:1px}
+.toast__msg{font-size:13px;font-weight:500;color:var(--text-2);line-height:1.4;word-wrap:break-word;white-space:normal}
+.toast > .ico{flex:none}
+.toast__body .t-act{display:inline-flex;align-items:center;gap:5px;margin:0;padding:5px 10px;border-radius:8px;border:1px solid var(--border-2);background:var(--panel-2);color:var(--text);font-size:11.5px;font-weight:650;cursor:pointer;white-space:nowrap;transition:background var(--dur),border-color var(--dur);flex:none}
 
 .chip,label.chip,span.chip{cursor:pointer!important}
+
+/* Модалка как окно: заголовок и кнопки управления */
+.modal__h h3{flex:1;min-width:0;font-size:16.5px}
+.modal__min,.modal__max{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--faint);cursor:pointer;background:none;border:none;transition:all var(--dur);flex:none}
+.modal__min:hover,.modal__max:hover{background:var(--panel-2);color:var(--text)}
+.modal__min .ico,.modal__max .ico{width:14px;height:14px}
+.modal__x{margin-left:4px}
+
+/* Модалка: плавное сворачивание/разворачивание */
+.modal--animating{transition:left .3s var(--ease),top .3s var(--ease),width .3s var(--ease),height .3s var(--ease),opacity .3s var(--ease)!important}
+
+/* Тост с действием (обновление и т.п.) */
+.toast__action{margin-top:8px;align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:9px;border:1px solid var(--border-2);background:var(--panel-2);color:var(--text-2);font-size:12.5px;font-weight:600;cursor:pointer;transition:background var(--dur),color var(--dur),border-color var(--dur);font-family:inherit}
+.toast__action:hover{background:var(--panel-3);color:var(--text);border-color:var(--border-2)}

@@ -1,5 +1,5 @@
 /* Audiowizard Workspace — Service Worker (кеш оболочки, обновления, офлайн) */
-const VER = '0.9.4-beta.281';
+const VER = '0.1-prototype.1227';
 const CACHE = `aw-shell-${VER}`;
 
 const PRECACHE = [
@@ -7,7 +7,7 @@ const PRECACHE = [
   './manifest.json', './version.json',
   './css/base.css', './css/app.css',
   './js/store.js', './js/xlsx.js', './js/ui.js', './js/ai-data.js', './js/ai.js', './js/crm.js', './js/windows.js', './js/navdrag.js', './js/app.js',
-  './icons/icon.svg', './icons/maskable.svg'
+  './icons/icon.svg', './icons/maskable.svg', './bg/pattern-ai.svg'
 ];
 
 self.addEventListener('install', e => {
@@ -50,17 +50,16 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Статика и версия: кеш-первым, фоновое обновление
+  // Статика и версия: сеть-первым (свежая версия всегда), кэш — офлайн-фолбэк
   e.respondWith(
-    caches.match(req).then(hit => {
-      const net = fetch(req).then(res => {
-        if (res && res.ok && !url.pathname.includes('version.json')) {
-          const copy = res.clone();
-          caches.open(CACHE).then(c => c.put(req, copy));
-        }
-        return res;
-      }).catch(() => hit);
-      return hit || net;
-    })
+    fetch(req).then(res => {
+      if (res && res.ok && !url.pathname.includes('version.json')) {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(req, copy));
+      }
+      return res;
+    }).catch(() =>
+      caches.match(req).then(hit => hit || caches.match('./index.html'))
+    )
   );
 });

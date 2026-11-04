@@ -1,0 +1,2 @@
+39 объектов (зазор 3.6px):
+1:apple, 2:balloon, 3:book, 4:butterfly, 5:cake, 6:camera, 7:cassette, 8:cat, 9:cherry, 10:clock, 11:coffee, 12:envelope, 13:fish, 14:flower, 15:ghost, 16:gift, 17:glasses, 18:guitar, 19:headphones, 20:heart, 21:lightbulb, 22:mic, 23:monster, 24:monster-2, 25:moon, 26:mushroom, 27:note, 28:paw, 29:pencil, 30:person, 31:planet, 32:rainbow, 33:robot, 34:rocket, 35:snail, 36:speech, 37:star, 38:storm, 39:umbrella
