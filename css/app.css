@@ -1244,6 +1244,15 @@ body.menu-dragging .main .theme-card:hover{box-shadow:none!important;transform:n
    за границей (overflow:hidden), разворот — обратной анимацией высоты. */
 .aw-win--corner-min{min-height:0!important}
 .aw-win--corner-min .aw-win__body{overflow:hidden}
+/* Иконки сворачивания в уголке: стрелка вниз (свернуть) / вверх (развернуть),
+   плавно сменяются с «−» при входе в уголок и при выходе из него. */
+.aw-win__min{position:relative}
+.win-min-ico{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transition:opacity .18s var(--ease),transform .18s var(--ease)}
+.win-min-ico--down,.win-min-ico--up{opacity:0;transform:translateY(3px)}
+.aw-win--corner .win-min-ico--dash{opacity:0;transform:translateY(-3px)}
+.aw-win--corner .win-min-ico--down{opacity:1;transform:none}
+.aw-win--corner-min .win-min-ico--down{opacity:0;transform:translateY(-3px)}
+.aw-win--corner-min .win-min-ico--up{opacity:1;transform:none}
 body.win-dragging *{user-select:none!important}
 
 /* Закрытие окон: плавное затухание */

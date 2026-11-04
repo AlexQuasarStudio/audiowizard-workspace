@@ -480,7 +480,7 @@ const Windows = (() => {
     const head = document.createElement('div');
     head.className = 'aw-win__head';
     head.innerHTML = '<span class="aw-win__title aw-win__title--sw" role="button" title="Сменить раздел">' + icon(iconName,'ico-sm') + ' <b>' + esc(title) + '</b>' + icon('chev-d','ico-sm') + '</span><span class="spacer"></span>' +
-      '<button class="iconbtn aw-win__min" title="Свернуть">&minus;</button>' +
+      '<button class="iconbtn aw-win__min" title="Свернуть"><span class="win-min-ico win-min-ico--dash">&minus;</span><span class="win-min-ico win-min-ico--down">' + icon('chev-d','ico-sm') + '</span><span class="win-min-ico win-min-ico--up">' + icon('chev-u','ico-sm') + '</span></button>' +
       '<button class="iconbtn aw-win__max" title="На весь экран">' + icon('expand','ico-sm') + '</button>' +
       '<button class="iconbtn aw-win__close" title="Закрыть">' + icon('x','ico-sm') + '</button>';
     const body = document.createElement('div');
@@ -810,40 +810,14 @@ const Windows = (() => {
       if (e.target.closest('.aw-win__close') || e.target.closest('.aw-win__max')) return;
       if (e.target.closest('.aw-win__min')) return;
       e.preventDefault();
-      let r = win.getBoundingClientRect();
+      const r = win.getBoundingClientRect();
       win.__inSplit = null; /* перетащили окно — оно больше не в сплите */
-      if (win.classList.contains('aw-win--corner')){
-        /* Вытащили из уголка — окно становится обычным, размер сохраняем. */
-        win.classList.remove('aw-win--corner');
-        if (win.classList.contains('aw-win--corner-min')){
-          /* Плавный разворот при взятии в драг: сначала окно раскрывается
-             (height/top с transition), затем начинает следовать за курсором. */
-          win.classList.remove('aw-win--corner-min');
-          const ch = win.__cornerHeight || 520;
-          const hh2 = win.offsetHeight;
-          const curTop = parseFloat(win.style.top) || r.top;
-          win.classList.add('aw-win--animating');
-          if ((win.__cornerPos || '').includes('b')) win.style.top = (curTop - (ch - hh2)) + 'px';
-          win.style.height = ch + 'px';
-          win.__cornerHeight = null;
-          win.__cornerTop = null;
-          /* Точка отсчёта драга — конечная РАСКРЫТАЯ позиция. Иначе первое
-             движение после разворота тянуло шапку к курсору (старый top). */
-          win.__expandTarget = { left: parseFloat(win.style.left) || r.left, top: win.style.top ? parseFloat(win.style.top) : r.top };
-          win.__expandUntil = Date.now() + 260;
-          setTimeout(() => { win.classList.remove('aw-win--animating'); win.__expandUntil = 0; win.__expandTarget = null; }, 260);
-          r = win.getBoundingClientRect();
-        }
-        if (win.__expandTarget){
-          r = Object.assign({}, r, { left: win.__expandTarget.left, top: win.__expandTarget.top });
-        }
-        win.__cornerPrev = null;
-        win.__cornerPos = null;
-      }
+      win.__cornerDetached = false;
       /* Геометрия ДО драга: если окно уронят в уголок, вернём его сюда. */
       win.__dragStartRect = { left: win.style.left || (r.left + 'px'), top: win.style.top || (r.top + 'px'),
         width: win.style.width || (r.width + 'px'), height: win.style.height || (r.height + 'px') };
-      active = { kind:'drag', win:win, sx:e.clientX, sy:e.clientY, ox:r.left, oy:r.top, moved:false };
+      active = { kind:'drag', win:win, sx:e.clientX, sy:e.clientY, ox:r.left, oy:r.top, moved:false,
+        noToggle: !!(e.target.closest && e.target.closest('.aw-win__title--sw')) };
       win.classList.add('aw-win--dragging');
       document.body.classList.add('win-dragging');
       focusWin(win);
@@ -959,6 +933,7 @@ const Windows = (() => {
     win.classList.remove('aw-win--corner-min');
     win.__cornerHeight = null;
     win.__cornerTop = null;
+    win.__cornerDetached = false;
     win.classList.add('aw-win--corner', 'aw-win--animating');
     setTimeout(() => win.classList.remove('aw-win--animating'), 320);
     focusWin(win);
@@ -1023,6 +998,35 @@ const Windows = (() => {
     if (!active.moved) return;
     const win = active.win;
     if (active.kind === 'drag'){
+      /* Из уголка выходим только при РЕАЛЬНОМ движении: одиночный клик по
+         шапке должен сворачивать/разворачивать, а не откреплять окно. */
+      if (win.classList.contains('aw-win--corner') && !win.__cornerDetached){
+        win.__cornerDetached = true;
+        win.classList.remove('aw-win--corner');
+        if (win.classList.contains('aw-win--corner-min')){
+          win.classList.remove('aw-win--corner-min');
+          const ch = win.__cornerHeight || 520;
+          const hh2 = win.offsetHeight;
+          const curTop = parseFloat(win.style.top) || win.getBoundingClientRect().top;
+          win.classList.add('aw-win--animating');
+          if ((win.__cornerPos || '').includes('b')) win.style.top = (curTop - (ch - hh2)) + 'px';
+          win.style.height = ch + 'px';
+          win.__cornerHeight = null;
+          win.__cornerTop = null;
+          win.__expandTarget = { left: parseFloat(win.style.left) || win.getBoundingClientRect().left, top: win.style.top ? parseFloat(win.style.top) : win.getBoundingClientRect().top };
+          win.__expandUntil = Date.now() + 260;
+          setTimeout(() => { win.classList.remove('aw-win--animating'); win.__expandUntil = 0; win.__expandTarget = null; }, 260);
+        }
+        win.__cornerPrev = null;
+        win.__cornerPos = null;
+        const rr0 = win.getBoundingClientRect();
+        active.sx = e.clientX; active.sy = e.clientY;
+        active.ox = win.__expandTarget ? win.__expandTarget.left : rr0.left;
+        active.oy = win.__expandTarget ? win.__expandTarget.top : rr0.top;
+        win.__dragStartRect = { left: win.style.left || (rr0.left + 'px'), top: win.style.top || (rr0.top + 'px'),
+          width: win.style.width || (rr0.width + 'px'), height: win.style.height || (rr0.height + 'px') };
+        return;
+      }
       if (win.__expandUntil){
         /* Идёт плавный разворот из уголка: игнорируем движение, но отсчёт
            держим на конечной раскрытой позиции — без прыжка к курсору. */
@@ -1355,6 +1359,11 @@ const Windows = (() => {
       } catch(e2){}
     }
     if (active){
+      /* Клик (без перемещения) по шапке уголка — свернуть/развернуть. */
+      if (active.kind === 'drag' && !active.moved && !active.noToggle
+          && active.win && active.win.classList.contains('aw-win--corner')){
+        toggleCornerCollapse(active.win);
+      }
       if (active.kind === 'resize' && active.win){
         active.win._resizing = false;
         /* Догон синхронного ресайза стыка на финальном кадре (если mousemove не успел) */
@@ -1367,7 +1376,7 @@ const Windows = (() => {
         allWins().forEach(rec => { rec.win.__origLeft = null; rec.win.__origRight = null; rec.win.__origGap = null; rec.win.__origGapE = null; rec.win.__origGapW = null; rec.win.__origGapN = null; rec.win.__origGapS = null; rec.win.__origTop = null; rec.win.__origBottom = null; });
       }
       if (active.kind === 'drag' && active.moved) active.win.__lastDragEnd = Date.now();
-      if (active.kind === 'drag') active.win.__dragStartRect = null;
+      if (active.kind === 'drag'){ active.win.__dragStartRect = null; active.win.__cornerDetached = false; }
       active.win.__lastSnap = null; /* сброс магнита после дропа */
       active.win.classList.remove('aw-win--dragging');
       document.body.classList.remove('win-dragging');
