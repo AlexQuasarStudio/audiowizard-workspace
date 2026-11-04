@@ -156,6 +156,7 @@ const APP = (() => {
           </div>
         </aside>
         <header class="head">
+          <button class="iconbtn head__burger" id="mobile-menu" aria-label="Меню" title="Меню">${icon('menu')}</button>
           <div class="head__search" data-tour="search" id="open-search">
             <div class="fake-input">${icon('search')}<input id="head-search-input" placeholder="Глобальный поиск…" autocomplete="off" spellcheck="false"><span class="kbd" id="head-search-hint">${fmtKeys(S.keys && S.keys.search)}</span></div>
           </div>
@@ -390,13 +391,18 @@ const APP = (() => {
       mainEl.classList.remove('view-in'); void mainEl.offsetWidth; mainEl.classList.add('view-in');
     }
     if (prefsFor().zen) applyZen(true, { skipFullscreen:true });
+    const openSideDrawer = ()=>{
+      const side = $('#side');
+      if (!side || side.classList.contains('open')) return;
+      side.classList.add('open');
+      const sc = document.createElement('div'); sc.className = 'side-scrim';
+      const closeScrim = ()=>{ side.classList.remove('open'); sc.classList.add('closing'); setTimeout(()=>sc.remove(), 320); };
+      sc.onclick = closeScrim;
+      document.body.appendChild(sc);
+    };
     $('#burger').onclick = ()=>{
       if (window.matchMedia('(max-width:960px)').matches){
-        $('#side').classList.add('open');
-        const sc = document.createElement('div'); sc.className = 'side-scrim';
-        const closeScrim = ()=>{ $('#side').classList.remove('open'); sc.classList.add('closing'); setTimeout(()=>sc.remove(), 320); };
-        sc.onclick = closeScrim;
-        document.body.appendChild(sc);
+        openSideDrawer();
       } else {
         const on = !document.body.classList.contains('side-collapsed');
         document.body.classList.toggle('side-collapsed', on);
@@ -406,6 +412,7 @@ const APP = (() => {
         /* без render(): класс сам переводит рельс, CSS-анимация ширины не обрывается */
       }
     };
+    { const mm = $('#mobile-menu'); if (mm) mm.onclick = ()=>{ if (window.matchMedia('(max-width:960px)').matches) openSideDrawer(); }; }
     $('#side-user').onclick = e=>userMenu(e.currentTarget);
     document.querySelectorAll('.foot a[data-doc]').forEach(a=>{
       a.onclick = ()=>{ window.__openDocTitle = a.dataset.doc; };
