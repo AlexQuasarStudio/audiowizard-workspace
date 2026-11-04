@@ -2258,9 +2258,9 @@ snapToCorner(S.draftPrefs.zenAvatarPos || 'bc', false);
       }
       return;
     }
-    /* Смена режима: кроссфейд старой копии и плавная ширина */
+    /* Смена режима: лицо гаснет, меняет содержимое и проявляется заново.
+       Старая копия не накладывается — текст прежних аватаров не просвечивает. */
     const oldW = Math.round(face.getBoundingClientRect().width);
-    const oldHtml = face.innerHTML;
     face.innerHTML = reactionFaceHtml(ids, em);
     face.classList.toggle('react-face--num', toNum);
     face.style.width = 'auto';
@@ -2277,16 +2277,14 @@ snapToCorner(S.draftPrefs.zenAvatarPos || 'bc', false);
         first.classList.add('react-face__enter');
       }
     }
-    const ghost = document.createElement('span');
-    ghost.className = 'react-face__ghost';
-    ghost.innerHTML = oldHtml;
-    face.appendChild(ghost);
-    /* Ширину ведём WAAPI: transitionend ловит и дочерние переходы и гасит анимацию */
-    const done = ()=>{ if (face.__patchSeq !== seq) return; face.style.width = ''; ghost.remove(); };
+    const done = ()=>{ if (face.__patchSeq !== seq) return; face.style.width = ''; face.style.opacity = ''; };
     try {
-      const anim = face.animate([{ width: oldW + 'px' }, { width: newW + 'px' }],
-        { duration: 220, easing: 'cubic-bezier(.2,.7,.2,1)' });
-      anim.onfinish = done;
+      face.animate([
+        { opacity: 1, width: oldW + 'px', offset: 0 },
+        { opacity: 0, width: oldW + 'px', offset: .35 },
+        { opacity: 0, width: newW + 'px', offset: .6 },
+        { opacity: 1, width: newW + 'px', offset: 1 }
+      ], { duration: 240, easing: 'cubic-bezier(.2,.7,.2,1)' }).onfinish = done;
     } catch(e){}
     setTimeout(done, 420);
   }

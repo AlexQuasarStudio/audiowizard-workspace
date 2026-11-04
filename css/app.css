@@ -883,8 +883,8 @@ body.zen .chat-msgs{
 
 /* ---------- Плавный вход вида + скелетон-фаза ---------- */
 .main{position:relative}
-.view-in{animation:viewIn .26s var(--ease)}
-@keyframes viewIn{from{opacity:.35;transform:translateY(7px)}to{opacity:1;transform:none}}
+.view-in{animation:viewIn .24s var(--ease)}
+@keyframes viewIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
 .view-sk{position:absolute;inset:0;z-index:6;pointer-events:none;display:flex;flex-direction:column;gap:14px;padding:26px 28px;background:transparent;animation:skFade .5s var(--ease) forwards;overflow:hidden}
 /* Пока скелетон активен — скрываем сам контент (visibility), а не рисуем поверх него.
    Сквозь прозрачный скелетон видны НАСТОЯЩИЕ дудлы фона — они совпадают 1-в-1. */
@@ -1180,10 +1180,10 @@ body.menu-dragging .main .theme-card:hover{box-shadow:none!important;transform:n
 /* ---- Смена чата: лёгкий въезд нового диалога (как в ТГ) ----
    Анимируется сам контейнер, а не каждый ребёнок: так не вспыхивают
    вложенные анимации сообщений (msgSelPop) и нет «мигания». */
-.chat-main.chat-switch--left{animation:chatSwitchIn .3s var(--ease)}
-.chat-main.chat-switch--right{animation:chatSwitchInR .3s var(--ease)}
-@keyframes chatSwitchIn{from{transform:translateX(-14px)}to{transform:none}}
-@keyframes chatSwitchInR{from{transform:translateX(14px)}to{transform:none}}
+.chat-main.chat-switch--left{animation:chatSwitchIn .26s var(--ease)}
+.chat-main.chat-switch--right{animation:chatSwitchInR .26s var(--ease)}
+@keyframes chatSwitchIn{from{transform:translateX(-12px);opacity:.55}to{transform:none;opacity:1}}
+@keyframes chatSwitchInR{from{transform:translateX(12px);opacity:.55}to{transform:none;opacity:1}}
 
 
 /* Углы-хендлы ресайза поверх скругления окна. НЕПРОЗРАЧНЫЙ фон в тон окна:
@@ -1657,6 +1657,9 @@ html[data-splash-no-doodles] #splash .splash__doodles{display:none}
 .react-pill.react-pop .react-n{animation:none}
 .react-pill.react-fade{animation:reactFade .18s var(--ease) forwards}
 .react-av.react-face__enter{animation:reactFaceIn .16s var(--ease)}
+/* Снятие аватара при «аватары → аватары»: уходит со своего места, не влияя на раскладку */
+.react-av--ghost{position:absolute;pointer-events:none;animation:reactAvOut .2s var(--ease) forwards}
+@keyframes reactAvOut{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(.55)}}
 
 /* --- Опросы --- */
 .poll{display:flex;flex-direction:column;gap:6px;margin-top:4px;min-width:220px;max-width:100%}
