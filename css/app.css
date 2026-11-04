@@ -439,7 +439,7 @@ body.zen .chats-layout{height:100%;position:static;inset:auto;z-index:auto;displ
 }
 /* Адаптив окна чатов под размер окна: при узком окне список чатов скрывается,
    чат занимает всю ширину (класс ставит JS при ресайзе окна). */
-#windows-layer .aw-win.aw-win--narrow-chats .chats-layout{grid-template-columns:0 1fr;gap:0}
+#windows-layer .aw-win.aw-win--narrow-chats .chats-layout{grid-template-columns:1fr;gap:0}
 #windows-layer .aw-win.aw-win--narrow-chats .chat-list{display:none}
 #windows-layer .aw-win.aw-win--narrow-chats .chat-list-toggle{display:none}
 #windows-layer .chat-list{position:static;min-width:0;overflow:hidden;border:1px solid var(--border);border-radius:14px;height:100%}
