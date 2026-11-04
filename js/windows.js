@@ -816,14 +816,19 @@ const Windows = (() => {
         /* Вытащили из уголка — окно становится обычным, размер сохраняем. */
         win.classList.remove('aw-win--corner');
         if (win.classList.contains('aw-win--corner-min')){
+          /* Плавный разворот при взятии в драг: сначала окно раскрывается
+             (height/top с transition), затем начинает следовать за курсором. */
           win.classList.remove('aw-win--corner-min');
           const ch = win.__cornerHeight || 520;
           const hh2 = win.offsetHeight;
           const curTop = parseFloat(win.style.top) || r.top;
+          win.classList.add('aw-win--animating');
           if ((win.__cornerPos || '').includes('b')) win.style.top = (curTop - (ch - hh2)) + 'px';
           win.style.height = ch + 'px';
           win.__cornerHeight = null;
           win.__cornerTop = null;
+          win.__expandUntil = Date.now() + 260;
+          setTimeout(() => { win.classList.remove('aw-win--animating'); win.__expandUntil = 0; }, 260);
           r = win.getBoundingClientRect();
         }
         win.__cornerPrev = null;
@@ -1012,6 +1017,15 @@ const Windows = (() => {
     if (!active.moved) return;
     const win = active.win;
     if (active.kind === 'drag'){
+      if (win.__expandUntil){
+        /* Идёт плавный разворот из уголка — выравниваем отсчёт под текущий
+           rect, чтобы после раскрытия окно не прыгнуло. */
+        const rr = win.getBoundingClientRect();
+        active.sx = e.clientX; active.sy = e.clientY;
+        active.ox = rr.left; active.oy = rr.top;
+        win.__lastSnap = null;
+        return;
+      }
       let x = active.ox + dx, y = active.oy + dy;
       const w = win.offsetWidth, h = win.offsetHeight;
       x = Math.max(-w + 100, Math.min(x, window.innerWidth - 100));
