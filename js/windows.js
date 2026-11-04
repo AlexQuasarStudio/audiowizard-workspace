@@ -494,6 +494,12 @@ const Windows = (() => {
       if (route === 'chats' || win.querySelector('.chats-layout')){
         win.classList.toggle('aw-win--narrow-chats', win.offsetWidth < 520);
       }
+      /* После смены ширины шапка чата может переноситься и становиться выше —
+         пересчитываем отступ ленты, иначе первое сообщение уходит под шапку. */
+      requestAnimationFrame(() => {
+        const v = win.querySelector('.view--chats');
+        try { v && v.__syncChatPads && v.__syncChatPads(); } catch(e){}
+      });
     };
     win._chatNarrow = applyChatNarrow;
     if (typeof ResizeObserver === 'function'){

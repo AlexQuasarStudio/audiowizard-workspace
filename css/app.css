@@ -442,10 +442,20 @@ body.zen .chats-layout{height:100%;position:static;inset:auto;z-index:auto;displ
 #windows-layer .aw-win.aw-win--narrow-chats .chats-layout{grid-template-columns:1fr;gap:0}
 #windows-layer .aw-win.aw-win--narrow-chats .chat-list{display:none}
 #windows-layer .aw-win.aw-win--narrow-chats .chat-list-toggle{display:none}
+/* Стрелка «назад» в узком окне открывает список чатов; в режиме списка
+   показываем только его, чат скрыт. */
+#windows-layer .aw-win.aw-win--narrow-chats #chat-back{display:inline-flex!important}
+#windows-layer .aw-win.aw-win--narrow-chats.aw-win--chat-list #chat-back{display:none!important}
+#windows-layer .aw-win.aw-win--narrow-chats.aw-win--chat-list .chat-list{display:block}
+#windows-layer .aw-win.aw-win--narrow-chats.aw-win--chat-list .chat-main{display:none}
 #windows-layer .chat-list{position:static;min-width:0;overflow:hidden;border:1px solid var(--border);border-radius:14px;height:100%}
 #windows-layer .chat-list__scroll{height:100%;overflow-y:auto}
 #windows-layer .chat-main{height:100%;min-width:0;background:transparent}
-#windows-layer .chat-main .chat-msgs{height:100%;max-width:none;margin:0}
+#windows-layer .chat-main .chat-msgs{height:100%;max-width:760px;margin:0 auto;padding-left:8px;padding-right:8px}
+/* В окне чатов заголовок раздела не нужен: окно уже подписано «Чаты».
+   Иначе шапка с названием наезжает на кнопку «Массовое сообщение», а лента
+   не помещается в тело окна (как в zen, где заголовок тоже скрыт). */
+#windows-layer .view--chats > .page-head{display:none}
 body.zen .chats-layout.list-hidden{grid-template-columns:0 1fr}
 body.zen .chats-layout .chat-list{position:static;min-width:0;overflow:hidden;border:1px solid var(--border);border-radius:16px;grid-column:1;opacity:1;transition:opacity .2s var(--ease);height:100%;min-height:0}
 body.zen .chats-layout.list-hidden .chat-list{opacity:0;pointer-events:none}

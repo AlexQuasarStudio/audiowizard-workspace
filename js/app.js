@@ -2392,6 +2392,8 @@ ex.innerHTML = avatarHTML(user(), '');
       try { window.__cacheDaySepTops && window.__cacheDaySepTops(); } catch(e){}
     };
     window.__syncChatPads = syncChatPads;
+    root.__syncChatPads = syncChatPads;
+    root.__fitChats = fitChats;
     /* Мини-чат в углу (Jivo-стиль): плавающая панель с последними сообщениями */
     const widgetEl = () => document.getElementById('chat-widget');
     const closeWidget = () => { const w = widgetEl(); if (w) w.remove(); };
@@ -3100,9 +3102,15 @@ const cm = root.querySelector('.chat-main');
       const prevFocusWasInput = !!(prevFocus && (prevFocus.id==='chat-t' || prevFocus.tagName==='TEXTAREA'));
       const prevSel = prevFocusWasInput && prevFocus.setSelectionRange
         ? [prevFocus.selectionStart, prevFocus.selectionEnd] : null;
+      {
+        const hostWin = root.closest('.aw-win');
+        if (hostWin){
+          hostWin.classList.remove('aw-win--chat-list');
+        }
+      }
       root.querySelector('.chat-main').innerHTML = `
         <div class="chat-head">
-          <button class="iconbtn" id="chat-back" style="display:none">${icon('chev-r')}</button>
+          <button class="iconbtn" id="chat-back" style="display:none">${icon('chev-l')}</button>
           <span class="chat-head__av chat-head__av--lv">${avatarHTML({ full_name:c.name, avatar:c.avatar, is_online:true }, '')}</span>
           <div class="chat-head__meta"><b>${esc(c.name)}</b><span id="chat-head-sub">${esc(c.description||'')}</span></div>
           <span class="spacer"></span>
@@ -4056,7 +4064,14 @@ const cm = root.querySelector('.chat-main');
       }
 
       const backBtn = root.querySelector('#chat-back');
-      if (backBtn) backBtn.onclick = () => { try { mobilePane(true); } catch(e){} };
+      if (backBtn) backBtn.onclick = () => {
+        const hostWin = root.closest('.aw-win');
+        if (hostWin && hostWin.classList.contains('aw-win--narrow-chats')){
+          hostWin.classList.add('aw-win--chat-list');
+          return;
+        }
+        try { mobilePane(true); } catch(e){}
+      };
       const soundBtn = $('#chat-sound', root);
       if (soundBtn){
         soundBtn.onclick = ()=>{
