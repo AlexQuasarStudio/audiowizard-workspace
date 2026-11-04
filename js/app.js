@@ -2618,6 +2618,9 @@ ex.innerHTML = avatarHTML(user(), '');
       } catch(e){}
       curChat = id;
       chatSel.set.clear(); chatSel.mode = false;
+      /* Выбор чата в узком окне выходит из списка к ленте. Фильтры «Все/Архив»
+         вызывают renderChat, но список при этом скрывать не должны. */
+      { const hostWin = root.closest('.aw-win'); if (hostWin) hostWin.classList.remove('aw-win--chat-list'); }
       try { mobilePane(false); } catch(e){}
       chatReplyTo = null; chatEditMsg = null;
       const main = root.querySelector('.chat-main');
@@ -3102,12 +3105,6 @@ const cm = root.querySelector('.chat-main');
       const prevFocusWasInput = !!(prevFocus && (prevFocus.id==='chat-t' || prevFocus.tagName==='TEXTAREA'));
       const prevSel = prevFocusWasInput && prevFocus.setSelectionRange
         ? [prevFocus.selectionStart, prevFocus.selectionEnd] : null;
-      {
-        const hostWin = root.closest('.aw-win');
-        if (hostWin){
-          hostWin.classList.remove('aw-win--chat-list');
-        }
-      }
       root.querySelector('.chat-main').innerHTML = `
         <div class="chat-head">
           <button class="iconbtn" id="chat-back" style="display:none">${icon('chev-l')}</button>
