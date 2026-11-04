@@ -99,7 +99,9 @@
   .shell--collapsed .side__collapse{display:none}
   .shell--collapsed .side__brand{flex-direction:column;gap:0;justify-content:center;padding:6px 0 0;height:auto}
   /* Свёрнутое меню: вместо логотипа — три полосы */
-  .shell--collapsed .side__brand-logo{display:none}
+  /* Скрываем лого только у самой панели: в контенте (например, «О приложении»)
+     тот же класс должен оставаться видимым при свёрнутом меню. */
+  .shell--collapsed .side .side__brand-logo{display:none}
   .side__burger{flex:none;width:34px;height:34px;border-radius:9px;color:var(--muted)}
   .side__burger:hover{color:var(--text);background:var(--panel-2)}
   .shell--collapsed .side__burger{width:32px;height:32px}
