@@ -2210,6 +2210,12 @@ snapToCorner(S.draftPrefs.zenAvatarPos || 'bc', false);
     if (!pill) return;
     const face = pill.querySelector('.react-face');
     if (!face) return;
+    /* Частые клики: убираем «призраков» и незавершённые анимации прошлого
+       патча — иначе они копятся (до десятков) и лицо реакции раздувается. */
+    face.querySelectorAll('.react-av--ghost, .react-face__ghost').forEach(g=>g.remove());
+    face.style.width = '';
+    try { face.getAnimations().forEach(a=>a.cancel()); } catch(e){}
+    const seq = (face.__patchSeq = (face.__patchSeq || 0) + 1);
     const toNum = ids.length > 3;
     const wasNum = face.classList.contains('react-face--num');
     if (toNum && wasNum){
@@ -2248,7 +2254,7 @@ snapToCorner(S.draftPrefs.zenAvatarPos || 'bc', false);
             { duration: 200, easing: 'cubic-bezier(.2,.7,.2,1)' });
           anim.onfinish = ()=>{ face.style.width = ''; };
         } catch(e){}
-        setTimeout(()=>{ face.style.width = ''; face.querySelectorAll('.react-av--ghost').forEach(g=>g.remove()); }, 380);
+        setTimeout(()=>{ if (face.__patchSeq !== seq) return; face.style.width = ''; face.querySelectorAll('.react-av--ghost').forEach(g=>g.remove()); }, 380);
       }
       return;
     }
@@ -2276,7 +2282,7 @@ snapToCorner(S.draftPrefs.zenAvatarPos || 'bc', false);
     ghost.innerHTML = oldHtml;
     face.appendChild(ghost);
     /* Ширину ведём WAAPI: transitionend ловит и дочерние переходы и гасит анимацию */
-    const done = ()=>{ face.style.width = ''; ghost.remove(); };
+    const done = ()=>{ if (face.__patchSeq !== seq) return; face.style.width = ''; ghost.remove(); };
     try {
       const anim = face.animate([{ width: oldW + 'px' }, { width: newW + 'px' }],
         { duration: 220, easing: 'cubic-bezier(.2,.7,.2,1)' });
@@ -7042,6 +7048,8 @@ function initPWA(){
     const p = S.product || {};
     if (!p.version) return;
     S.changelog = S.changelog || [];
+    /* Демо-записи старых бета-версий приводим к версии прототипа */
+    S.changelog.forEach(v => { if (v.demo && /^0\.9\./.test(v.version)) v.version = '0.1-prototype'; });
     /* Системная запись «Прототип» (v0) — всегда на месте, независимо от демо/удалений */
     if (!S.changelog.some(v => v.id === 'v0')){
       S.changelog.push({ id:'v0', version:'0.1-prototype', title:'Прототип Audiowizard Workspace',

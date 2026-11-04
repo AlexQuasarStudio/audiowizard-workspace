@@ -234,10 +234,10 @@ function seedState(){
 
   const changelog = [
     { id:'v0', version:'0.1-prototype', title:'Прототип Audiowizard Workspace', content:'Первая версия приложения', created_at:Date.now()-3600000, is_published:true },
-    { id:'v4', version:'0.9.4-beta', title:'PWA-оболочка и финальная полировка', content:'Тосты, плавные модалки, глобальный поиск, офлайн-очередь, обновления через service worker.', created_at:days(1), is_published:true, demo:true },
-    { id:'v1', version:'0.9.2-beta', title:'Онбординг, темы и калькулятор', content:'Обучающий тур для новых ролей, пять тем оформления (включая системную), калькулятор услуг встроен в форму заказа, автосохранение черновиков и очередь офлайн-операций.', created_at:days(2), is_published:true, demo:true },
-    { id:'v2', version:'0.9.1-beta', title:'Чаты: реакции и опросы', content:'Реакции на сообщения, опросы с голосованием, массовые сообщения клиентам от менеджеров. Исправлена мелкая ошибка в таблице заказов.', created_at:days(6), is_published:true, demo:true },
-    { id:'v3', version:'0.9.0-beta', title:'Первый бета-релиз', content:'Дашборды, заказы со статусами, клиенты и исполнители, импорт/экспорт, тикеты и идеи. Добро пожаловать в Audiowizard Workspace!', created_at:days(20), is_published:true, demo:true }
+    { id:'v4', version:'0.1-prototype', title:'PWA-оболочка и финальная полировка', content:'Тосты, плавные модалки, глобальный поиск, офлайн-очередь, обновления через service worker.', created_at:days(1), is_published:true, demo:true },
+    { id:'v1', version:'0.1-prototype', title:'Онбординг, темы и калькулятор', content:'Обучающий тур для новых ролей, пять тем оформления (включая системную), калькулятор услуг встроен в форму заказа, автосохранение черновиков и очередь офлайн-операций.', created_at:days(2), is_published:true, demo:true },
+    { id:'v2', version:'0.1-prototype', title:'Чаты: реакции и опросы', content:'Реакции на сообщения, опросы с голосованием, массовые сообщения клиентам от менеджеров. Исправлена мелкая ошибка в таблице заказов.', created_at:days(6), is_published:true, demo:true },
+    { id:'v3', version:'0.1-prototype', title:'Первый бета-релиз', content:'Дашборды, заказы со статусами, клиенты и исполнители, импорт/экспорт, тикеты и идеи. Добро пожаловать в Audiowizard Workspace!', created_at:days(20), is_published:true, demo:true }
   ];
 
   const importRules = [
