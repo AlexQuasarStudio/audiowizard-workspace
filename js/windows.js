@@ -36,6 +36,7 @@ const Windows = (() => {
         minimized: !!r.minimized,
         corner: r.win.__cornerPos || null,
         cornerPrev: r.win.__cornerPrev || null,
+        cornerMin: r.win.classList.contains('aw-win--corner-min'),
         max: r.win._prevRect ? { left: r.win._prevRect.left, top: r.win._prevRect.top, width: r.win._prevRect.width, height: r.win._prevRect.height } : null };
     }).filter(Boolean);
     try { localStorage.setItem(WS_KEY, JSON.stringify(arr.slice(-12))); } catch(e){}
@@ -58,6 +59,11 @@ const Windows = (() => {
           if (s.height) win.style.height = s.height;
           if (s.right) win.style.right = s.right;
           if (s.corner){ win.__cornerPos = s.corner; win.classList.add('aw-win--corner'); }
+          if (s.cornerMin){
+            win.classList.add('aw-win--corner-min');
+            const mb2 = win.querySelector('.aw-win__min');
+            if (mb2) mb2.title = 'Развернуть';
+          }
           if (s.cornerPrev) win.__cornerPrev = s.cornerPrev;
           if (s.max){
             win._prevRect = { left: s.max.left, top: s.max.top, width: s.max.width, height: s.max.height };
@@ -648,7 +654,10 @@ const Windows = (() => {
 
     /* --- Кнопки: min / max / close --- */
     const minBtn = win.querySelector('.aw-win__min');
-    if (minBtn) minBtn.onclick = () => minimizeWin(win, win._route || route);
+    if (minBtn) minBtn.onclick = () => {
+      if (win.classList.contains('aw-win--corner')){ toggleCornerCollapse(win); return; }
+      minimizeWin(win, win._route || route);
+    };
     const maxBtn = win.querySelector('.aw-win__max');
     if (maxBtn) maxBtn.onclick = () => toggleMax(win, maxBtn);
 
@@ -809,6 +818,11 @@ const Windows = (() => {
       if (win.classList.contains('aw-win--corner')){
         /* Вытащили из уголка — окно становится обычным, размер сохраняем. */
         win.classList.remove('aw-win--corner');
+        if (win.classList.contains('aw-win--corner-min')){
+          win.classList.remove('aw-win--corner-min');
+          win.style.height = (win.__cornerHeight || 520) + 'px';
+          win.__cornerHeight = null;
+        }
         win.__cornerPrev = null;
         win.__cornerPos = null;
       }
@@ -925,6 +939,8 @@ const Windows = (() => {
     win.style.right = ''; win.style.bottom = '';
     win.style.minWidth = '0'; win.style.minHeight = '0';
     win.__cornerPos = p;
+    win.classList.remove('aw-win--corner-min');
+    win.__cornerHeight = null;
     win.classList.add('aw-win--corner', 'aw-win--animating');
     setTimeout(() => win.classList.remove('aw-win--animating'), 320);
     focusWin(win);
@@ -932,9 +948,31 @@ const Windows = (() => {
     try { win._chatNarrow && win._chatNarrow(); } catch(e){}
     try { persistWins(); } catch(e){}
   }
+  function toggleCornerCollapse(win){
+    if (!win || !win.classList.contains('aw-win--corner')) return;
+    const head = win.querySelector('.aw-win__head');
+    const hh = head ? Math.round(head.offsetHeight) : 53;
+    win.classList.add('aw-win--animating');
+    const minBtn = win.querySelector('.aw-win__min');
+    if (win.classList.contains('aw-win--corner-min')){
+      win.classList.remove('aw-win--corner-min');
+      win.style.height = (win.__cornerHeight || cornerRectFor(win.__cornerPos || 'br').height) + 'px';
+      win.__cornerHeight = null;
+      if (minBtn) minBtn.title = 'Свернуть';
+    } else {
+      win.__cornerHeight = win.offsetHeight;
+      win.classList.add('aw-win--corner-min');
+      win.style.height = hh + 'px';
+      win.style.minHeight = '0';
+      if (minBtn) minBtn.title = 'Развернуть';
+    }
+    setTimeout(() => win.classList.remove('aw-win--animating'), 340);
+    try { persistWins(); } catch(e){}
+  }
   function exitCorner(win){
     if (!win || !win.classList.contains('aw-win--corner')) return;
-    win.classList.remove('aw-win--corner');
+    win.classList.remove('aw-win--corner', 'aw-win--corner-min');
+    win.__cornerHeight = null;
     const p = win.__cornerPrev;
     if (p){
       win.style.left = p.left || '';

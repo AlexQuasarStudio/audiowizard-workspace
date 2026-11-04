@@ -1240,6 +1240,10 @@ body.menu-dragging .main .theme-card:hover{box-shadow:none!important;transform:n
 /* Уголок окна чата: компактная панель у угла экрана */
 .aw-win--corner{border-radius:16px;box-shadow:var(--sh-2)}
 .aw-win--corner .aw-win__max{display:none}
+/* Свёрнутый уголок: окно сжимается до своей шапки, тело плавно прячется
+   за границей (overflow:hidden), разворот — обратной анимацией высоты. */
+.aw-win--corner-min{min-height:0!important}
+.aw-win--corner-min .aw-win__body{overflow:hidden}
 body.win-dragging *{user-select:none!important}
 
 /* Закрытие окон: плавное затухание */
