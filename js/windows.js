@@ -827,9 +827,15 @@ const Windows = (() => {
           win.style.height = ch + 'px';
           win.__cornerHeight = null;
           win.__cornerTop = null;
+          /* Точка отсчёта драга — конечная РАСКРЫТАЯ позиция. Иначе первое
+             движение после разворота тянуло шапку к курсору (старый top). */
+          win.__expandTarget = { left: parseFloat(win.style.left) || r.left, top: win.style.top ? parseFloat(win.style.top) : r.top };
           win.__expandUntil = Date.now() + 260;
-          setTimeout(() => { win.classList.remove('aw-win--animating'); win.__expandUntil = 0; }, 260);
+          setTimeout(() => { win.classList.remove('aw-win--animating'); win.__expandUntil = 0; win.__expandTarget = null; }, 260);
           r = win.getBoundingClientRect();
+        }
+        if (win.__expandTarget){
+          r = Object.assign({}, r, { left: win.__expandTarget.left, top: win.__expandTarget.top });
         }
         win.__cornerPrev = null;
         win.__cornerPos = null;
@@ -1018,11 +1024,11 @@ const Windows = (() => {
     const win = active.win;
     if (active.kind === 'drag'){
       if (win.__expandUntil){
-        /* Идёт плавный разворот из уголка — выравниваем отсчёт под текущий
-           rect, чтобы после раскрытия окно не прыгнуло. */
-        const rr = win.getBoundingClientRect();
+        /* Идёт плавный разворот из уголка: игнорируем движение, но отсчёт
+           держим на конечной раскрытой позиции — без прыжка к курсору. */
+        const t = win.__expandTarget;
         active.sx = e.clientX; active.sy = e.clientY;
-        active.ox = rr.left; active.oy = rr.top;
+        if (t){ active.ox = t.left; active.oy = t.top; }
         win.__lastSnap = null;
         return;
       }
