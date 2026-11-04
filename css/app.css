@@ -1515,8 +1515,10 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
 
 /* Смена вида таблица/карточки: мягкое появление */
 .view-anim{animation:viewIn .22s var(--ease)}
-/* Фильтр-плашки: старый список коротко гаснет перед перерисовкой */
-.list-fading{opacity:.15;transform:translateY(3px);transition:opacity .11s var(--ease),transform .11s var(--ease);pointer-events:none}
+/* Фильтр-плашки: список перерисовывается сразу и мягко «оседает» —
+   так клик отзывается без паузы и без мигания в пустоту. */
+.list-swap{animation:listSwap .18s var(--ease)}
+@keyframes listSwap{from{transform:translateY(4px)}to{transform:none}}
 @keyframes viewIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 /* Дудл-фон на авторизации: мягкий узор-«подсветка» акцентного тона.

@@ -1658,21 +1658,26 @@ const CRM = (() => {
     host.classList.add('view-anim');
   }
 
-  /* Плавная смена содержимого при переключении фильтров-плашек: старый список
-     коротко гаснет, после перерисовки новый проявляется (fade+slide). */
-  let listFadeTimer = 0;
+  /* Контейнер списка, который по смыслу переживает перерисовку:
+     у заказов — обёртка таблицы/карточек, у людей — сетка карточек или таблица. */
+  function listHost(root){
+    return root.querySelector('.o-wrap') || root.querySelector('.person-grid') ||
+           root.querySelector('.pl-wrap') || root.querySelector('.tbl-wrap') || root.querySelector('#o-rows');
+  }
+
+  /* Смена содержимого по плашкам-фильтрам («Выполнено», «В работе»,
+     «Активные», «Чёрный список»): список перерисовывается сразу (клик
+     отзывается мгновенно) и мягко «оседает» на место — сдвиг на пару
+     пикселей вместо паузы и мигания в пустоту. */
   function animateFilterChange(root, renderFn){
     const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const host = root.querySelector('#o-rows') || root.querySelector('.person-grid, .tbl-wrap');
-    if (!host || reduce){ renderFn(); return; }
-    if (listFadeTimer) clearTimeout(listFadeTimer);
-    host.classList.add('list-fading');
-    listFadeTimer = setTimeout(()=>{
-      listFadeTimer = 0;
-      renderFn();
-      const h = root.querySelector('#o-rows') || root.querySelector('.person-grid, .tbl-wrap');
-      if (h){ h.classList.remove('view-anim'); void h.offsetWidth; h.classList.add('view-anim'); }
-    }, 110);
+    renderFn();
+    if (reduce) return;
+    const h = listHost(root);
+    if (!h) return;
+    h.classList.remove('list-swap');
+    void h.offsetWidth;
+    h.classList.add('list-swap');
   }
 
   function peopleView(root, role){
