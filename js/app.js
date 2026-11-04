@@ -162,8 +162,10 @@ const APP = (() => {
           </div>
         </aside>
         <header class="head">
-          <button class="iconbtn head__burger" id="mobile-menu" aria-label="Меню" title="Меню">${icon('menu')}</button>
-          <button class="iconbtn head__msearch" id="m-search" aria-label="Поиск" title="Поиск">${icon('search')}</button>
+          <div class="head__mtools" id="mobile-tools">
+            <button class="iconbtn head__burger" id="mobile-menu" aria-label="Меню" title="Меню">${icon('menu')}</button>
+            <button class="iconbtn head__msearch" id="m-search" aria-label="Поиск" title="Поиск">${icon('search')}</button>
+          </div>
           <div class="head__search" data-tour="search" id="open-search">
             <div class="fake-input">${icon('search')}<input id="head-search-input" placeholder="Глобальный поиск…" autocomplete="off" spellcheck="false"><span class="kbd" id="head-search-hint">${fmtKeys(S.keys && S.keys.search)}</span></div>
           </div>

@@ -24,6 +24,10 @@
 .head__burger{display:none}
 /* Иконка поиска появляется на телефоне вместо поля в шапке */
 .head__msearch{display:none}
+/* Группа мобильных кнопок (меню + поиск): на десктопе её нет совсем,
+   на телефоне это такая же стеклянная плашка, как блоки справа —
+   иначе иконки висели на дудл-фоне без подложки. */
+.head__mtools{display:none}
 .m-search-back{display:none}
 @keyframes mSearchIn{from{opacity:0;transform:translateY(-8px) scale(.985)}to{opacity:1;transform:none}}
 @keyframes mSearchFade{from{opacity:0}to{opacity:1}}
@@ -1030,6 +1034,14 @@ body:not(.zen) .side{position:fixed;top:7px;left:12px;bottom:7px;height:auto;tra
      распахивается во всю ширину поверх страницы, фон под ним размывается. */
   .head__search{display:none}
   .head__msearch{display:inline-flex;flex:none}
+  /* Меню и поиск — в общей стеклянной плашке, как блоки справа */
+  .head__mtools{display:inline-flex;align-items:center;gap:1px;height:40px;padding:0 4px;border-radius:14px;
+    background:color-mix(in srgb,var(--panel) 74%,transparent);
+    -webkit-backdrop-filter:blur(16px) saturate(1.15);backdrop-filter:blur(16px) saturate(1.15);
+    border:1px solid color-mix(in srgb,var(--border-2) 78%,transparent);box-shadow:var(--sh-1);
+    box-sizing:border-box;flex:none;transition:background-color var(--dur),border-color var(--dur)}
+  .head__mtools:hover{background:color-mix(in srgb,var(--panel) 86%,transparent)}
+  .head__mtools .iconbtn{width:32px;height:32px;border-radius:10px}
   body.m-search-open .head{z-index:5200}
   body.m-search-open .head > *:not(#open-search):not(#m-search-back){visibility:hidden}
   body.m-search-open .head__search{display:block;position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 10px);width:auto;max-width:none;min-width:0;z-index:5200;animation:mSearchIn .2s var(--ease)}
