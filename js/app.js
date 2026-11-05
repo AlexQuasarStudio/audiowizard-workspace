@@ -238,7 +238,9 @@ const APP = (() => {
         /* Рисуем от ТЕКУЩЕГО значения __pOff, а не от цели __pTarget: иначе при
            сбросе (наведение/хоткей) плашки проявлялись МГНОВЕННО до конца —
            цель уже 0, а интерполяция __pOff ещё плавно шла к ней. */
-        const p = Math.min(1, Math.max(0, window.__pOff));
+        /* Пока открыт мобильный поиск, плашки не растворяются: поле поиска
+           должно оставаться видимым на любом скролле. */
+        const p = document.body.classList.contains('m-search-open') ? 0 : Math.min(1, Math.max(0, window.__pOff));
         list.forEach(el => {
           /* Растворение, а не уезд: плашки гаснут (opacity) с мягким
              размытием по мере скролла и так же проявляются обратно. */
@@ -285,6 +287,7 @@ const APP = (() => {
       const PILL_STEP = 1 / FADE; /* растворение на 1px скролла */
       window.__pillsHandler = () => {
         const y = window.scrollY;
+        if (document.body.classList.contains('m-search-open')){ window.__pillsAcc = 0; paint(0); return; }
         const prev = (window.__pillPrevY == null) ? y : window.__pillPrevY;
         window.__pillPrevY = y;
         /* Настоящий скролл всегда «размораживает» плашки: если пользователь
@@ -455,8 +458,8 @@ const APP = (() => {
     document.querySelectorAll('.foot a[data-doc]').forEach(a=>{
       a.onclick = ()=>{ window.__openDocTitle = a.dataset.doc; };
     });
-    $('#brand-click').onclick = ()=>showAboutModal();
-    $('#brand-click').onkeydown = e=>{ if (e.key==='Enter') showAboutModal(); };
+    $('#brand-click').onclick = ()=>openAboutWin();
+    $('#brand-click').onkeydown = e=>{ if (e.key==='Enter') openAboutWin(); };
     const sc2 = $('#side-collapse');
     sc2 && (sc2.onclick = e=>{ e.stopPropagation(); document.body.classList.toggle('side-collapsed'); document.querySelector('.shell').classList.toggle('shell--collapsed', document.body.classList.contains('side-collapsed')); prefsFor().sideCollapsed = document.body.classList.contains('side-collapsed'); saveState(); });
     { const sw = $('#open-search'), si = $('#head-search-input');
@@ -475,11 +478,18 @@ const APP = (() => {
         if (mback) mback.hidden = true;
         if (sw) sw.classList.remove('is-open');
         if (si) si.blur();
+        window.__pillsFrozen = false;
         if (typeof closeHeaderSearch === 'function') closeHeaderSearch();
       };
       window.__closeMobileSearch = closeM;
       if (mb && sw && si) mb.onclick = ()=>{
         if (typeof closeSideDrawer === 'function') closeSideDrawer();
+        /* Пока открыт поиск, поле должно быть видно ВСЕГДА: гасим эффект
+           «плашки растворились при скролле» и замораживаем его до закрытия. */
+        if (window.__pillsReset) window.__pillsReset();
+        window.__pillsFrozen = true;
+        document.body.classList.remove('pills-hide', 'm-head-fit');
+        if (sw){ sw.style.opacity = ''; sw.style.filter = ''; sw.style.pointerEvents = ''; delete sw.dataset.pillHidden; }
         document.body.classList.add('m-search-open');
         if (mback) mback.hidden = false;
         sw.classList.add('is-open');
@@ -489,6 +499,35 @@ const APP = (() => {
         requestAnimationFrame(()=>{ if (document.body.classList.contains('m-search-open') && document.activeElement !== si) si.focus({ preventScroll:true }); });
       };
       if (mback) mback.onmousedown = e=>{ e.preventDefault(); closeM(); };
+      /* При прокрутке вниз иконка поиска «заезжает» в кнопку меню: группа
+         сжимается до одной кнопки. Возвращается, как только тянут вверх или
+         страница вернулась к началу. Пока открыт поиск — не трогаем: поле
+         должно быть на месте. */
+      if (!window.__mHeadScroll){
+        window.__mHeadScroll = true;
+        let lastY = window.scrollY || 0, queued = false;
+        const syncHead = ()=>{
+          const y = window.scrollY || 0;
+          const mobile = !window.matchMedia || window.matchMedia('(max-width:960px)').matches;
+          const open = document.body.classList.contains('m-search-open');
+          const fit = mobile && !open && (y > 32 ? y > lastY + 1 : false);
+          const back = mobile && !open && (y <= 32 || y < lastY - 1);
+          if (fit) document.body.classList.add('m-head-fit');
+          else if (back) document.body.classList.remove('m-head-fit');
+          if (!mobile || open) document.body.classList.remove('m-head-fit');
+          lastY = y;
+        };
+        window.addEventListener('scroll', ()=>{
+          if (queued) return;
+          queued = true;
+          requestAnimationFrame(()=>{ queued = false; syncHead(); });
+        }, { passive:true });
+        window.addEventListener('resize', syncHead);
+        /* Открыли поиск — сразу возвращаем иконке место */
+        const origClose = window.__closeMobileSearch;
+        window.__closeMobileSearch = ()=>{ origClose && origClose(); syncHead(); };
+        document.addEventListener('click', e=>{ if (e.target.closest('#m-search')) document.body.classList.remove('m-head-fit'); }, true);
+      }
       if (!window.__mSearchBound){
         window.__mSearchBound = true;
         /* capture: обработчик поля в ui.js останавливает всплытие Escape */
@@ -768,33 +807,60 @@ const QUICK_BY_ROLE = {
     </div>`;
   }
 
-  function showAboutModal(){
-    const p = S.product || {};
-    const beta = p.beta !== false;
-    const uNow = me();
-    const staff = !!(uNow && typeof isStaff === 'function' && isStaff(uNow.role));
-    openModal({
-      title:'О программе',
-      body:`<div class="stack" style="gap:14px">
-        <div class="row" style="gap:16px">
-          <span class="side__brand-logo logo-mark--lg">${icon('logo-full')}</span>
-          <div>
-            <b style="font-size:17px">Audiowizard Workspace</b>
-            <div class="small muted">Версия ${esc(p.version || '0.1-prototype')} · сборка ${p.build || 216} ${beta?'· <span class="beta-badge">Beta</span>':''}</div>
-          </div>
-        </div>
-        <div class="card card-pad" style="background:var(--bg-2)">
-          <b class="small" style="display:block;text-align:center;letter-spacing:.05em;text-transform:uppercase;font-size:10.5px;color:var(--muted)">Что нового</b>
-          <ul class="whats-new stack small" style="gap:7px;margin-top:10px;color:var(--text-2)">
-            ${(p.notes||[]).map(n=>`<li class="wn-item"><span class="dot" style="background:var(--accent);margin-top:7px;flex:none"></span><span>${esc(n)}</span></li>`).join('')}
-          </ul>
-        </div>
-        ${staff ? serverStateHtml() : ''}
-        <p class="small faint">Внутренняя CRM и клиентский портал сервиса обработки контента. PWA-приложение: работает офлайн, устанавливается на устройства.</p>
-      </div>`,
-      footer:`<button class="btn btn--primary" data-x>Закрыть</button>`,
-      onMount:(m2,c2)=>{ m2.querySelector('[data-x]').onclick=c2; }
+  function aboutWindowHTML(){
+      return `<div class="card card-pad row" style="gap:16px">
+        <span class="side__brand-logo logo-mark--lg">${icon('logo-full')}</span>
+        <div><b style="font-size:16px">Audiowizard Workspace</b><div class="small muted">Версия ${esc((S.product||{}).version || '0.1-prototype')} · сборка ${(S.product||{}).build || 216} ${((S.product||{}).beta !== false)?'<span class="beta-badge">Beta</span>':''}</div></div>
+        <span class="spacer"></span><button class="btn btn--soft btn--sm" id="ab-tour">${icon('bulb')} Пройти тур</button><button class="btn btn--soft btn--sm" id="ab-check">${icon('refresh')} Проверить обновления</button></div>
+      <div class="card card-pad"><h3 style="margin-bottom:12px">Модели развертывания</h3>
+        <div class="cols-2 grid">
+          <div class="card card-pad" style="background:var(--bg-2)"><div class="row">${icon('cloud')}<b>On-Demand (SaaS)</b><span class="badge c-green">активна</span></div>
+            <p class="small muted" style="margin-top:8px">Облачная модель: только браузер и интернет. AI-сервисы по подписке.</p></div>
+          <div class="card card-pad" style="background:var(--bg-2)"><div class="row">${icon('server')}<b>On-Premise</b><span class="badge c-gray">в разработке</span></div>
+            <p class="small muted" style="margin-top:8px">Локальное развертывание в контуре клиента: Docker, лицензия, защищённый репозиторий обновлений.</p></div>
+        </div></div>
+      <div class="card card-pad"><h3 style="margin-bottom:6px">История обновлений</h3>
+        ${S.changelog.filter(v => !isProd() ? true : (v.id==='v0' || v.id==='cur' || !v.demo))
+          .sort((a,b)=> (a.id==='v0' ? -1 : b.id==='v0' ? 1 : (b.created_at||0)-(a.created_at||0)))
+          .map(v=>`<div class="ver-item"><span class="ver-badge">v${esc(v.version)}</span>
+          <span><b class="small">${esc(v.title)}</b>${v.content?`<p class="small muted" style="margin-top:3px">${esc(v.content)}</p>`:''}<span class="faint" style="font-size:11px">${fmtDate(v.created_at)}</span></span></div>`).join('')}</div>
+      <div class="card card-pad" style="border-color:color-mix(in srgb,var(--accent) 30%,transparent)"><h3 style="margin-bottom:6px">Сообщить о проблеме</h3>
+        <p class="small muted" style="margin-bottom:10px">Что-то работает не так или есть идея? Напишите парой строк — мы получим сообщение.</p>
+        <div class="field"><input class="input" id="ab-issue" placeholder="Коротко: что случилось или что улучшить"></div>
+        <div class="field" style="margin-top:8px"><textarea class="input" id="ab-issue-detail" rows="2" placeholder="Подробности (необязательно)"></textarea></div>
+        <div class="row" style="gap:8px;margin-top:8px"><button class="btn btn--primary btn--sm" id="ab-issue-send">${icon('send')} Отправить</button><span class="small faint" id="ab-issue-msg"></span></div></div>`;
+    }
+
+  /* «О приложении»: то же окно открывается и из настроек, и кликом по лого. */
+  let aboutWin = null;
+  function openAboutWin(){
+    if (aboutWin && aboutWin.el && aboutWin.el.isConnected) return;
+    aboutWin = openWinModal({
+      title:'О приложении', icon:'info', wide:true, route:'settings',
+      body:`<div class="stack about-body" id="about-win">${aboutWindowHTML()}</div>`,
+      onMount:(el)=>{ bindAboutWindow(el, me() || {}); },
+      onClose:()=>{ aboutWin = null; }
     });
+  }
+
+  /* Привязка полей окна «О приложении» (тур, проверка обновлений, обращение).
+     Вынесена из settingsView: окно открывается и кнопкой в меню, и по лого. */
+  function bindAboutWindow(el, u2){
+    if (!el) return;
+    const uu = u2 || me() || {};
+    const t = $('#ab-tour', el), c = $('#ab-check', el), snd = $('#ab-issue-send', el);
+    if (t) t.onclick = ()=>{ uu.tour_completed=false; saveState(); startTour(0); };
+    if (c) c.onclick = ()=>checkUpdates(true);
+    if (snd) snd.onclick = ()=>{
+      const subj = ($('#ab-issue', el).value || '').trim();
+      if (!subj){ toast('Опишите проблему в одном предложении','warn'); return; }
+      const detail = ($('#ab-issue-detail', el).value || '').trim();
+      S.tickets.unshift({ id:uid(), user_id:uu.id, subject:subj, message:detail||subj, order_id:null, status:'new', created_at:Date.now(), resolved_at:null });
+      logAudit('Обращение из «О приложении»: '+subj, 'Тикет');
+      saveState(); $('#ab-issue', el).value = ''; $('#ab-issue-detail', el).value = '';
+      $('#ab-issue-msg', el).textContent = 'Отправлено, спасибо!';
+      toast('Сообщение отправлено — мы получили его','ok');
+    };
   }
 
   /* ---------- Уведомления ---------- */
@@ -5706,7 +5772,7 @@ const cm = root.querySelector('.chat-main');
       if (section==='security') el.innerHTML = securityHTML(u);
       if (section==='keys') el.innerHTML = keysHTML();
       if (section==='docs') el.innerHTML = docsHTML();
-      if (section==='about') el.innerHTML = aboutHTML();
+      if (section==='about') el.innerHTML = aboutWindowHTML();
       if (section==='calc') el.innerHTML = calcHTML();
       if (section==='data') el.innerHTML = dataHTML();
       if (section==='product') el.innerHTML = productHTML();
@@ -5730,17 +5796,6 @@ const cm = root.querySelector('.chat-main');
       section=b.dataset.sec; settingsSection=section; $$('[data-sec]',root).forEach(x=>x.classList.toggle('on', x===b)); renderSec();
     });
     renderSec();
-
-    let aboutWin = null;
-    function openAboutWin(){
-      if (aboutWin && aboutWin.el && aboutWin.el.isConnected) return;
-      aboutWin = openWinModal({
-        title:'О приложении', icon:'info', wide:true, route:'settings',
-        body:`<div class="stack about-body" id="about-win">${aboutHTML()}</div>`,
-        onMount:(el)=>{ bindSection('about', el); },
-        onClose:()=>{ aboutWin = null; }
-      });
-    }
 
     function profileHTML(u2){
       return `<div class="card card-pad"><h3 style="margin-bottom:14px">Профиль</h3>
@@ -5968,29 +6023,6 @@ const cm = root.querySelector('.chat-main');
         <p class="small faint" style="margin-top:12px">Кликните по комбинации и нажмите новую. Запись идёт в вашем браузере.</p>
         <p class="small faint" style="margin-top:6px">Ctrl и Cmd на macOS считаются одним модификатором.</p>
         <button class="btn btn--ghost btn--sm" data-kreset-all style="margin-top:10px">${icon('refresh')} Вернуть все по умолчанию</button></div>`;
-    }
-    function aboutHTML(){
-      return `<div class="card card-pad row" style="gap:16px">
-        <span class="side__brand-logo logo-mark--lg">${icon('logo-full')}</span>
-        <div><b style="font-size:16px">Audiowizard Workspace</b><div class="small muted">Версия ${esc((S.product||{}).version || '0.1-prototype')} · сборка ${(S.product||{}).build || 216} ${((S.product||{}).beta !== false)?'<span class="beta-badge">Beta</span>':''}</div></div>
-        <span class="spacer"></span><button class="btn btn--soft btn--sm" id="ab-tour">${icon('bulb')} Пройти тур</button><button class="btn btn--soft btn--sm" id="ab-check">${icon('refresh')} Проверить обновления</button></div>
-      <div class="card card-pad"><h3 style="margin-bottom:12px">Модели развертывания</h3>
-        <div class="cols-2 grid">
-          <div class="card card-pad" style="background:var(--bg-2)"><div class="row">${icon('cloud')}<b>On-Demand (SaaS)</b><span class="badge c-green">активна</span></div>
-            <p class="small muted" style="margin-top:8px">Облачная модель: только браузер и интернет. AI-сервисы по подписке.</p></div>
-          <div class="card card-pad" style="background:var(--bg-2)"><div class="row">${icon('server')}<b>On-Premise</b><span class="badge c-gray">в разработке</span></div>
-            <p class="small muted" style="margin-top:8px">Локальное развертывание в контуре клиента: Docker, лицензия, защищённый репозиторий обновлений.</p></div>
-        </div></div>
-      <div class="card card-pad"><h3 style="margin-bottom:6px">История обновлений</h3>
-        ${S.changelog.filter(v => !isProd() ? true : (v.id==='v0' || v.id==='cur' || !v.demo))
-          .sort((a,b)=> (a.id==='v0' ? -1 : b.id==='v0' ? 1 : (b.created_at||0)-(a.created_at||0)))
-          .map(v=>`<div class="ver-item"><span class="ver-badge">v${esc(v.version)}</span>
-          <span><b class="small">${esc(v.title)}</b>${v.content?`<p class="small muted" style="margin-top:3px">${esc(v.content)}</p>`:''}<span class="faint" style="font-size:11px">${fmtDate(v.created_at)}</span></span></div>`).join('')}</div>
-      <div class="card card-pad" style="border-color:color-mix(in srgb,var(--accent) 30%,transparent)"><h3 style="margin-bottom:6px">Сообщить о проблеме</h3>
-        <p class="small muted" style="margin-bottom:10px">Что-то работает не так или есть идея? Напишите парой строк — мы получим сообщение.</p>
-        <div class="field"><input class="input" id="ab-issue" placeholder="Коротко: что случилось или что улучшить"></div>
-        <div class="field" style="margin-top:8px"><textarea class="input" id="ab-issue-detail" rows="2" placeholder="Подробности (необязательно)"></textarea></div>
-        <div class="row" style="gap:8px;margin-top:8px"><button class="btn btn--primary btn--sm" id="ab-issue-send">${icon('send')} Отправить</button><span class="small faint" id="ab-issue-msg"></span></div></div>`;
     }
     /* ---------- Согласование правок документов ----------
        Правки не-админов не применяются сразу: создаётся заявка, админ видит
@@ -6588,20 +6620,7 @@ const cm = root.querySelector('.chat-main');
         };
         $('#sec-2fa', el).onclick = ()=>wipModal('Двухфакторная аутентификация');
       }
-      if (sec==='about'){
-        $('#ab-check', el).onclick = ()=>checkUpdates(true);
-        $('#ab-tour', el).onclick = ()=>{ u.tour_completed=false; saveState(); startTour(0); };
-        $('#ab-issue-send', el).onclick = ()=>{
-          const subj = $('#ab-issue', el).value.trim();
-          if (!subj){ toast('Опишите проблему в одном предложении','warn'); return; }
-          const detail = $('#ab-issue-detail', el).value.trim();
-          S.tickets.unshift({ id:uid(), user_id:u.id, subject:subj, message:detail||subj, order_id:null, status:'new', created_at:Date.now(), resolved_at:null });
-          logAudit('Обращение из «О приложении»: '+subj, 'Тикет');
-          saveState(); $('#ab-issue', el).value = ''; $('#ab-issue-detail', el).value = '';
-          $('#ab-issue-msg', el).textContent = 'Отправлено, спасибо!';
-          toast('Сообщение отправлено — мы получили его','ok');
-        };
-      }
+      if (sec==='about') bindAboutWindow(el, u);
       if (sec==='docs'){
         /* Аккордеон документов: клик по шапке переключает класс .open.
            Обратная анимация (сворачивание) идёт через CSS transition по

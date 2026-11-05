@@ -1022,8 +1022,10 @@ body:not(.zen) .side{position:fixed;top:7px;left:12px;bottom:7px;height:auto;tra
      контент занимает всю ширину экрана (раньше оставалась колонка 264px,
      из-за чего страница была шире экрана). */
   body:not(.zen) .shell{grid-template-columns:1fr}
-  body:not(.zen) .head{grid-column:1;padding-left:12px}
-  body:not(.zen) .main{grid-column:1}
+  body:not(.zen) .head{grid-column:1;padding-left:12px;padding-right:12px}
+  /* Контент по центру экрана: слева было 26px против 12px справа — блоки
+     выглядели сдвинутыми вправо. Теперь поля одинаковые. */
+  body:not(.zen) .main{grid-column:1;padding-left:12px;padding-right:12px}
   /* Футер тоже в первую колонку: иначе он создавал неявную вторую колонку
      шириной 352px и страница снова становилась шире экрана. */
   body:not(.zen) .foot{grid-column:1;padding-left:12px}
@@ -1042,6 +1044,16 @@ body:not(.zen) .side{position:fixed;top:7px;left:12px;bottom:7px;height:auto;tra
     box-sizing:border-box;flex:none;transition:background-color var(--dur),border-color var(--dur)}
   .head__mtools:hover{background:color-mix(in srgb,var(--panel) 86%,transparent)}
   .head__mtools .iconbtn{width:32px;height:32px;border-radius:10px}
+  /* Иконка поиска при прокрутке вниз уезжает в кнопку меню: группа
+     сжимается до одной кнопки. */
+  .head__mtools{overflow:hidden}
+  .head__mtools .head__msearch{overflow:hidden;transition:width .26s var(--ease),opacity .18s var(--ease),transform .26s var(--ease)}
+  body.m-head-fit .head__mtools .head__msearch{width:0;opacity:0;transform:translateX(-6px) scale(.82);pointer-events:none}
+  /* Правые плашки — той же высоты и радиуса, что группа меню и поиска */
+  .head__ops{height:40px;padding:4px;border-radius:14px;box-sizing:border-box}
+  .head__ops .head-actions__main{width:32px;height:30px}
+  .head__ops .head-actions__arrow{height:30px}
+  .head__pill--balance{border-radius:14px}
   body.m-search-open .head{z-index:5200}
   body.m-search-open .head > *:not(#open-search):not(#m-search-back){visibility:hidden}
   body.m-search-open .head__search{display:block;position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 10px);width:auto;max-width:none;min-width:0;z-index:5200;animation:mSearchIn .2s var(--ease)}
