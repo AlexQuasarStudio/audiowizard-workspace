@@ -640,7 +640,9 @@ const CRM = (() => {
       if (!staff) return;
       const host = el.closest('[data-ctx="order"]');
       const o = S.orders.find(x => x.id === host.dataset.oid);
-      if (!o || o.demo) return;
+      /* Демо-заказы тоже правим: на них и показывают возможности приложения.
+         Правки ложатся в localStorage так же, как у обычных записей. */
+      if (!o) return;
       const f = el.dataset.inline;
       const done = msg => { saveState(); try { logAudit(msg, 'Заказы'); } catch(e){} inlineRefresh(() => render(false)); };
       if (f === 'client'){
@@ -2413,7 +2415,7 @@ updatePeopleBulk();
       if (!staff) return;
       const host = el.closest('[data-uid]');
       const p = S.users.find(x => x.id === host.dataset.uid);
-      if (!p || p.demo) return;
+      if (!p) return;
       p.ext = p.ext || {};
       const f = el.dataset.inline;
       const done = msg => { saveState(); try { logAudit(msg, 'Люди'); } catch(e){} inlineRefresh(() => render()); };
