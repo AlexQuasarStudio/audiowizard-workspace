@@ -57,12 +57,16 @@ function toast(msg, kind='info', title='', opts={}){
   const el = document.createElement('div');
   el.classList.add('toast', 'toast--' + kind);
   if (title) el.classList.add('toast--has-title');
+  if (opts && opts.action && opts.action.label) el.classList.add('toast--act');
   const action = opts && opts.action && opts.action.label ? opts.action : null;
   /* Компактный тост в одну строку (как изначально): иконка, текст, кнопка
      действия рядом с текстом, крестик закрытия справа по центру. */
+  /* Кнопка действия — отдельным блоком справа от текста (как раньше):
+     внутри тела она «прилипала» к концу сообщения и при длинном тексте
+     уезжала в середину. */
   el.innerHTML = `${icon(icons[kind]||'info')}<div class="toast__body">${
-    title?`<b class="toast__title">${esc(title)}</b>`:''}<span class="toast__msg">${msg}</span>${
-    action?`<button class="t-act">${icon('refresh','ico-sm')}${esc(action.label)}</button>`:''}</div>`
+    title?`<b class="toast__title">${esc(title)}</b>`:''}<span class="toast__msg">${msg}</span></div>${
+    action?`<button class="t-act">${icon('refresh','ico-sm')}${esc(action.label)}</button>`:''}`
     + `<button class="t-close" aria-label="Закрыть">${icon('x','ico-sm')}</button>`;
   host.appendChild(el);
   if (action){
