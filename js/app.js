@@ -458,8 +458,9 @@ const APP = (() => {
     document.querySelectorAll('.foot a[data-doc]').forEach(a=>{
       a.onclick = ()=>{ window.__openDocTitle = a.dataset.doc; };
     });
-    $('#brand-click').onclick = ()=>openAboutWin();
-    $('#brand-click').onkeydown = e=>{ if (e.key==='Enter') openAboutWin(); };
+    /* Логотип ведёт в «О приложении» — тот же раздел настроек, без окна */
+    $('#brand-click').onclick = ()=>openAboutSection();
+    $('#brand-click').onkeydown = e=>{ if (e.key==='Enter') openAboutSection(); };
     const sc2 = $('#side-collapse');
     sc2 && (sc2.onclick = e=>{ e.stopPropagation(); document.body.classList.toggle('side-collapsed'); document.querySelector('.shell').classList.toggle('shell--collapsed', document.body.classList.contains('side-collapsed')); prefsFor().sideCollapsed = document.body.classList.contains('side-collapsed'); saveState(); });
     { const sw = $('#open-search'), si = $('#head-search-input');
@@ -830,18 +831,6 @@ const QUICK_BY_ROLE = {
         <div class="field" style="margin-top:8px"><textarea class="input" id="ab-issue-detail" rows="2" placeholder="Подробности (необязательно)"></textarea></div>
         <div class="row" style="gap:8px;margin-top:8px"><button class="btn btn--primary btn--sm" id="ab-issue-send">${icon('send')} Отправить</button><span class="small faint" id="ab-issue-msg"></span></div></div>`;
     }
-
-  /* «О приложении»: то же окно открывается и из настроек, и кликом по лого. */
-  let aboutWin = null;
-  function openAboutWin(){
-    if (aboutWin && aboutWin.el && aboutWin.el.isConnected) return;
-    aboutWin = openWinModal({
-      title:'О приложении', icon:'info', wide:true, route:'settings',
-      body:`<div class="stack about-body" id="about-win">${aboutWindowHTML()}</div>`,
-      onMount:(el)=>{ bindAboutWindow(el, me() || {}); },
-      onClose:()=>{ aboutWin = null; }
-    });
-  }
 
   /* Привязка полей окна «О приложении» (тур, проверка обновлений, обращение).
      Вынесена из settingsView: окно открывается и кнопкой в меню, и по лого. */
@@ -5734,6 +5723,19 @@ const cm = root.querySelector('.chat-main');
 
   /* ---------- Настройки ---------- */
   let settingsSection = '';
+  /* «О приложении» — обычный раздел настроек. Клик по лого открывает его
+     так же, как пункт бокового меню: без всплывающего окна. */
+  function openAboutSection(){
+    const target = '#/settings/about';
+    if (location.hash === target){
+      settingsSection = 'about';
+      route = { name:'settings', param:'about' };
+      try { render(); } catch(e){ console.error(e); }
+    } else {
+      location.hash = target;
+    }
+  }
+
   function settingsView(root, section){
     const u = user();
     section = section || settingsSection || 'profile';
@@ -5790,9 +5792,6 @@ const cm = root.querySelector('.chat-main');
         <div id="set-body" class="stack"></div>
       </div>`;
     $$('[data-sec]', root).forEach(b=>b.onclick=()=>{
-      /* «О приложении» — отдельное окно поверх настроек: справку о версии
-         открывают ненадолго, терять текущий раздел при этом не нужно. */
-      if (b.dataset.sec === 'about'){ openAboutWin(); return; }
       section=b.dataset.sec; settingsSection=section; $$('[data-sec]',root).forEach(x=>x.classList.toggle('on', x===b)); renderSec();
     });
     renderSec();
