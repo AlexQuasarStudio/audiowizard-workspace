@@ -5984,7 +5984,115 @@ const cm = root.querySelector('.chat-main');
             </span>
           </div>`; }).join('')}</div>`
         : '<p class="small faint">Пока пусто — добавьте первую задачу или выберите вариант ниже</p>'}
+        <div class="row row--between" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);gap:10px;flex-wrap:wrap">
+          <div style="flex:1;min-width:190px"><b class="small">Обмен с ИИ-помощниками</b>
+            <div class="small faint">Экспорт — Markdown с приоритетами и заданием для ассистента. Импорт принимает текст, Markdown или JSON, в том числе ответ ИИ.</div></div>
+          <div class="row" style="gap:6px">
+            <button class="btn btn--ghost btn--sm" type="button" data-td-exp>${icon('export')} Экспорт</button>
+            <button class="btn btn--ghost btn--sm" type="button" data-td-imp>${icon('import')} Импорт</button>
+          </div>
+        </div>
       </div>`;
+    }
+
+    /* ---- ToDo для ИИ: выгрузка в Markdown и разбор ответа ---- */
+    const TODO_PRIO = { 1:'Критично', 2:'Важно', 3:'Обычно', 4:'Не срочно', 5:'Когда-нибудь' };
+    const todoNorm = s => String(s||'').replace(/\s+/g,' ').trim().toLowerCase();
+
+    function todoExportText(u2){
+      const mine = (S.todos||[]).filter(t=>t.owner_id===u2.id);
+      const open = mine.filter(t=>!t.done), done = mine.filter(t=>t.done);
+      const when = new Date().toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      const role = (typeof ROLE_LABEL!=='undefined' && ROLE_LABEL[u2.role]) || u2.role;
+      const lines = [
+        `# ToDo — ${u2.full_name}`,
+        '',
+        `_Выгружено ${when} · Audiowizard Workspace · роль: ${role}_`,
+        '',
+        `Открыто: ${open.length} · выполнено: ${done.length} · всего: ${mine.length}`,
+        '',
+        '## Задание для ИИ-помощника',
+        'Ты — помощник по планированию рабочего дня. Ниже мой список задач с приоритетами.',
+        '',
+        '1. Предложи порядок выполнения на сегодня — от критичного к незначительному.',
+        '2. Сгруппируй похожие задачи и оцени время на каждую.',
+        '3. Отметь, что стоит делегировать или отложить.',
+        '',
+        'Ответ — короткий план без пересказа списка.',
+        '',
+        '## Задачи'
+      ];
+      const byPrio = (a,b) => ((a.prio||3)-(b.prio||3)) || ((b.created_at||0)-(a.created_at||0));
+      const rest = [...open].sort(byPrio);
+      if (!rest.length) lines.push('', 'Открытых задач нет.');
+      for (let p=1; p<=5; p++){
+        const list = rest.filter(t => (t.prio||3) === p);
+        if (!list.length) continue;
+        lines.push('', `### ${p} — ${TODO_PRIO[p]}`);
+        list.forEach(t => lines.push(`- [ ] (P${p}) ${String(t.text||'').trim()}`));
+      }
+      if (done.length){
+        lines.push('', '### Выполнено');
+        [...done].sort((a,b)=>((b.created_at||0)-(a.created_at||0))).forEach(t => lines.push(`- [x] (P${t.prio||3}) ${String(t.text||'').trim()}`));
+      }
+      lines.push('', '## Правила',
+        '- (P1) — критично, (P5) — когда-нибудь.',
+        '- Строка «[x]» — уже сделана, повторно её не предлагай.',
+        '- Этот же список можно вернуть в приложение через «Импорт» в настройках.');
+      return lines.join('\n');
+    }
+
+    /* Разбор импорта: JSON или текст/Markdown. Понимает наш собственный
+       формат, списки «- [ ] (P2) …», «P2 …», «!2 …» и нумерованные строки. */
+    function todoParseImport(text){
+      const raw = String(text||'');
+      const items = [], seen = new Set();
+      const add = (value, prio, isDone) => {
+        const t = String(value||'')
+          .replace(/^[-–—•*]\s*/, '')
+          .replace(/\s+/g,' ')
+          .replace(/[\s.;,]+$/,'')
+          .trim();
+        if (t.length < 2 || t.length > 200) return;
+        if (!/[0-9a-zа-яё]/i.test(t)) return;
+        const key = todoNorm(t);
+        if (seen.has(key)) return;
+        seen.add(key);
+        items.push({ text:t, prio:Math.min(5, Math.max(1, parseInt(prio,10)||3)), done:!!isDone });
+      };
+      let j = null;
+      try { j = JSON.parse(raw.trim()); } catch(e){ j = null; }
+      if (j){
+        const arr = Array.isArray(j) ? j : (Array.isArray(j.todos) ? j.todos : (Array.isArray(j.tasks) ? j.tasks : null));
+        if (arr){
+          arr.forEach(x => {
+            if (typeof x === 'string') add(x, 3, false);
+            else if (x && typeof x === 'object') add(x.text || x.title || x.task, x.prio || x.priority || 3, x.done || x.completed);
+          });
+          if (items.length) return items;
+        }
+      }
+      let lines = raw.split(/\r?\n/);
+      /* Если есть раздел «Задачи» — берём только его: инструкции для
+         ассистента и служебную шапку в список не тащим. */
+      const start = lines.findIndex(l => /^#{1,6}\s*задач/i.test(l.trim()));
+      if (start >= 0) lines = lines.slice(start + 1);
+      lines.forEach(line => {
+        let s = line.trim();
+        if (!s) return;
+        if (/^#{1,6}\s/.test(s)) return;
+        if (/^[-*_]{3,}$/.test(s)) return;
+        if (/^[>_|]/.test(s)) return;
+        let isDone = false;
+        const cb = s.match(/^(?:[-*•]\s*)?\[( |x|X)\]\s*(.*)$/);
+        if (cb){ isDone = cb[1].toLowerCase() === 'x'; s = cb[2]; }
+        s = s.replace(/^[-–—•*]\s*/, '').replace(/^\d+[.)]\s*/, '');
+        let prio = 3;
+        const pm = s.match(/^\(?\s*[Pp]\s*([1-5])\s*\)?[.:)\s—-]*(.*)$/) || s.match(/^!\s*([1-5])[.:)\s—-]+(.*)$/);
+        if (pm){ prio = +pm[1]; s = pm[2] || ''; }
+        add(s, prio, isDone);
+      });
+      return items;
     }
 
     function remindersHTML(u2){
@@ -6649,6 +6757,106 @@ const cm = root.querySelector('.chat-main');
           S.todos = (S.todos||[]).filter(x=>x.id!==b.dataset.tdDel);
           saveState(); renderSec();
         });
+        /* ToDo → ИИ: показываем готовый Markdown, копируем или скачиваем */
+        const tdExp = el.querySelector('[data-td-exp]');
+        if (tdExp) tdExp.onclick = ()=>{
+          const text = todoExportText(u);
+          const iso = new Date().toISOString().slice(0,10);
+          const fileName = `todo-${u.username || 'me'}-${iso}.md`;
+          openWinModal({
+            title:'Экспорт ToDo для ИИ', icon:'export', narrow:true,
+            body:`<div class="stack" style="gap:10px">
+              <p class="small muted" style="margin:0">Шапка, приоритеты и задание для ассистента. Скопируйте в чат или скачайте файл — вернуть список можно через «Импорт».</p>
+              <textarea class="input" id="td-exp-text" rows="11" readonly spellcheck="false" style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.5"></textarea>
+            </div>`,
+            footer:`<button class="btn btn--ghost" data-x>Закрыть</button><button class="btn btn--ghost" id="td-exp-copy">${icon('copy')} Скопировать</button><button class="btn btn--primary" id="td-exp-dl">${icon('export')} Скачать .md</button>`,
+            onMount:(host)=>{
+              const ta = host.querySelector('#td-exp-text');
+              if (ta) ta.value = text;
+              const copyBtn = host.querySelector('#td-exp-copy');
+              if (copyBtn) copyBtn.onclick = ()=>{
+                const ok = ()=> toast('ToDo скопирован для ИИ','ok');
+                if (navigator.clipboard && navigator.clipboard.writeText){
+                  navigator.clipboard.writeText(text).then(ok, ()=>{
+                    if (ta){ ta.select(); try { document.execCommand('copy'); } catch(e){} ok(); }
+                  });
+                } else if (ta){
+                  ta.select(); try { document.execCommand('copy'); } catch(e){} ok();
+                }
+              };
+              const dl = host.querySelector('#td-exp-dl');
+              if (dl) dl.onclick = ()=>{
+                const blob = new Blob([text], { type:'text/markdown;charset=utf-8' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob); a.download = fileName;
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+                logAudit('Экспорт ToDo для ИИ','Планировщик');
+                toast('Файл ToDo скачан','ok');
+              };
+            }
+          });
+        };
+        /* ИИ → ToDo: вставка текста или файл, повторы не добавляются */
+        const tdImp = el.querySelector('[data-td-imp]');
+        if (tdImp) tdImp.onclick = ()=>{
+          openWinModal({
+            title:'Импорт ToDo', icon:'import', narrow:true,
+            body:`<div class="stack" style="gap:10px">
+              <p class="small muted" style="margin:0">Вставьте список задач — текст, Markdown или JSON. Подойдёт и ответ ИИ, и файл экспорта. Повторы не добавляются.</p>
+              <textarea class="input" id="td-imp-text" rows="9" spellcheck="false" placeholder="- [ ] (P2) Позвонить клиенту"></textarea>
+              <div class="row row--between" style="gap:8px;flex-wrap:wrap">
+                <label class="btn btn--ghost btn--sm" style="cursor:pointer">${icon('file','ico-sm')} Выбрать файл<input type="file" id="td-imp-file" accept=".md,.markdown,.txt,.json" hidden></label>
+                <span class="small faint" id="td-imp-cnt">Задач не найдено</span>
+              </div>
+            </div>`,
+            footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" id="td-imp-go" disabled>Добавить</button>`,
+            onMount:(host, close)=>{
+              const ta = host.querySelector('#td-imp-text');
+              const go = host.querySelector('#td-imp-go');
+              const cnt = host.querySelector('#td-imp-cnt');
+              const existing = new Set((S.todos||[]).filter(t=>t.owner_id===u.id).map(t=>todoNorm(t.text)));
+              let parsed = [];
+              const fresh = ()=> parsed.filter(x=>!existing.has(todoNorm(x.text)));
+              const refresh = ()=>{
+                parsed = todoParseImport(ta ? ta.value : '');
+                const list = fresh();
+                if (go) go.disabled = !list.length;
+                if (cnt){
+                  const dup = parsed.length - list.length;
+                  cnt.textContent = !parsed.length ? 'Задач не найдено'
+                    : `Найдено: ${parsed.length}${dup ? ` · уже есть: ${dup}` : ''}`;
+                }
+              };
+              if (ta) ta.addEventListener('input', refresh);
+              refresh();
+              const file = host.querySelector('#td-imp-file');
+              if (file) file.onchange = ()=>{
+                const f = file.files && file.files[0];
+                if (!f) return;
+                const rd = new FileReader();
+                rd.onload = ()=>{ if (ta){ ta.value = String(rd.result || ''); refresh(); toast('Файл прочитан','ok'); } };
+                rd.onerror = ()=> toast('Не удалось прочитать файл','err');
+                rd.readAsText(f, 'utf-8');
+              };
+              if (go) go.onclick = ()=>{
+                const list = fresh();
+                if (!list.length) return;
+                S.todos = S.todos || [];
+                list.forEach(x=>{
+                  S.todos.push({ id:uid(), owner_id:u.id, text:x.text, prio:x.prio, done:x.done, created_at:Date.now() });
+                  existing.add(todoNorm(x.text));
+                });
+                const added = list.length, skipped = parsed.length - added;
+                saveState();
+                logAudit(`Импорт ToDo: добавлено ${added}${skipped ? `, пропущено ${skipped}` : ''}`,'Планировщик');
+                close && close();
+                renderSec();
+                toast(`Добавлено задач: ${added}${skipped ? ` · пропущено: ${skipped}` : ''}`,'ok');
+              };
+            }
+          });
+        };
         /* --- Напоминания --- */
         const add = el.querySelector('#rm-add');
         if (add) add.onclick = ()=>{
