@@ -3636,14 +3636,10 @@ updatePeopleBulk();
       const csv = '\ufeff' + rows2.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(';')).join('\n');
       downloadText(`${ent}-export.csv`, csv, 'text/csv');
     };
-    /* Единая книга XLSX с листами (тот же формат, что у импорта) */
+    /* Единая книга XLSX: клиенты — по листам менеджеров, остальное — как раньше */
     const emitXlsxAll = (nid) => {
-      const book = { 'Клиенты': buildRows('clients', nid), 'Исполнители': buildRows('executors', nid), 'Заказы': buildRows('orders', nid) };
-      const bytes = AWX.writeSheets(book);
-      const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const aEl = document.createElement('a');
-      aEl.href = URL.createObjectURL(blob); aEl.download = 'audiowizard-export.xlsx'; aEl.click();
-      setTimeout(()=>URL.revokeObjectURL(aEl.href), 4000);
+      const book = { ...clientSheets(), 'Исполнители': buildRows('executors', nid), 'Заказы': buildRows('orders', nid) };
+      downloadXlsxBook(book, 'audiowizard-export.xlsx');
     };
     $('#exp-go', root).onclick = ()=>{
       const ent = $('#exp-entity', root).value, nid = $('#exp-niche', root).value;
@@ -3654,7 +3650,10 @@ updatePeopleBulk();
         toast('Экспорт готов — файлы скачиваются', 'ok');
         return;
       }
-      if (expFmt === 'xlsx'){ emitXlsxAll(nid); }
+      if (expFmt === 'xlsx'){
+        if (ent === 'clients') downloadXlsxBook(clientSheets(), 'clients-by-managers.xlsx');
+        else emitXlsxAll(nid);
+      }
       else { emitCsv(ent, nid); }
       logAudit(`Экспорт: ${ent} (${expFmt.toUpperCase()})`, 'Экспорт');
       toast('Экспорт готов — файл скачивается', 'ok');
@@ -3791,7 +3790,71 @@ updatePeopleBulk();
     a.href = URL.createObjectURL(blob); a.download = name; a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
   }
+  /* Клиенты — отдельный лист на каждого менеджера: удобно передавать
+     менеджеру его базу, не фильтруя общую выгрузку. Клиенты без
+     назначенного менеджера и с устаревшей ссылкой идут в «Без менеджера». */
+  function clientSheets(){
+    const clients = noDemo(S.users.filter(x=>x.role==='client'));
+    const numOf = new Map(clients.map((c,i)=>[c.id, (c.ext && c.ext.xlsxRow) || (i+2)]));
+    const groups = new Map();
+    clients.forEach(c=>{
+      const rawMid = (c.ext && c.ext.managerId) || '';
+      const mid = userById(rawMid) ? rawMid : '';
+      if (!groups.has(mid)) groups.set(mid, []);
+      groups.get(mid).push(c);
+    });
+    const rank = { top_manager:0, manager:1, admin:2 };
+    const entries = [...groups.entries()].sort((a,b)=>{
+      if (!a[0]) return 1;
+      if (!b[0]) return -1;
+      const ua = userById(a[0]), ub = userById(b[0]);
+      const ra = ua ? (rank[ua.role] ?? 9) : 9;
+      const rb = ub ? (rank[ub.role] ?? 9) : 9;
+      if (ra !== rb) return ra - rb;
+      return String(ua ? ua.full_name : '').localeCompare(String(ub ? ub.full_name : ''), 'ru');
+    });
+    const used = new Set();
+    const sheetName = (label)=>{
+      const base = String(label).replace(/[:\\/?*\[\]]/g,' ').replace(/\s+/g,' ').trim().slice(0,31) || 'Клиенты';
+      let name = base, i = 2;
+      while (used.has(name.toLowerCase())){
+        const suffix = ` (${i++})`;
+        name = base.slice(0, 31 - suffix.length).trimEnd() + suffix;
+      }
+      used.add(name.toLowerCase());
+      return name;
+    };
+    const header = ['ФИО/Компания','Логин','Email','Телефон','Комментарий','Статус','№ строки'];
+    const book = {};
+    entries.forEach(([mid, list])=>{
+      const m = mid ? userById(mid) : null;
+      const label = m ? `Клиенты — ${m.full_name}` : 'Клиенты — Без менеджера';
+      book[sheetName(label)] = [header, ...list.map(x=>[
+        x.full_name,
+        x.username,
+        x.email,
+        x.phone,
+        (x.ext && x.ext.comment) || '',
+        (x.ext && x.ext.status) || 'active',
+        numOf.get(x.id)
+      ])];
+    });
+    if (!Object.keys(book).length) book['Клиенты'] = [header];
+    return book;
+  }
+  function downloadXlsxBook(book, name){
+    const bytes = AWX.writeSheets(book);
+    const blob = new Blob([bytes], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  }
   function exportPeople(role){
+    if (role === 'client'){
+      downloadXlsxBook(clientSheets(), 'clients-by-managers.xlsx');
+      toast('XLSX по менеджерам выгружен','ok');
+      return;
+    }
     const rows2 = [['ФИО','Email','Телефон','Статус'], ...noDemo(S.users.filter(x=>x.role===role)).map(x=>[x.full_name,x.email,x.phone,x.ext.status])];
     downloadText(`${role}s.csv`, '\ufeff'+rows2.map(r=>r.join(';')).join('\n'), 'text/csv');
     toast('CSV выгружен','ok');

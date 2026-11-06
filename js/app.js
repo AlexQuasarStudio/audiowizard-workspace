@@ -5954,6 +5954,7 @@ const cm = root.querySelector('.chat-main');
       const mine = (S.todos||[]).filter(t=>t.owner_id===u2.id);
       const byPrio = (a,b)=> (a.done?1:0)-(b.done?1:0) || (a.prio||5)-(b.prio||5) || ((b.created_at||0)-(a.created_at||0));
       const sorted = [...mine].sort(byPrio);
+      const openCount = sorted.filter(t=>!t.done).length;
       const PRESETS = [
         'Позвонить клиенту', 'Проверить статус заказов', 'Согласовать счёт',
         'Поставить задачу исполнителю', 'Ответить на тикеты', 'Проверить дедлайны',
@@ -5975,10 +5976,21 @@ const cm = root.querySelector('.chat-main');
         <div class="chips" style="gap:6px;margin-bottom:12px">
           ${PRESETS.map(p=>`<span class="chip" data-td-preset="${esc(p)}" style="cursor:pointer">${esc(p)}</span>`).join('')}
         </div>
-        ${sorted.length ? `<div class="stack" style="gap:8px">${sorted.map(t=>{
+        ${sorted.length ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px">
+          <label class="check" style="gap:6px;flex:none"><input type="checkbox" id="td-sel-all" ${openCount?'':'disabled'} aria-label="Выбрать все задачи"><span class="box"><svg><use href="#i-check-c"/></svg></span><span class="small">Выбрать все</span></label>
+          <span class="spacer"></span>
+          <span class="small faint" id="td-sel-cnt"></span>
+          <button class="btn btn--ghost btn--sm" type="button" id="td-close-sel" disabled>Закрыть выбранные</button>
+          <button class="btn btn--soft btn--sm" type="button" id="td-close-all" ${openCount?'':'disabled'}>Закрыть все</button>
+        </div>
+        <div class="stack" style="gap:8px">${sorted.map(t=>{
           const lbl = PRIO_LABEL[t.prio] || ('Приоритет '+t.prio);
           return `<div class="row row--between" style="padding:10px 12px;border:1px solid var(--border);border-radius:12px;${t.done?'opacity:.55':''}">
-            <span class="small" style="display:flex;gap:8px;align-items:baseline">
+            <span class="small" style="display:flex;gap:8px;align-items:center;min-width:0">
+              <label class="check" style="gap:0;flex:none;margin:0" title="Выбрать задачу">
+                <input type="checkbox" data-td-check value="${esc(t.id)}" ${t.done?'disabled':''} aria-label="Выбрать задачу">
+                <span class="box"><svg><use href="#i-check-c"/></svg></span>
+              </label>
               ${t.done?'<span class="badge c-green">готово</span>':`<span class="badge ${t.prio===1?'c-red':(t.prio===2?'c-orange':'c-gray')}" title="Приоритет ${t.prio} из 5">${esc(lbl)}</span>`}
               <b>${esc(t.text)}</b>
             </span>
@@ -6761,6 +6773,40 @@ const cm = root.querySelector('.chat-main');
           S.todos = (S.todos||[]).filter(x=>x.id!==b.dataset.tdDel);
           saveState(); renderSec();
         });
+        /* Массовое закрытие: выбранная группа задач или все открытые разом */
+        const tdBulkChecks = ()=>Array.from(el.querySelectorAll('[data-td-check]')).filter(c=>!c.disabled);
+        const tdSelAll = el.querySelector('#td-sel-all');
+        const tdSelCnt = el.querySelector('#td-sel-cnt');
+        const tdCloseSel = el.querySelector('#td-close-sel');
+        const tdCloseAll = el.querySelector('#td-close-all');
+        const syncTdBulk = ()=>{
+          const checks = tdBulkChecks();
+          const n = checks.filter(c=>c.checked).length;
+          if (tdSelCnt) tdSelCnt.textContent = n ? `Выбрано: ${n}` : '';
+          if (tdCloseSel) tdCloseSel.disabled = !n;
+          if (tdSelAll){
+            tdSelAll.checked = checks.length > 0 && n === checks.length;
+            tdSelAll.indeterminate = n > 0 && n < checks.length;
+          }
+        };
+        tdBulkChecks().forEach(c=>c.onchange = syncTdBulk);
+        if (tdSelAll) tdSelAll.onchange = ()=>{
+          tdBulkChecks().forEach(c=>c.checked = tdSelAll.checked);
+          syncTdBulk();
+        };
+        if (tdCloseSel) tdCloseSel.onclick = ()=>{
+          const ids = new Set(tdBulkChecks().filter(c=>c.checked).map(c=>c.value));
+          if (!ids.size) return;
+          (S.todos||[]).forEach(t=>{ if (t.owner_id===u.id && ids.has(t.id)) t.done = true; });
+          saveState(); toast(`Закрыто задач: ${ids.size}`,'ok'); renderSec();
+        };
+        if (tdCloseAll) tdCloseAll.onclick = ()=>{
+          const open = (S.todos||[]).filter(t=>t.owner_id===u.id && !t.done);
+          if (!open.length) return;
+          open.forEach(t=>{ t.done = true; });
+          saveState(); toast(`Закрыто задач: ${open.length}`,'ok'); renderSec();
+        };
+        syncTdBulk();
         /* ToDo → ИИ: показываем готовый Markdown, копируем или скачиваем */
         const tdExp = el.querySelector('[data-td-exp]');
         if (tdExp) tdExp.onclick = ()=>{
