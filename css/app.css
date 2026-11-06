@@ -347,10 +347,15 @@ html[data-theme^='dark'] .auth__card{box-shadow:var(--sh-2)}
 .inline-add__row .input{flex:0 1 auto;min-height:34px}
 /* Инлайн-добавление живёт прямо в списке: первая строка таблицы или
    карточка в сетке. Поэтому рамка/фон панели здесь не нужны. */
-tr.inl-tr>td{padding:0!important;border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--accent-soft) 30%,transparent)}
+tr.inl-tr>td{padding:6px 10px;border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--accent-soft) 30%,transparent)}
 tr.inl-tr{animation:inlRowIn .2s var(--ease)}
 @keyframes inlRowIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-.inline-add--row{margin:0;padding:8px 10px;border:0;border-radius:0;background:transparent}
+.inline-add--row{margin:0;padding:6px 0;border:0;border-radius:0;background:transparent}
+/* Новая строка в таблице: та же геометрия, что у строк данных — те же
+   отступы ячеек и высота, без «панели» вокруг полей. */
+.o-tbl tr.inl-tr>td{padding:6px 10px;vertical-align:middle}
+.o-tbl tr.inl-tr .inline-add__row{gap:8px}
+.o-tbl tr.inl-tr .inline-add__row .input{min-height:30px}
 .inline-add--row .inline-add__row{gap:6px;margin-bottom:0}
 .inline-add--row .inline-add__row .input{flex:1 1 150px;min-width:0;max-width:320px}
 .inline-add--row>.small{display:none}
