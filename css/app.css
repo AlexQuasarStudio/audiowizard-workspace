@@ -1647,8 +1647,8 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
 
 /* Смена вида таблица/карточки: мягкое появление */
 .view-anim{animation:viewIn .22s var(--ease)}
-/* «О приложении» в настройках — компактная карточка: только логотип,
-   который открывает окно с серверами и обновлениями. */
+/* «О приложении» в настройках — тот же состав, что и в модалке;
+   логотип в шапке открывает её поверх страницы. */
 .about-section{display:flex;align-items:center;gap:16px}
 .about-section__logo{border:0;background:none;padding:0;margin:0;display:inline-flex;flex:none;cursor:pointer;border-radius:18px;outline:none}
 .about-section__logo .side__brand-logo{transition:box-shadow .16s var(--ease),transform .16s var(--ease)}

@@ -825,9 +825,12 @@ const QUICK_BY_ROLE = {
     </div>`;
   }
 
-  function aboutWindowHTML(){
+  function aboutWindowHTML(opts){
+      const logoBtn = !!(opts && opts.logoButton);
       return `<div class="card card-pad row" style="gap:16px">
-        <span class="side__brand-logo logo-mark--lg">${icon('logo-full')}</span>
+        ${logoBtn
+          ? `<button type="button" class="about-section__logo" id="ab-open" title="Открыть «О приложении»" aria-label="Открыть «О приложении»"><span class="side__brand-logo logo-mark--lg">${icon('logo-full')}</span></button>`
+          : `<span class="side__brand-logo logo-mark--lg">${icon('logo-full')}</span>`}
         <div><b style="font-size:16px">Audiowizard Workspace</b><div class="small muted">Версия ${esc((S.product||{}).version || '0.1-prototype')} · сборка ${(S.product||{}).build || 216} ${((S.product||{}).beta !== false)?'<span class="beta-badge">Beta</span>':''}</div></div>
         <span class="spacer"></span><button class="btn btn--soft btn--sm" id="ab-tour">${icon('bulb')} Пройти тур</button><button class="btn btn--soft btn--sm" id="ab-check">${icon('refresh')} Проверить обновления</button></div>
       ${isStaff((me() || {}).role) ? serverStateHtml() : ''}
@@ -850,21 +853,11 @@ const QUICK_BY_ROLE = {
         <div class="row" style="gap:8px;margin-top:8px"><button class="btn btn--primary btn--sm" id="ab-issue-send">${icon('send')} Отправить</button><span class="small faint" id="ab-issue-msg"></span></div></div>`;
     }
 
-  /* Компактный раздел настроек: только логотип-кнопка. Всю подробную
-     информацию (серверы, модели развертывания, обновления) показывает
-     то же окно, что открывается кликом по логотипу в меню. */
+  /* Раздел настроек — тот же состав, что и в окне «О приложении»:
+     серверы, модели развертывания, история обновлений и обращение.
+     Логотип в шапке — кнопка: открывает модалку с размытым фоном. */
   function aboutSectionHTML(){
-    const p = S.product || {};
-    return `<div class="card card-pad about-section">
-      <button type="button" class="about-section__logo" id="ab-open" title="Открыть «О приложении»" aria-label="Открыть «О приложении»">
-        <span class="side__brand-logo logo-mark--lg">${icon('logo-full')}</span>
-      </button>
-      <div class="about-section__txt">
-        <b style="font-size:16px">Audiowizard Workspace</b>
-        <div class="small muted">Версия ${esc(p.version || '0.1-prototype')} · сборка ${esc(String(p.build || ''))} ${p.beta !== false?'<span class="beta-badge">Beta</span>':''}</div>
-        <p class="small muted" style="margin:6px 0 0">Нажмите на логотип — откроются сведения о приложении, состоянии серверов и обновлениях.</p>
-      </div>
-    </div>`;
+    return `<div class="stack about-body">${aboutWindowHTML({ logoButton:true })}</div>`;
   }
 
   /* «О приложении» — окно поверх интерфейса: открывается и из настроек,
@@ -872,8 +865,10 @@ const QUICK_BY_ROLE = {
   let aboutWin = null;
   function openAboutWin(){
     if (aboutWin && aboutWin.el && aboutWin.el.isConnected) return;
-    aboutWin = openWinModal({
-      title:'О приложении', icon:'info', wide:true, route:'settings',
+    /* Обычная модалка с затемнением и размытием фона (как было раньше),
+       а не плавающее окно оконного менеджера. */
+    aboutWin = openModal({
+      title:'О приложении', wide:true,
       body:`<div class="stack about-body" id="about-win">${aboutWindowHTML()}</div>`,
       onMount:(el)=>{ bindAboutWindow(el, me() || {}); },
       onClose:()=>{ aboutWin = null; }
@@ -6952,6 +6947,7 @@ const cm = root.querySelector('.chat-main');
         $('#sec-2fa', el).onclick = ()=>wipModal('Двухфакторная аутентификация');
       }
       if (sec==='about'){
+        bindAboutWindow(el, u);
         const ab = $('#ab-open', el);
         if (ab) ab.onclick = ()=>openAboutWin();
       }
