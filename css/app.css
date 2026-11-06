@@ -2001,6 +2001,10 @@ body.pills-hide .head{pointer-events:none}
 }
 @media (min-width:861px){ .set-back{display:none!important} }
 @keyframes setIn{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:none}}
+/* Правило импорта, которое переставили: мягкая подсветка, чтобы было видно,
+   куда оно уехало в приоритете */
+.rule-moved{animation:ruleMoved .5s var(--ease)}
+@keyframes ruleMoved{0%{box-shadow:0 0 0 2px var(--accent)}70%{box-shadow:0 0 0 2px var(--accent-soft)}100%{box-shadow:none}}
 
 /* ---- Документы: аккордеон (шапка сворачивает тело) ---- */
 .doc-acc{border:1px solid var(--border);border-radius:12px;background:var(--panel);margin-bottom:8px;overflow:hidden}

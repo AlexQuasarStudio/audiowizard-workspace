@@ -3133,14 +3133,16 @@ updatePeopleBulk();
           </div></div>
       </div>
       <div class="card" style="margin-top:14px"><div class="card-h"><h3>${icon('scroll')} Правила импорта</h3>
-        <span class="small faint">условия (И), regex · применяются при импорте и вручную</span></div>
+        <span class="small faint">условия (И), regex · приоритет сверху вниз</span></div>
         <div class="card-b stack" style="gap:9px">
           <div id="rules-list" class="stack" style="gap:8px">
             ${S.importRules.map(r=>`<div class="card card-pad" style="padding:11px 13px;background:var(--bg-2)">
               <div class="row row--between" style="gap:8px">
                 <span class="badge ${r.entity==='client'?'c-green':'c-violet'}">${r.entity==='client'?'Клиент':'Заказ'}</span>
                 <span class="small" style="flex:1;min-width:0;color:var(--text-2)">${esc(ruleLabel(r))}</span>
-                ${admin?`<button class="iconbtn" style="width:30px;height:30px" data-editrule="${r.id}" title="Изменить">${icon('edit')}</button>
+                ${admin?`<button class="iconbtn" style="width:28px;height:28px" data-ruleup="${r.id}" title="Выше приоритетом">${icon('chev-u','ico-sm')}</button>
+                <button class="iconbtn" style="width:28px;height:28px" data-ruledn="${r.id}" title="Ниже приоритетом">${icon('chev-d','ico-sm')}</button>
+                <button class="iconbtn" style="width:30px;height:30px" data-editrule="${r.id}" title="Изменить">${icon('edit')}</button>
                 <button class="iconbtn" style="width:30px;height:30px" data-delrule="${r.id}" title="Удалить">${icon('trash')}</button>`:''}
               </div></div>`).join('') || '<p class="small faint">Правил пока нет</p>'}
           </div>
@@ -3458,6 +3460,10 @@ updatePeopleBulk();
         if (!Number.isNaN(asNum)){
           const byRow = all.find(x => x.ext && x.ext.xlsxRow === asNum);
           if (byRow) return byRow.id;
+          /* Импортированные записи нумеруются ext.num (нумерация с 2, 1 — шапка):
+             без этой ветки «Номер клиента» в заказах не находил клиента. */
+          const byNum = all.find(x => x.ext && x.ext.num === asNum);
+          if (byNum) return byNum.id;
           if (base[asNum - 2]) return base[asNum - 2].id;
         }
         const byName = all.find(x => norm(x.full_name) === norm(String(n)));
@@ -3734,6 +3740,25 @@ updatePeopleBulk();
         if (ed){ const r = S.importRules.find(x => x.id === ed.dataset.editrule); r && ruleEditor(r); }
         const del = e.target.closest('[data-delrule]');
         if (del){ S.importRules = S.importRules.filter(x => x.id !== del.dataset.delrule); logAudit('Удалено правило импорта', 'Настройки'); saveState(); toast('Правило удалено', 'ok'); APP.render(); }
+        /* Приоритет правил: порядок в списке = порядок применения (сверху вниз) */
+        const up = e.target.closest('[data-ruleup]');
+        const dn = e.target.closest('[data-ruledn]');
+        if (up || dn){
+          const id = (up || dn).dataset[up ? 'ruleup' : 'ruledn'];
+          const arr = S.importRules;
+          const i = arr.findIndex(x => x.id === id);
+          const j = i + (up ? -1 : 1);
+          if (i >= 0 && j >= 0 && j < arr.length){
+            const [it] = arr.splice(i, 1);
+            arr.splice(j, 0, it);
+            saveState();
+            APP.render();
+            requestAnimationFrame(()=>{
+              const el = (document.querySelector(`[data-ruleup="${id}"]`) || {}).closest ? document.querySelector(`[data-ruleup="${id}"]`).closest('.card') : null;
+              if (el){ el.classList.add('rule-moved'); setTimeout(()=>el.classList.remove('rule-moved'), 520); }
+            });
+          }
+        }
       });
     }
     $$('#log-filters .chip', root).forEach(ch => ch.addEventListener('click', () => {
