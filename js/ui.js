@@ -384,8 +384,11 @@ function showDropdown(anchor, items, opts={}){
     const top = baseTop - ddH - 6;
     y = top >= 8 ? top : 8;
   }
-  y = Math.min(y, window.innerHeight - ddH - 10);
+  /* Финальный клампинг: после всех поправок (alignRight и переворота вверх)
+     плашка обязана остаться в экране целиком. */
+  y = Math.max(8, Math.min(y, window.innerHeight - ddH - 10));
   if (opts.alignRight) x = r.right - ddW;
+  x = Math.max(8, Math.min(x, window.innerWidth - ddW - 8));
   dd.style.left = x+'px'; dd.style.top = y+'px';
   dd.addEventListener('click', e => {
     const moreBtn = e.target.closest('[data-more-emoji]');

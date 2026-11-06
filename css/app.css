@@ -1654,7 +1654,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1044");mask-image:url("../bg/pattern-ai.svg?v=1044");
+  -webkit-mask-image:url("../bg/pattern-ai.svg");mask-image:url("../bg/pattern-ai.svg");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -1740,13 +1740,15 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1044");mask-image:url("../bg/pattern-ai.svg?v=1044");
+  -webkit-mask-image:url("../bg/pattern-ai-tile.png");mask-image:url("../bg/pattern-ai-tile.png");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
   -webkit-mask-mode:alpha;mask-mode:alpha}
 html[data-splash-no-doodles] #splash .splash__doodles{display:none}
 #splash.no-doodles .splash__doodles{opacity:0}
+/* Заставка появляется сразу с дудл-маской, а не «дорисовывается» на глазах */
+html.splash-hold #splash{visibility:hidden}
 .splash__inner{position:relative;z-index:2}
 
 /* ===== Эксперимент: просвет и прозрачность (аналог плашек шапки) ===== */

@@ -61,6 +61,17 @@ p{margin:0 0 10px}
 [data-theme="dark-mono"] .msg--own .msg__bubble .react-pill.on{background:rgba(255,255,255,.22);border-color:#f0ede8}
 [data-theme="dark-mono"] .msg--own .msg__bubble .poll,[data-theme="dark-mono"] .msg--own .msg__bubble .poll__opt{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16)}
 [data-theme="dark-mono"] .vn__play{background:#3b3733;color:#f0ede8}
+/* Светлая монохромная: свой пузырь делаем плотным тёмным — серый «микс»
+   давал слабый контраст с текстом. */
+[data-theme="light-mono"] .msg--own .msg__bubble{background:linear-gradient(135deg,#2b3038 0%,#14181f 100%);border-color:#14181f;color:#f6f4f1}
+[data-theme="light-mono"] .msg--own .msg__bubble .txt{color:#f6f4f1}
+[data-theme="light-mono"] .msg--own .msg__bubble .time{color:rgba(246,244,241,.72)}
+[data-theme="light-mono"] .msg--own .msg__bubble .react-pill{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.22);color:#f6f4f1}
+[data-theme="light-mono"] .msg--own .msg__bubble .react-pill.on{background:rgba(255,255,255,.24);border-color:#f6f4f1}
+/* Присутствие (онлайн/офлайн) — критичный элемент: в монотемах оставляем
+   зелёный и серый, иначе статус читается ложно. */
+[data-theme="dark-mono"] .dot--online,[data-theme="light-mono"] .dot--online{background:#26b06a}
+[data-theme="dark-mono"] .dot--offline,[data-theme="light-mono"] .dot--offline{background:#9aa0a8}
 [data-theme="dark-mono"] .msg--own .vn__play{background:#f0ede8;color:#1b1918}
 [data-theme="dark-mono"] .msg--own .vn__wave i{background:rgba(240,237,232,.4)}
 [data-theme="dark-mono"] .msg--own .vn__wave i.on{background:#fcfaf6}
@@ -221,7 +232,7 @@ button.chip,.chip[role="button"]{cursor:pointer}
 .modal-mask.closing .modal{animation:popOut .18s var(--ease) forwards}
 
 /* ---------- Дропдаун-меню ---------- */
-.dd{position:fixed;z-index:4300;min-width:190px;max-height:min(70vh, 520px);overflow-y:auto;overscroll-behavior:contain;background:var(--panel);border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--sh-2);padding:6px;animation:popIn .18s var(--ease)}
+.dd{position:fixed;z-index:4300;min-width:190px;max-width:calc(100vw - 16px);max-height:min(70vh, 520px);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;background:var(--panel);border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--sh-2);padding:6px;animation:popIn .18s var(--ease)}
 .dd.closing{animation:popOut .16s var(--ease) forwards;pointer-events:none}
 /* Данные о сообщении в контекстном меню (как в WhatsApp) */
 .dd__info{display:flex;flex-direction:column;gap:3px;padding:10px 12px;margin-bottom:6px;border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--panel-2) 55%,transparent);border-radius:10px 10px 0 0;font-size:11.5px;color:var(--text-2)}

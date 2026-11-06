@@ -14,9 +14,23 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="css/base.css?v=1286">
-<link rel="stylesheet" href="css/app.css?v=1286">
-  <link rel="preload" as="image" href="bg/pattern-ai.svg?v=1286" fetchpriority="high">
+<!-- Дудл-маска заставки: лёгкий PNG-тайл (сам SVG 700 КБ и не успевал
+       к первому кадру). Грузим до стилей и не показываем заставку, пока
+       маска не готова — тогда первый же её кадр уже с узором. -->
+<link rel="preload" as="image" href="bg/pattern-ai-tile.png" type="image/png" fetchpriority="high">
+<script>
+  (function(){
+    var h = document.documentElement;
+    h.classList.add('splash-hold');
+    var img = new Image();
+    var done = function(){ h.classList.remove('splash-hold'); };
+    img.onload = function(){ if (img.decode) { img.decode().then(done, done); } else { done(); } };
+    img.onerror = done;
+    img.src = 'bg/pattern-ai-tile.png';
+  })();
+</script>
+<link rel="stylesheet" href="css/base.css?v=1287">
+<link rel="stylesheet" href="css/app.css?v=1287">
 </head>
 <body>
 
@@ -151,15 +165,15 @@
 
 <noscript><p style="padding:24px;color:#e8ecf4;font-family:sans-serif">Для работы Audiowizard Workspace включите JavaScript.</p></noscript>
 
-<script>window.__BUILD_NUM__ = 1286;</script>
-<script src="js/store.js?v=1286" defer></script>
-<script src="js/xlsx.js?v=1286" defer></script>
-<script src="js/ui.js?v=1286" defer></script>
-<script src="js/ai-data.js?v=1286" defer></script>
-<script src="js/ai.js?v=1286" defer></script>
-<script src="js/crm.js?v=1286" defer></script>
-<script src="js/windows.js?v=1286" defer></script>
-<script src="js/navdrag.js?v=1286" defer></script>
-<script src="js/app.js?v=1286" defer></script>
+<script>window.__BUILD_NUM__ = 1287;</script>
+<script src="js/store.js?v=1287" defer></script>
+<script src="js/xlsx.js?v=1287" defer></script>
+<script src="js/ui.js?v=1287" defer></script>
+<script src="js/ai-data.js?v=1287" defer></script>
+<script src="js/ai.js?v=1287" defer></script>
+<script src="js/crm.js?v=1287" defer></script>
+<script src="js/windows.js?v=1287" defer></script>
+<script src="js/navdrag.js?v=1287" defer></script>
+<script src="js/app.js?v=1287" defer></script>
 </body>
 </html>
