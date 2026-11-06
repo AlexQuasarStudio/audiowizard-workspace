@@ -192,7 +192,6 @@ const APP = (() => {
           <span class="foot__ver">
             ${!((S.product||{}).beta === false) ? '<span class="beta-badge">Beta</span>' : ''}
             <span>v${esc((S.product||{}).version || '0.1-prototype')}</span>
-            <span class="foot__build" title="Номер сборки">${window.__BUILD_NUM__ || ''}</span>
             <button class="btn btn--ghost btn--sm" id="btn-update-check">${icon('refresh')} Обновления</button>
           </span>
         </footer>
@@ -458,9 +457,9 @@ const APP = (() => {
     document.querySelectorAll('.foot a[data-doc]').forEach(a=>{
       a.onclick = ()=>{ window.__openDocTitle = a.dataset.doc; };
     });
-    /* Логотип ведёт в «О приложении» — тот же раздел настроек, без окна */
-    $('#brand-click').onclick = ()=>openAboutSection();
-    $('#brand-click').onkeydown = e=>{ if (e.key==='Enter') openAboutSection(); };
+    /* Логотип открывает то же окно «О приложении», что и пункт настроек */
+    $('#brand-click').onclick = ()=>openAboutWin();
+    $('#brand-click').onkeydown = e=>{ if (e.key==='Enter') openAboutWin(); };
     const sc2 = $('#side-collapse');
     sc2 && (sc2.onclick = e=>{ e.stopPropagation(); document.body.classList.toggle('side-collapsed'); document.querySelector('.shell').classList.toggle('shell--collapsed', document.body.classList.contains('side-collapsed')); prefsFor().sideCollapsed = document.body.classList.contains('side-collapsed'); saveState(); });
     { const sw = $('#open-search'), si = $('#head-search-input');
@@ -644,7 +643,17 @@ const APP = (() => {
         sec.classList.toggle('closed');
         const items = document.querySelector(`.side__sec-items[data-sec-items="${sec.dataset.secTitle}"]`);
         if (items){ items.style.overflow = 'hidden';
-          if (sec.classList.contains('closed')){ items.style.maxHeight = '0px'; } else { items.style.maxHeight = items.scrollHeight + 'px'; setTimeout(()=>{ items.style.maxHeight = 'none'; }, 320); }
+          /* Схлопывание должно идти от фактической высоты: после раскрытия
+             maxHeight стоял 'none', а none → 0px не анимируется — раздел
+             закрывался рывком. Фиксируем высоту, затем ведём к нулю. */
+          if (sec.classList.contains('closed')){
+            items.style.maxHeight = items.scrollHeight + 'px';
+            void items.offsetHeight;
+            items.style.maxHeight = '0px';
+          } else {
+            items.style.maxHeight = items.scrollHeight + 'px';
+            setTimeout(()=>{ items.style.maxHeight = 'none'; }, 320);
+          }
         }
         prefsFor().closedSecs = prefsFor().closedSecs || [];
         const title = sec.dataset.secTitle;
@@ -673,7 +682,7 @@ const QA = {
   calc:       { id:'calc',       label:'Калькулятор услуг',     icon:'calc',      run:()=>CRM.openCalculator() },
   client:     { id:'client',     label:'Добавить клиента',      icon:'user-plus', run:()=>CRM.openPersonForm('client', null) },
   executor:   { id:'executor',   label:'Добавить исполнителя',  icon:'user-plus', run:()=>CRM.openPersonForm('executor', null) },
-  chats:      { id:'chats',      label:'Чаты',                  icon:'chats',     run:()=>{ try { Windows.spawn('chats'); } catch(err){ go('chats'); } } },
+  chats:      { id:'chats',      label:'Новый чат',             icon:'chats',     run:()=>{ try { Windows.spawn('chats'); } catch(err){ go('chats'); } } },
   transcribe: { id:'transcribe', label:'ИИ-стенограммы',        icon:'mic',       run:()=>go('ai-transcribe') },
   texts:      { id:'texts',      label:'ИИ-копирайтинг',        icon:'edit',      run:()=>go('ai-texts') },
   translate:  { id:'translate',  label:'ИИ-переводы',           icon:'globe',     run:()=>go('ai-translate') },
@@ -831,6 +840,19 @@ const QUICK_BY_ROLE = {
         <div class="field" style="margin-top:8px"><textarea class="input" id="ab-issue-detail" rows="2" placeholder="Подробности (необязательно)"></textarea></div>
         <div class="row" style="gap:8px;margin-top:8px"><button class="btn btn--primary btn--sm" id="ab-issue-send">${icon('send')} Отправить</button><span class="small faint" id="ab-issue-msg"></span></div></div>`;
     }
+
+  /* «О приложении» — окно поверх интерфейса: открывается и из настроек,
+     и кликом по лого. */
+  let aboutWin = null;
+  function openAboutWin(){
+    if (aboutWin && aboutWin.el && aboutWin.el.isConnected) return;
+    aboutWin = openWinModal({
+      title:'О приложении', icon:'info', wide:true, route:'settings',
+      body:`<div class="stack about-body" id="about-win">${aboutWindowHTML()}</div>`,
+      onMount:(el)=>{ bindAboutWindow(el, me() || {}); },
+      onClose:()=>{ aboutWin = null; }
+    });
+  }
 
   /* Привязка полей окна «О приложении» (тур, проверка обновлений, обращение).
      Вынесена из settingsView: окно открывается и кнопкой в меню, и по лого. */
@@ -5794,6 +5816,8 @@ const cm = root.querySelector('.chat-main');
         <div id="set-body" class="stack"></div>
       </div>`;
     $$('[data-sec]', root).forEach(b=>b.onclick=()=>{
+      /* «О приложении» — окно поверх настроек: справку открывают ненадолго */
+      if (b.dataset.sec === 'about'){ openAboutWin(); return; }
       section=b.dataset.sec; settingsSection=section; $$('[data-sec]',root).forEach(x=>x.classList.toggle('on', x===b)); renderSec();
     });
     renderSec();

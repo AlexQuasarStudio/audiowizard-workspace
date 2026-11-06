@@ -356,7 +356,7 @@ body.zen-corner-br .cookie-bar{right:auto;left:14px}
 .modal__h{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border)}
 .modal__b{padding:18px 20px;overflow-y:auto;flex:1}
 .modal__f{display:flex;justify-content:flex-end;gap:9px;padding:13px 20px;border-top:1px solid var(--border);background:var(--bg-2)}
-.t-close{margin-left:auto;width:26px;height:26px;border-radius:8px;border:none;background:none;color:var(--faint);cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none;opacity:0;transition:opacity .15s var(--ease)}
+.t-close{width:26px;height:26px;border-radius:8px;border:none;background:none;color:var(--faint);cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none;opacity:0;transition:opacity .15s var(--ease)}
 .toast:hover .t-close{opacity:1}
 /* Тост с кнопкой действия: крестик виден сразу — иначе справа оставался бы
    невидимый зазор, а кнопка «висела» в пустоте. */
@@ -424,8 +424,9 @@ th.sortable.sorted-desc::after{content:"↓";opacity:1}
 .toast__title{display:block;font-weight:700;font-size:13px;color:var(--text);line-height:1.35}
 .toast__msg{font-size:13px;font-weight:500;color:var(--text-2);line-height:1.4;word-wrap:break-word;white-space:normal}
 .toast > .ico{flex:none}
-/* Кнопка действия живёт отдельно от текста и стоит справа, перед крестиком */
-.toast > .t-act{display:inline-flex;align-items:center;gap:5px;margin:0 0 0 2px;padding:5px 10px;border-radius:8px;border:1px solid var(--border-2);background:var(--panel-2);color:var(--text);font-size:11.5px;font-weight:650;cursor:pointer;white-space:nowrap;transition:background var(--dur),border-color var(--dur);flex:none;align-self:center}
+/* Правая колонка тоста: крестик сверху, кнопка действия — под ним */
+.toast__side{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none;margin-left:auto;align-self:stretch;justify-content:space-between}
+.toast__side .t-act{display:inline-flex;align-items:center;gap:5px;margin:0;padding:5px 10px;border-radius:8px;border:1px solid var(--border-2);background:var(--panel-2);color:var(--text);font-size:11.5px;font-weight:650;cursor:pointer;white-space:nowrap;transition:background var(--dur),border-color var(--dur);flex:none}
 
 
 .chip,label.chip,span.chip{cursor:pointer!important}

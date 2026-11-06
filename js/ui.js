@@ -65,9 +65,9 @@ function toast(msg, kind='info', title='', opts={}){
      внутри тела она «прилипала» к концу сообщения и при длинном тексте
      уезжала в середину. */
   el.innerHTML = `${icon(icons[kind]||'info')}<div class="toast__body">${
-    title?`<b class="toast__title">${esc(title)}</b>`:''}<span class="toast__msg">${msg}</span></div>${
-    action?`<button class="t-act">${icon('refresh','ico-sm')}${esc(action.label)}</button>`:''}`
-    + `<button class="t-close" aria-label="Закрыть">${icon('x','ico-sm')}</button>`;
+    title?`<b class="toast__title">${esc(title)}</b>`:''}<span class="toast__msg">${msg}</span></div>`
+    + `<div class="toast__side"><button class="t-close" aria-label="Закрыть">${icon('x','ico-sm')}</button>${
+      action?`<button class="t-act">${icon('refresh','ico-sm')}${esc(action.label)}</button>`:''}</div>`;
   host.appendChild(el);
   if (action){
     const tAct = el.querySelector('.t-act');
@@ -249,6 +249,30 @@ function openWinModal({ title='', icon='app', body='', footer='', wide=false, na
       footEl.querySelectorAll('[data-x]').forEach(x => x.addEventListener('click', () => win._close && win._close()));
       win.appendChild(footEl);
     }
+    /* Окно по контенту: если содержимое короче заданной высоты, окно
+       поджимается — иначе короткие формы висят с пустотой внизу. */
+    const fitWin = ()=>{
+      try {
+        const bodyEl = win.querySelector('.aw-win__body');
+        if (!bodyEl) return;
+        const cur = win.getBoundingClientRect().height;
+        const prev = win.style.height;
+        /* Меряем естественную высоту: на время замера окно отпускаем в auto,
+           иначе flex-тело растянуто и scrollHeight равен текущей высоте. */
+        win.style.height = 'auto';
+        const need = Math.ceil(win.getBoundingClientRect().height);
+        const maxH = window.innerHeight - 40;
+        if (need > 0 && need < cur - 6 && need <= maxH){
+          win.classList.add('aw-win--animating');
+          win.style.height = Math.max(200, Math.min(need, maxH)) + 'px';
+          setTimeout(()=>win.classList.remove('aw-win--animating'), 340);
+        } else {
+          win.style.height = prev;
+        }
+      } catch(e){}
+    };
+    requestAnimationFrame(()=>requestAnimationFrame(fitWin));
+    setTimeout(fitWin, 320);
     return { el: win, close: () => { win._close && win._close(); } };
   }
   return openModal({ title, body, footer, wide, onMount, onClose });

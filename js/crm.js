@@ -107,7 +107,7 @@ const CRM = (() => {
     });
     inp.addEventListener('blur', ()=>finish(true));
     if (type === 'select') inp.addEventListener('change', ()=>finish(true));
-    __crmInline = { cancel: ()=>finish(false) };
+    __crmInline = { cancel: ()=>finish(false), el };
   }
   /* Даты в инлайне вводим обычным текстом «дд.мм.гггг»: нативный input[type=date]
      сегментный, и при клике в центр фокус попадает в год — цифры дописываются
@@ -175,6 +175,12 @@ const CRM = (() => {
       });
     }
     let done = false;
+    /* Плашка не исчезает рывком: сначала короткое затухание, потом remove */
+    const drop = ()=>{
+      if (box.classList.contains('pick-out')) return;
+      box.classList.add('pick-out');
+      setTimeout(()=>box.remove(), 150);
+    };
     const finish = (save)=>{
       if (done) return; done = true;
       document.removeEventListener('mousedown', onDoc, true);
@@ -182,11 +188,21 @@ const CRM = (() => {
         const vals = single ? (picked ? [picked] : []) : [...box.querySelectorAll('.inline-pick__list input:checked')].map(i=>i.value);
         if (!single || vals.length) onSave(vals);
       }
-      box.remove();
+      drop();
       el.classList.remove('inline-editing');
       __crmInline = null;
     };
-    const onDoc = e=>{ if (!box.contains(e.target)) finish(true); };
+    const onDoc = e=>{
+      if (box.contains(e.target)) return;
+      /* Повторный клик по той же ячейке — это «закрыть», а не «переоткрыть»:
+         закрываем плашку и гасим следующий клик по ячейке. */
+      if (el === e.target || el.contains(e.target)){
+        window.__inlineToggleAt = Date.now();
+        finish(false);
+        return;
+      }
+      finish(true);
+    };
     box.addEventListener('click', e=>{
       e.stopPropagation();
       if (!single) return;
@@ -205,7 +221,7 @@ const CRM = (() => {
       else if (e.key === 'Enter' && e.target.tagName !== 'INPUT'){ e.preventDefault(); finish(true); }
     });
     setTimeout(()=>{ if (!done) document.addEventListener('mousedown', onDoc, true); }, 0);
-    __crmInline = { cancel: ()=>finish(false) };
+    __crmInline = { cancel: ()=>finish(false), el };
   }
 
   /* После сохранения инлайна не перерисовываем список сразу: иначе клик по
@@ -327,15 +343,18 @@ const CRM = (() => {
   /* Номер заказа — только латиница: кириллические двойники переводим
      в латиницу, остальные недопустимые символы убираем. */
   const CYR_ID_MAP = { 'А':'A','В':'B','С':'C','Е':'E','Н':'H','К':'K','М':'M','О':'O','Р':'P','Т':'T','Х':'X','У':'Y' };
-  function sanitizeOrderId(v){
-    return String(v || '')
+  /* live=true — фильтр «по мере набора»: дефис в конце не срезаем, иначе
+     набрать «AW-1042» невозможно (дефис исчезал сразу после ввода).
+     Полная зачистка краёв — только при сохранении. */
+  function sanitizeOrderId(v, live){
+    const s = String(v || '')
       .toUpperCase()
       .split('')
       .map(ch => CYR_ID_MAP[ch] || ch)
       .join('')
       .replace(/[^A-Z0-9-]/g, '')
-      .replace(/-{2,}/g, '-')
-      .replace(/^-+|-+$/g, '');
+      .replace(/-{2,}/g, '-');
+    return live ? s : s.replace(/^-+|-+$/g, '');
   }
 
   /* Проверка уникальности ID на лету: возвращает заказ-дубль или null.
@@ -932,6 +951,7 @@ const CRM = (() => {
           });
         };
 
+        if (!root.__inlineRowsBound){ root.__inlineRowsBound = 1;
         root.addEventListener('click', e=>{
           const box = e.target.closest && e.target.closest('.inline-add');
           if (!box || box.id) return;
@@ -944,7 +964,7 @@ const CRM = (() => {
           const f = e.target.dataset && e.target.dataset.f;
           if (f === 'id'){
             const el = e.target;
-            const clean = sanitizeOrderId(el.value);
+            const clean = sanitizeOrderId(el.value, true);
             if (el.value !== clean){
               const pos = Math.min(el.selectionStart || 0, clean.length);
               el.value = clean;
@@ -959,8 +979,9 @@ const CRM = (() => {
           const box = e.target.closest && e.target.closest('.inline-add');
           if (!box || box.id) return;
           if (e.key === 'Enter' && e.target.tagName === 'INPUT'){ e.preventDefault(); saveInline(box); }
-          if (e.key === 'Escape'){ inlineClose(box, root); }
+          if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); inlineClose(box, root); }
         });
+        } /* __inlineRowsBound */
       }
       const bt = root.querySelector('#btn-tools');
       bt && (bt.onclick = () => APP.go('tools'));
@@ -1056,6 +1077,8 @@ const CRM = (() => {
         const inl = e.target.closest('[data-inline]');
         if (inl && staff){
           if (e.target.closest('.inline-input,.inline-pick')) return;
+          /* Клик, которым закрыли плашку, не должен тут же открывать её снова */
+          if (window.__inlineToggleAt && Date.now() - window.__inlineToggleAt < 400){ window.__inlineToggleAt = 0; e.stopPropagation(); return; }
           e.stopPropagation();
           openOrderInline(inl);
           return;
@@ -1286,7 +1309,7 @@ const CRM = (() => {
         const checkFormId = markOrderIdField(g('#of-id'), g('#of-id-hint'), isEdit ? o.id : null);
         g('#of-id').addEventListener('input', e=>{
           const el = e.target;
-          const clean = sanitizeOrderId(el.value);
+          const clean = sanitizeOrderId(el.value, true);
           if (el.value !== clean){
             const pos = Math.min(el.selectionStart || 0, clean.length);
             el.value = clean;
@@ -1867,25 +1890,22 @@ const CRM = (() => {
     const tr = box.closest('tr.inl-tr');
     const h = box.offsetHeight;
     box.style.overflow = 'hidden';
-    box.style.maxHeight = h + 'px';
     box.classList.add('closing');
-    /* Высоту самой строки тоже ведём к нулю: иначе после схлопывания плашки
-       остаётся полоса с паддингами ячейки и строка исчезает рывком. */
-    let trH = 0;
-    if (tr){
-      trH = tr.getBoundingClientRect().height;
-      tr.style.height = trH + 'px';
-      tr.classList.add('closing');
+    if (tr) tr.classList.add('closing');
+    /* Схлопываем анимацией: высота плашки едет к нулю, строка следует за ней.
+       CSS-transition у таблицы срабатывал нестабильно, поэтому ведём явно. */
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (box.animate && !reduce){
+      try {
+        box.animate(
+          [{ height: h + 'px', opacity: 1, paddingTop: getComputedStyle(box).paddingTop, paddingBottom: getComputedStyle(box).paddingBottom },
+           { height: '0px', opacity: 0, paddingTop: '0px', paddingBottom: '0px' }],
+          { duration: 180, easing: 'cubic-bezier(.22,.61,.36,1)', fill: 'forwards' }
+        );
+      } catch(e){}
     }
-    requestAnimationFrame(()=>{
-      box.style.maxHeight = '0px';
-      box.style.opacity = '0';
-      box.style.paddingTop = '0px';
-      box.style.paddingBottom = '0px';
-      box.style.marginTop = '0px';
-      box.style.marginBottom = '0px';
-      if (tr) tr.style.height = '0px';
-    });
+    box.style.height = '0px';
+    box.style.opacity = '0';
     setTimeout(()=>{
       box.classList.remove('closing','inline-add--row','inline-add--card','inline-add--in');
       box.style.cssText = '';
@@ -2263,6 +2283,7 @@ const CRM = (() => {
           });
         };
 
+        if (!root.__inlinePeopleBound){ root.__inlinePeopleBound = 1;
         root.addEventListener('click', e=>{
           const box = e.target.closest && e.target.closest('.inline-add');
           if (!box || box.id) return;
@@ -2273,8 +2294,9 @@ const CRM = (() => {
           const box = e.target.closest && e.target.closest('.inline-add');
           if (!box || box.id) return;
           if (e.key === 'Enter' && e.target.tagName === 'INPUT'){ e.preventDefault(); savePerson(box); }
-          if (e.key === 'Escape'){ inlineClose(box, root); }
+          if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); inlineClose(box, root); }
         });
+        } /* __inlinePeopleBound */
       }
       $$('[data-inv]', root).forEach(b=>b.onclick = ()=>openInvites());
       $$('[data-exp]', root).forEach(b=>b.onclick = ()=>exportPeople(role));

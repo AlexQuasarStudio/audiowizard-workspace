@@ -219,7 +219,7 @@ body.pills-move .head__ops{-webkit-backdrop-filter:none!important;backdrop-filte
 /* Безобидные плашки под ссылки футера: читаются на любом фоне (в т.ч. дудлы) */
 .foot a{color:var(--muted);background:color-mix(in srgb,var(--panel) 62%,transparent);border:1px solid color-mix(in srgb,var(--border-2) 55%,transparent);border-radius:99px;padding:5px 12px;display:inline-flex;align-items:center;gap:6px;transition:color var(--dur),border-color var(--dur),background var(--dur);white-space:nowrap}
 .foot a:hover{color:var(--text);text-decoration:none}
-.foot__ver{margin-left:auto;display:flex;align-items:center;gap:8px;white-space:nowrap;background:color-mix(in srgb,var(--panel) 62%,transparent);border:1px solid color-mix(in srgb,var(--border-2) 55%,transparent);border-radius:99px;padding:3px 6px 3px 12px;color:var(--text-2)}
+.foot__ver{margin-left:auto;display:flex;align-items:center;gap:8px;white-space:nowrap;background:color-mix(in srgb,var(--panel) 62%,transparent);border:1px solid color-mix(in srgb,var(--border-2) 55%,transparent);border-radius:99px;padding:3px 6px 3px 5px;color:var(--text-2)}
 /* Номер сборки в подвале: по нему видно, какая версия реально открыта */
 .foot__build{font-size:10.5px;color:var(--faint);font-variant-numeric:tabular-nums}
 .foot__ver > span:not(.beta-badge){font-weight:600;color:var(--text)}
@@ -1402,7 +1402,10 @@ select.inline-input{padding:3px 30px 3px 8px;background-position:right 8px cente
 .inline-pick__row--opt.on{background:var(--accent-soft);color:var(--accent)}
 .inline-pick__row--opt.on .ico{opacity:1}
 @keyframes pickIn{from{opacity:0;transform:translateY(-4px) scale(.985)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){.inline-pick{animation:none}}
+/* Уход плашки — такое же мягкое затухание, как и появление */
+.inline-pick.pick-out{animation:pickOut .14s var(--ease) forwards;pointer-events:none}
+@keyframes pickOut{to{opacity:0;transform:translateY(-4px) scale(.985)}}
+@media (prefers-reduced-motion:reduce){.inline-pick{animation:none}.inline-pick.pick-out{animation:none;opacity:0}}
 td .inline-input{min-width:96px}
 .aw-snap-guide{position:fixed;z-index:4380;background:var(--accent-soft);border:2px dashed var(--accent);border-radius:12px;display:none;pointer-events:none;transition:opacity .12s var(--ease)}
 .aw-snap-guide--corner{border:2px dashed var(--accent);border-radius:16px;background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:0 12px 40px color-mix(in srgb,var(--accent) 16%,transparent)}
@@ -2209,7 +2212,9 @@ body.pills-hide .head{pointer-events:none}
 /* ---- Плавное появление/исчезание инлайн-плашек добавления ---- */
 @keyframes inlineIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 .inline-add{animation:inlineIn .2s var(--ease)}
-.inline-add.closing{animation:none;opacity:0;transform:translateY(-4px);transition:opacity .16s var(--ease),transform .16s var(--ease)}
+/* transition задаём полный список: правило .closing перебивало базовое,
+   и max-height не анимировался — строка схлопывалась рывком */
+.inline-add.closing{animation:none;opacity:0;transform:translateY(-4px);transition:max-height .18s var(--ease),opacity .16s var(--ease),transform .16s var(--ease),padding .18s var(--ease),margin .18s var(--ease)}
 /* Строка добавления в таблице: плавно появляется и схлопывается по высоте */
 tr.inl-tr{transition:height .2s var(--ease),opacity .16s var(--ease);overflow:hidden}
 tr.inl-tr>td{transition:padding .18s var(--ease)}
