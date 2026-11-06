@@ -62,12 +62,78 @@ p{margin:0 0 10px}
 [data-theme="dark-mono"] .msg--own .msg__bubble .poll,[data-theme="dark-mono"] .msg--own .msg__bubble .poll__opt{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16)}
 [data-theme="dark-mono"] .vn__play{background:#3b3733;color:#f0ede8}
 /* Светлая монохромная: свой пузырь делаем плотным тёмным — серый «микс»
-   давал слабый контраст с текстом. */
-[data-theme="light-mono"] .msg--own .msg__bubble{background:linear-gradient(135deg,#2b3038 0%,#14181f 100%);border-color:#14181f;color:#f6f4f1}
-[data-theme="light-mono"] .msg--own .msg__bubble .txt{color:#f6f4f1}
-[data-theme="light-mono"] .msg--own .msg__bubble .time{color:rgba(246,244,241,.72)}
-[data-theme="light-mono"] .msg--own .msg__bubble .react-pill{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.22);color:#f6f4f1}
-[data-theme="light-mono"] .msg--own .msg__bubble .react-pill.on{background:rgba(255,255,255,.24);border-color:#f6f4f1}
+   давал слабый контраст с текстом.
+   Внутри такого пузыря НЕЛЬЗЯ пользоваться обычными токенами темы (акцент
+   #14181f, text-2, faint — все тёмные и на тёмном фоне исчезают). Поэтому
+   задаём локальную палитру «светлое на тёмном» и перекрываем ею все элементы
+   пузыря: цитату, счётчик ответов, закреп/опрос, упоминания, «переслано»,
+   реакции, файл, карточки, голосовое и опрос. */
+[data-theme="light-mono"] .msg--own .msg__bubble{
+  --own-ink:#f6f4f1;
+  --own-ink-2:rgba(246,244,241,.74);
+  --own-soft:rgba(255,255,255,.10);
+  --own-soft-2:rgba(255,255,255,.16);
+  --own-line:rgba(255,255,255,.20);
+  background:linear-gradient(135deg,#2b3038 0%,#14181f 100%);
+  border-color:#14181f;color:var(--own-ink)
+}
+[data-theme="light-mono"] .msg--own .msg__bubble .txt{color:var(--own-ink)}
+[data-theme="light-mono"] .msg--own .msg__bubble .time{color:var(--own-ink-2)}
+/* Вторичный текст: «изменено», длительность голосового, число реакций */
+[data-theme="light-mono"] .msg--own .msg__bubble .msg__edited,
+[data-theme="light-mono"] .msg--own .msg__bubble .vn__time,
+[data-theme="light-mono"] .msg--own .msg__bubble .react-n{color:var(--own-ink-2)}
+/* Акцентные элементы-иконки и ссылки внутри текста */
+[data-theme="light-mono"] .msg--own .msg__bubble .msg__replies,
+[data-theme="light-mono"] .msg--own .msg__bubble .msg__pin-ico,
+[data-theme="light-mono"] .msg--own .msg__bubble .msg__poll-ico,
+[data-theme="light-mono"] .msg--own .msg__bubble .msg__fwd,
+[data-theme="light-mono"] .msg--own .msg__bubble .msg__more,
+[data-theme="light-mono"] .msg--own .msg__bubble .ticks__ic.on{color:var(--own-ink)}
+[data-theme="light-mono"] .msg--own .msg__bubble .msg__more:hover{background:var(--own-soft-2)}
+/* Цитата-ответ: акцентная полоса и автор — светлые, фон — деликатная подложка */
+[data-theme="light-mono"] .msg--own .msg__bubble .msg__quote{
+  background:rgba(255,255,255,.08);
+  border-left-color:rgba(246,244,241,.72);
+  color:var(--own-ink-2)
+}
+[data-theme="light-mono"] .msg--own .msg__bubble .msg__quote b{color:var(--own-ink)}
+/* Упоминания @ник/@все: вместо тёмного акцента — светлый текст и подложка */
+[data-theme="light-mono"] .msg--own .msg__bubble .msg-mention{color:var(--own-ink);background:rgba(255,255,255,.14)}
+[data-theme="light-mono"] .msg--own .msg__bubble .msg-mention--all{background:rgba(255,255,255,.20)}
+[data-theme="light-mono"] .msg--own .msg__bubble .msg-mention--role{background:rgba(255,255,255,.12)}
+[data-theme="light-mono"] .msg--own .msg__bubble .msg-mention:hover{background:rgba(255,255,255,.26)}
+/* Файл и карточка контакта/заказа: тёмная подложка вместо белой плашки */
+[data-theme="light-mono"] .msg--own .msg__bubble .msg__file,
+[data-theme="light-mono"] .msg--own .msg__bubble .msg__artifact{
+  background:var(--own-soft);
+  border-color:var(--own-line);
+  color:var(--own-ink)
+}
+[data-theme="light-mono"] .msg--own .msg__bubble .msg__file .ico,
+[data-theme="light-mono"] .msg--own .msg__bubble .msg__artifact-ico{color:var(--own-ink)}
+[data-theme="light-mono"] .msg--own .msg__bubble .msg__artifact-ico{background:var(--own-soft-2)}
+[data-theme="light-mono"] .msg--own .msg__bubble .msg__file:hover,
+[data-theme="light-mono"] .msg--own .msg__bubble .msg__artifact:hover{background:var(--own-soft-2);border-color:rgba(255,255,255,.30)}
+[data-theme="light-mono"] .msg--own .msg__bubble .msg__artifact-txt .small{color:var(--own-ink-2)}
+/* Голосовое: светлая кнопка с тёмной иконкой, светлая волна и ползунок скорости */
+[data-theme="light-mono"] .msg--own .msg__bubble .vn__play{background:var(--own-ink);color:#14181f}
+[data-theme="light-mono"] .msg--own .msg__bubble .vn__wave i{background:rgba(246,244,241,.35)}
+[data-theme="light-mono"] .msg--own .msg__bubble .vn__wave i.on{background:var(--own-ink)}
+[data-theme="light-mono"] .msg--own .msg__bubble .vn__speed{background:var(--own-soft-2);border-color:var(--own-line);color:var(--own-ink)}
+[data-theme="light-mono"] .msg--own .msg__bubble .vn__speed--fast{color:var(--own-ink)}
+/* Опрос: вопрос, бейджи и варианты — светлые на тёмной подложке */
+[data-theme="light-mono"] .msg--own .msg__bubble .poll>b{color:var(--own-ink)}
+[data-theme="light-mono"] .msg--own .msg__bubble .poll__badge{background:var(--own-soft);border-color:var(--own-line);color:var(--own-ink-2)}
+[data-theme="light-mono"] .msg--own .msg__bubble .poll__opt{background:rgba(255,255,255,.08);border-color:var(--own-line);color:var(--own-ink)}
+[data-theme="light-mono"] .msg--own .msg__bubble .poll__opt .fill{background:rgba(255,255,255,.16)}
+[data-theme="light-mono"] .msg--own .msg__bubble .poll__opt b{color:var(--own-ink-2)}
+[data-theme="light-mono"] .msg--own .msg__bubble .poll__check{color:var(--own-ink)}
+[data-theme="light-mono"] .msg--own .msg__bubble .poll__opt.voted{border-color:rgba(246,244,241,.60)}
+/* Реакции: пилюля уже светлая, но кольца аватаров были белыми — в тон пузыря */
+[data-theme="light-mono"] .msg--own .msg__bubble .react-pill{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.22);color:var(--own-ink)}
+[data-theme="light-mono"] .msg--own .msg__bubble .react-pill.on{background:rgba(255,255,255,.24);border-color:var(--own-ink)}
+[data-theme="light-mono"] .msg--own .msg__bubble .react-av{border-color:#1e232b}
 /* Присутствие (онлайн/офлайн) — критичный элемент: в монотемах оставляем
    зелёный и серый, иначе статус читается ложно. */
 [data-theme="dark-mono"] .dot--online,[data-theme="light-mono"] .dot--online{background:#26b06a}
