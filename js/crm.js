@@ -1856,17 +1856,40 @@ const CRM = (() => {
     }
     const table = wrap.querySelector('table.tbl');
     if (table){
+      /* Новая строка собирается по разметке обычной строки: те же ячейки,
+         а поля раскладываем по своим колонкам (ID — «Заказ», клиент,
+         дедлайн, итого, кнопки — в последнюю). */
+      const cols = (table.tHead && table.tHead.rows[0]) ? table.tHead.rows[0].cells.length : 1;
       const tr = document.createElement('tr');
-      tr.className = 'inl-tr';
-      const td = document.createElement('td');
-      td.colSpan = (table.tHead && table.tHead.rows[0]) ? table.tHead.rows[0].cells.length : 1;
-      tr.appendChild(td);
+      tr.className = 'inl-tr inline-add inline-add--row';
+      tr.dataset.clone = '1';
+      for (let i = 0; i < cols; i++) tr.appendChild(document.createElement('td'));
+      const cellAt = i => tr.cells[Math.max(0, Math.min(i, cols - 1))];
+      const put = (i, sel) => { const el = box.querySelector(sel); if (el) cellAt(i).appendChild(el); };
+      if (kind === 'orders'){
+        put(1, '[data-f="id"]');
+        put(3, '[data-f="client"]');
+        put(6, '[data-f="deadline"]');
+        put(7, '[data-f="total"]');
+      } else {
+        /* Люди: имя — в колонку «ФИО», контакты — в соседнюю */
+        put(2, '[data-f="name"]');
+        put(3, '[data-f="email"]');
+        put(3, '[data-f="phone"]');
+      }
+      const lastCell = cellAt(cols - 1);
+      ['[data-inline-save]','[data-inline-cancel]'].forEach(sel => { const el = box.querySelector(sel); if (el) lastCell.appendChild(el); });
+      /* Подсказка нужна проверке дублей ID — держим её в ячейке, но скрытой */
+      const hint = box.querySelector('[data-inline-hint]');
+      if (hint){ hint.hidden = true; cellAt(kind === 'orders' ? 1 : 3).appendChild(hint); }
       const tbody = table.tBodies[0] || table.appendChild(document.createElement('tbody'));
       tbody.insertBefore(tr, tbody.firstChild);
-      box.classList.add('inline-add--row');
-      td.appendChild(box);
-      box.__tr = tr;
+      box.remove();
+      tr.classList.add('inline-add--in');
+      setTimeout(()=>tr.classList.remove('inline-add--in'), 280);
+      return tr;
     }
+    return box;
   }
 
   /* Новая пустая строка/карточка на каждое нажатие: форма-шаблон #o-inline
@@ -1879,8 +1902,7 @@ const CRM = (() => {
     box.dataset.clone = '1';
     box.hidden = true;
     tpl.parentNode.insertBefore(box, tpl.nextSibling);
-    inlineOpen(box, root, kind);
-    return box;
+    return inlineOpen(box, root, kind) || box;
   }
 
   /* Закрытие: сначала плавно схлопываем строку, потом убираем её из списка

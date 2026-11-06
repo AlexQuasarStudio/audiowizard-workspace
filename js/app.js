@@ -729,7 +729,15 @@ const QUICK_BY_ROLE = {
     const qBtn = dd.querySelector('[data-i="'+items.indexOf(items.find(it=>it.label==='Быстрые действия'))+'"]');
     if (qBtn){
       let subDD = null, pinned = false, hoverTimer = null, subItems = null;
-      const removeSub = () => { if (subDD) { subDD.remove(); subDD = null; } };
+      /* Подменю гаснет так же плавно, как и появляется (в zen это заметно:
+         раньше плашка исчезала рывком). */
+      const removeSub = () => {
+        if (!subDD) return;
+        const el = subDD; subDD = null;
+        el.classList.add('closing');
+        el.style.pointerEvents = 'none';
+        setTimeout(()=>el.remove(), 170);
+      };
       const buildSub = () => {
         if (subDD) { subDD.remove(); subDD = null; }
         /* Быстрые действия (те же, что в плашке иконок) + пункты меню (разделы) */
@@ -5748,6 +5756,8 @@ const cm = root.querySelector('.chat-main');
 
   /* ---------- Настройки ---------- */
   let settingsSection = '';
+  /* Телефон: настройки — список разделов, выбранный открывается экраном с «Назад» */
+  const isMobileSettings = () => !!(window.matchMedia && window.matchMedia('(max-width: 860px)').matches);
   /* «О приложении» — обычный раздел настроек. Клик по лого открывает его
      так же, как пункт бокового меню: без всплывающего окна. */
   function openAboutSection(){
@@ -5763,6 +5773,8 @@ const cm = root.querySelector('.chat-main');
 
   function settingsView(root, section){
     const u = user();
+    /* Раздел пришёл из маршрута (#/settings/profile) или это вход в настройки */
+    const fromRoute = !!section;
     section = section || settingsSection || 'profile';
     const sections = [
       ['profile','Профиль','clients'], ['look','Внешний вид','palette'], ['notify','Уведомления и рассылки','bell'],
@@ -5810,16 +5822,37 @@ const cm = root.querySelector('.chat-main');
     };
     root.innerHTML = `
       <div class="page-head"><div><h2>${__t('settings.title','Настройки')}</h2><div class="sub">${__t('settings.subtitle','Профиль, внешний вид, безопасность и документы')}</div></div></div>
-      <div class="settings-grid">
+      <div class="settings-grid${isMobileSettings() && fromRoute ? ' set-detail' : ''}">
         <div class="settings-nav card card-pad" style="padding:8px">
           ${sections.map(([id,label,ic])=>`<button class="side__link ${section===id?'on':''}" data-sec="${id}" style="width:100%">${icon(ic)}<span>${label}</span></button>`).join('')}
         </div>
-        <div id="set-body" class="stack"></div>
+        <div class="set-main">
+          <button class="btn btn--ghost btn--sm set-back" type="button" data-set-back ${isMobileSettings() && fromRoute ? '' : 'hidden'}>${icon('chev-r','ico-sm')} Настройки</button>
+          <div id="set-body" class="stack"></div>
+        </div>
       </div>`;
+    /* Телефон: список разделов ↔ экран раздела, с плавным переходом */
+    const mobileState = (detail, animate)=>{
+      const grid = root.querySelector('.settings-grid');
+      if (!grid) return;
+      grid.classList.toggle('set-detail', !!detail);
+      const back = root.querySelector('[data-set-back]');
+      if (back) back.hidden = !detail;
+      if (animate){
+        const target = detail ? root.querySelector('.set-main') : root.querySelector('.settings-nav');
+        if (target){ target.classList.remove('set-in'); void target.offsetWidth; target.classList.add('set-in'); }
+      }
+    };
+    const backBtn = root.querySelector('[data-set-back]');
+    if (backBtn) backBtn.onclick = ()=>{
+      mobileState(false, true);
+      try { root.querySelector('.settings-nav').scrollIntoView({ block:'start' }); } catch(e){}
+    };
     $$('[data-sec]', root).forEach(b=>b.onclick=()=>{
       /* «О приложении» — окно поверх настроек: справку открывают ненадолго */
       if (b.dataset.sec === 'about'){ openAboutWin(); return; }
       section=b.dataset.sec; settingsSection=section; $$('[data-sec]',root).forEach(x=>x.classList.toggle('on', x===b)); renderSec();
+      if (isMobileSettings()) mobileState(true, true);
     });
     renderSec();
 

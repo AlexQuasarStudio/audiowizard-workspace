@@ -359,7 +359,11 @@ tr.inl-tr{animation:inlRowIn .2s var(--ease)}
 .inline-add--row .inline-add__row{gap:6px;margin-bottom:0}
 .inline-add--row .inline-add__row .input{flex:1 1 150px;min-width:0;max-width:320px}
 .inline-add--row>.small{display:none}
-.inline-add--card{margin:0;border:1px solid var(--accent);background:var(--panel);border-radius:14px;animation:inlineIn .2s var(--ease)}
+/* Новая карточка в сетке — в той же «оболочке», что и карточки данных:
+   та же рамка, радиус, отступы и тень. */
+.inline-add--card{margin:0;border:1px solid var(--border);background:var(--panel);border-radius:14px;padding:12px;box-shadow:var(--sh-1);animation:inlineIn .2s var(--ease)}
+.inline-add--card .inline-add__row{gap:8px;flex-wrap:wrap}
+.inline-add--card .inline-add__row .input{flex:1 1 100%;max-width:none}
 .inline-add{transition:max-height .18s var(--ease),opacity .16s var(--ease),padding .18s var(--ease),margin .18s var(--ease)}.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
 .filters .input-wrap{min-width:160px;flex:1 1 200px;max-width:320px}
 .filters select.input{width:auto;min-width:120px;max-width:100%}
@@ -486,6 +490,10 @@ body.zen .chats-layout{height:100%;position:static;inset:auto;z-index:auto;displ
    чат занимает всю ширину (класс ставит JS при ресайзе окна). */
 #windows-layer .aw-win.aw-win--narrow-chats .chats-layout{grid-template-columns:1fr;gap:0}
 #windows-layer .aw-win.aw-win--narrow-chats .chat-list{display:none}
+/* В фуллскрине раскладка чатов двухколоночная (лента во 2-й колонке).
+   В узком окне колонка одна, и лента оставалась с grid-column:2 — ширина 0,
+   окно «схлопывалось». Возвращаем её в единственную колонку. */
+#windows-layer .aw-win.aw-win--narrow-chats .chats-layout .chat-main{grid-column:1;width:auto}
 #windows-layer .aw-win.aw-win--narrow-chats .chat-list-toggle{display:none}
 /* Стрелка «назад» в узком окне открывает список чатов; в режиме списка
    показываем только его, чат скрыт. */
@@ -1980,6 +1988,19 @@ body.pills-hide .head{pointer-events:none}
 .settings-grid{display:grid;grid-template-columns:248px minmax(0,1fr);gap:20px;align-items:start}
 .settings-grid > .settings-nav{position:sticky;top:clamp(18px,3.4vw,28px);align-self:start}
 @media (max-width:860px){.settings-grid{grid-template-columns:1fr}.settings-grid > .settings-nav{position:static}}
+/* Телефон: настройки как в нативных приложениях — сначала список разделов,
+   затем экран выбранного раздела с кнопкой «Назад». Переходы плавные. */
+@media (max-width:860px){
+  .settings-grid{display:block}
+  .settings-grid .set-main{display:none}
+  .settings-grid.set-detail .settings-nav{display:none}
+  .settings-grid.set-detail .set-main{display:block}
+  .set-back{display:inline-flex;align-items:center;gap:6px;margin:0 0 12px;padding-left:2px}
+  .set-back .ico{transform:rotate(180deg)}
+  .set-main.set-in,.settings-nav.set-in{animation:setIn .26s var(--ease)}
+}
+@media (min-width:861px){ .set-back{display:none!important} }
+@keyframes setIn{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:none}}
 
 /* ---- Документы: аккордеон (шапка сворачивает тело) ---- */
 .doc-acc{border:1px solid var(--border);border-radius:12px;background:var(--panel);margin-bottom:8px;overflow:hidden}
