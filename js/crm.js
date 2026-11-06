@@ -2209,7 +2209,7 @@ const CRM = (() => {
         }
       }
       const end = Math.min(startIdx + P_CHUNK, filtered.length);
-      const docs = filtered.slice(startIdx, end).map((p,i) => cardsView ? personCard(p, role, staff, startIdx + i + 1) : personRow(p, role, staff, startIdx + i + 1)).join('');
+      const docs = filtered.slice(startIdx, end).map((p,i) => cardsView ? personCard(p, role, staff, startIdx + i + 1) : personRow(p, role, staff, startIdx + i + 2)).join('');
       host.insertAdjacentHTML('beforeend', docs);
       const oldSent = root.querySelector('#pl-sentinel');
       oldSent && oldSent.remove();
@@ -2619,8 +2619,9 @@ updatePeopleBulk();
      записи номер присваивается один раз и не переиспользуется после удаления. */
   function nextPersonNum(){
     S.settings = S.settings || {};
-    S.settings._personSeq = S.settings._personSeq || 0;
-    S.settings._personSeq += 1;
+    /* Первая строка Excel — заголовки колонок, поэтому люди нумеруются с 2:
+       номер 1 зарезервирован под шапку таблицы при импорте. */
+    S.settings._personSeq = Math.max(1, S.settings._personSeq || 0) + 1;
     const n = S.settings._personSeq;
     saveState();
     return n;
@@ -3107,7 +3108,7 @@ updatePeopleBulk();
   function toolsView(root){
     const u = me(); const admin = u.role==='admin';
     root.innerHTML = `
-      <div class="page-head"><div><h2>Импорт и экспорт</h2><div class="sub">${S.importLogs.length ? 'Добавлено '+(S.importLogs[0].added||0)+' · пропущено '+(S.importLogs[0].skipped||0)+' · ошибок '+(S.importLogs[0].errs||0) : 'Нет импортов'}</div></div>${me().role==='admin'?`<div class="page-actions"><button class="btn btn--ghost btn--sm" id="il-exp">${icon('export')} Экспорт журнала</button></div>`:''}</div>
+      <div class="page-head"><div><h2>Импорт и экспорт</h2><div class="sub">${window.__lastImport ? 'Добавлено '+(window.__lastImport.added||0)+' · пропущено '+(window.__lastImport.skipped||0)+' · ошибок '+(window.__lastImport.errs||0) : 'Нет импортов за эту сессию'}</div></div>${me().role==='admin'?`<div class="page-actions"><button class="btn btn--ghost btn--sm" id="il-exp">${icon('export')} Экспорт журнала</button></div>`:''}</div>
       <div class="cols-2 grid">
         <div class="card"><div class="card-h"><h3>${icon('import')} Импорт</h3><span class="badge c-blue">XLSX → CSV автоматически</span></div>
           <div class="card-b stack" style="gap:12px">
@@ -3562,6 +3563,9 @@ updatePeopleBulk();
         addLog(`Итог: добавлено ${added}, пропущено ${skipped}, правил применено ${ruled} · ошибок: ${domErr}, предупреждений: ${domWarn} · листов: ${chosen.length} · за ${Math.round(performance.now() - t0)} мс`, 'ok');
         const stamp = Date.now();
         S.importLogs.unshift({ t: stamp, added, skipped, ruled, errs: domErr, warns: domWarn, infos: impKind.ok||0, file: file.name, entity: chosen.map(s=>s.kind).join('+') });
+        /* Счётчик в шапке — только про текущий сеанс: после перезагрузки
+           он снова нулевой, а не показывает прошлый импорт. */
+        window.__lastImport = { added, skipped, errs: domErr, ts: stamp };
         /* ПОЛНЫЙ построчный журнал каждой операции */
         const lineRecs = [];
         logBuf.forEach(([txt, kind]) => lineRecs.push({ t: stamp, file: file.name, entity: chosen.map(s=>s.kind).join('+'), kind: kind||'ok', text: txt }));

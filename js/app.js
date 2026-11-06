@@ -5867,7 +5867,7 @@ const cm = root.querySelector('.chat-main');
         </div>
         <div class="cols-2 grid" style="gap:12px">
           <div class="field"><label>ФИО / Название</label><input class="input" id="pf-name" value="${esc(u2.full_name)}"></div>
-          <div class="field"><label>Логин</label><input class="input" value="${esc(u2.username)}" disabled></div>
+          <div class="field"><label>Логин</label><input class="input" id="pf-login" value="${esc(u2.username)}" autocomplete="off" spellcheck="false"></div>
           <div class="field"><label>Email</label><input class="input" id="pf-email" value="${esc(u2.email)}"></div>
           <div class="field"><label>Телефон</label><input class="input" id="pf-phone" value="${esc(u2.phone)}"></div>
         </div>
@@ -6509,6 +6509,21 @@ const cm = root.querySelector('.chat-main');
             toast('Профиль сохранён','ok');
           });
         });
+        /* Логин меняем аккуратно: только a-z, 0-9, точка, дефис, подчёркивание;
+           проверяем занятость и не даём сохранить пустое/короткое. */
+        const pfLogin = $('#pf-login', el);
+        if (pfLogin){
+          pfLogin.addEventListener('change', ()=>{
+            const val = pfLogin.value.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
+            if (val.length < 3){ toast('Логин: минимум 3 символа (a-z, 0-9, . _ -)','err'); pfLogin.value = u.username || ''; return; }
+            if (val === (u.username || '')){ pfLogin.value = val; return; }
+            if (S.users.some(x => x.id !== u.id && norm(x.username) === val)){ toast('Этот логин уже занят','err'); pfLogin.value = u.username || ''; return; }
+            u.username = val;
+            pfLogin.value = val;
+            pfCommit('логин «'+val+'»', ()=>APP && APP.render && requestAnimationFrame(APP.render));
+            toast('Логин изменён','ok');
+          });
+        }
         /* Черновики заказов: автосохранение, вопрос при закрытии, очистка */
         const draftAuto = $('#draft-auto', el);
         if (draftAuto){
