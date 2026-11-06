@@ -830,6 +830,7 @@ const QUICK_BY_ROLE = {
         <span class="side__brand-logo logo-mark--lg">${icon('logo-full')}</span>
         <div><b style="font-size:16px">Audiowizard Workspace</b><div class="small muted">Версия ${esc((S.product||{}).version || '0.1-prototype')} · сборка ${(S.product||{}).build || 216} ${((S.product||{}).beta !== false)?'<span class="beta-badge">Beta</span>':''}</div></div>
         <span class="spacer"></span><button class="btn btn--soft btn--sm" id="ab-tour">${icon('bulb')} Пройти тур</button><button class="btn btn--soft btn--sm" id="ab-check">${icon('refresh')} Проверить обновления</button></div>
+      ${isStaff((me() || {}).role) ? serverStateHtml() : ''}
       <div class="card card-pad"><h3 style="margin-bottom:12px">Модели развертывания</h3>
         <div class="cols-2 grid">
           <div class="card card-pad" style="background:var(--bg-2)"><div class="row">${icon('cloud')}<b>On-Demand (SaaS)</b><span class="badge c-green">активна</span></div>
@@ -848,6 +849,23 @@ const QUICK_BY_ROLE = {
         <div class="field" style="margin-top:8px"><textarea class="input" id="ab-issue-detail" rows="2" placeholder="Подробности (необязательно)"></textarea></div>
         <div class="row" style="gap:8px;margin-top:8px"><button class="btn btn--primary btn--sm" id="ab-issue-send">${icon('send')} Отправить</button><span class="small faint" id="ab-issue-msg"></span></div></div>`;
     }
+
+  /* Компактный раздел настроек: только логотип-кнопка. Всю подробную
+     информацию (серверы, модели развертывания, обновления) показывает
+     то же окно, что открывается кликом по логотипу в меню. */
+  function aboutSectionHTML(){
+    const p = S.product || {};
+    return `<div class="card card-pad about-section">
+      <button type="button" class="about-section__logo" id="ab-open" title="Открыть «О приложении»" aria-label="Открыть «О приложении»">
+        <span class="side__brand-logo logo-mark--lg">${icon('logo-full')}</span>
+      </button>
+      <div class="about-section__txt">
+        <b style="font-size:16px">Audiowizard Workspace</b>
+        <div class="small muted">Версия ${esc(p.version || '0.1-prototype')} · сборка ${esc(String(p.build || ''))} ${p.beta !== false?'<span class="beta-badge">Beta</span>':''}</div>
+        <p class="small muted" style="margin:6px 0 0">Нажмите на логотип — откроются сведения о приложении, состоянии серверов и обновлениях.</p>
+      </div>
+    </div>`;
+  }
 
   /* «О приложении» — окно поверх интерфейса: открывается и из настроек,
      и кликом по лого. */
@@ -5758,18 +5776,6 @@ const cm = root.querySelector('.chat-main');
   let settingsSection = '';
   /* Телефон: настройки — список разделов, выбранный открывается экраном с «Назад» */
   const isMobileSettings = () => !!(window.matchMedia && window.matchMedia('(max-width: 860px)').matches);
-  /* «О приложении» — обычный раздел настроек. Клик по лого открывает его
-     так же, как пункт бокового меню: без всплывающего окна. */
-  function openAboutSection(){
-    const target = '#/settings/about';
-    if (location.hash === target){
-      settingsSection = 'about';
-      route = { name:'settings', param:'about' };
-      try { render(); } catch(e){ console.error(e); }
-    } else {
-      location.hash = target;
-    }
-  }
 
   function settingsView(root, section){
     const u = user();
@@ -5811,7 +5817,7 @@ const cm = root.querySelector('.chat-main');
       if (section==='security') el.innerHTML = securityHTML(u);
       if (section==='keys') el.innerHTML = keysHTML();
       if (section==='docs') el.innerHTML = docsHTML();
-      if (section==='about') el.innerHTML = aboutWindowHTML();
+      if (section==='about') el.innerHTML = aboutSectionHTML();
       if (section==='calc') el.innerHTML = calcHTML();
       if (section==='data') el.innerHTML = dataHTML();
       if (section==='product') el.innerHTML = productHTML();
@@ -5849,8 +5855,6 @@ const cm = root.querySelector('.chat-main');
       try { root.querySelector('.settings-nav').scrollIntoView({ block:'start' }); } catch(e){}
     };
     $$('[data-sec]', root).forEach(b=>b.onclick=()=>{
-      /* «О приложении» — окно поверх настроек: справку открывают ненадолго */
-      if (b.dataset.sec === 'about'){ openAboutWin(); return; }
       section=b.dataset.sec; settingsSection=section; $$('[data-sec]',root).forEach(x=>x.classList.toggle('on', x===b)); renderSec();
       if (isMobileSettings()) mobileState(true, true);
     });
@@ -6902,7 +6906,10 @@ const cm = root.querySelector('.chat-main');
         };
         $('#sec-2fa', el).onclick = ()=>wipModal('Двухфакторная аутентификация');
       }
-      if (sec==='about') bindAboutWindow(el, u);
+      if (sec==='about'){
+        const ab = $('#ab-open', el);
+        if (ab) ab.onclick = ()=>openAboutWin();
+      }
       if (sec==='docs'){
         /* Аккордеон документов: клик по шапке переключает класс .open.
            Обратная анимация (сворачивание) идёт через CSS transition по
