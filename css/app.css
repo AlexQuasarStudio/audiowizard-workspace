@@ -1601,7 +1601,12 @@ body.win-dragging *{user-select:none!important}
 .ticks{display:inline-flex;gap:0;align-items:center;vertical-align:middle;color:rgba(255,255,255,.65)}
 .ticks .ico{width:15px;height:15px;margin-left:1px}
 .ticks,.ticks.on{color:inherit}
-.msg--own .msg__bubble{background:color-mix(in srgb,var(--accent) 20%,var(--bg));border-color:color-mix(in srgb,var(--accent) 45%,transparent);border-radius:16px 16px 4px 16px}
+/* Свои сообщения — акцентный оттенок из референса: в светлой фиолетовой
+   теме подложка #DCD6E3, рамка #B0A4C2 (акцент 20% и 45% поверх фона).
+   Готовые токены --own-bubble / --own-bubble-bd лежат в css/base.css для
+   каждой темы: если браузер не умеет color-mix, пузырь не побелеет, а
+   возьмёт ближайший оттенок темы. */
+.msg--own .msg__bubble{background:var(--own-bubble,color-mix(in srgb,var(--accent) 20%,var(--bg)));border-color:var(--own-bubble-bd,color-mix(in srgb,var(--accent) 45%,transparent));border-radius:16px 16px 4px 16px}
 /* Хвост пузыря — в стиле Telegram: отдельный «треугольник» не нужен.
    Угол пузыря у хвоста имеет меньший радиус (4px против 16px) и образует
    аккуратный носик-указатель — ровные края без пикселизации. */
@@ -1863,7 +1868,12 @@ html.splash-hold #splash{visibility:hidden}
    ============================================================ */
 
 /* --- Свои сообщения: мягкая акцентная подложка (принцип «некричащих» цветов) --- */
-.msg--own .msg__bubble{background:color-mix(in srgb,var(--accent) 20%,var(--bg));border-color:color-mix(in srgb,var(--accent) 45%,transparent);border-radius:16px 16px 4px 16px}
+/* Свои сообщения — акцентный оттенок из референса: в светлой фиолетовой
+   теме подложка #DCD6E3, рамка #B0A4C2 (акцент 20% и 45% поверх фона).
+   Готовые токены --own-bubble / --own-bubble-bd лежат в css/base.css для
+   каждой темы: если браузер не умеет color-mix, пузырь не побелеет, а
+   возьмёт ближайший оттенок темы. */
+.msg--own .msg__bubble{background:var(--own-bubble,color-mix(in srgb,var(--accent) 20%,var(--bg)));border-color:var(--own-bubble-bd,color-mix(in srgb,var(--accent) 45%,transparent));border-radius:16px 16px 4px 16px}
 
 /* --- Вложения в сообщении --- */
 .msg__img{display:block;max-width:100%;max-height:320px;border-radius:12px;margin:2px 0 4px;cursor:pointer;object-fit:cover}
