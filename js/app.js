@@ -3202,11 +3202,12 @@ ex.innerHTML = avatarHTML(user(), '');
               ${own?'':`<div class="who" data-av-uid="${esc(m.user_id||'')}" title="Открыть профиль" style="cursor:pointer;${whoColor?`color:${whoColor};`:''}">${esc(author.full_name)}${isStaff(author.role)?`<span class="role-mark role-mark--${author.role}" title="${esc(ROLE_LABEL[author.role])}">${icon('shield','ico-sm')}</span>`:''}${c.owner_id===m.user_id?'<span class="chat-role-tag chat-role-tag--owner">владелец</span>':((c.admins||[]).includes(m.user_id)?'<span class="chat-role-tag chat-role-tag--admin">админ</span>':'')}${canModerate&&ghost?' <span class="ghost-mode-note">'+icon('eye-off','ico-sm')+' невидимка</span>':''}</div>`}
               ${fwdHtml}
               ${quoteHtml}
-              <div class="txt">${m.pinned?`<span class="msg__pin-ico" title="Закреплено">${icon('pin','ico-sm')}</span>`:''}${m.type==='poll'?`<span class="msg__poll-ico">${icon('poll','ico-sm')}</span>`:''}${isArtifact ? '' : txtRender}<span class="time">${repliesBtn}${m.edited?`<span class="msg__edited" title="Изменено ${fmtDT(m.editedAt||m.created_at)}">изменено</span>`:''}${fmtTime(m.created_at)}${own?`<span class="ticks" title="${(m.readBy||[]).length?('Прочитано'):'Доставлено, ещё не прочитано'}"><span class="ticks__ic ${(m.readBy||[]).length>0?'on':''}">${(m.readBy||[]).length>0?icon('checks','ico-sm'):icon('check','ico-sm')}</span></span>`:''}</span></div>
+              <div class="txt">${m.pinned?`<span class="msg__pin-ico" title="Закреплено">${icon('pin','ico-sm')}</span>`:''}${m.type==='poll'?`<span class="msg__poll-ico">${icon('poll','ico-sm')}</span>`:''}${isArtifact ? '' : txtRender}</div>
               ${fileHtml}
               ${artifactHtml}
               ${pollHtml}
               ${reactions?`<div class="msg__reactions">${reactions}</div>`:''}
+              <div class="msg__foot"><span class="time">${repliesBtn}${m.edited?`<span class="msg__edited" title="Изменено ${fmtDT(m.editedAt||m.created_at)}">изменено</span>`:''}${fmtTime(m.created_at)}${own?`<span class="ticks" title="${(m.readBy||[]).length?('Прочитано'):'Доставлено, ещё не прочитано'}"><span class="ticks__ic ${(m.readBy||[]).length>0?'on':''}">${(m.readBy||[]).length>0?icon('checks','ico-sm'):icon('check','ico-sm')}</span></span>`:''}</span></div>
             </div>
           </div>`
         };

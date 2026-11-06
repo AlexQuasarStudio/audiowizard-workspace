@@ -761,7 +761,11 @@ body.zen .day-sep.on-scroll{top:0}
 .chat-mention-dd .dd__item.on{background:var(--accent-soft)}
 .msg-mention:hover{background:var(--accent-soft);text-decoration:underline}
 .who .ghost-mode-note{display:inline-flex;align-items:center;gap:3px;color:var(--muted);font-weight:600;font-size:10.5px}
-.msg__bubble{background:var(--panel);border:1px solid var(--border);border-radius:16px 16px 16px 4px;padding:9px 14px 6px;min-width:0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.msg__bubble{background:var(--panel);border:1px solid var(--border);border-radius:16px 16px 16px 4px;padding:9px 14px 6px;min-width:0;box-shadow:0 1px 2px rgba(0,0,0,.04);display:flex;flex-direction:column}
+/* Время и галочки — всегда у нижнего края пузыря (и после реакций),
+   прижаты вправо, даже если сообщение широкое */
+.msg__foot{display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-top:4px}
+.msg__foot .time{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--faint);line-height:1.2;white-space:nowrap}
 /* Появление/исчезновение сообщений — как в ТГ: плавно и только для новых
    (класс .msg--in вешает JS по diff'у id), история при перерисовке не дёргается. */
 .msg,.msg-system{transition:opacity .19s var(--ease),transform .19s var(--ease),max-height .22s var(--ease),margin .22s var(--ease)}
@@ -1231,7 +1235,7 @@ body.menu-dragging .main .theme-card:hover{box-shadow:none!important;transform:n
 #windows-layer{position:fixed;inset:0;pointer-events:none;z-index:3000;overflow:hidden}
 .tour-card{position:fixed;z-index:1601;width:330px;max-width:calc(100vw - 28px);background:var(--panel);border:1px solid var(--border-2);border-radius:16px;box-shadow:var(--sh-2);padding:18px;animation:popIn .4s var(--ease)}
 .tour-spot{position:fixed;z-index:1600;border-radius:14px;box-shadow:0 0 0 4px var(--accent-soft),0 0 0 9999px rgba(4,6,10,.66);transition:left .48s var(--ease),top .48s var(--ease),width .48s var(--ease),height .48s var(--ease);pointer-events:none}
-.aw-win{position:fixed;min-width:320px;min-height:220px;background:var(--panel);border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--sh-2);display:flex;flex-direction:column;pointer-events:auto;animation:popIn .22s var(--ease);overflow:hidden}
+.aw-win{position:fixed;min-width:320px;min-height:220px;background:var(--panel);border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--sh-2);display:flex;flex-direction:column;pointer-events:auto;animation:popIn .22s var(--ease);overflow:hidden;transition:box-shadow .2s var(--ease)}
 .aw-win--dragging{box-shadow:0 30px 90px -12px rgba(0,0,0,.65);opacity:.97}
 
 /* В активном сплите тень между окнами не рисуется (стык без наложения) */
