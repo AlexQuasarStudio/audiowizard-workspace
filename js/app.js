@@ -4276,14 +4276,16 @@ const cm = root.querySelector('.chat-main');
         ...(c.type!=='direct' && canModerate ? [{ label:'Пригласить в чат', icon:'plus', onClick:()=>{ try { inviteToChat(); } catch(e){} } }] : []),
         { label:'Уведомления чата: вкл', icon:'bell', onClick:()=>{ toast('Уведомления чата включены','info'); } },
         { label:'Не беспокоить 1 час', icon:'clock', onClick:()=>{ toast('Чат в режиме «Не беспокой до '+fmtTime(Date.now()+3600000),'info'); } },
-        '-', { label: isArchived(c, u) ? 'Вернуть из архива' : 'В архив', icon:'archive', onClick:()=>{
+        /* Порядок пунктов: архив — самый последний, сразу под удалением и без
+           разделителя: это «отложить» после «удалить», а не часть настроек. */
+        ...(canModerate ? ['-', { label:'Удалить чат (90 дней на восстановление)', icon:'trash', danger:true, onClick:()=>confirmModal({ title:'Удалить чат?', text:'Чат будет отключён. Восстановление возможно в течение 90 дней из бекапа.', okText:'Удалить', danger:true }).then(ok=>{ if(ok){ c.is_active=false; logAudit(`Чат удалён: ${c.name}`,'Чат'); saveState(); toast('Чат удалён. Восстановление доступно 90 дней','ok'); APP.render(); } }) }] : ['-']),
+        { label: isArchived(c, u) ? 'Вернуть из архива' : 'В архив', icon:'archive', onClick:()=>{
             const arch = isArchived(c, u);
             setArchived(c, u, !arch);
             toast(arch ? 'Чат возвращён из архива' : 'Чат скрыт в архив','ok');
             if (!arch && curChat === c.id) curChat = null;
             APP.render();
-          } },
-        ...(canModerate?['-',{ label:'Удалить чат (90 дней на восстановление)', icon:'trash', danger:true, onClick:()=>confirmModal({ title:'Удалить чат?', text:'Чат будет отключён. Восстановление возможно в течение 90 дней из бекапа.', okText:'Удалить', danger:true }).then(ok=>{ if(ok){ c.is_active=false; logAudit(`Чат удалён: ${c.name}`,'Чат'); saveState(); toast('Чат удалён. Восстановление доступно 90 дней','ok'); APP.render(); } }) }]:[])
+          } }
       ]);
 
       /* Карточка чата (как в ТГ): клик по аватару в шапке — название, описание,
