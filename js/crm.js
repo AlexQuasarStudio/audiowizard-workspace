@@ -2775,8 +2775,10 @@ updatePeopleBulk();
      для него invite (в invites ищем по email или по полю personId). */
   function importedNeedsInvite(p){
     if (!p || !p.ext || !p.ext.xlsxRow) return false;
-    if (p.ext.invited || p.ext.activated) return false;
-    if (p.email && (S.invites||[]).some(inv => inv.personId === p.id || inv.email && norm(inv.email) === norm(p.email))) return false;
+    if (p.ext.activated) return false;
+    /* Кнопка исчезает только после принятия: пока приглашение не использовано,
+       человек ещё не в системе — даём скопировать/продлить ссылку. */
+    if (p.email && (S.invites||[]).some(inv => (inv.personId === p.id || inv.email && norm(inv.email) === norm(p.email)) && (inv.used > 0 || (inv.usedBy||[]).length))) return false;
     return true;
   }
   function createInviteForPerson(p){
@@ -2913,13 +2915,40 @@ updatePeopleBulk();
         if (dmBtn) dmBtn.onclick = ()=>{ close(); window.openDirectChat(p.id); };
         const invPersonBtn = mask.querySelector('[data-invite-person]');
         if (invPersonBtn) invPersonBtn.onclick = ()=>{
-          const inv = createInviteForPerson(p);
-          if (inv) {
-            try { navigator.clipboard.writeText(inviteLink(inv)); } catch(e){}
-            toast('Приглашение: '+inviteLink(inv),'info');
-            close(); openPersonCard(p.id, roleEff);
-          } else toast('Вы не можете пригласить с этой ролью','warn');
+          const existing = (S.invites||[]).find(inv => (inv.personId === p.id || (p.email && inv.email && norm(inv.email)===norm(p.email))) && !(inv.used>0 || (inv.usedBy||[]).length));
+          const inv = existing || createInviteForPerson(p);
+          if (!inv){ toast('Вы не можете пригласить с этой ролью','warn'); return; }
+          const link = inviteLink(inv);
+          close();
+          openWinModal({ title:'Приглашение в систему', narrow:true, icon:'user-plus',
+            body:`<p class="small">Ссылка для <b>${esc(p.full_name)}</b> действует до ${fmtDT(inv.expiresAt)} и станет недействительной после регистрации. Скопируйте и отправьте её лично — автоматически она не копируется.</p>
+              <div class="field" style="margin-top:10px"><label>Ссылка</label><input class="input mono" id="inv-link" readonly value="${esc(link)}"></div>
+              <div class="small faint" style="margin-top:6px">Пока приглашение не принято, кнопка остаётся в профиле — можно вернуться и скопировать снова.</div>`,
+            footer:`<button class="btn btn--ghost" data-x>Закрыть</button><button class="btn btn--primary" data-copy>${icon('copy')} Скопировать</button>`,
+            onMount:(mm,cl)=>{
+              mm.querySelector('[data-x]').onclick = cl;
+              mm.querySelector('[data-copy]').onclick = ()=>{
+                try { navigator.clipboard.writeText(link); toast('Ссылка скопирована','ok'); } catch(e){ toast('Не удалось скопировать — выделите ссылку вручную','warn'); }
+              };
+            }});
         };
+        /* Специализации в карточке: клик по строке — правка (staff) */
+        const specEl = mask.querySelector('[data-inline="specs"]');
+        if (specEl && isStaff(u.role)){
+          specEl.style.cursor = 'pointer';
+          specEl.title = 'Изменить специализации';
+          specEl.onclick = ()=>{
+            inlineField(specEl, { value:(p.ext.specializations||[]).join(', '), placeholder:'Специализации через запятую', onSave:v=>{
+              const arr = [...new Set(String(v||'').split(',').map(x=>x.trim()).filter(Boolean))];
+              const oldQ = p.ext.qualification || {}; const q = {};
+              arr.forEach(sp2 => { q[sp2] = oldQ[sp2] || 3; });
+              p.ext.specializations = arr; p.ext.qualification = q;
+              saveState(); toast('Специализации обновлены','ok');
+              try { logAudit('Специализации «'+p.full_name+'»: '+(arr.join(', ')||'—'), 'Люди'); } catch(e){}
+              close(); openPersonCard(p.id, roleEff);
+            }});
+          };
+        }
         const editBtn = mask.querySelector('[data-pf-edit]');
         if (editBtn) editBtn.onclick = () => { close(); openPersonForm(role, p); };
         /* Смена роли — только админ; себе роль менять нельзя (защита от потери доступа) */
