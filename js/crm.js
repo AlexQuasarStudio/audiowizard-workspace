@@ -2021,6 +2021,25 @@ const CRM = (() => {
 
   /* Закрытие: сначала плавно схлопываем строку, потом убираем её из списка
      и возвращаем плашку на исходное место в разметке. */
+  /* Esc убирает все новые строки активного раздела — фокус на вводе не нужен.
+     Capture: срабатываем раньше обработчиков полей, чтобы убрать строки целиком.
+     Если открыт поповер выбора или правится ячейка — сначала закрывается он. */
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (__crmInline) return;
+    if (document.querySelector('.inline-pick, .modal-mask')) return;
+    /* Свёрнутые окна не считаем: они не мешают и не должны глушить Esc. */
+    const winOpen = [...document.querySelectorAll('.aw-win')].some(w => {
+      const st = getComputedStyle(w), r = w.getBoundingClientRect();
+      return st.display !== 'none' && st.visibility !== 'hidden' && r.width > 0 && r.height > 0;
+    });
+    if (winOpen) return;
+    const rows = [...document.querySelectorAll('.inline-add[data-clone="1"]')].filter(b => b.isConnected && !b.hidden);
+    if (!rows.length) return;
+    e.preventDefault(); e.stopPropagation();
+    rows.forEach(b => inlineClose(b, null));
+  }, true);
+
   function inlineClose(box, root, cb){
     if (!box || box.hidden){ cb && cb(); return; }
     const tr = box.closest('tr.inl-tr');
