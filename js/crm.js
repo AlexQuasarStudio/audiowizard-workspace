@@ -1238,7 +1238,14 @@ const CRM = (() => {
     const items = [
       { label:'Открыть профиль', icon:'file', onClick:()=>openPersonCard(uid, role) },
       ...(u.id !== p.id ? [{ label:'Написать лично', icon:'chats', onClick:()=>{ if (typeof window.openDirectChat==='function') window.openDirectChat(p.id); } }] : []),
-      { label:'Копировать ID', icon:'copy', onClick:()=>{ navigator.clipboard&&navigator.clipboard.writeText(p.id); toast('ID скопирован','ok'); } },
+      { label:'Копировать номер', icon:'copy', onClick:()=>{
+        /* В таблице и карточках показывается номер человека (ext.num / строка
+           импорта), а не внутренний uid — его и копируем. */
+        const num = personDisplayNum(p, '');
+        if (num === '' || num == null){ toast('У этого человека ещё нет номера','warn'); return; }
+        navigator.clipboard && navigator.clipboard.writeText(String(num));
+        toast(`Номер «${num}» скопирован`, 'ok');
+      } },
     ];
     if (staff){
       items.push('-');
