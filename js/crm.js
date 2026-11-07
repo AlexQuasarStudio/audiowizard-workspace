@@ -1991,6 +1991,9 @@ const CRM = (() => {
     box.style.height = '0px';
     box.style.opacity = '0';
     setTimeout(()=>{
+      /* Соседа запоминаем ДО удаления: для клона box и tr — один и тот же
+         узел, и box.remove() делал tr несвязанным, из-за чего фокус не ставился. */
+      const prevRow = tr ? tr.previousElementSibling : null;
       box.classList.remove('closing','inline-add--row','inline-add--card','inline-add--in');
       box.style.cssText = '';
       if (box.dataset.clone === '1'){
@@ -1999,17 +2002,14 @@ const CRM = (() => {
         if (box.__home && box.__home.parent && box.__home.parent.isConnected) box.__home.parent.insertBefore(box, box.__home.next);
         box.hidden = true;
       }
-      if (tr && tr.isConnected){
-        const prev = tr.previousElementSibling;
-        tr.remove();
-        /* Последовательное удаление: после Esc курсор встаёт в предыдущую
-           новую строку (если она есть) — можно удалять подряд. */
-        if (prev && prev.classList && prev.classList.contains('inline-add')){
-          setTimeout(()=>{
-            const f = prev.querySelector('input, select');
-            if (f){ try { f.focus(); } catch(e){} }
-          }, 0);
-        }
+      if (tr && tr.isConnected) tr.remove();
+      /* Последовательное удаление: после Esc курсор встаёт в предыдущую
+         новую строку (если она есть) — можно удалять подряд. */
+      if (prevRow && prevRow.isConnected && prevRow.classList.contains('inline-add')){
+        setTimeout(()=>{
+          const f = prevRow.querySelector('input, select');
+          if (f){ try { f.focus(); f.select && f.select(); } catch(e){} }
+        }, 0);
       }
       cb && cb();
     }, 210);
