@@ -73,81 +73,6 @@ p{margin:0 0 10px}
 [data-theme="dark-mono"] .msg--own .msg__bubble .react-pill.on{background:rgba(255,255,255,.22);border-color:#f0ede8}
 [data-theme="dark-mono"] .msg--own .msg__bubble .poll,[data-theme="dark-mono"] .msg--own .msg__bubble .poll__opt{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16)}
 [data-theme="dark-mono"] .vn__play{background:#3b3733;color:#f0ede8}
-/* Светлая монохромная: свой пузырь — плотный тёмно-серый, но не чёрный:
-   чёрная подложка перетягивала внимание на себя в светлой ленте. Серый
-   «микс» темы давал слабый контраст с текстом, поэтому берём собственный
-   тёмно-серый градиент и светлый текст.
-   Внутри такого пузыря НЕЛЬЗЯ пользоваться обычными токенами темы (акцент
-   #14181f, text-2, faint — все тёмные и на тёмном фоне исчезают). Поэтому
-   задаём локальную палитру «светлое на тёмном» и перекрываем ею все элементы
-   пузыря: цитату, счётчик ответов, закреп/опрос, упоминания, «переслано»,
-   реакции, файл, карточки, голосовое и опрос. */
-[data-theme="light-mono"] .msg--own .msg__bubble{
-  --own-ink:#f6f4f1;
-  --own-ink-2:rgba(246,244,241,.74);
-  --own-soft:rgba(255,255,255,.10);
-  --own-soft-2:rgba(255,255,255,.16);
-  --own-line:rgba(255,255,255,.20);
-  background:linear-gradient(135deg,#4e5158 0%,#3f4249 100%);
-  border-color:transparent;color:var(--own-ink)
-}
-[data-theme="light-mono"] .msg--own .msg__bubble .txt{color:var(--own-ink)}
-[data-theme="light-mono"] .msg--own .msg__bubble .time{color:var(--own-ink-2)}
-/* Вторичный текст: «изменено», длительность голосового, число реакций */
-[data-theme="light-mono"] .msg--own .msg__bubble .msg__edited,
-[data-theme="light-mono"] .msg--own .msg__bubble .vn__time,
-[data-theme="light-mono"] .msg--own .msg__bubble .react-n{color:var(--own-ink-2)}
-/* Акцентные элементы-иконки и ссылки внутри текста */
-[data-theme="light-mono"] .msg--own .msg__bubble .msg__replies,
-[data-theme="light-mono"] .msg--own .msg__bubble .msg__pin-ico,
-[data-theme="light-mono"] .msg--own .msg__bubble .msg__poll-ico,
-[data-theme="light-mono"] .msg--own .msg__bubble .msg__fwd,
-[data-theme="light-mono"] .msg--own .msg__bubble .msg__more,
-[data-theme="light-mono"] .msg--own .msg__bubble .ticks__ic.on{color:var(--own-ink)}
-[data-theme="light-mono"] .msg--own .msg__bubble .msg__more:hover{background:var(--own-soft-2)}
-/* Цитата-ответ: акцентная полоса и автор — светлые, фон — деликатная подложка */
-[data-theme="light-mono"] .msg--own .msg__bubble .msg__quote{
-  background:rgba(255,255,255,.08);
-  border-left-color:rgba(246,244,241,.72);
-  color:var(--own-ink-2)
-}
-[data-theme="light-mono"] .msg--own .msg__bubble .msg__quote b{color:var(--own-ink)}
-/* Упоминания @ник/@все: вместо тёмного акцента — светлый текст и подложка */
-[data-theme="light-mono"] .msg--own .msg__bubble .msg-mention{color:var(--own-ink);background:rgba(255,255,255,.14)}
-[data-theme="light-mono"] .msg--own .msg__bubble .msg-mention--all{background:rgba(255,255,255,.20)}
-[data-theme="light-mono"] .msg--own .msg__bubble .msg-mention--role{background:rgba(255,255,255,.12)}
-[data-theme="light-mono"] .msg--own .msg__bubble .msg-mention:hover{background:rgba(255,255,255,.26)}
-/* Файл и карточка контакта/заказа: тёмная подложка вместо белой плашки */
-[data-theme="light-mono"] .msg--own .msg__bubble .msg__file,
-[data-theme="light-mono"] .msg--own .msg__bubble .msg__artifact{
-  background:var(--own-soft);
-  border-color:var(--own-line);
-  color:var(--own-ink)
-}
-[data-theme="light-mono"] .msg--own .msg__bubble .msg__file .ico,
-[data-theme="light-mono"] .msg--own .msg__bubble .msg__artifact-ico{color:var(--own-ink)}
-[data-theme="light-mono"] .msg--own .msg__bubble .msg__artifact-ico{background:var(--own-soft-2)}
-[data-theme="light-mono"] .msg--own .msg__bubble .msg__file:hover,
-[data-theme="light-mono"] .msg--own .msg__bubble .msg__artifact:hover{background:var(--own-soft-2);border-color:rgba(255,255,255,.30)}
-[data-theme="light-mono"] .msg--own .msg__bubble .msg__artifact-txt .small{color:var(--own-ink-2)}
-/* Голосовое: светлая кнопка с тёмной иконкой, светлая волна и ползунок скорости */
-[data-theme="light-mono"] .msg--own .msg__bubble .vn__play{background:var(--own-ink);color:#14181f}
-[data-theme="light-mono"] .msg--own .msg__bubble .vn__wave i{background:rgba(246,244,241,.35)}
-[data-theme="light-mono"] .msg--own .msg__bubble .vn__wave i.on{background:var(--own-ink)}
-[data-theme="light-mono"] .msg--own .msg__bubble .vn__speed{background:#fff;border-color:transparent;color:#14181f}
-[data-theme="light-mono"] .msg--own .msg__bubble .vn__speed--fast{color:#14181f}
-/* Опрос: вопрос, бейджи и варианты — светлые на тёмной подложке */
-[data-theme="light-mono"] .msg--own .msg__bubble .poll>b{color:var(--own-ink)}
-[data-theme="light-mono"] .msg--own .msg__bubble .poll__badge{background:var(--own-soft);border-color:var(--own-line);color:var(--own-ink-2)}
-[data-theme="light-mono"] .msg--own .msg__bubble .poll__opt{background:rgba(255,255,255,.08);border-color:var(--own-line);color:var(--own-ink)}
-[data-theme="light-mono"] .msg--own .msg__bubble .poll__opt .fill{background:rgba(255,255,255,.16)}
-[data-theme="light-mono"] .msg--own .msg__bubble .poll__opt b{color:var(--own-ink-2)}
-[data-theme="light-mono"] .msg--own .msg__bubble .poll__check{color:var(--own-ink)}
-[data-theme="light-mono"] .msg--own .msg__bubble .poll__opt.voted{border-color:rgba(246,244,241,.60)}
-/* Реакции: пилюля уже светлая, но кольца аватаров были белыми — в тон пузыря */
-[data-theme="light-mono"] .msg--own .msg__bubble .react-pill{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.22);color:var(--own-ink)}
-[data-theme="light-mono"] .msg--own .msg__bubble .react-pill.on{background:rgba(255,255,255,.24);border-color:var(--own-ink)}
-[data-theme="light-mono"] .msg--own .msg__bubble .react-av{border-color:#1e232b}
 /* Присутствие (онлайн/офлайн) — критичный элемент: в монотемах оставляем
    зелёный и серый, иначе статус читается ложно. */
 [data-theme="dark-mono"] .dot--online,[data-theme="light-mono"] .dot--online{background:#26b06a}
@@ -162,7 +87,7 @@ p{margin:0 0 10px}
 [data-theme="light-blue"]{--bg:#f3f4f6;--bg-2:#e9ecf0;--panel:#ffffff;--panel-2:#f1f3f6;--panel-3:#e3e8ee;--text:#1e2430;--text-2:#454e5e;--muted:#6b7484;--faint:#6e7889;--border:#dfe3e9;--border-2:#c9d1db;--accent:#5b7ba6;--accent-soft:rgba(91,123,166,.12);--accent-2:#7e9ac2;--blue:#5b7ba6;--blue-soft:rgba(91,123,166,.12);--grad-brand:linear-gradient(135deg,#7e9ac2,#5b7ba6 55%,#4d6a92);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f;--own-bubble:#B2C1D5;--own-bubble-bd:transparent;--own-accent:#5B7BA6}
 [data-theme="light-red"]{--bg:#f6f3ee;--bg-2:#eee9e1;--panel:#fffefb;--panel-2:#f4efe7;--panel-3:#eae2d6;--text:#2b2118;--text-2:#54463a;--muted:#6f6358;--faint:#8f8276;--border:#e7dfd3;--border-2:#d5c9ba;--accent:#b4624e;--accent-soft:rgba(180,98,78,.12);--accent-2:#cd8271;--red:#b4624e;--red-soft:rgba(180,98,78,.12);--grad-brand:linear-gradient(135deg,#cd8271,#b4624e 55%,#9d5442);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f;--own-bubble:#D8B3AA;--own-bubble-bd:transparent;--own-accent:#B4624E}
 [data-theme="light-green"]{--bg:#f4f5f0;--bg-2:#eaede3;--panel:#fefefc;--panel-2:#f1f3ea;--panel-3:#e5e9db;--text:#22291f;--text-2:#48523f;--muted:#677059;--faint:#75806a;--border:#e2e6d8;--border-2:#ccd3bc;--accent:#5f7d59;--accent-soft:rgba(95,125,89,.13);--accent-2:#7e9a77;--green:#5f7d59;--green-soft:rgba(95,125,89,.13);--grad-brand:linear-gradient(135deg,#5f7d59,#4f6d49 55%,#44603f);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f;--own-bubble:#B3C2AF;--own-bubble-bd:transparent;--own-accent:#5F7D59}
-[data-theme="light-mono"]{--bg:#f6f4f1;--bg-2:#eeece7;--panel:#fffefb;--panel-2:#f2f0ea;--panel-3:#e8e5dd;--text:#1d1b17;--text-2:#4a463f;--muted:#716c62;--faint:#7c766a;--border:#e6e2d9;--border-2:#d4cfc3;--accent:#14181f;--accent-soft:rgba(20,24,31,.08);--accent-2:#3d434d;--blue:#5f636b;--violet:#3d434d;--green:#5f636b;--red:#3d434d;--yellow:#3d434d;--grad-brand:linear-gradient(135deg,#3d434d,#14181f);--check-bg:#fffefb;--check-tick:#ffffff;--own-bubble:#C9C8C7;--own-bubble-bd:#78797B}
+[data-theme="light-mono"]{--bg:#f6f4f1;--bg-2:#eeece7;--panel:#fffefb;--panel-2:#f2f0ea;--panel-3:#e8e5dd;--text:#1d1b17;--text-2:#4a463f;--muted:#716c62;--faint:#7c766a;--border:#e6e2d9;--border-2:#d4cfc3;--accent:#14181f;--accent-soft:rgba(20,24,31,.08);--accent-2:#3d434d;--blue:#5f636b;--violet:#3d434d;--green:#5f636b;--red:#3d434d;--yellow:#3d434d;--grad-brand:linear-gradient(135deg,#3d434d,#14181f);--check-bg:#fffefb;--check-tick:#ffffff;--own-bubble:#C9C8C7;--own-bubble-bd:transparent}
 /* Светлые темы: пузырь пастельный, поэтому белая кнопка остаётся, но иконка,
    волна и «скорость» — в акценте темы: белое на светлом не читается. */
 [data-theme^="light"]{
