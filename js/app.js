@@ -2447,6 +2447,21 @@ ex.innerHTML = avatarHTML(user(), '');
     const el = document.querySelector('.msg[data-msg="' + mid + '"] .msg__bubble');
     return el ? el.offsetHeight : 0;
   }
+  /* После снятия последней реакции у короткого сообщения время должно
+     вернуться в строку текста, как при обычном рендере. Точечно, без
+     перерисовки ленты: иначе элементы справа остаются в отдельной строке. */
+  function restoreInlineTime(mid){
+    const msg = document.querySelector('.msg[data-msg="' + mid + '"]');
+    if (!msg) return;
+    if (msg.querySelector('.msg__file, .msg__artifact, .poll')) return;
+    const foot = msg.querySelector('.msg__foot');
+    const time = foot && foot.querySelector('.time');
+    const txt = msg.querySelector('.txt');
+    if (!foot || !time || !txt) return;
+    time.classList.add('time--in');
+    txt.appendChild(time);
+    foot.remove();
+  }
   function animateBubbleHeight(mid, prevH){
     if (!prevH) return;
     /* Вызывается сразу после renderChat, в том же такте: старую высоту
@@ -4639,6 +4654,7 @@ const cm = root.querySelector('.chat-main');
               const row = rBtn.closest('.msg__reactions');
               rBtn.remove();
               if (row && !row.querySelector('.react-pill')) row.remove();
+              restoreInlineTime(mid);
               animateBubbleHeight(mid, prevH);
             }, 190);
           } else {
@@ -4926,6 +4942,7 @@ const cm = root.querySelector('.chat-main');
           const row = pill.closest('.msg__reactions');
           pill.remove();
           if (row && !row.querySelector('.react-pill')) row.remove();
+          restoreInlineTime(mm.id);
           animateBubbleHeight(mm.id, prevH);
         }, 190);
       } else if (arr.length){
