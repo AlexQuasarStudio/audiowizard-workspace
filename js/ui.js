@@ -250,7 +250,10 @@ function openWinModal({ title='', icon='app', body='', footer='', wide=false, na
       win.appendChild(footEl);
     }
     /* Окно по контенту: если содержимое короче заданной высоты, окно
-       поджимается — иначе короткие формы висят с пустотой внизу. */
+       поджимается — иначе короткие формы висят с пустотой внизу.
+       Поджимаем СРАЗУ, до первого кадра и без transition: иначе окно
+       успевало показаться по центру «старой» высоты и заметно подплывало
+       к новому центру уже после появления. */
     const fitWin = ()=>{
       try {
         const bodyEl = win.querySelector('.aw-win__body');
@@ -270,18 +273,18 @@ function openWinModal({ title='', icon='app', body='', footer='', wide=false, na
         const maxH = window.innerHeight - 40;
         if (need > 0 && need < cur - 6 && need <= maxH){
           const nh = Math.max(200, Math.min(need, maxH));
-          win.classList.add('aw-win--animating');
           win.style.height = nh + 'px';
-          /* Поджали по контенту — возвращаем окно в центр: top считался от
-             прежней высоты, и окно оставалось смещённым вниз. */
+          /* Поджали по контенту — сразу возвращаем окно в центр: top считался
+             от прежней высоты, и окно оставалось смещённым вниз. */
           win.style.top = Math.max(8, Math.round(curTop + (cur - nh) / 2)) + 'px';
-          setTimeout(()=>win.classList.remove('aw-win--animating'), 340);
         } else {
           win.style.height = prev;
         }
       } catch(e){}
     };
-    requestAnimationFrame(()=>requestAnimationFrame(fitWin));
+    fitWin();
+    /* Поздняя проверка: шрифты/картинки могли изменить высоту. Тоже без
+       анимации — окно не «плывёт», а просто встаёт на место. */
     setTimeout(fitWin, 320);
     return { el: win, close: () => { win._close && win._close(); } };
   }
