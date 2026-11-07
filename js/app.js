@@ -3290,7 +3290,7 @@ ex.innerHTML = avatarHTML(user(), '');
           html: `<div class="msg ${own?'msg--own':''}${isTail ? ' msg--tail' : ''}${chatSel.set.has(m.id) ? ' msg--sel' : ''}" data-msg="${m.id}">
             <button type="button" class="msg-quick" data-quick="${m.id}" title="Поставить 👍" aria-label="Поставить 👍">👍</button>
             <div class="msg__bubble">
-              ${own?'':`<div class="who" data-av-uid="${esc(m.user_id||'')}" title="Открыть профиль" style="cursor:pointer;${whoColor?`color:${whoColor};`:''}">${esc(author.full_name)}${isStaff(author.role)?`<span class="role-mark role-mark--${author.role}" title="${esc(ROLE_LABEL[author.role])}">${icon('shield','ico-sm')}</span>`:''}${c.owner_id===m.user_id?'<span class="chat-role-tag chat-role-tag--owner">владелец</span>':((c.admins||[]).includes(m.user_id)?'<span class="chat-role-tag chat-role-tag--admin">админ</span>':'')}${canModerate&&ghost?' <span class="ghost-mode-note">'+icon('eye-off','ico-sm')+' невидимка</span>':''}</div>`}
+              ${own?'':`<div class="who" data-av-uid="${esc(m.user_id||'')}" title="Открыть профиль" style="cursor:pointer;${whoColor?`color:${whoColor};`:''}"><span class="who__name">${esc(author.full_name)}</span>${isStaff(author.role)?`<span class="role-mark role-mark--${author.role}" title="${esc(ROLE_LABEL[author.role])}">${icon('shield','ico-sm')}</span>`:''}${c.owner_id===m.user_id?'<span class="chat-role-tag chat-role-tag--owner">владелец</span>':''}${canModerate&&ghost?' <span class="ghost-mode-note">'+icon('eye-off','ico-sm')+' невидимка</span>':''}</div>`}
               ${fwdHtml}
               ${quoteHtml}
               <div class="txt">${m.pinned?`<span class="msg__pin-ico" title="Закреплено">${icon('pin','ico-sm')}</span>`:''}${m.type==='poll'?`<span class="msg__poll-ico">${icon('poll','ico-sm')}</span>`:''}${isArtifact ? '' : txtRender}${inlineTime?timeHtml:''}</div>
@@ -4447,7 +4447,7 @@ const cm = root.querySelector('.chat-main');
               <div class="chat-info-member" data-member="${esc(x.id)}" title="Открыть профиль">
                 <span class="chat-info-member__av" data-mem-av="${esc(x.id)}" title="Открыть профиль">${avatarHTML(x,'avatar--sm')}</span>
                 <div class="chat-info-member__meta"><b class="chat-info-member__nick" data-mem-dm="${esc(x.id)}" title="Написать (ЛС)">${esc(x.full_name)}</b><span class="small faint">${esc(ROLE_LABEL[x.role]||x.role)}</span></div>
-                ${c.owner_id===x.id?'<span class="chat-role-tag chat-role-tag--owner">владелец</span>':((c.admins||[]).includes(x.id)?'<span class="chat-role-tag chat-role-tag--admin">админ</span>':'')}
+                ${c.owner_id===x.id?'<span class="chat-role-tag chat-role-tag--owner">владелец</span>':''}
                 ${canModerate && c.owner_id!==x.id ? `<button class="btn btn--ghost btn--sm" data-chat-admin="${esc(x.id)}" title="${(c.admins||[]).includes(x.id)?'Снять админа чата':'Сделать админом чата'}">${(c.admins||[]).includes(x.id)?'− админ':'+ админ'}</button>`:''}
               </div>`).join('') || '<div class="small faint">Участников нет</div>'}
             </div>
