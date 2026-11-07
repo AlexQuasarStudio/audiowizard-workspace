@@ -843,13 +843,28 @@ const QUICK_BY_ROLE = {
           <div class="card card-pad" style="background:var(--bg-2)"><div class="row">${icon('server')}<b>On-Premise</b><span class="badge c-gray">в разработке</span></div>
             <p class="small muted" style="margin-top:8px">Локальное развертывание в контуре клиента: Docker, лицензия, защищённый репозиторий обновлений.</p></div>
         </div></div>`;
+      /* Патчноуты: один и тот же отфильтрованный список для истории в настройках
+         и для «последнего обновления» в компактной модалке. Свежие — сверху. */
+      const changelogList = () => S.changelog
+        .filter(v => !isProd() ? true : (v.id==='v0' || v.id==='cur' || !v.demo))
+        .slice()
+        .sort((a,b)=> (b.created_at||0)-(a.created_at||0));
+      const noteHtml = v => `<div class="ver-item"><span class="ver-badge">v${esc(v.version)}</span>
+          <span><b class="small">${esc(v.title)}</b>${v.content?`<p class="small muted" style="margin-top:3px">${esc(v.content).replace(/\n/g,'<br>')}</p>`:''}<span class="faint" style="font-size:11px">${fmtDate(v.created_at)}</span></span></div>`;
       const history = modal ? '' : `<div class="card card-pad"><h3 style="margin-bottom:6px">История обновлений</h3>
-        ${S.changelog.filter(v => !isProd() ? true : (v.id==='v0' || v.id==='cur' || !v.demo))
-          /* Строго от новых к старым: свежий патчноут — первой строкой,
-             «Прототип» (первая версия) уходит вниз по своей дате. */
-          .sort((a,b)=> (b.created_at||0)-(a.created_at||0))
-          .map(v=>`<div class="ver-item"><span class="ver-badge">v${esc(v.version)}</span>
-          <span><b class="small">${esc(v.title)}</b>${v.content?`<p class="small muted" style="margin-top:3px">${esc(v.content).replace(/\n/g,'<br>')}</p>`:''}<span class="faint" style="font-size:11px">${fmtDate(v.created_at)}</span></span></div>`).join('')}</div>`;
+        ${changelogList().map(noteHtml).join('')}</div>`;
+      /* Модалка по клику на лого: полной истории там не место, но последняя
+         запись патчноутов должна быть видна — она и была раньше. */
+      const latestNote = (()=>{
+        if (!modal) return '';
+        const list = changelogList();
+        /* «Прототип» — это ПЕРВАЯ версия, а не последнее обновление: берём
+           самую свежую настоящую запись, v0 — только если других нет
+           (например, в прод-режиме демо-записи скрыты). */
+        const v = list.find(x => x.id !== 'v0') || list[0];
+        if (!v) return '';
+        return `<div class="card card-pad"><h3 style="margin-bottom:6px">Последнее обновление</h3>${noteHtml(v)}</div>`;
+      })();
       const issue = modal ? '' : `<div class="card card-pad" style="border-color:color-mix(in srgb,var(--accent) 30%,transparent)"><h3 style="margin-bottom:6px">Сообщить о проблеме</h3>
         <p class="small muted" style="margin-bottom:10px">Что-то работает не так или есть идея? Напишите парой строк — мы получим сообщение.</p>
         <div class="field"><input class="input" id="ab-issue" placeholder="Коротко: что случилось или что улучшить"></div>
@@ -861,6 +876,7 @@ const QUICK_BY_ROLE = {
           : `<span class="side__brand-logo logo-mark--lg">${icon('logo-full')}</span>`}
         <div><b style="font-size:16px">Audiowizard Workspace</b><div class="small muted">Версия ${esc((S.product||{}).version || '0.1-prototype')} · сборка ${(S.product||{}).build || 216} ${((S.product||{}).beta !== false)?'<span class="beta-badge">Beta</span>':''}</div></div>
         ${modal ? '' : `<span class="spacer"></span><button class="btn btn--soft btn--sm" id="ab-tour">${icon('bulb')} Пройти тур</button><button class="btn btn--soft btn--sm" id="ab-check">${icon('refresh')} Проверить обновления</button>`}</div>
+      ${latestNote}
       ${isStaff((me() || {}).role) ? serverStateHtml() : ''}
       ${models}${history}${issue}`;
     }
@@ -7667,23 +7683,18 @@ function initPWA(){
       S.changelog.push({ id:'v0', version:'0.1-prototype', title:'Прототип Audiowizard Workspace',
         content:'Первая версия приложения', created_at: Date.now()-3600000*24*20, is_published:true });
     }
-    /* Свежая запись есть всегда и описывает текущую сборку: раньше при
-       версии-прототипе её удаляли, и последний патчноут пропадал из истории. */
-    const proto = S.changelog.find(v => v.id === 'v0');
-    const notes = (p.notes || []).map(n => String(n).trim()).filter(Boolean);
-    const build = p.build || BUILD_NUM;
-    /* Первая строка патчноутов — заголовок записи, остальные — её текст.
-       Иначе заголовок дублировался первой же строкой в описании. */
-    const ownTitle = !!(notes[0] && notes[0] !== (proto && proto.title));
-    const title = ownTitle ? notes[0] : `Сборка ${build}`;
-    const body = notes.slice(1).join('\n');
-    const content = ownTitle ? body : (body || 'Актуальная сборка приложения.');
-    const prev = S.changelog.find(v => v.id === 'cur');
-    /* Ничего не изменилось — не трогаем запись, чтобы не сдвигать её дату */
-    if (prev && prev.version === p.version && prev.title === title && prev.content === content) return;
-    S.changelog = S.changelog.filter(v => v.id !== 'cur');
+    const cur = S.changelog[0];
+    /* Если текущая версия продукта = версия записи-прототипа (v0) — не дублируем:
+       патчноут про прототип остаётся единственной записью. */
+    const isProtoCurrent = p.version === '0.1-prototype';
+    if (isProtoCurrent){
+      S.changelog = S.changelog.filter(v => v.id !== 'cur');
+      return;
+    }
+    if (cur && cur.version === p.version && cur.title === (p.notes && p.notes.length ? p.notes[0] : '')) return;
     S.changelog.unshift({
-      id:'cur', version: p.version, title, content,
+      id:'cur', version: p.version, title: (p.notes && p.notes.length ? p.notes[0] : 'Текущая версия'),
+      content: (p.notes || []).join('\n') || 'Актуальная сборка приложения.',
       created_at: Date.now(), is_published:true
     });
   }
