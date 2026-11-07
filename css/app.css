@@ -1599,6 +1599,10 @@ body.win-dragging *{user-select:none!important}
 /* ТГ-вёрстка времени: плавает в конце последней строки текста,
    не ломая переносы; короткие сообщения — компактная одна строка. */
 .msg__bubble .time{float:right;display:inline-flex;align-items:center;gap:2px;margin:3px 0 0 6px;white-space:nowrap;font-size:10px;color:var(--faint);position:relative}
+/* Время в строке с текстом (нет реакций и вложений): короткое сообщение
+   укладывается в одну строку, у длинного время встаёт у правого края
+   последней строки. Отдельная нижняя строка нужна только реакциям. */
+.msg__bubble .time--in{font-size:11px;gap:6px;margin:1px 0 0 10px}
 .msg--own .msg__bubble .time{color:var(--muted)}
 /* Вторичные подписи внутри своего пузыря — не теряются на плотной подложке */
 .msg--own .msg__bubble .msg__edited{color:var(--muted)}

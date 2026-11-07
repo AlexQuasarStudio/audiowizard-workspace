@@ -3235,6 +3235,14 @@ ex.innerHTML = avatarHTML(user(), '');
           : m.type === 'voice'
             ? voiceHtml(m)
             : `<a class="msg__file" href="${esc(m.file.dataUrl||'')}" download="${esc(m.file.name||'файл')}">${icon('clip','ico-sm')}<span>${esc(m.file.name||'файл')}</span></a>`) : '';
+        /* Время с галочками, счётчиком ответов и пометкой «изменено».
+           Без реакций и вложений его можно пустить прямо в строку с текстом
+           (float справа): короткое сообщение остаётся одной строкой, длинное
+           получает время у правого края последней строки. Отдельная нижняя
+           строка нужна только реакциям — они и меняют высоту пузыря. */
+        const timeInner = `${repliesBtn}${m.edited?`<span class="msg__edited" title="${esc('Изменено ' + fmtDT(m.editedAt||m.created_at))}">изменено</span>`:''}${fmtTime(m.created_at)}${own?`<span class="ticks" title="${(m.readBy||[]).length?('Прочитано'):'Доставлено, ещё не прочитано'}"><span class="ticks__ic ${(m.readBy||[]).length>0?'on':''}">${(m.readBy||[]).length>0?icon('checks','ico-sm'):icon('check','ico-sm')}</span></span>`:''}`;
+        const inlineTime = !reactions && !fileHtml && !artifactHtml && !pollHtml;
+        const timeHtml = `<span class="time${inlineTime?' time--in':''}">${timeInner}</span>`;
         return {
           userId: m.user_id, own, daySep, created_at: m.created_at,
           html: `<div class="msg ${own?'msg--own':''}${isTail ? ' msg--tail' : ''}${chatSel.set.has(m.id) ? ' msg--sel' : ''}" data-msg="${m.id}">
@@ -3243,11 +3251,11 @@ ex.innerHTML = avatarHTML(user(), '');
               ${own?'':`<div class="who" data-av-uid="${esc(m.user_id||'')}" title="Открыть профиль" style="cursor:pointer;${whoColor?`color:${whoColor};`:''}">${esc(author.full_name)}${isStaff(author.role)?`<span class="role-mark role-mark--${author.role}" title="${esc(ROLE_LABEL[author.role])}">${icon('shield','ico-sm')}</span>`:''}${c.owner_id===m.user_id?'<span class="chat-role-tag chat-role-tag--owner">владелец</span>':((c.admins||[]).includes(m.user_id)?'<span class="chat-role-tag chat-role-tag--admin">админ</span>':'')}${canModerate&&ghost?' <span class="ghost-mode-note">'+icon('eye-off','ico-sm')+' невидимка</span>':''}</div>`}
               ${fwdHtml}
               ${quoteHtml}
-              <div class="txt">${m.pinned?`<span class="msg__pin-ico" title="Закреплено">${icon('pin','ico-sm')}</span>`:''}${m.type==='poll'?`<span class="msg__poll-ico">${icon('poll','ico-sm')}</span>`:''}${isArtifact ? '' : txtRender}</div>
+              <div class="txt">${m.pinned?`<span class="msg__pin-ico" title="Закреплено">${icon('pin','ico-sm')}</span>`:''}${m.type==='poll'?`<span class="msg__poll-ico">${icon('poll','ico-sm')}</span>`:''}${isArtifact ? '' : txtRender}${inlineTime?timeHtml:''}</div>
               ${fileHtml}
               ${artifactHtml}
               ${pollHtml}
-              <div class="msg__foot">${reactions?`<div class="msg__reactions">${reactions}</div>`:''}<span class="time">${repliesBtn}${m.edited?`<span class="msg__edited" title="Изменено ${fmtDT(m.editedAt||m.created_at)}">изменено</span>`:''}${fmtTime(m.created_at)}${own?`<span class="ticks" title="${(m.readBy||[]).length?('Прочитано'):'Доставлено, ещё не прочитано'}"><span class="ticks__ic ${(m.readBy||[]).length>0?'on':''}">${(m.readBy||[]).length>0?icon('checks','ico-sm'):icon('check','ico-sm')}</span></span>`:''}</span></div>
+              ${inlineTime?'':`<div class="msg__foot">${reactions?`<div class="msg__reactions">${reactions}</div>`:''}${timeHtml}</div>`}
             </div>
           </div>`
         };
