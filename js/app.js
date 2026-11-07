@@ -220,7 +220,11 @@ const APP = (() => {
       /* В zen меню выезжает за 0.3s — плашки растворяются тем же темпом, чтобы
          движение было согласованным. В обычном режиме реакция быстрее. */
       const fadeMs = () => document.body.classList.contains('zen-toggling') ? 300 : FADE_MS;
-      const pillEls = () => [document.querySelector('.head__right'), document.querySelector('#open-search')].filter(Boolean);
+      /* Слева на телефоне — такая же стеклянная плашка (меню + поиск):
+         растворяется по той же логике, что и правые. На десктопе она скрыта
+         (display:none), поэтому в работу списка фактически не попадает. */
+      const pillEls = () => [document.querySelector('.head__right'), document.querySelector('#open-search'),
+        document.querySelector('.head__mtools')].filter(Boolean);
       let pillLastT = 0;
       const pillTick = ts => {
         window.__pRaf = 0;
@@ -315,7 +319,7 @@ const APP = (() => {
          снова следует за скроллом. document-слушатели навешиваем один раз. */
       if (!window.__pillsBound){
         window.__pillsBound = true;
-        const isPill = el => !!(el && el.closest && el.closest('.head__search, .head__right'));
+        const isPill = el => !!(el && el.closest && el.closest('.head__search, .head__right, .head__mtools'));
         document.addEventListener('pointerover', e => {
           if (!isPill(e.target)) return;
           window.__pillHover = true;
@@ -328,7 +332,7 @@ const APP = (() => {
         document.addEventListener('pointerout', e => {
           if (!isPill(e.target)) return;
           const to = e.relatedTarget;
-          if (to && to.closest && to.closest('.head__search, .head__right')) return;
+          if (to && to.closest && to.closest('.head__search, .head__right, .head__mtools')) return;
           window.__pillHover = false;
           setTimeout(() => {
             if (!window.__pillHover && !window.__pillContainsActive()){
@@ -338,13 +342,13 @@ const APP = (() => {
           }, 0);
         }, true);
         document.addEventListener('pointerdown', e => {
-          const pEl = e.target.closest && e.target.closest('.head__search, .head__right, .head');
+          const pEl = e.target.closest && e.target.closest('.head__search, .head__right, .head__mtools, .head');
           if (!pEl) return;
           /* Невидимая плашка (полностью растворена) — не интерактивна:
              клик по ней (или по шапке, где она живёт) не должен её «будить».
              Приходит событие на .head-обёртке, поэтому проверяем по плашкам
              ВНУТРИ неё, а не по самой обёртке (обёртка всегда прозрачна). */
-          const inner = pEl.matches('.head__search, .head__right') ? pEl : pEl.querySelector('.head__search, .head__right');
+          const inner = pEl.matches('.head__search, .head__right, .head__mtools') ? pEl : pEl.querySelector('.head__search, .head__right, .head__mtools');
           const anyHidden = inner && parseFloat(getComputedStyle(inner).opacity) <= 0.15;
           if (anyHidden) return;
           window.__pillsFrozen = true;

@@ -170,18 +170,21 @@
 /* Плашки и поиск едут вместе со страницей (сдвиг задаёт JS, плавно);
    при полном уходе они перестают ловить клики. */
 body.pills-hide .head__right,
-body.pills-hide .head__search{pointer-events:none}
+body.pills-hide .head__search,
+body.pills-hide .head__mtools{pointer-events:none}
 /* Маска/блюр не должны «светить» за пределами плашки во время уезда */
 body.pills-move .head__search .fake-input,
 body.pills-move .head__pill--balance,
 body.pills-move .head__ops{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
-.head__right,.head__search{will-change:transform}
+.head__right,.head__search,.head__mtools{will-change:transform,opacity,filter}
 /* Скрытая плашка: гасим клики у ВСЕХ потомков (кнопок), иначе клик по
    невидимому контейнеру уходит на внутренние элементы и «будит» плашку. */
 .head__right[data-pill-hidden="1"],
 .head__right[data-pill-hidden="1"] *,
 .head__search[data-pill-hidden="1"],
-.head__search[data-pill-hidden="1"] *{pointer-events:none!important}
+.head__search[data-pill-hidden="1"] *,
+.head__mtools[data-pill-hidden="1"],
+.head__mtools[data-pill-hidden="1"] *{pointer-events:none!important}
 /* Горячая кнопка быстрых действий: иконка действия + стрелка-селектор */
 .head__pill{display:inline-flex;align-items:center;gap:10px;padding:5px 8px;border-radius:16px;background:var(--panel);border:1px solid var(--border-2);box-shadow:var(--sh-1)}
 .head__pill--balance{display:inline-flex;align-items:center;gap:3px;height:44px;padding:0 6px 0 10px;border-radius:14px;background:color-mix(in srgb,var(--panel) 74%,transparent);-webkit-backdrop-filter:blur(16px) saturate(1.15);backdrop-filter:blur(16px) saturate(1.15);border:1px solid color-mix(in srgb,var(--border-2) 78%,transparent);box-shadow:var(--sh-1);box-sizing:border-box;transition:background-color var(--dur),border-color var(--dur)}
