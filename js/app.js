@@ -3247,8 +3247,7 @@ ex.innerHTML = avatarHTML(user(), '');
               ${fileHtml}
               ${artifactHtml}
               ${pollHtml}
-              ${reactions?`<div class="msg__reactions">${reactions}</div>`:''}
-              <div class="msg__foot"><span class="time">${repliesBtn}${m.edited?`<span class="msg__edited" title="Изменено ${fmtDT(m.editedAt||m.created_at)}">изменено</span>`:''}${fmtTime(m.created_at)}${own?`<span class="ticks" title="${(m.readBy||[]).length?('Прочитано'):'Доставлено, ещё не прочитано'}"><span class="ticks__ic ${(m.readBy||[]).length>0?'on':''}">${(m.readBy||[]).length>0?icon('checks','ico-sm'):icon('check','ico-sm')}</span></span>`:''}</span></div>
+              <div class="msg__foot">${reactions?`<div class="msg__reactions">${reactions}</div>`:''}<span class="time">${repliesBtn}${m.edited?`<span class="msg__edited" title="Изменено ${fmtDT(m.editedAt||m.created_at)}">изменено</span>`:''}${fmtTime(m.created_at)}${own?`<span class="ticks" title="${(m.readBy||[]).length?('Прочитано'):'Доставлено, ещё не прочитано'}"><span class="ticks__ic ${(m.readBy||[]).length>0?'on':''}">${(m.readBy||[]).length>0?icon('checks','ico-sm'):icon('check','ico-sm')}</span></span>`:''}</span></div>
             </div>
           </div>`
         };
