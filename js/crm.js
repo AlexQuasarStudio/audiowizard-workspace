@@ -2011,12 +2011,18 @@ const CRM = (() => {
       if (tr && tr.isConnected) tr.remove();
       /* Последовательное удаление: после Esc курсор встаёт в предыдущую
          новую строку (если она есть) — можно удалять подряд. */
-      if (prevRow && prevRow.isConnected && prevRow.classList.contains('inline-add')){
-        setTimeout(()=>{
-          const f = prevRow.querySelector('input, select');
-          if (f){ try { f.focus(); f.select && f.select(); } catch(e){} }
-        }, 0);
-      }
+      setTimeout(()=>{
+        /* 1) предыдущая новая строка, 2) её первое поле, 3) кнопка добавления:
+           фокус не должен остаться на body ни в одном из сценариев. */
+        let f = null;
+        if (prevRow && prevRow.isConnected && prevRow.classList.contains('inline-add'))
+          f = prevRow.querySelector('input, select');
+        if (!f){
+          const addBtn = document.querySelector('#btn-inline-order, #btn-inline-person, #btn-inline-executor, #pl-add');
+          if (addBtn) { try { addBtn.focus(); } catch(e){} return; }
+        }
+        if (f){ try { f.focus(); f.select && f.select(); } catch(e){} }
+      }, 0);
       cb && cb();
     }, 210);
   }
