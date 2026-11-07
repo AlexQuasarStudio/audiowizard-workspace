@@ -5924,7 +5924,7 @@ const cm = root.querySelector('.chat-main');
       <div class="cols-2 grid" style="gap:12px">
         <div class="field"><label>Дни месяца</label><input class="input" id="po-days" value="${p.days.join(', ')}" placeholder="1, 15"></div>
         <div class="field"><label>Время (МСК)</label><input class="input" id="po-time" type="time" value="${esc(p.time)}"></div>
-        <div class="field"><label>Комиссия системы оплат, %</label><input class="input" id="po-comm" type="number" min="0" max="50" step="0.5" value="${cfg.commission}"></div>
+        <div class="field"><label>Комиссия Smartcat, % (индивидуально)</label><input class="input" id="po-comm" type="number" min="0" max="50" step="0.5" value="${cfg.commission}"></div>
         <div class="field"><label>Маржа админа, %</label><input class="input" id="po-admin" type="number" min="0" max="100" step="1" value="${cfg.adminMargin}"></div>
         <div class="field"><label>Доля менеджера, %</label><input class="input" id="po-mgr" type="number" min="0" max="100" step="1" value="${cfg.managerFee}"></div>
         <div class="field"><label>Автоматически</label><label class="row small" style="gap:8px;padding-top:9px"><input type="checkbox" id="po-auto" ${p.auto?'checked':''}> по расписанию</label>
@@ -5943,8 +5943,8 @@ const cm = root.querySelector('.chat-main');
       <div class="row row--between" style="margin-bottom:10px"><span class="small faint">Комиссия ${cfg.commission}% / на руки</span><b class="small">${fmtMoney(pend.commission)} / ${fmtMoney(pend.net)}</b></div>
       ${staff?rows:''}
       ${staff?`<h4 class="small" style="margin:12px 0 4px">Заказы периода</h4>${list}`:''}
-      ${!staff?`<p class="small">Ваш долг по выполненным заказам: <b>${fmtMoney(myDebt)}</b></p><p class="small faint">Выплата приходит на привязанный аккаунт Smartcat или вне системы — по договорённости с менеджером. Внутренняя комиссия системы оплат — ${cfg.commission}%.</p>`:''}
-      <p class="small faint" style="margin-top:8px">Внутренняя комиссия системы оплат — ${cfg.commission}%. Сумма к зачислению = долг − комиссия.</p>
+      ${!staff?`<p class="small">Ваш долг по выполненным заказам: <b>${fmtMoney(myDebt)}</b></p><p class="small faint">Выплата приходит на привязанный аккаунт Smartcat или вне системы — по договорённости с менеджером. Комиссия Smartcat — ${cfg.commission}% (индивидуальна для аккаунта).</p>`:''}
+      <p class="small faint" style="margin-top:8px">Комиссия Smartcat — ${cfg.commission}% (индивидуальна для аккаунта). Сумма к зачислению = долг − комиссия.</p>
     </div>
 
     <div class="card card-pad">
@@ -5978,7 +5978,7 @@ const cm = root.querySelector('.chat-main');
       if (!pend.orders.length){ toast('В этом периоде нет неоплаченных выполненных заказов','info'); return; }
       const ok = await confirmModal({
         title:'Выплатить сейчас?', okText:'Выплатить '+fmtMoney(pend.total),
-        text:`Будет закрыто ${pend.orders.length} заказов. Исполнителям и менеджерам — ${fmtMoney(pend.total)}, внутренняя комиссия системы оплат ${cfgCom() }%: ${fmtMoney(pend.commission)}. На руки — ${fmtMoney(pend.net)}.`,
+        text:`Будет закрыто ${pend.orders.length} заказов. Исполнителям и менеджерам — ${fmtMoney(pend.total)}, комиссия Smartcat ${cfgCom()}% (индивидуальна): ${fmtMoney(pend.commission)}. На руки — ${fmtMoney(pend.net)}.`,
         checkbox:'Проверил суммы и получателей'
       });
       if (!ok) return;

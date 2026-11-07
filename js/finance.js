@@ -13,9 +13,9 @@ const Finance = (function(){
     const f = (S.settings && S.settings.finance) || {};
     return {
       adminMargin: clamp(f.adminMargin ?? 25, 0, 100),
-      managerFee: clamp(f.managerFee ?? 5, 0, 100),
+      managerFee: clamp(f.managerFee ?? 10, 0, 100),
       executorShare: clamp(f.executorShare ?? 40, 0, 100),
-      commission: clamp(f.payoutCommission ?? 2, 0, 50)
+      commission: clamp(f.payoutCommission ?? 5, 0, 50)
     };
   }
 
@@ -26,7 +26,12 @@ const Finance = (function(){
     const total = Math.max(0, Number(o && o.total) || 0);
     const exec = ((o && o.executors) || []).reduce((a, e) => a + (Number(e.amount) || 0), 0);
     const admin = Math.round(total * c.adminMargin / 100);
-    const manager = Math.round(total * c.managerFee / 100);
+    /* Менеджер сам прописывает оплату за заказ (o.managerFee, %), по умолчанию
+       10%. Потолок — свободный остаток: больше, чем осталось после
+       исполнителей и маржи, начислить нельзя. */
+    const mgrPct = clamp(o && o.managerFee != null ? o.managerFee : c.managerFee, 0, 100);
+    const managerWant = Math.round(total * mgrPct / 100);
+    const manager = Math.max(0, Math.min(managerWant, total - exec - admin));
     const left = total - exec - admin - manager;
     return { total, exec, admin, manager, left, over: left < 0 ? -left : 0, cfg: c };
   }
