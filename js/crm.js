@@ -2984,11 +2984,26 @@ updatePeopleBulk();
         const scReq = mask.querySelector('[data-sc-req]');
         if (scReq) scReq.onclick = ()=>{
           const cur = Finance.scOf(p.id);
-          const login = prompt('Логин в '+(((S.settings.integrations||{}).payout||{}).name || 'платёжном сервисе'), cur.login||'');
-          if (!login) return;
-          Finance.requestSmartcat(p.id, login);
-          toast('Запрос на привязку отправлен на подтверждение','ok');
-          close(); openPersonCard(p.id, roleEff);
+          const pname = (((S.settings.integrations||{}).payout||{}).name || 'платёжный сервис');
+          openWinModal({ title:'Привязка аккаунта', narrow:true, icon:'card',
+            body:`<p class="small">Укажите логин в ${esc(pname)} для <b>${esc(p.full_name)}</b>. Запрос уйдёт на подтверждение менеджеру или админу.</p>
+              <div class="field" style="margin-top:10px"><label>Логин</label>
+                <input class="input" id="sc-login" value="${esc(cur.login||'')}" placeholder="например, maria.kuznetsova" autocomplete="off"></div>`,
+            footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-send>Отправить запрос</button>`,
+            onMount:(mm,cl)=>{
+              mm.querySelector('[data-x]').onclick = cl;
+              const inp = mm.querySelector('#sc-login');
+              if (inp) setTimeout(()=>inp.focus(), 60);
+              const send = mm.querySelector('[data-send]');
+              send.onclick = ()=>{
+                const login = (inp.value||'').trim();
+                if (!login){ toast('Укажите логин','warn'); inp.focus(); return; }
+                Finance.requestSmartcat(p.id, login);
+                toast('Запрос на привязку отправлен на подтверждение','ok');
+                cl();
+                try { close(); openPersonCard(p.id, roleEff); } catch(e){}
+              };
+            } });
         };
         const scOk = mask.querySelector('[data-sc-ok]');
         if (scOk) scOk.onclick = ()=>{ Finance.approveSmartcat(p.id); toast('Аккаунт подтверждён','ok'); close(); openPersonCard(p.id, roleEff); };

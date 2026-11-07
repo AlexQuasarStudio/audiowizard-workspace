@@ -6056,10 +6056,22 @@ const cm = root.querySelector('.chat-main');
     el.querySelectorAll('[data-sc-req]').forEach(b=>b.onclick=()=>{
       const uid=b.dataset.scReq; const usr=userById(uid); if(!usr) return;
       const cur=Finance.scOf(uid);
-      const login = prompt('Логин в '+(payoutProvider().name||'платёжном сервисе'), cur.login||'');
-      if (!login) return;
-      Finance.requestSmartcat(uid, login);
-      toast('Запрос на привязку отправлен на подтверждение','ok'); APP.render();
+      const pname = payoutProvider().name || 'платёжный сервис';
+      openWinModal({ title:'Привязка аккаунта', narrow:true, icon:'card',
+        body:`<p class="small">Логин в ${esc(pname)} для <b>${esc(usr.full_name)}</b>. Запрос уйдёт на подтверждение.</p>
+          <div class="field" style="margin-top:10px"><label>Логин</label><input class="input" id="sc-login" value="${esc(cur.login||'')}" autocomplete="off"></div>`,
+        footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-send>Отправить запрос</button>`,
+        onMount:(mm,cl)=>{
+          mm.querySelector('[data-x]').onclick = cl;
+          const inp = mm.querySelector('#sc-login'); if (inp) setTimeout(()=>inp.focus(), 60);
+          mm.querySelector('[data-send]').onclick = ()=>{
+            const login=(inp.value||'').trim();
+            if(!login){ toast('Укажите логин','warn'); inp.focus(); return; }
+            Finance.requestSmartcat(uid, login);
+            toast('Запрос на привязку отправлен на подтверждение','ok');
+            cl(); APP.render();
+          };
+        } });
     });
   }
   function settingsView(root, section){
