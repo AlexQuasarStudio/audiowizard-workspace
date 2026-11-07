@@ -107,11 +107,7 @@ const Windows = (() => {
     const link = navLink(route);
     if (!link) return;
     link.classList.toggle('has-win', !!open);
-    if (open){
-      link.classList.remove('win-dot--pop');
-      void link.offsetWidth;
-      link.classList.add('win-dot--pop');
-    }
+    if (open) link.classList.remove('win-dot--pop'); /* без пульсации при открытии окна */
   }
   function refreshAllIndicators(){
     document.querySelectorAll('a.side__link.has-win').forEach(l => l.classList.remove('has-win', 'win-dot--pop'));

@@ -5925,7 +5925,7 @@ const cm = root.querySelector('.chat-main');
 
     const scRows = (S.users||[]).filter(x => x.ext && ['executor','manager','top_manager'].includes(x.role) && (staff || x.id===myId)).map(x => {
       const sc = Finance.scOf(x.id);
-      return `<div class="row row--between" style="padding:6px 0;border-bottom:1px solid var(--border);gap:8px">
+      return `<div class="row row--between" data-sc-row="${esc(x.full_name+' '+(sc.login||''))}" style="padding:6px 0;border-bottom:1px solid var(--border);gap:8px">
         <span class="small" style="min-width:0">${esc(x.full_name)} ${scStateBadge(sc.status)}<br><span class="faint">${esc(sc.login||'логин не указан')}</span></span>
         <span class="row" style="gap:6px;flex:none">
           ${staff && sc.status==='pending'?`<button class="btn btn--sm btn--primary" data-sc-ok="${x.id}">Подтвердить</button><button class="btn btn--sm btn--ghost" data-sc-no="${x.id}">Отклонить</button>`:''}
@@ -5981,6 +5981,7 @@ const cm = root.querySelector('.chat-main');
     <div class="card card-pad">
       <h3 style="margin-bottom:8px">${provName}</h3>
       <p class="small faint">Аккаунт прикрепляет админ или менеджер, либо исполнитель сам — с подтверждением менеджера или админа.</p>
+      <input class="input" id="sc-q" placeholder="Поиск по имени или логину" style="margin:8px 0">
       ${scRows}
     </div>`;
   }
@@ -6028,6 +6029,11 @@ const cm = root.querySelector('.chat-main');
       const a=document.createElement('a');
       a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
       a.download='smartcat-payout-'+new Date().toISOString().slice(0,10)+'.json'; a.click();
+    };
+    const scq = el.querySelector('#sc-q');
+    if (scq) scq.oninput = ()=>{
+      const v = scq.value.trim().toLowerCase();
+      el.querySelectorAll('[data-sc-row]').forEach(r=>{ r.hidden = !!v && !r.dataset.scRow.toLowerCase().includes(v); });
     };
     el.querySelectorAll('[data-sc-ok]').forEach(b=>b.onclick=()=>{ Finance.approveSmartcat(b.dataset.scOk); toast('Аккаунт подтверждён','ok'); APP.render(); });
     el.querySelectorAll('[data-sc-no]').forEach(b=>b.onclick=()=>{ Finance.rejectSmartcat(b.dataset.scNo); toast('Запрос отклонён','warn'); APP.render(); });

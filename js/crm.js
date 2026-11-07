@@ -1265,6 +1265,7 @@ const CRM = (() => {
           <div class="cols-2 grid" style="gap:13px">
             <div class="field"><label>Ниша *</label><select class="input" id="of-niche">
               <option value="">— выбрать —</option>${S.niches.map(n=>`<option value="${n.id}" ${o.nish_id===n.id?'selected':''}>${esc(n.name)}</option>`).join('')}</select></div>
+            <div class="field"><label>Доля менеджера, %</label><input type="number" class="input" id="of-mgrfee" min="0" max="100" step="1" value="${o.managerFee != null ? o.managerFee : (window.Finance ? Finance.cfg().managerFee : 10)}"></div>
             <div class="field"><label>Статус</label><select class="input" id="of-status">
               ${Object.entries(STATUS_META).map(([st,mt])=>`<option value="${st}" ${o.status===st?'selected':''}>${mt.label}</option>`).join('')}</select></div>
           </div>
@@ -1561,6 +1562,7 @@ const CRM = (() => {
           return {
             order_id:sanitizeOrderId(g('#of-id').value), client_id:g('#of-client').value, client_ids:[...selClients], nish_id:g('#of-niche').value, tariff:g('#of-tariff').value,
             status:g('#of-status').value, deadline:g('#of-deadline').value||null, start:g('#of-start').value||null, total:+g('#of-total').value||0,
+            managerFee: Math.max(0, Math.min(100, +g('#of-mgrfee').value || 10)),
             prepay:+g('#of-prepay').value, cert:g('#of-cert').value, need_cert:g('#of-need-cert').checked,
             comment:g('#of-comment').value, project_id:g('#of-project').value, folder_id:g('#of-folder').value,
             proposed:+g('#of-proposed').value||0, forbid:g('#of-forbid').checked,
