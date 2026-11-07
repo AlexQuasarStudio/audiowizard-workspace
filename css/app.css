@@ -1599,19 +1599,21 @@ body.win-dragging *{user-select:none!important}
 /* ТГ-вёрстка времени: плавает в конце последней строки текста,
    не ломая переносы; короткие сообщения — компактная одна строка. */
 .msg__bubble .time{float:right;display:inline-flex;align-items:center;gap:2px;margin:3px 0 0 6px;white-space:nowrap;font-size:10px;color:var(--faint);position:relative}
-.msg--own .msg__bubble .time{color:var(--faint)}
+.msg--own .msg__bubble .time{color:var(--muted)}
+/* Вторичные подписи внутри своего пузыря — не теряются на плотной подложке */
+.msg--own .msg__bubble .msg__edited{color:var(--muted)}
 .msg__bubble .txt:after{content:"";display:block;clear:both}
 /* Текст сообщения — отдельный блочный слой под ником, переносы сохранены */
 .msg__bubble .txt{display:block;white-space:pre-wrap;word-wrap:break-word;line-height:1.45;font-size:13.5px}
 .ticks{display:inline-flex;gap:0;align-items:center;vertical-align:middle;color:rgba(255,255,255,.65)}
 .ticks .ico{width:15px;height:15px;margin-left:1px}
 .ticks,.ticks.on{color:inherit}
-/* Свои сообщения — акцентный оттенок из референса: в светлой фиолетовой
-   теме подложка #DCD6E3, рамка #B0A4C2 (акцент 20% и 45% поверх фона).
-   Готовые токены --own-bubble / --own-bubble-bd лежат в css/base.css для
-   каждой темы: если браузер не умеет color-mix, пузырь не побелеет, а
-   возьмёт ближайший оттенок темы. */
-.msg--own .msg__bubble{background:var(--own-bubble,color-mix(in srgb,var(--accent) 20%,var(--bg)));border-color:var(--own-bubble-bd,color-mix(in srgb,var(--accent) 45%,transparent));border-radius:16px 16px 4px 16px}
+/* Свои сообщения — аккуратный цветовой акцент темы: плотная, но мягкая
+   подложка (акцент ≈46% в тёмных темах и ≈36% в светлых) и более
+   выраженная кайма. Готовые токены --own-bubble / --own-bubble-bd /
+   --own-accent лежат в css/base.css для каждой темы: если браузер не умеет
+   color-mix, пузырь не побелеет, а возьмёт ближайший оттенок темы. */
+.msg--own .msg__bubble{background:var(--own-bubble,color-mix(in srgb,var(--accent) 46%,var(--bg)));border-color:var(--own-bubble-bd,color-mix(in srgb,var(--accent) 70%,var(--bg)));border-radius:16px 16px 4px 16px}
 /* Хвост пузыря — в стиле Telegram: отдельный «треугольник» не нужен.
    Угол пузыря у хвоста имеет меньший радиус (4px против 16px) и образует
    аккуратный носик-указатель — ровные края без пикселизации. */
@@ -1871,13 +1873,30 @@ html.splash-hold #splash{visibility:hidden}
    (блок был потерян; восстановлен по разметке и дизайн-системе)
    ============================================================ */
 
-/* --- Свои сообщения: мягкая акцентная подложка (принцип «некричащих» цветов) --- */
-/* Свои сообщения — акцентный оттенок из референса: в светлой фиолетовой
-   теме подложка #DCD6E3, рамка #B0A4C2 (акцент 20% и 45% поверх фона).
-   Готовые токены --own-bubble / --own-bubble-bd лежат в css/base.css для
-   каждой темы: если браузер не умеет color-mix, пузырь не побелеет, а
-   возьмёт ближайший оттенок темы. */
-.msg--own .msg__bubble{background:var(--own-bubble,color-mix(in srgb,var(--accent) 20%,var(--bg)));border-color:var(--own-bubble-bd,color-mix(in srgb,var(--accent) 45%,transparent));border-radius:16px 16px 4px 16px}
+/* --- Свои сообщения: аккуратный цветовой акцент темы --- */
+/* Свои сообщения — аккуратный цветовой акцент темы: плотная, но мягкая
+   подложка (акцент ≈46% в тёмных темах и ≈36% в светлых) и более
+   выраженная кайма. Готовые токены --own-bubble / --own-bubble-bd /
+   --own-accent лежат в css/base.css для каждой темы: если браузер не умеет
+   color-mix, пузырь не побелеет, а возьмёт ближайший оттенок темы. */
+.msg--own .msg__bubble{background:var(--own-bubble,color-mix(in srgb,var(--accent) 46%,var(--bg)));border-color:var(--own-bubble-bd,color-mix(in srgb,var(--accent) 70%,var(--bg)));border-radius:16px 16px 4px 16px}
+/* Акцентные детали внутри своего пузыря: на плотной подложке обычный
+   --accent тонет — берём --own-accent (осветлённый в тёмных темах,
+   углублённый в светлых). */
+.msg--own .msg__bubble .msg__replies,
+.msg--own .msg__bubble .msg__pin-ico,
+.msg--own .msg__bubble .msg__poll-ico,
+.msg--own .msg__bubble .msg__more,
+.msg--own .msg__bubble .msg__fwd,
+.msg--own .msg__bubble .msg__quote b,
+.msg--own .msg__bubble .msg__file .ico,
+.msg--own .msg__bubble .msg__artifact-ico{color:var(--own-accent,var(--accent))}
+.msg--own .msg__bubble .msg-mention{color:var(--own-accent,var(--accent))}
+.msg--own .msg__bubble .msg-mention--all,
+.msg--own .msg__bubble .msg-mention--role{background:color-mix(in srgb,var(--own-accent,var(--accent)) 16%,transparent)}
+.msg--own .msg__bubble .msg-mention:hover{background:color-mix(in srgb,var(--own-accent,var(--accent)) 24%,transparent)}
+.msg--own .msg__bubble .msg__quote{border-left-color:var(--own-accent,var(--accent));background:color-mix(in srgb,var(--own-accent,var(--accent)) 10%,transparent)}
+
 
 /* --- Вложения в сообщении --- */
 .msg__img{display:block;max-width:100%;max-height:320px;border-radius:12px;margin:2px 0 4px;cursor:pointer;object-fit:cover}
