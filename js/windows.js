@@ -1335,7 +1335,18 @@ const Windows = (() => {
     const verticalOverlap = r => (r.top <= bottom - 10) && (r.bottom >= rc.top + 10);
     const horizontalOverlap = r => (r.left <= right - 10) && (r.right >= rc.left + 10);
     let best = null, bestDist = Infinity;
-    allWins().forEach(r => {
+    /* Защёлка соседа на время ресайза стыка: без неё при движении другой
+       окно становилось «ближе» и стык внезапно подменял соседа. */
+    const latched = win.__splitPartner;
+    if (latched && latched.isConnected && latched.__inSplit && latched !== win){
+      const lr = latched.getBoundingClientRect();
+      const near = (d.includes('e') && Math.abs(lr.left - right) <= 60)
+        || (d.includes('w') && Math.abs(lr.right - rc.left) <= 60)
+        || (d.includes('n') && Math.abs(lr.bottom - rc.top) <= 60)
+        || (d.includes('s') && Math.abs(lr.top - bottom) <= 60);
+      if (near){ win.__splitPartner = latched; best = latched; }
+    }
+    if (!best) allWins().forEach(r => {
 
       const o = r.win;
       if (o === win || !o.__inSplit) return;
@@ -1366,9 +1377,11 @@ const Windows = (() => {
       }
     });
     if (!best){
+      win.__splitPartner = null;
       win.classList.remove('aw-win--split');
       return;
     }
+    win.__splitPartner = best;
     win.classList.add('aw-win--split');
     best.classList.add('aw-win--split');
     const br = best.getBoundingClientRect();
@@ -1594,7 +1607,8 @@ const Windows = (() => {
           syncSplit(w, { left:r.left, top:r.top, width:r.width, height:r.height }, active.dir);
         }
         /* Сброс исходных краёв соседей: следующий ресайз стартует с чистого состояния */
-        allWins().forEach(rec => { rec.win.__origLeft = null; rec.win.__origRight = null; rec.win.__origGap = null; rec.win.__origGapE = null; rec.win.__origGapW = null; rec.win.__origGapN = null; rec.win.__origGapS = null; rec.win.__origTop = null; rec.win.__origBottom = null; });
+        win.__splitPartner = null;
+        allWins().forEach(rec => { rec.win.__splitPartner = null; rec.win.__origLeft = null; rec.win.__origRight = null; rec.win.__origGap = null; rec.win.__origGapE = null; rec.win.__origGapW = null; rec.win.__origGapN = null; rec.win.__origGapS = null; rec.win.__origTop = null; rec.win.__origBottom = null; });
       }
       if (active.kind === 'drag' && active.moved) active.win.__lastDragEnd = Date.now();
       if (active.kind === 'drag'){ active.win.__dragStartRect = null; active.win.__cornerDetached = false; }

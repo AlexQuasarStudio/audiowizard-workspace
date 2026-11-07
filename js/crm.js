@@ -1933,11 +1933,17 @@ const CRM = (() => {
         put(5, '[data-f="total"]');
       } else {
         /* Люди: имя — в колонку «ФИО», контакты — в соседнюю */
-        /* Имя и контакты — в одну ячейку «ФИО», друг под другом */
         put(2, '[data-f="name"]');
-        put(2, '[data-f="email"]');
-        put(2, '[data-f="phone"]');
-        put(4, '[data-f="spec"]');
+        if (kind === 'people' && box.querySelector('[data-f="spec"]')){
+          /* Исполнитель: контакты под ФИО, специализации — в свою колонку */
+          put(2, '[data-f="email"]');
+          put(2, '[data-f="phone"]');
+          put(3, '[data-f="spec"]');
+        } else {
+          /* Клиент: email и телефон — в колонку «Контакт» */
+          put(3, '[data-f="email"]');
+          put(3, '[data-f="phone"]');
+        }
       }
       const lastCell = cellAt(cols - 1);
       ['[data-inline-save]','[data-inline-cancel]'].forEach(sel => { const el = box.querySelector(sel); if (el) lastCell.appendChild(el); });
