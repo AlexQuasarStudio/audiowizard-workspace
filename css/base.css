@@ -55,6 +55,13 @@ p{margin:0 0 10px}
 [data-theme="dark-blue"]{--bg:#0c0e13;--bg-2:#12151c;--panel:#161a23;--panel-2:#1d2230;--panel-3:#242a3a;--text:#e9edf4;--text-2:#c0c8d6;--muted:#8d97aa;--faint:#667082;--border:#242a38;--border-2:#333a4d;--accent:#7a95c4;--accent-soft:rgba(122,149,196,.15);--accent-2:#9fb4d8;--blue:#7a95c4;--blue-soft:rgba(122,149,196,.15);--grad-brand:linear-gradient(135deg,var(--accent-2),var(--accent) 55%,#5d77a1);--on-accent:#0c0e13;--own-bubble:#45536D;--own-bubble-bd:#596C8F;--own-accent:#C3CFE4}
 [data-theme="dark-red"]{--bg:#0d0e11;--bg-2:#141519;--panel:#191a1f;--panel-2:#202127;--panel-3:#282a32;--text:#f1ede9;--text-2:#cfc7c0;--muted:#a29892;--faint:#756c66;--border:#2a2830;--border-2:#3a3741;--accent:#c96f5e;--accent-soft:rgba(201,111,94,.15);--accent-2:#de8f7e;--red:#c96f5e;--red-soft:rgba(201,111,94,.15);--grad-brand:linear-gradient(135deg,var(--accent-2),var(--accent) 55%,#a55a4b);--own-bubble:#6C4139;--own-bubble-bd:#915247;--own-accent:#E7BEB7}
 [data-theme="dark-green"]{--bg:#0c0f0d;--bg-2:#121614;--panel:#171c19;--panel-2:#1e2420;--panel-3:#262e29;--text:#ebf0ec;--text-2:#c4cfc6;--muted:#93a297;--faint:#6a786e;--border:#242b26;--border-2:#333d36;--accent:#87ab93;--accent-soft:rgba(135,171,147,.14);--accent-2:#a5c7ae;--green:#87ab93;--green-soft:rgba(135,171,147,.14);--grad-brand:linear-gradient(135deg,var(--accent-2),var(--accent) 55%,#6d8f76);--on-accent:#0c0f0d;--own-bubble:#4B5F52;--own-bubble-bd:#627C6B;--own-accent:#C9D9CE}
+/* Тёмные темы: «скорость» голосового тоже не белая — приглушённый
+   серый оттенок акцента, чтобы пилюля не перетягивала внимание. */
+[data-theme^="dark"]{
+  --own-media-chip:color-mix(in srgb,var(--own-accent,var(--accent)) 58%,#8b8595);
+  --own-media-chip-ink:#241f2c;
+  --own-media-chip-bd:rgba(255,255,255,.10);
+}
 [data-theme="dark-mono"]{--bg:#0e0d0c;--bg-2:#161413;--panel:#1b1918;--panel-2:#231f1d;--panel-3:#2b2725;--text:#f0ede8;--text-2:#ccc8c1;--muted:#9c968c;--faint:#716c63;--border:#2b2825;--border-2:#3b3733;--accent:#f5f7fa;--accent-soft:rgba(245,247,250,.1);--accent-2:#dcd9d2;--blue:#b9b3a8;--violet:#dcd9d2;--green:#b9b3a8;--red:#d0c9be;--yellow:#d0c9be;--grad-brand:linear-gradient(135deg,#e8e4dc,#c9c4ba);--check-bg:#2a2c31;--check-tick:#0d0e11;--on-accent:#0d0e11;--own-bubble:#3C3C3C;--own-bubble-bd:#8F9092}
 /* Тёмная монохромная: акцент почти белый, поэтому пузырь «своих» сообщений
    иначе становится светло-серым с белым текстом (нечитаемо). Фиксируем тёмный
@@ -162,8 +169,10 @@ p{margin:0 0 10px}
   --own-media-btn:#ffffff; --own-media-ink:var(--accent);
   --own-media-wave:color-mix(in srgb,var(--own-accent,var(--accent)) 32%,transparent);
   --own-media-wave-on:var(--own-accent,var(--accent));
-  --own-media-chip:#ffffff; --own-media-chip-ink:var(--accent);
-  --own-media-chip-bd:color-mix(in srgb,var(--accent) 14%,transparent);
+  /* «Скорость» (1x) — не белая пилюля: мягкий серый с оттенком акцента,
+     белая слишком ярко выделялась на пастельном пузыре. */
+  --own-media-chip:color-mix(in srgb,var(--accent) 10%,#e7e5ea); --own-media-chip-ink:var(--accent);
+  --own-media-chip-bd:color-mix(in srgb,var(--accent) 16%,transparent);
 }
 
 /* Монохром: контраст цифр в «кружках» */
