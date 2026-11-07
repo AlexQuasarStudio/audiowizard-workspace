@@ -2449,6 +2449,8 @@ ex.innerHTML = avatarHTML(user(), '');
   }
   function animateBubbleHeight(mid, prevH){
     if (!prevH) return;
+    /* Вызывается сразу после renderChat, в том же такте: старую высоту
+       ставим до отрисовки кадра, поэтому пузырь не «прыгает» вниз-вверх. */
     const el = document.querySelector('.msg[data-msg="' + mid + '"] .msg__bubble');
     if (!el) return;
     const nextH = el.offsetHeight;
@@ -2458,7 +2460,7 @@ ex.innerHTML = avatarHTML(user(), '');
     el.getBoundingClientRect();
     el.style.transition = 'height .18s var(--ease)';
     el.style.height = nextH + 'px';
-    setTimeout(() => { el.style.height = ''; el.style.transition = ''; el.style.overflow = ''; }, 210);
+    setTimeout(() => { el.style.height = ''; el.style.transition = ''; el.style.overflow = ''; }, 230);
   }
   function patchReactionPill(pill, ids, em){
     if (!pill) return;
@@ -4617,6 +4619,7 @@ const cm = root.querySelector('.chat-main');
         const rBtn = e.target.closest('[data-react]');
         if (rBtn){
           const [mid, em] = rBtn.dataset.react.split('|');
+          const prevH = bubbleHeightOf(mid);
           const m = S.messages.find(x=>x.id===mid);
           m.reactions = m.reactions||{};
           m.reactions[em] = m.reactions[em]||[];
@@ -4630,7 +4633,7 @@ const cm = root.querySelector('.chat-main');
           const ids = m.reactions[em] || [];
           if (!ids.length){
             rBtn.classList.add('react-fade');
-            setTimeout(()=>renderChat(), 190);
+            setTimeout(()=>{ renderChat(); animateBubbleHeight(mid, prevH); }, 190);
           } else {
             patchReactionPill(rBtn, ids, em);
             rBtn.classList.toggle('on', ids.includes(u.id));
