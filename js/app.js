@@ -5944,7 +5944,7 @@ const cm = root.querySelector('.chat-main');
     return `
     <div class="card card-pad">
       <h3 style="margin-bottom:6px">Выплаты</h3>
-      <p class="small faint">По умолчанию — 1-го и 15-го числа в 15:00 МСК. В выплату попадают все заказы, выполненные с 1-го (включительно) по 14-е 15:00 и с 15-го (включительно) по 1-е 15:00. Исполнителям — их суммы, менеджерам — доля заказа, админу — маржа ${cfg.adminMargin}%.</p>
+      <p class="small faint">По умолчанию — 1-го и 15-го числа в 15:00 МСК. В выплату попадают все заказы, выполненные с 1-го (включительно) по 14-е 15:00 и с 15-го (включительно) по 1-е 15:00.</p>
       <div class="row row--between" style="margin-top:10px;gap:10px;flex-wrap:wrap">
         <span class="badge ${p.enabled?'badge--ok':'badge--outline'}">${p.enabled?'Расписание включено':'Расписание выключено'}</span>
         <span class="badge badge--outline">${esc(Finance.fmtPeriod(pend.period))}</span>
@@ -5956,7 +5956,6 @@ const cm = root.querySelector('.chat-main');
       <div class="cols-2 grid" style="gap:12px">
         <div class="field"><label>Дни месяца</label><input class="input" id="po-days" value="${p.days.join(', ')}" placeholder="1, 15"></div>
         <div class="field"><label>Время (МСК)</label><input class="input" id="po-time" type="time" value="${esc(p.time)}"></div>
-        <div class="field"><label>Комиссия ${provName}, % (индивидуально)</label><input class="input" id="po-comm" type="number" min="0" max="50" step="0.5" value="${cfg.commission}"></div>
         <div class="field"><label>Маржа админа, %</label><input class="input" id="po-admin" type="number" min="0" max="100" step="1" value="${cfg.adminMargin}"></div>
         <div class="field"><label>Доля менеджера, %</label><input class="input" id="po-mgr" type="number" min="0" max="100" step="1" value="${cfg.managerFee}"></div>
         <div class="field"><label>Автоматически</label><label class="row small" style="gap:8px;padding-top:9px"><input type="checkbox" id="po-auto" ${p.auto?'checked':''}> по расписанию</label>
@@ -5972,11 +5971,11 @@ const cm = root.querySelector('.chat-main');
     <div class="card card-pad">
       <h3 style="margin-bottom:8px">К выплате ${staff?'сейчас':''}</h3>
       <div class="row row--between" style="margin-bottom:8px"><span class="small faint">Итого</span><b>${fmtMoney(pend.total)}</b></div>
-      <div class="row row--between" style="margin-bottom:10px"><span class="small faint">Комиссия ${cfg.commission}% / на руки</span><b class="small">${fmtMoney(pend.commission)} / ${fmtMoney(pend.net)}</b></div>
+      <div class="row row--between" style="margin-bottom:10px"><span class="small faint">Сборы провайдера (ориентир) / на руки</span><b class="small">${fmtMoney(pend.commission)} / ${fmtMoney(pend.net)}</b></div>
       ${staff?rows:''}
       ${staff?`<h4 class="small" style="margin:12px 0 4px">Заказы периода</h4>${list}`:''}
-      ${!staff?`<p class="small">Ваш долг по выполненным заказам: <b>${fmtMoney(myDebt)}</b></p><p class="small faint">Выплата приходит на привязанный аккаунт ${provName} или вне системы — по договорённости с менеджером. Комиссия ${provName} — ${cfg.commission}% (индивидуальна для аккаунта).</p>`:''}
-      <p class="small faint" style="margin-top:8px">Комиссия ${provName} — ${cfg.commission}% (индивидуальна для аккаунта). Сумма к зачислению = долг − комиссия.</p>
+      ${!staff?`<p class="small">Ваш долг по выполненным заказам: <b>${fmtMoney(myDebt)}</b></p><p class="small faint">Выплата приходит на привязанный аккаунт ${provName} или вне системы — по договорённости с менеджером. ${provName} не берёт комиссию с заработка: удерживаются только транзакционные сборы банка/платёжной системы — их размер зависит от страны и способа выплаты, проверяйте на <a href="https://help.smartcat.com/understanding-freelancer-fees-in-smartcat" target="_blank" rel="noopener">официальной странице</a>.</p>`:''}
+      <p class="small faint" style="margin-top:8px">Сборы провайдера зависят от страны и способа выплаты — уточняйте на официальном сайте. Сумма к зачислению = долг − сборы.</p>
     </div>
 
     <div class="card card-pad">
@@ -5991,10 +5990,10 @@ const cm = root.querySelector('.chat-main');
     if (save) save.onclick = ()=>{
       const days = String((el.querySelector('#po-days')||{}).value||'').split(/[^0-9]+/).map(Number).filter(d=>d>=1&&d<=28);
       const time = ((el.querySelector('#po-time')||{}).value||'15:00').trim() || '15:00';
-      const comm = Math.max(0, Math.min(50, Number((el.querySelector('#po-comm')||{}).value)||0));
+      const comm = cfg.commission;
       const adm = Math.max(0, Math.min(100, Number((el.querySelector('#po-admin')||{}).value)||0));
       const mgr = Math.max(0, Math.min(100, Number((el.querySelector('#po-mgr')||{}).value)||0));
-      S.settings.finance = Object.assign({}, S.settings.finance, { adminMargin:adm, managerFee:mgr, payoutCommission:comm });
+      S.settings.finance = Object.assign({}, S.settings.finance, { adminMargin:adm, managerFee:mgr });
       S.settings.payout = Object.assign({}, p, {
         enabled: !!((el.querySelector('#po-on')||{}).checked),
         auto: !!((el.querySelector('#po-auto')||{}).checked),
