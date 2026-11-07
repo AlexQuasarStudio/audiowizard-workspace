@@ -579,6 +579,9 @@ const CRM = (() => {
             <input class="input" data-f="client" placeholder="Клиент (ФИО/название)" style="min-width:170px">
             <input class="input" data-f="total" placeholder="Сумма, ₽" type="number" min="0" style="max-width:120px">
             <input class="input" data-f="start" type="date" title="Начало (по умолчанию сегодня)" style="max-width:150px" value="${new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)}">
+            <select class="input" data-f="status" title="Статус">
+              ${Object.entries(STATUS_META).filter(([st])=>st!=='archived').map(([st,mt])=>`<option value="${st}" ${st==='waiting'?'selected':''}>${mt.label}</option>`).join('')}
+            </select>
             <input class="input" data-f="deadline" placeholder="дд.мм.гггг" title="Дедлайн" style="max-width:150px"${window.matchMedia && window.matchMedia('(max-width:960px)').matches ? ' type="date"' : ''}>
             <button class="btn btn--primary btn--sm" type="button" data-inline-save title="Создать заказ">${icon('check-c','ico-sm')}</button>
             <button class="iconbtn" type="button" data-inline-cancel title="Отмена">${icon('x','ico-sm')}</button>
@@ -977,8 +980,9 @@ const CRM = (() => {
           const now = Date.now();
           const stRaw = (v('start') || '').trim();
           const stTs = stRaw ? new Date(stRaw + 'T00:00:00').getTime() : now;
+          const statusRaw = v('status') || 'waiting';
           const no = { id: uid(), order_id: oid, client_id: client.id, order_date: now, deadline: dlTs,
-            status: 'waiting', total, certification_amount: 0, need_cert:false, start_date: (stTs || now), manager_id: me().id,
+            status: statusRaw, total, certification_amount: 0, need_cert:false, start_date: (stTs || now), manager_id: me().id,
             comment:'', project_id:'', folder_id:'', nish_id:'', executors:[], audio:0, files:[], proposed_price:0, paid_amount:0,
             forbid_download:false, portfolio_ban:true, nda:false, history:[{ t: now, txt:'Заказ создан (инлайн)' }], created_at: now };
           if (no.deadline && no.start_date && no.deadline < no.start_date){ toast('Дедлайн раньше даты создания — исправьте','err'); return; }
@@ -1925,12 +1929,14 @@ const CRM = (() => {
       const cellAt = i => tr.cells[Math.max(0, Math.min(i, cols - 1))];
       const put = (i, sel) => { const el = box.querySelector(sel); if (el) cellAt(i).appendChild(el); };
       if (kind === 'orders'){
-        /* Колонки: 0 чекбокс, 1 заказ, 2 клиент, 3 начало, 4 дедлайн, 5 итого */
+        /* Колонки: 0 чекбокс, 1 заказ, 2 клиент, 3 исполнители,
+           4 начало, 5 дедлайн, 6 итого, 7 статус */
         put(1, '[data-f="id"]');
         put(2, '[data-f="client"]');
-        put(3, '[data-f="start"]');
-        put(4, '[data-f="deadline"]');
-        put(5, '[data-f="total"]');
+        put(4, '[data-f="start"]');
+        put(5, '[data-f="deadline"]');
+        put(6, '[data-f="total"]');
+        put(7, '[data-f="status"]');
       } else {
         /* Люди: имя — в колонку «ФИО», контакты — в соседнюю */
         put(2, '[data-f="name"]');
