@@ -1092,6 +1092,14 @@ const Windows = (() => {
           else if (cornerDrop !== win.__cornerGuard || best.d >= 170) win.__cornerGuard = null;
         }
       }
+      /* Живой вертикальный магнит: окно прилипает к соседу сверху/снизу ещё
+         во время драга, без ожидания отпускания. */
+      if (!cornerDrop){
+        const magY = liveVerticalMagnet(win, x, y, w, h);
+        if (magY !== null){ y = magY; win.style.top = y + 'px'; }
+      }
+      /* Предпросмотр стыка: тень гаснет сразу, как только окна прижались. */
+      previewSplitDuringDrag(win);
       if (!cornerDrop){
         if (x < 26) snap = (y < 26 ? 'tl' : 'left');        /* левая половина */
         else if (x + w > window.innerWidth - 26) snap = (y < 26 ? 'tr' : 'right'); /* правая */
@@ -1143,6 +1151,21 @@ const Windows = (() => {
   const MIN_WIN_W = 300;
   /* Минимальная высота окна при вертикальном сплите (стыки n/s) */
   const MIN_WIN_H = 200;
+  /* Геометрия окна по ЦЕЛЕВЫМ left/top/width/height, а не по rect.
+     Во время перехода (.aw-win--animating) rect ещё показывает стартовую
+     позицию: после снапа к половине экрана syncSplitClasses видел старый
+     прямоугольник, не находил стык и снимал класс сплита — тень оставалась.
+     Слой окон fixed/inset:0, поэтому style-координаты совпадают с rect. */
+  function winGeom(el){
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return { left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:0, height:0 };
+    const L = parseFloat(el.style.left), T = parseFloat(el.style.top);
+    const W = parseFloat(el.style.width), H = parseFloat(el.style.height);
+    if (Number.isFinite(L) && Number.isFinite(T) && Number.isFinite(W) && Number.isFinite(H) && W > 0 && H > 0){
+      return { left:L, top:T, right:L + W, bottom:T + H, width:W, height:H };
+    }
+    return { left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height };
+  }
   /* Тень между состыкованными окнами недопустима: класс aw-win--split
      (box-shadow:none) вешаем на ОБА окна, а не только на активное.
      Соседство считаем по фактическим DOM-окнам слоя: это надёжнее реестра
@@ -1151,12 +1174,12 @@ const Windows = (() => {
   function syncSplitClasses(){
     const els = Array.from(document.querySelectorAll('#windows-layer .aw-win'));
     els.forEach(el => {
-      const r = el.getBoundingClientRect();
+      const r = winGeom(el);
       /* Класс сплита — только у окон, реально поставленных в сплит */
       if (!el.__inSplit || !r.width || !r.height){ el.classList.remove('aw-win--split'); return; }
       const adj = els.some(other => {
         if (other === el || !other.__inSplit) return false;
-        const o2 = other.getBoundingClientRect();
+        const o2 = winGeom(other);
         if (!o2.width || !o2.height) return false;
         /* Соседство по горизонтали (сплит слева/справа) и по вертикали
            (окна друг над другом). Вертикальный стык раньше не учитывался —
@@ -1170,6 +1193,57 @@ const Windows = (() => {
       el.classList.toggle('aw-win--split', adj);
     });
   }
+  /* Живой вертикальный магнит: если dragged-окно почти прижалось верхом к
+     нижнему краю соседа (или низом к его верху), притягиваем его встык ещё
+     во время движения — в полноширинном вертикальном сплите это сразу
+     показывает, что окна встанут друг над другом. */
+  function liveVerticalMagnet(win, x, y, w, h){
+    let bestY = null, bestD = 27;
+    allWins().forEach(rec => {
+      const el = rec.win;
+      if (el === win) return;
+      const o = winGeom(el);
+      if (!o.width || !o.height) return;
+      /* Пересечение по горизонтали не меньше 40px: окна не липнут издалека */
+      if (!((x <= o.right - 40) && (o.left <= x + w - 40))) return;
+      const dTop = Math.abs(o.bottom - y);            /* верхом к низу соседа */
+      const dBot = Math.abs(o.top - (y + h));         /* низом к верху соседа */
+      if (dTop < bestD){ bestD = dTop; bestY = Math.round(o.bottom); }
+      if (dBot < bestD){ bestD = dBot; bestY = Math.round(o.top - h); }
+    });
+    return bestY;
+  }
+
+  /* Стык во время драга: как только окно прижалось к соседу, оба получают
+     класс сплита — тень плавно гаснет сразу, ещё до отпускания кнопки.
+     На дропе состояние пересчитывает syncSplitClasses. */
+  function previewSplitDuringDrag(win){
+    if (!win) return;
+    const r = winGeom(win);
+    const near = [];
+    allWins().forEach(rec => {
+      const el = rec.win;
+      if (el === win) return;
+      const o = winGeom(el);
+      if (!o.width || !o.height) return;
+      const vertOv = (r.top <= o.bottom - 10) && (o.top <= r.bottom - 10);
+      const horOv  = (r.left <= o.right - 10) && (o.left <= r.right - 10);
+      const horAdj = vertOv && (Math.abs(o.left - r.right) <= 12 || Math.abs(o.right - r.left) <= 12);
+      const verAdj = horOv  && (Math.abs(o.top - r.bottom) <= 12 || Math.abs(o.bottom - r.top) <= 12);
+      if (horAdj || verAdj) near.push(el);
+    });
+    (win.__splitPeek || []).forEach(el => {
+      if (el !== win && near.indexOf(el) < 0 && !el.__inSplit) el.classList.remove('aw-win--split');
+    });
+    win.__splitPeek = near;
+    if (near.length){
+      win.classList.add('aw-win--split');
+      near.forEach(el => el.classList.add('aw-win--split'));
+    } else if (!win.__inSplit){
+      win.classList.remove('aw-win--split');
+    }
+  }
+
   function syncSplit(win, rc, d){
     /* Стык — только для окон в сплите: обычные окна совместно не ресайзятся */
     if (!win.__inSplit) return;
@@ -1386,18 +1460,21 @@ const Windows = (() => {
         win.style.height = H + 'px';
         win.style.minWidth = '0'; win.style.minHeight = '0';
         win.classList.add('aw-win--animating');
-        setTimeout(() => win.classList.remove('aw-win--animating'), 320);
+        setTimeout(() => { win.classList.remove('aw-win--animating'); syncSplitClasses(); }, 320);
         /* Снап к половине экрана = потенциальный стык: если рядом (вплотную, зазор ≤ 8)
-           уже стоит окно в сплите — связываем оба, чтобы стык ресайзился совместно
-           и тень на стыке гасла (раньше после снапа тень оставалась, т.к. __inSplit
-           не ставился и syncSplitClasses не вызывался). */
+           уже стоит другое окно — связываем оба, чтобы стык ресайзился совместно
+           и тень на стыке гасла. Стык бывает и боковой (окна слева/справа),
+           и вертикальный (одно над другим на всю ширину) — раньше проверялся
+           только боковой, из-за чего в вертикальном сплите тень оставалась. */
         const sr = { left: L, top: T, right: L + W, bottom: T + H };
         allWins().forEach(rec => {
           if (rec.win === win) return;
-          const or = rec.win.getBoundingClientRect();
-          const ov = (sr.top <= or.bottom - 10) && (or.top <= sr.bottom - 10);
-          if (!ov) return;
-          if (Math.abs(or.left - sr.right) <= 8 || Math.abs(or.right - sr.left) <= 8){
+          const or = winGeom(rec.win);
+          const ovV = (sr.top <= or.bottom - 10) && (or.top <= sr.bottom - 10);
+          const ovH = (sr.left <= or.right - 10) && (or.left <= sr.right - 10);
+          const sideAdj = ovV && (Math.abs(or.left - sr.right) <= 8 || Math.abs(or.right - sr.left) <= 8);
+          const vertAdj = ovH && (Math.abs(or.top - sr.bottom) <= 8 || Math.abs(or.bottom - sr.top) <= 8);
+          if (sideAdj || vertAdj){
             win.__inSplit = win.__inSplit || 'snap';
             rec.win.__inSplit = rec.win.__inSplit || 'snap';
           }
@@ -1436,6 +1513,7 @@ const Windows = (() => {
       if (active.kind === 'drag' && active.moved) active.win.__lastDragEnd = Date.now();
       if (active.kind === 'drag'){ active.win.__dragStartRect = null; active.win.__cornerDetached = false; }
       active.win.__lastSnap = null; /* сброс магнита после дропа */
+      active.win.__splitPeek = null; /* предпросмотр стыка больше не нужен */
       active.win.classList.remove('aw-win--dragging');
       document.body.classList.remove('win-dragging');
       persistWins();

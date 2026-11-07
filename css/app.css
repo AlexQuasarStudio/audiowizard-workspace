@@ -1265,10 +1265,11 @@ body.menu-dragging .main .theme-card:hover{box-shadow:none!important;transform:n
 #windows-layer{position:fixed;inset:0;pointer-events:none;z-index:3000;overflow:hidden}
 .tour-card{position:fixed;z-index:1601;width:330px;max-width:calc(100vw - 28px);background:var(--panel);border:1px solid var(--border-2);border-radius:16px;box-shadow:var(--sh-2);padding:18px;animation:popIn .4s var(--ease)}
 .tour-spot{position:fixed;z-index:1600;border-radius:14px;box-shadow:0 0 0 4px var(--accent-soft),0 0 0 9999px rgba(4,6,10,.66);transition:left .48s var(--ease),top .48s var(--ease),width .48s var(--ease),height .48s var(--ease);pointer-events:none}
-/* Появление окна — только плавная прозрачность: без сдвига и масштаба.
-   popIn (translateY 14px + scale) читался как «окно плавает к центру». */
-@keyframes winFade{from{opacity:0}to{opacity:1}}
-.aw-win{position:fixed;min-width:320px;min-height:220px;background:var(--panel);border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--sh-2);display:flex;flex-direction:column;pointer-events:auto;animation:winFade .16s var(--ease);overflow:hidden;transition:box-shadow .2s var(--ease)}
+/* Появление окна — короткий фейд с лёгким увеличением (0.975 → 1).
+   translateY убран: раньше popIn сдвигал окно и это читалось как
+   «окно подплывает к центру». Геометрия и центр — сразу конечные. */
+@keyframes winIn{from{opacity:0;transform:scale(.975)}to{opacity:1;transform:none}}
+.aw-win{position:fixed;min-width:320px;min-height:220px;background:var(--panel);border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--sh-2);display:flex;flex-direction:column;pointer-events:auto;animation:winIn .22s var(--ease);overflow:hidden;transition:box-shadow .2s var(--ease)}
 .aw-win--dragging{box-shadow:0 30px 90px -12px rgba(0,0,0,.65);opacity:.97}
 
 /* В активном сплите тень между окнами не рисуется (стык без наложения) */
@@ -1591,7 +1592,7 @@ body.win-dragging *{user-select:none!important}
 .aw-win__min:hover{color:var(--text);background:var(--panel-3)}
 
 /* ---------- Плавная анимация max/min окна ---------- */
-.aw-win--animating{transition:left .3s var(--ease),right .3s var(--ease),top .3s var(--ease),bottom .3s var(--ease),width .3s var(--ease),height .3s var(--ease),transform .3s var(--ease),opacity .3s var(--ease)!important}
+.aw-win--animating{transition:left .3s var(--ease),right .3s var(--ease),top .3s var(--ease),bottom .3s var(--ease),width .3s var(--ease),height .3s var(--ease),transform .3s var(--ease),opacity .3s var(--ease),box-shadow .3s var(--ease)!important}
 
 /* Местное время в приветствии дашборда */
 .dash-clock{font-variant-numeric:tabular-nums;color:inherit}
@@ -1626,7 +1627,7 @@ body.win-dragging *{user-select:none!important}
    цвету и тени). Токены --own-bubble / --own-accent лежат в css/base.css
    для каждой темы: если браузер не умеет color-mix, пузырь не побелеет,
    а возьмёт ближайший оттенок темы. */
-.msg--own .msg__bubble{background:var(--own-bubble,color-mix(in srgb,var(--accent) 46%,var(--bg)));border-color:transparent;border-radius:16px 16px 4px 16px}
+.msg--own .msg__bubble{background:var(--own-bubble,color-mix(in srgb,var(--accent) 46%,var(--bg)));border-color:var(--own-bubble-bd,transparent);border-radius:16px 16px 4px 16px}
 /* Хвост пузыря — в стиле Telegram: отдельный «треугольник» не нужен.
    Угол пузыря у хвоста имеет меньший радиус (4px против 16px) и образует
    аккуратный носик-указатель — ровные края без пикселизации. */
@@ -1892,7 +1893,7 @@ html.splash-hold #splash{visibility:hidden}
    цвету и тени). Токены --own-bubble / --own-accent лежат в css/base.css
    для каждой темы: если браузер не умеет color-mix, пузырь не побелеет,
    а возьмёт ближайший оттенок темы. */
-.msg--own .msg__bubble{background:var(--own-bubble,color-mix(in srgb,var(--accent) 46%,var(--bg)));border-color:transparent;border-radius:16px 16px 4px 16px}
+.msg--own .msg__bubble{background:var(--own-bubble,color-mix(in srgb,var(--accent) 46%,var(--bg)));border-color:var(--own-bubble-bd,transparent);border-radius:16px 16px 4px 16px}
 /* Акцентные детали внутри своего пузыря: на плотной подложке обычный
    --accent тонет — берём --own-accent (осветлённый в тёмных темах,
    углублённый в светлых). */
