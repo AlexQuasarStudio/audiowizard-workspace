@@ -4633,7 +4633,14 @@ const cm = root.querySelector('.chat-main');
           const ids = m.reactions[em] || [];
           if (!ids.length){
             rBtn.classList.add('react-fade');
-            setTimeout(()=>{ renderChat(); animateBubbleHeight(mid, prevH); }, 190);
+            /* Без renderChat: перерисовка ленты сдвигала скролл и все
+               сообщения дёргались. Убираем только пилюлю и её строку. */
+            setTimeout(()=>{
+              const row = rBtn.closest('.msg__reactions');
+              rBtn.remove();
+              if (row && !row.querySelector('.react-pill')) row.remove();
+              animateBubbleHeight(mid, prevH);
+            }, 190);
           } else {
             patchReactionPill(rBtn, ids, em);
             rBtn.classList.toggle('on', ids.includes(u.id));
@@ -4915,7 +4922,12 @@ const cm = root.querySelector('.chat-main');
       } else if (!arr.length && pill){
         pill.classList.add('react-fade');
         el2.classList.add('msg--reacting');
-        setTimeout(()=>{ rerenderKeepScroll(); animateBubbleHeight(mm.id, prevH); }, 190);
+        setTimeout(()=>{
+          const row = pill.closest('.msg__reactions');
+          pill.remove();
+          if (row && !row.querySelector('.react-pill')) row.remove();
+          animateBubbleHeight(mm.id, prevH);
+        }, 190);
       } else if (arr.length){
         el2.classList.add('msg--reacting');
         rerenderKeepScroll();
