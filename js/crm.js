@@ -371,6 +371,22 @@ const CRM = (() => {
     saveState(); APP.render();
   }
 
+  /* Нештатный возврат: снимаем отметки оплаты по заказу, долги снова
+     попадают в «К выплате». Статус и начисления не меняем. */
+  function returnToUnpaid(o){
+    if (!o) return;
+    let n = 0;
+    (o.executors || []).forEach(e => { if (e.is_paid){ e.is_paid = false; n++; } });
+    if (o.splitAccrual && o.splitAccrual.manager && o.splitAccrual.manager.paid){ o.splitAccrual.manager.paid = false; n++; }
+    if (!n){ toast('У заказа нет оплаченных долей','info'); return; }
+    o.history = o.history || [];
+    o.history.push({ t: Date.now(), txt: 'Возврат в неоплаченные (вручную)' });
+    try { logAudit(`Заказ ${o.order_id} возвращён в неоплаченные`, 'Оплата'); } catch(e){}
+    saveState();
+    toast(`Заказ ${o.order_id} снова в неоплаченных`,'ok');
+    APP.render();
+  }
+
   function generateOrderId(){
     /* Номер уникален глобально в системе: максимум существующего AW-N + 1 */
     let max = 1042;
@@ -1272,6 +1288,8 @@ const CRM = (() => {
       })),
       '-',
       ...(o.status==='done' && o.executors.some(e=>!e.is_paid) ? [{ label:'Оплатить всем', icon:'card', onClick:()=>payOrder(o) }] : []),
+      ...((isStaff((me()||{}).role) && ((o.executors||[]).some(e=>e.is_paid) || !!(o.splitAccrual && o.splitAccrual.manager && o.splitAccrual.manager.paid)))
+        ? [{ label:'Вернуть в неоплаченные', icon:'refresh', onClick:()=>returnToUnpaid(o) }] : []),
       ...(o.status!=='archived' ? [{ label:'В архив', icon:'archive', onClick:()=>setStatus(o,'archived') }] : [{ label:'Из архива', icon:'archive', onClick:()=>setStatus(o, o.history.some(h=>h.txt.includes('Выполнено'))?'done':'work') }]),
       { label:'Удалить', icon:'trash', danger:true, onClick:()=>staffCanDelete?deleteOrder(o):toast('Удаление доступно только для статусов «Черновик» и «В ожидании»','err') }
     ];
