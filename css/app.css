@@ -780,7 +780,7 @@ body.zen .day-sep.on-scroll{top:0}
 .who{display:inline-flex;align-items:center;gap:4px;flex-wrap:nowrap;white-space:nowrap;max-width:100%;width:fit-content;margin-bottom:2px;font-size:11.5px;font-weight:700;color:var(--accent);line-height:1.4;cursor:pointer}
 /* Служебные значки рядом с ником никогда не переносятся на новую строку;
    длинное имя усекается, а значки остаются на месте. */
-.who__name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who__name{min-width:0;white-space:normal;overflow-wrap:anywhere}
 .who .role-mark,.who .chat-role-tag,.who .ghost-mode-note{flex:none}
 .who .ghost-mode-note{display:inline-flex;align-items:center;gap:3px;color:var(--muted);font-weight:600;font-size:10.5px}
 /* Упоминание @ник в тексте — кликабельно, ведёт в ЛС */
@@ -2058,8 +2058,8 @@ html.splash-hold #splash{visibility:hidden}
 
 /* --- Роли в чате --- */
 .chat-role-tag{display:inline-flex;align-items:center;flex:none;font-size:9.5px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;padding:1px 5px;border-radius:6px;margin-left:5px;vertical-align:middle;white-space:nowrap}
-.chat-info-member__meta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chat-info-member__meta .chat-info-member__nick{display:inline-block;max-width:calc(100% - 8px);overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.chat-info-member__meta{white-space:nowrap}
+.chat-info-member__meta .chat-info-member__nick{display:inline-block;vertical-align:middle}
 .chat-role-tag--owner{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
 .chat-role-tag--admin{background:color-mix(in srgb,var(--yellow) 22%,transparent);color:var(--yellow)}
 
