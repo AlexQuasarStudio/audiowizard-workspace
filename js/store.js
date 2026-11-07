@@ -372,6 +372,12 @@ const SEED_DEMO_RE = /^(u-(manager|top|ex\d+|cl\d+)|(o|ch|m\d|n\d|nf\d|i\d|t\d|p
 function migrateFinance(){
   if (!S.settings) S.settings = {};
   S.settings.finance = Object.assign({ adminMargin:25, managerFee:10, executorShare:40, payoutCommission:5 }, S.settings.finance || {});
+  /* Старые сохранения держали прежний дефолт 5% — поднимаем до 10%,
+     если пользователь явно не менял значение (метка версии дефолтов). */
+  if (S.settings.finance._defaultsVersion !== 2){
+    if (S.settings.finance.managerFee == null || Number(S.settings.finance.managerFee) === 5) S.settings.finance.managerFee = 10;
+    S.settings.finance._defaultsVersion = 2;
+  }
   S.settings.integrations = Object.assign({ payout:{ key:'smartcat', name:'Smartcat', commission:5, enabled:true, perUser:true } }, S.settings.integrations || {});
   S.settings.payout = Object.assign({ enabled:true, auto:true, days:[1,15], time:'15:00', tz:'Europe/Moscow', lastRunAt:null, history:[] }, S.settings.payout || {});
   if (!Array.isArray(S.settings.payout.days) || !S.settings.payout.days.length) S.settings.payout.days = [1,15];
