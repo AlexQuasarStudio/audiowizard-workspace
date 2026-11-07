@@ -989,6 +989,64 @@ const Windows = (() => {
     setTimeout(() => win.classList.remove('aw-win--animating'), 340);
     try { persistWins(); } catch(e){}
   }
+  /* Уголок привязан к краям экрана. При входе в полноэкранный режим и выходе
+     из него innerHeight меняется, а окно оставалось на прежних пикселях —
+     визуально оно «отклеивалось» от нижнего края. Пересчитываем позицию по
+     тому же углу, сохраняя размер, который пользователь задал вручную. */
+  function spotCorner(win){
+    if (!win || !win.classList.contains('aw-win--corner')) return;
+    if (active || win.__expandUntil) return;
+    const pos = win.__cornerPos || 'br';
+    const rc = cornerRectFor(pos);
+    const head = win.querySelector('.aw-win__head');
+    const headH = head ? Math.round(head.offsetHeight) : 53;
+    const collapsed = win.classList.contains('aw-win--corner-min');
+    const w = Math.min(Math.round(win.offsetWidth) || rc.width, rc.width);
+    const fullH = Math.min(Math.round(win.offsetHeight) || rc.height, rc.height);
+    const h = collapsed ? headH : fullH;
+    const left = pos.includes('r') ? rc.left + rc.width - w : rc.left;
+    const top  = pos.includes('b') ? rc.top + rc.height - h : rc.top;
+    const curL = parseFloat(win.style.left), curT = parseFloat(win.style.top);
+    const curW = parseFloat(win.style.width), curH = parseFloat(win.style.height);
+    const same = Math.abs((curL || 0) - left) < 1 && Math.abs((curT || 0) - top) < 1
+      && (collapsed || (Math.abs((curW || 0) - w) < 1 && Math.abs((curH || 0) - fullH) < 1));
+    if (same) return;
+    win.classList.add('aw-win--animating');
+    win.style.left = Math.round(left) + 'px';
+    win.style.top = Math.round(top) + 'px';
+    if (collapsed){
+      /* Свёрнутый уголок: запоминаем геометрию развёрнутого состояния,
+         чтобы по клику он раскрылся ровно до нижнего края. */
+      win.__cornerTop = rc.top;
+      win.__cornerHeight = rc.height;
+    } else {
+      win.style.width = w + 'px';
+      win.style.height = fullH + 'px';
+      win.style.minWidth = '0'; win.style.minHeight = '0';
+    }
+    setTimeout(() => win.classList.remove('aw-win--animating'), 320);
+  }
+  let __cornerRAF = null;
+  function reflowCorners(){
+    const els = document.querySelectorAll('#windows-layer .aw-win--corner');
+    if (!els.length) return;
+    els.forEach(spotCorner);
+    try { persistWins(); } catch(e){}
+  }
+  function scheduleCorners(){
+    if (__cornerRAF) cancelAnimationFrame(__cornerRAF);
+    __cornerRAF = requestAnimationFrame(() => { __cornerRAF = null; reflowCorners(); });
+  }
+  window.addEventListener('resize', scheduleCorners, { passive:true });
+  ['fullscreenchange','webkitfullscreenchange'].forEach(ev => {
+    document.addEventListener(ev, () => {
+      /* Браузер меняет размеры после события полного экрана — ловим кадр,
+         затем ещё раз, когда переход закончится. */
+      scheduleCorners();
+      setTimeout(scheduleCorners, 120);
+      setTimeout(scheduleCorners, 380);
+    });
+  });
   function exitCorner(win){
     if (!win || !win.classList.contains('aw-win--corner')) return;
     win.__cornerWasMin = false;
