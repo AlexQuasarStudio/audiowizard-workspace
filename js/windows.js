@@ -667,6 +667,9 @@ const Windows = (() => {
        переключает left↔auto/right: CSS не умеет анимировать auto, и окно
        «телепортировалось» при переносе из левого сплита в правый и обратно. */
     const splitWin = (pos) => {
+      /* Перенос из уголка через меню: сначала честно выходим из уголка,
+         иначе иконки шапки живут в старом режиме. */
+      clearCornerState(win);
       if (pos === 'max'){ toggleMax(win, maxBtn); return; }
       const vw = window.innerWidth, vh = window.innerHeight;
       const halfW = Math.round(vw / 2), halfH = Math.round(vh / 2);
@@ -1047,6 +1050,22 @@ const Windows = (() => {
       setTimeout(scheduleCorners, 380);
     });
   });
+  /* Снять состояние уголка без возврата старой геометрии: используется,
+     когда окно переносят через контекстное меню (сплит/центр/максимум).
+     Иначе класс aw-win--corner оставался и правые иконки шапки продолжали
+     считать окно уголком: максимум скрыт, «свернуть» сворачивал уголок. */
+  function clearCornerState(win){
+    if (!win) return;
+    win.classList.remove('aw-win--corner', 'aw-win--corner-min');
+    win.__cornerPos = null;
+    win.__cornerPrev = null;
+    win.__cornerHeight = null;
+    win.__cornerTop = null;
+    win.__cornerWasMin = false;
+    win.__cornerDetached = false;
+    const mb = win.querySelector('.aw-win__min');
+    if (mb) mb.title = 'Свернуть';
+  }
   function exitCorner(win){
     if (!win || !win.classList.contains('aw-win--corner')) return;
     win.__cornerWasMin = false;
