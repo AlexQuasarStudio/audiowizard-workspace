@@ -103,6 +103,27 @@ const Finance = (function(){
 
   function hasDebt(o){ return debts(o).total > 0; }
 
+  /* Исключения: заказы, вручную убранные из выплаты (по order_id). */
+  function excludedIds(){
+    const p = (S.settings && S.settings.payout) || {};
+    return Array.isArray(p.excluded) ? p.excluded : [];
+  }
+  function isExcluded(o){ return excludedIds().includes(o && o.order_id); }
+  function setExcluded(orderId, on){
+    const p = payoutCfg();
+    const set = new Set(excludedIds());
+    if (on) set.add(orderId); else set.delete(orderId);
+    p.excluded = [...set];
+    S.settings.payout = p;
+    saveState();
+    return p.excluded;
+  }
+  /* Все выполненные заказы с неоплаченными долями — без привязки к периоду:
+     к моменту выплаты в неё попадает всё, что ещё не оплачено. */
+  function payoutOrders(){
+    return (S.orders || []).filter(o => o.status === 'done' && debts(o).total > 0);
+  }
+
   /* --- Расписание выплат (по умолчанию 1-е и 15-е, 15:00 МСК) --- */
   function payoutCfg(){
     const p = Object.assign({ enabled:true, auto:true, days:[1,15], time:'15:00', tz:'Europe/Moscow' }, (S.settings && S.settings.payout) || {});
@@ -170,15 +191,11 @@ const Finance = (function(){
     return `${f.toLocaleDateString('ru-RU', opts)} 15:00 — ${t.toLocaleDateString('ru-RU', opts)} 15:00 МСК${mark}`;
   }
 
-  /* Заказы, выполненные в текущем полуинтервале, с неоплаченными долями. */
+  /* Все выполненные заказы с неоплаченными долями, кроме вручную
+     исключённых. Период расписания влияет только на дату выплаты. */
   function pending(now){
     const p = period(now);
-    const orders = (S.orders || []).filter(o => {
-      if (o.status !== 'done') return false;
-      const t = o.done_at || (o.history || []).reduce((a, h) => Math.max(a, h.t || 0), 0);
-      if (!t) return false;
-      return t >= p.from && t < p.to;
-    }).filter(o => debts(o).total > 0);
+    const orders = payoutOrders().filter(o => !isExcluded(o));
     const byUser = {};
     let total = 0;
     orders.forEach(o => {
@@ -189,13 +206,14 @@ const Finance = (function(){
       });
     });
     const commission = Math.round(total * cfg().commission / 100);
-    return { period: p, orders, byUser, total, commission, net: total - commission };
+    const excluded = excludedIds().length;
+    return { period: p, orders, byUser, total, commission, net: total - commission, excluded };
   }
 
   /* Выплата (вручную или по расписанию): закрывает доли в заказах периода. */
   function runPayout(opts = {}){
     const pend = pending(opts.now);
-    if (!pend.orders.length) return { ok:false, why:'Нет выполненных заказов с неоплаченными долями в текущем периоде' };
+    if (!pend.orders.length) return { ok:false, why:'Нет выполненных заказов с неоплаченными долями' };
     const by = (me() || {}).id || 'system';
     pend.orders.forEach(o => {
       (o.executors || []).forEach(e => { e.is_paid = true; });
@@ -313,6 +331,7 @@ const Finance = (function(){
   }
 
   return { cfg, split, accrue, debts, hasDebt, payoutCfg, period, fmtPeriod, pending, runPayout,
+    payoutOrders, excludedIds, isExcluded, setExcluded,
     scOf, scStatusLabel, requestSmartcat, approveSmartcat, rejectSmartcat, smartcatPayload, docsForOrder };
 })();
 window.Finance = Finance;

@@ -5917,10 +5917,17 @@ const cm = root.querySelector('.chat-main');
         <b class="small" style="white-space:nowrap">${fmtMoney(amount)}</b>
       </div>`;
     }).join('') || '<p class="small faint">В текущем периоде долгов нет.</p>';
-    const list = pend.orders.map(o => {
+    const allOrders = Finance.payoutOrders();
+    const exclSet = new Set(Finance.excludedIds());
+    const list = allOrders.map(o => {
       const d = Finance.debts(o);
       const names = Object.keys(d.byUser).map(uid => (userById(uid)||{}).full_name).filter(Boolean).join(', ');
-      return `<div class="row row--between" style="padding:5px 0"><span class="small">${esc(o.order_id)} · ${esc(names)}</span><b class="small">${fmtMoney(d.total)}</b></div>`;
+      const off = exclSet.has(o.order_id);
+      return `<div class="row row--between" style="padding:5px 0;gap:8px;${off?'opacity:.55':''}">
+        <span class="small" style="min-width:0">${esc(o.order_id)} · ${esc(names)}${off?' · <span class="faint">не в выплате</span>':''}</span>
+        <span class="row" style="gap:8px;flex:none"><b class="small" style="white-space:nowrap">${fmtMoney(d.total)}</b>
+          <button class="btn btn--sm ${off?'btn--soft':'btn--ghost'}" data-po-exc="${esc(o.order_id)}" data-back="${off?1:0}">${off?'Вернуть':'Убрать'}</button></span>
+      </div>`;
     }).join('') || '<p class="small faint">Нет выполненных заказов с неоплаченными долями.</p>';
 
     const scRows = (S.users||[]).filter(x => x.ext && ['executor','manager','top_manager'].includes(x.role) && (staff || x.id===myId)).map(x => {
@@ -5944,7 +5951,7 @@ const cm = root.querySelector('.chat-main');
     return `
     <div class="card card-pad">
       <h3 style="margin-bottom:6px">Выплаты</h3>
-      <p class="small faint">По умолчанию — 1-го и 15-го числа в 15:00 МСК. В выплату попадают все заказы, выполненные с 1-го (включительно) по 14-е 15:00 и с 15-го (включительно) по 1-е 15:00.</p>
+      <p class="small faint">По умолчанию — 1-го и 15-го числа в 15:00 МСК. В выплату попадают <b>все выполненные заказы с неоплаченными долями</b> — в том числе завершённые вне текущего периода. Любой заказ можно убрать из выплаты вручную и вернуть обратно.</p>
       <div class="row row--between" style="margin-top:10px;gap:10px;flex-wrap:wrap">
         <span class="badge ${p.enabled?'badge--ok':'badge--outline'}">${p.enabled?'Расписание включено':'Расписание выключено'}</span>
         <span class="badge badge--outline">${esc(Finance.fmtPeriod(pend.period))}</span>
@@ -5973,7 +5980,7 @@ const cm = root.querySelector('.chat-main');
       <div class="row row--between" style="margin-bottom:8px"><span class="small faint">Итого</span><b>${fmtMoney(pend.total)}</b></div>
       <div class="row row--between" style="margin-bottom:10px"><span class="small faint">Сборы провайдера (ориентир) / на руки</span><b class="small">${fmtMoney(pend.commission)} / ${fmtMoney(pend.net)}</b></div>
       ${staff?rows:''}
-      ${staff?`<h4 class="small" style="margin:12px 0 4px">Заказы периода</h4>${list}`:''}
+      ${staff?`<h4 class="small" style="margin:12px 0 4px">Заказы к выплате${pend.excluded?' · убрано вручную: '+pend.excluded:''}</h4>${list}`:''}
       ${!staff?`<p class="small">Ваш долг по выполненным заказам: <b>${fmtMoney(myDebt)}</b></p><p class="small faint">Выплата приходит на привязанный аккаунт ${provName} или вне системы — по договорённости с менеджером. ${provName} не берёт комиссию с заработка: удерживаются только транзакционные сборы банка/платёжной системы — их размер зависит от страны и способа выплаты, проверяйте на <a href="https://help.smartcat.com/understanding-freelancer-fees-in-smartcat" target="_blank" rel="noopener">официальной странице</a>.</p>`:''}
       <p class="small faint" style="margin-top:8px">Сборы провайдера зависят от страны и способа выплаты — уточняйте на официальном сайте. Сумма к зачислению = долг − сборы.</p>
     </div>
@@ -5988,6 +5995,12 @@ const cm = root.querySelector('.chat-main');
   }
   function bindPayouts(el){
     const p = Finance.payoutCfg();
+    el.querySelectorAll('[data-po-exc]').forEach(b => b.onclick = ()=>{
+      const id = b.dataset.poExc, back = b.dataset.back === '1';
+      Finance.setExcluded(id, !back);
+      toast(back ? `${id} возвращён в выплату` : `${id} убран из выплаты`, 'info');
+      APP.render();
+    });
     const save = el.querySelector('#po-save');
     if (save) save.onclick = ()=>{
       const days = String((el.querySelector('#po-days')||{}).value||'').split(/[^0-9]+/).map(Number).filter(d=>d>=1&&d<=28);
