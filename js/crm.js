@@ -1925,16 +1925,18 @@ const CRM = (() => {
       const cellAt = i => tr.cells[Math.max(0, Math.min(i, cols - 1))];
       const put = (i, sel) => { const el = box.querySelector(sel); if (el) cellAt(i).appendChild(el); };
       if (kind === 'orders'){
+        /* Колонки: 0 чекбокс, 1 заказ, 2 клиент, 3 начало, 4 дедлайн, 5 итого */
         put(1, '[data-f="id"]');
-        put(3, '[data-f="client"]');
-        put(5, '[data-f="start"]');
-        put(6, '[data-f="deadline"]');
-        put(7, '[data-f="total"]');
+        put(2, '[data-f="client"]');
+        put(3, '[data-f="start"]');
+        put(4, '[data-f="deadline"]');
+        put(5, '[data-f="total"]');
       } else {
         /* Люди: имя — в колонку «ФИО», контакты — в соседнюю */
+        /* Имя и контакты — в одну ячейку «ФИО», друг под другом */
         put(2, '[data-f="name"]');
-        put(3, '[data-f="email"]');
-        put(3, '[data-f="phone"]');
+        put(2, '[data-f="email"]');
+        put(2, '[data-f="phone"]');
         put(4, '[data-f="spec"]');
       }
       const lastCell = cellAt(cols - 1);
@@ -2003,8 +2005,10 @@ const CRM = (() => {
         /* Последовательное удаление: после Esc курсор встаёт в предыдущую
            новую строку (если она есть) — можно удалять подряд. */
         if (prev && prev.classList && prev.classList.contains('inline-add')){
-          const f = prev.querySelector('.inline-add input, .inline-add select');
-          if (f){ try { f.focus(); } catch(e){} }
+          setTimeout(()=>{
+            const f = prev.querySelector('input, select');
+            if (f){ try { f.focus(); } catch(e){} }
+          }, 0);
         }
       }
       cb && cb();

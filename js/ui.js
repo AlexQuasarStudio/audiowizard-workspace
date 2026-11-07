@@ -786,6 +786,10 @@ const Cols = (function(){
     });
   }
 
+  let suppressClick = false;
+  document.addEventListener('click', e => {
+    if (suppressClick){ e.stopPropagation(); e.preventDefault(); }
+  }, true);
   document.addEventListener('pointerdown', e => {
     const g = e.target.closest('.col-grip');
     if (!g) return;
@@ -800,6 +804,7 @@ const Cols = (function(){
     const widths = read(key);
     th.classList.add('col-dragging');
     const move = ev => {
+      dragged = true;
       const w = Math.max(56, Math.round(startW + ev.clientX - startX));
       /* min-width обязателен: при auto-раскладке одна ширина игнорируется,
          если содержимое требует больше места. */
@@ -807,11 +812,17 @@ const Cols = (function(){
       th.style.minWidth = w + 'px';
       widths[idx] = w;
     };
+    let dragged = false;
     const up = () => {
       document.removeEventListener('pointermove', move);
       document.removeEventListener('pointerup', up);
       th.classList.remove('col-dragging');
       write(key, widths);
+      if (dragged){
+        /* Гасим клик по шапке: иначе после ресайза срабатывала сортировка */
+        suppressClick = true;
+        setTimeout(()=>{ suppressClick = false; }, 60);
+      }
     };
     document.addEventListener('pointermove', move);
     document.addEventListener('pointerup', up);
