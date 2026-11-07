@@ -14,6 +14,7 @@ const Finance = (function(){
     return {
       adminMargin: clamp(f.adminMargin ?? 25, 0, 100),
       managerFee: clamp(f.managerFee ?? 5, 0, 100),
+      executorShare: clamp(f.executorShare ?? 40, 0, 100),
       commission: clamp(f.payoutCommission ?? 2, 0, 50)
     };
   }
@@ -109,6 +110,24 @@ const Finance = (function(){
     const d = ts ? new Date(ts) : new Date();
     return new Date(d.getTime() + (d.getTimezoneOffset() + 180) * 60000);
   }
+  /* Праздники РФ (2026) — выплата не должна падать на выходной.
+     Сдвигаем НАЗАД, до предыдущего рабочего дня, и предупреждаем. */
+  const HOLIDAYS = new Set([
+    '2026-01-01','2026-01-02','2026-01-05','2026-01-06','2026-01-07','2026-01-08',
+    '2026-02-23','2026-03-08','2026-03-09','2026-05-01','2026-05-09','2026-05-11',
+    '2026-06-12','2026-11-04'
+  ]);
+  function isWorkday(d){
+    const wd = d.getUTCDay();
+    if (wd === 0 || wd === 6) return false;
+    const iso = d.toISOString().slice(0, 10);
+    return !HOLIDAYS.has(iso);
+  }
+  function shiftBack(ts){
+    let d = new Date(ts), moved = false, guard = 0;
+    while (!isWorkday(d) && guard++ < 14){ d = new Date(d.getTime() - DAY); moved = true; }
+    return { ts: d.getTime(), shifted: moved };
+  }
   function cutTimestamp(year, month, day, hh, mm){
     return Date.UTC(year, month, day, hh - 3, mm, 0, 0);
   }
@@ -135,12 +154,15 @@ const Finance = (function(){
     }
     if (from == null) from = cuts[0];
     if (to == null) to = cuts[cuts.length - 1];
-    return { from, to, days: p.days, time: p.time, tz: p.tz };
+    const a = shiftBack(from), b = shiftBack(to);
+    return { from: a.ts, to: b.ts, shiftedFrom: a.shifted, shiftedTo: b.shifted,
+      rawFrom: from, rawTo: to, days: p.days, time: p.time, tz: p.tz };
   }
   function fmtPeriod(p){
     const f = new Date(p.from), t = new Date(p.to);
     const opts = { day:'numeric', month:'short', timeZone:'Europe/Moscow' };
-    return `${f.toLocaleDateString('ru-RU', opts)} 15:00 — ${t.toLocaleDateString('ru-RU', opts)} 15:00 МСК`;
+    const mark = (p.shiftedFrom || p.shiftedTo) ? ' · ⚠ сдвинуто с выходного' : '';
+    return `${f.toLocaleDateString('ru-RU', opts)} 15:00 — ${t.toLocaleDateString('ru-RU', opts)} 15:00 МСК${mark}`;
   }
 
   /* Заказы, выполненные в текущем полуинтервале, с неоплаченными долями. */

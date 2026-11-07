@@ -578,6 +578,7 @@ const CRM = (() => {
             <input class="input" data-f="id" placeholder="ID (пусто = авто AW-N)" style="font-family:var(--mono);max-width:150px">
             <input class="input" data-f="client" placeholder="Клиент (ФИО/название)" style="min-width:170px">
             <input class="input" data-f="total" placeholder="Сумма, ₽" type="number" min="0" style="max-width:120px">
+            <input class="input" data-f="start" type="date" title="Начало (по умолчанию сегодня)" style="max-width:150px" value="${new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)}">
             <input class="input" data-f="deadline" placeholder="дд.мм.гггг" title="Дедлайн" style="max-width:150px"${window.matchMedia && window.matchMedia('(max-width:960px)').matches ? ' type="date"' : ''}>
             <button class="btn btn--primary btn--sm" type="button" data-inline-save title="Создать заказ">${icon('check-c','ico-sm')}</button>
             <button class="iconbtn" type="button" data-inline-cancel title="Отмена">${icon('x','ico-sm')}</button>
@@ -974,8 +975,10 @@ const CRM = (() => {
             return;
           }
           const now = Date.now();
+          const stRaw = (v('start') || '').trim();
+          const stTs = stRaw ? new Date(stRaw + 'T00:00:00').getTime() : now;
           const no = { id: uid(), order_id: oid, client_id: client.id, order_date: now, deadline: dlTs,
-            status: 'waiting', total, certification_amount: 0, need_cert:false, start_date: now, manager_id: me().id,
+            status: 'waiting', total, certification_amount: 0, need_cert:false, start_date: (stTs || now), manager_id: me().id,
             comment:'', project_id:'', folder_id:'', nish_id:'', executors:[], audio:0, files:[], proposed_price:0, paid_amount:0,
             forbid_download:false, portfolio_ban:true, nda:false, history:[{ t: now, txt:'Заказ создан (инлайн)' }], created_at: now };
           if (no.deadline && no.start_date && no.deadline < no.start_date){ toast('Дедлайн раньше даты создания — исправьте','err'); return; }
@@ -1922,6 +1925,7 @@ const CRM = (() => {
       if (kind === 'orders'){
         put(1, '[data-f="id"]');
         put(3, '[data-f="client"]');
+        put(5, '[data-f="start"]');
         put(6, '[data-f="deadline"]');
         put(7, '[data-f="total"]');
       } else {
@@ -1929,6 +1933,7 @@ const CRM = (() => {
         put(2, '[data-f="name"]');
         put(3, '[data-f="email"]');
         put(3, '[data-f="phone"]');
+        put(4, '[data-f="spec"]');
       }
       const lastCell = cellAt(cols - 1);
       ['[data-inline-save]','[data-inline-cancel]'].forEach(sel => { const el = box.querySelector(sel); if (el) lastCell.appendChild(el); });
@@ -1990,7 +1995,16 @@ const CRM = (() => {
         if (box.__home && box.__home.parent && box.__home.parent.isConnected) box.__home.parent.insertBefore(box, box.__home.next);
         box.hidden = true;
       }
-      if (tr && tr.isConnected) tr.remove();
+      if (tr && tr.isConnected){
+        const prev = tr.previousElementSibling;
+        tr.remove();
+        /* Последовательное удаление: после Esc курсор встаёт в предыдущую
+           новую строку (если она есть) — можно удалять подряд. */
+        if (prev && prev.classList && prev.classList.contains('inline-add')){
+          const f = prev.querySelector('.inline-add input, .inline-add select');
+          if (f){ try { f.focus(); } catch(e){} }
+        }
+      }
       cb && cb();
     }, 210);
   }
@@ -2203,6 +2217,7 @@ const CRM = (() => {
             <input class="input" data-f="name" placeholder="${role==='executor'?'ФИО исполнителя *':'ФИО / Компания *'}" style="min-width:180px">
             <input class="input" data-f="email" placeholder="Email" style="min-width:160px">
             <input class="input" data-f="phone" placeholder="Телефон" style="min-width:130px">
+            ${role==='executor'?`<input class="input" data-f="spec" placeholder="Специализации через запятую" style="min-width:190px">`:''}
             <button class="btn btn--primary btn--sm" type="button" data-inline-save title="Добавить">${icon('check-c','ico-sm')}</button>
             <button class="iconbtn" type="button" data-inline-cancel title="Отмена">${icon('x','ico-sm')}</button>
           </div>
@@ -2326,6 +2341,8 @@ const CRM = (() => {
           const name = (v('name')||'').trim();
           const email = (v('email')||'').trim();
           const phone = (v('phone')||'').trim();
+          const specRaw = (v('spec')||'').trim();
+          const specs = specRaw ? specRaw.split(/[,;]+/).map(x=>x.trim()).filter(Boolean) : [];
           if (!name){ toast('Укажите имя', 'warn'); const i = box.querySelector('[data-f="name"]'); if (i) i.focus(); return; }
           if (!email && !phone){ toast('Нужен email или телефон', 'warn'); const i = box.querySelector('[data-f="email"]'); if (i) i.focus(); return; }
           const normE = norm(email);
@@ -2335,11 +2352,12 @@ const CRM = (() => {
             .map(b => ({
               name: (b.querySelector('[data-f="name"]')||{}).value || '',
               email: (b.querySelector('[data-f="email"]')||{}).value || '',
-              phone: (b.querySelector('[data-f="phone"]')||{}).value || ''
+              phone: (b.querySelector('[data-f="phone"]')||{}).value || '',
+              spec: (b.querySelector('[data-f="spec"]')||{}).value || ''
             }));
           const nu = { id: uid(), username: normE.split('@')[0] || 'user'+Date.now(), email, pw:'inline123', role,
             full_name: name, phone, about:'', theme:'system', is_online:false, avatar:'', consent_marketing:false, tour_completed:false, created_at: Date.now(),
-            ext: { specializations: [], qualification:{}, qualOverall:0, earned:0, status:'active', workStatus:'working', comment:'',
+            ext: { specializations: specs, qualification:{}, qualOverall:0, earned:0, status:'active', workStatus:'working', comment:'',
               managerId: me().id, xlsxRow: null, num: nextPersonNum() } };
           S.users.push(nu);
           /* list — копия S.users на входе в раздел; синхронизируем, иначе
