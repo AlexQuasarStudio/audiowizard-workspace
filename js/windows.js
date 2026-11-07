@@ -1606,8 +1606,10 @@ const Windows = (() => {
           const r = w.getBoundingClientRect();
           syncSplit(w, { left:r.left, top:r.top, width:r.width, height:r.height }, active.dir);
         }
-        /* Сброс исходных краёв соседей: следующий ресайз стартует с чистого состояния */
-        win.__splitPartner = null;
+        /* Сброс исходных краёв соседей: следующий ресайз стартует с чистого состояния.
+           Здесь именно active.win: в ветке ресайза локальной переменной win нет,
+           из-за чего mouseup падал и active не сбрасывался (ресайз «залипал»). */
+        active.win.__splitPartner = null;
         allWins().forEach(rec => { rec.win.__splitPartner = null; rec.win.__origLeft = null; rec.win.__origRight = null; rec.win.__origGap = null; rec.win.__origGapE = null; rec.win.__origGapW = null; rec.win.__origGapN = null; rec.win.__origGapS = null; rec.win.__origTop = null; rec.win.__origBottom = null; });
       }
       if (active.kind === 'drag' && active.moved) active.win.__lastDragEnd = Date.now();
