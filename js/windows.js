@@ -1279,6 +1279,16 @@ const Windows = (() => {
       if (!o.width || !o.height) return;
       /* Пересечение по горизонтали не меньше 40px: окна не липнут издалека */
       if (!((x <= o.right - 40) && (o.left <= x + w - 40))) return;
+      /* Магнит не должен цепляться за окно, которое перекрыто другим
+         (наблюдали «магнит слетел на заднее окно»): точка в центре соседа
+         обязана принадлежать ему, а не верхнему окну. */
+      try {
+        const cx = Math.max(1, Math.min(window.innerWidth - 1, Math.round(o.left + o.width / 2)));
+        const cy = Math.max(1, Math.min(window.innerHeight - 1, Math.round(o.top + o.height / 2)));
+        const hit = document.elementFromPoint(cx, cy);
+        const hitWin = hit && hit.closest ? hit.closest('.aw-win') : null;
+        if (hitWin && hitWin !== el) return;
+      } catch(e){}
       const dTop = Math.abs(o.bottom - y);            /* верхом к низу соседа */
       const dBot = Math.abs(o.top - (y + h));         /* низом к верху соседа */
       if (dTop < bestD){ bestD = dTop; bestY = Math.round(o.bottom); }
@@ -1507,7 +1517,10 @@ const Windows = (() => {
          в вертикальном сплите у края экрана окно должно лечь к стыку, а не
          уехать в половину. */
       let magnetDone = false;
-      if (!win.__cornerDrop && !win.__inSplit && !snapped){
+      /* Раньше окно в сплите не могло примагнититься к НОВОМУ соседу —
+         «перемагничивание» требовало выйти из сплита. Теперь стык ищется
+         всегда: syncSplitClasses пересчитает пары по факту близости. */
+      if (!win.__cornerDrop && !snapped){
         magnetDone = applyDropMagnet(win, { neighborsOnly:true });
         if (magnetDone) snapped = true;
       }
