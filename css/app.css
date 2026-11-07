@@ -383,6 +383,15 @@ tr.inl-tr{animation:inlRowIn .2s var(--ease)}
 .deadline-cell.today{color:var(--yellow);font-weight:600}
 .audio-dur{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-size:12px;font-family:var(--mono)}
 .pay-cell{font-weight:650;white-space:nowrap}
+/* Маркер долга у суммы заказа: выполнено, но доли не оплачены.
+   Отдельной колонки нет — только этот знак и подсказка. */
+.o-debt{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;margin-left:6px;
+  padding:0 4px;border-radius:6px;font-size:10px;font-weight:700;vertical-align:1px;
+  color:var(--yellow,#a07f3f);background:color-mix(in srgb,var(--yellow,#a07f3f) 16%,transparent);
+  border:1px solid color-mix(in srgb,var(--yellow,#a07f3f) 34%,transparent);cursor:help}
+.o-debt:hover{background:color-mix(in srgb,var(--yellow,#a07f3f) 24%,transparent)}
+/* Плашка фильтра «Долги» в заказах */
+.chip--debt{gap:5px}
 
 /* Форма заказа */
 .order-form{display:grid;grid-template-columns:1fr 300px;gap:22px}
@@ -2363,3 +2372,13 @@ tr.inl-tr.closing>td{padding-top:0;padding-bottom:0}
 
 /* Канвас волны: до первой отрисовки — на всю контентную ширину */
 #ai-wave{display:block;width:100%;height:56px;cursor:pointer}
+
+/* ---------- Ширина колонок таблиц (как в полноценной таблице) ---------- */
+.tbl thead th{position:relative}
+.col-grip{position:absolute;top:0;right:0;width:10px;height:100%;cursor:col-resize;z-index:5;
+  background:transparent;border-radius:3px;pointer-events:auto}
+.col-grip:after{content:"";position:absolute;top:22%;bottom:22%;left:4.5px;width:1px;
+  background:color-mix(in srgb,var(--border-2) 70%,transparent);transition:background-color .15s var(--ease)}
+.col-grip:hover:after,.col-dragging .col-grip:after{background:var(--accent);width:2px;left:3.5px}
+th.col-dragging{user-select:none}
+body.col-dragging,body.col-dragging *{cursor:col-resize!important;user-select:none!important}

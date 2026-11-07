@@ -2440,6 +2440,26 @@ ex.innerHTML = avatarHTML(user(), '');
   /* Точечное обновление пилюли без перерисовки ленты: аватары и цифра сменяют
      друг друга кроссфейдом, ширина меняется плавно; цифра внутри режима —
      сразу, без анимации. */
+  /* Плавная смена высоты пузыря при реакциях: новая плашка добавляет строку,
+     и пузырь раньше «прыгал». Запоминаем высоту до перерисовки и анимируем
+     к новой — без скачка. */
+  function bubbleHeightOf(mid){
+    const el = document.querySelector('.msg[data-msg="' + mid + '"] .msg__bubble');
+    return el ? el.offsetHeight : 0;
+  }
+  function animateBubbleHeight(mid, prevH){
+    if (!prevH) return;
+    const el = document.querySelector('.msg[data-msg="' + mid + '"] .msg__bubble');
+    if (!el) return;
+    const nextH = el.offsetHeight;
+    if (!nextH || Math.abs(nextH - prevH) < 1) return;
+    el.style.height = prevH + 'px';
+    el.style.overflow = 'hidden';
+    el.getBoundingClientRect();
+    el.style.transition = 'height .18s var(--ease)';
+    el.style.height = nextH + 'px';
+    setTimeout(() => { el.style.height = ''; el.style.transition = ''; el.style.overflow = ''; }, 210);
+  }
   function patchReactionPill(pill, ids, em){
     if (!pill) return;
     const face = pill.querySelector('.react-face');
@@ -4704,6 +4724,7 @@ const cm = root.querySelector('.chat-main');
         const m = S.messages.find(x=>x.id===el.dataset.msg);
         if (!m) return;
         const toggleReaction = (em)=>{
+          const prevH = bubbleHeightOf(m.id);
           m.reactions = m.reactions || {};
           m.reactions[em] = m.reactions[em] || [];
           const idx = m.reactions[em].indexOf(u.id);
@@ -4714,8 +4735,8 @@ const cm = root.querySelector('.chat-main');
           const pill = box.querySelector('.react-pill[data-react="' + m.id + '|' + em + '"]');
           const ids = m.reactions[em] || [];
           if (!ids.length){
-            if (pill){ pill.classList.add('react-fade'); setTimeout(()=>renderChat(), 190); }
-            else renderChat();
+            if (pill){ pill.classList.add('react-fade'); setTimeout(()=>{ renderChat(); animateBubbleHeight(m.id, prevH); }, 190); }
+            else { renderChat(); animateBubbleHeight(m.id, prevH); }
             return;
           }
           if (pill){
@@ -4723,6 +4744,7 @@ const cm = root.querySelector('.chat-main');
             pill.classList.toggle('on', ids.includes(u.id));
           } else {
             renderChat();
+            animateBubbleHeight(m.id, prevH);
             requestAnimationFrame(()=>{
               const np = root.querySelector('.react-pill[data-react="' + m.id + '|' + em + '"]')
                 || document.querySelector('.react-pill[data-react="' + m.id + '|' + em + '"]');
@@ -4875,6 +4897,7 @@ const cm = root.querySelector('.chat-main');
       if (!el2) return;
       const mm = S.messages.find(x=>x.id===el2.dataset.msg);
       if (!mm) return;
+      const prevH = bubbleHeightOf(mm.id);
       mm.reactions = mm.reactions || {};
       const arr = mm.reactions['👍'] = mm.reactions['👍'] || [];
       const i = arr.indexOf(u.id);
@@ -4889,10 +4912,11 @@ const cm = root.querySelector('.chat-main');
       } else if (!arr.length && pill){
         pill.classList.add('react-fade');
         el2.classList.add('msg--reacting');
-        setTimeout(()=>rerenderKeepScroll(), 190);
+        setTimeout(()=>{ rerenderKeepScroll(); animateBubbleHeight(mm.id, prevH); }, 190);
       } else if (arr.length){
         el2.classList.add('msg--reacting');
         rerenderKeepScroll();
+        animateBubbleHeight(mm.id, prevH);
         const np = root.querySelector('.msg[data-msg="' + mm.id + '"] .react-pill[data-react="' + mm.id + '|👍"]')
           || document.querySelector('.msg[data-msg="' + mm.id + '"] .react-pill[data-react="' + mm.id + '|👍"]');
         if (np) np.classList.add('react-pill--in');
@@ -5836,6 +5860,152 @@ const cm = root.querySelector('.chat-main');
   /* Телефон: настройки — список разделов, выбранный открывается экраном с «Назад» */
   const isMobileSettings = () => !!(window.matchMedia && window.matchMedia('(max-width: 860px)').matches);
 
+  /* ---------- Выплаты и Smartcat ---------- */
+  function scStateBadge(st){
+    const map = { approved:['badge--ok','Подтверждён'], pending:['badge--warn','Ждёт подтверждения'], rejected:['badge--err','Отклонён'], none:['badge--outline','Не привязан'] };
+    const [cls,label] = map[st] || map.none;
+    return `<span class="badge ${cls}">${label}</span>`;
+  }
+  function payoutsHTML(){
+    const u = me();
+    const staff = ['admin','top_manager','manager'].includes(u.role);
+    const p = Finance.payoutCfg();
+    const cfg = Finance.cfg();
+    const pend = Finance.pending();
+    const myId = u.id;
+    const rows = Object.entries(pend.byUser).map(([uid, amount]) => {
+      const usr = userById(uid) || { full_name:uid };
+      const sc = Finance.scOf(uid);
+      return `<div class="row row--between" style="padding:6px 0;border-bottom:1px solid var(--border)">
+        <span class="small"><b>${esc(usr.full_name)}</b> · ${esc(usr.role==='executor'?'исполнитель':usr.role==='manager'||usr.role==='top_manager'?'менеджер':'админ')}
+          <span class="faint">${sc.status==='approved'?'· Smartcat '+esc(sc.login||'—'):'· Smartcat не привязан'}</span></span>
+        <b class="small" style="white-space:nowrap">${fmtMoney(amount)}</b>
+      </div>`;
+    }).join('') || '<p class="small faint">В текущем периоде долгов нет.</p>';
+    const list = pend.orders.map(o => {
+      const d = Finance.debts(o);
+      const names = Object.keys(d.byUser).map(uid => (userById(uid)||{}).full_name).filter(Boolean).join(', ');
+      return `<div class="row row--between" style="padding:5px 0"><span class="small">${esc(o.order_id)} · ${esc(names)}</span><b class="small">${fmtMoney(d.total)}</b></div>`;
+    }).join('') || '<p class="small faint">Нет выполненных заказов с неоплаченными долями.</p>';
+
+    const scRows = (S.users||[]).filter(x => x.ext && ['executor','manager','top_manager'].includes(x.role)).map(x => {
+      const sc = Finance.scOf(x.id);
+      return `<div class="row row--between" style="padding:6px 0;border-bottom:1px solid var(--border);gap:8px">
+        <span class="small" style="min-width:0">${esc(x.full_name)} ${scStateBadge(sc.status)}<br><span class="faint">${esc(sc.login||'логин не указан')}</span></span>
+        <span class="row" style="gap:6px;flex:none">
+          ${staff && sc.status==='pending'?`<button class="btn btn--sm btn--primary" data-sc-ok="${x.id}">Подтвердить</button><button class="btn btn--sm btn--ghost" data-sc-no="${x.id}">Отклонить</button>`:''}
+          ${staff && sc.status!=='approved'?`<button class="btn btn--sm btn--soft" data-sc-req="${x.id}">${sc.login?'Запросить заново':'Прикрепить'}</button>`:''}
+          ${x.id===myId && sc.status!=='approved'?`<button class="btn btn--sm btn--soft" data-sc-req="${x.id}">Привязать свой аккаунт</button>`:''}
+        </span>
+      </div>`;
+    }).join('');
+
+    const myDebt = (() => {
+      const mine = [];
+      (S.orders||[]).forEach(o => { const d = Finance.debts(o); if (d.byUser[myId]) mine.push({o, amount:d.byUser[myId]}); });
+      return mine.reduce((a,x)=>a+x.amount,0);
+    })();
+
+    return `
+    <div class="card card-pad">
+      <h3 style="margin-bottom:6px">Выплаты</h3>
+      <p class="small faint">По умолчанию — 1-го и 15-го числа в 15:00 МСК. В выплату попадают все заказы, выполненные с 1-го (включительно) по 14-е 15:00 и с 15-го (включительно) по 1-е 15:00. Исполнителям — их суммы, менеджерам — доля заказа, админу — маржа ${cfg.adminMargin}%.</p>
+      <div class="row row--between" style="margin-top:10px;gap:10px;flex-wrap:wrap">
+        <span class="badge ${p.enabled?'badge--ok':'badge--outline'}">${p.enabled?'Расписание включено':'Расписание выключено'}</span>
+        <span class="badge badge--outline">${esc(Finance.fmtPeriod(pend.period))}</span>
+      </div>
+    </div>
+
+    ${staff?`<div class="card card-pad">
+      <h3 style="margin-bottom:10px">Расписание</h3>
+      <div class="cols-2 grid" style="gap:12px">
+        <div class="field"><label>Дни месяца</label><input class="input" id="po-days" value="${p.days.join(', ')}" placeholder="1, 15"></div>
+        <div class="field"><label>Время (МСК)</label><input class="input" id="po-time" type="time" value="${esc(p.time)}"></div>
+        <div class="field"><label>Комиссия системы оплат, %</label><input class="input" id="po-comm" type="number" min="0" max="50" step="0.5" value="${cfg.commission}"></div>
+        <div class="field"><label>Маржа админа, %</label><input class="input" id="po-admin" type="number" min="0" max="100" step="1" value="${cfg.adminMargin}"></div>
+        <div class="field"><label>Доля менеджера, %</label><input class="input" id="po-mgr" type="number" min="0" max="100" step="1" value="${cfg.managerFee}"></div>
+        <div class="field"><label>Автоматически</label><label class="row small" style="gap:8px;padding-top:9px"><input type="checkbox" id="po-auto" ${p.auto?'checked':''}> по расписанию</label>
+          <label class="row small" style="gap:8px"><input type="checkbox" id="po-on" ${p.enabled?'checked':''}> выплаты включены</label></div>
+      </div>
+      <div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn btn--primary btn--sm" id="po-save">Сохранить расписание</button>
+        <button class="btn btn--soft btn--sm" id="po-run">Выплатить сейчас</button>
+        <button class="btn btn--ghost btn--sm" id="po-export">Экспорт для Smartcat</button>
+      </div>
+    </div>`:''}
+
+    <div class="card card-pad">
+      <h3 style="margin-bottom:8px">К выплате ${staff?'сейчас':''}</h3>
+      <div class="row row--between" style="margin-bottom:8px"><span class="small faint">Итого</span><b>${fmtMoney(pend.total)}</b></div>
+      <div class="row row--between" style="margin-bottom:10px"><span class="small faint">Комиссия ${cfg.commission}% / на руки</span><b class="small">${fmtMoney(pend.commission)} / ${fmtMoney(pend.net)}</b></div>
+      ${staff?rows:''}
+      ${staff?`<h4 class="small" style="margin:12px 0 4px">Заказы периода</h4>${list}`:''}
+      ${!staff?`<p class="small">Ваш долг по выполненным заказам: <b>${fmtMoney(myDebt)}</b></p><p class="small faint">Выплата приходит на привязанный аккаунт Smartcat или вне системы — по договорённости с менеджером. Внутренняя комиссия системы оплат — ${cfg.commission}%.</p>`:''}
+      <p class="small faint" style="margin-top:8px">Внутренняя комиссия системы оплат — ${cfg.commission}%. Сумма к зачислению = долг − комиссия.</p>
+    </div>
+
+    <div class="card card-pad">
+      <h3 style="margin-bottom:8px">Smartcat</h3>
+      <p class="small faint">Аккаунт прикрепляет админ или менеджер, либо исполнитель сам — с подтверждением менеджера или админа.</p>
+      ${scRows}
+    </div>`;
+  }
+  function bindPayouts(el){
+    const p = Finance.payoutCfg();
+    const save = el.querySelector('#po-save');
+    if (save) save.onclick = ()=>{
+      const days = String((el.querySelector('#po-days')||{}).value||'').split(/[^0-9]+/).map(Number).filter(d=>d>=1&&d<=28);
+      const time = ((el.querySelector('#po-time')||{}).value||'15:00').trim() || '15:00';
+      const comm = Math.max(0, Math.min(50, Number((el.querySelector('#po-comm')||{}).value)||0));
+      const adm = Math.max(0, Math.min(100, Number((el.querySelector('#po-admin')||{}).value)||0));
+      const mgr = Math.max(0, Math.min(100, Number((el.querySelector('#po-mgr')||{}).value)||0));
+      S.settings.finance = Object.assign({}, S.settings.finance, { adminMargin:adm, managerFee:mgr, payoutCommission:comm });
+      S.settings.payout = Object.assign({}, p, {
+        enabled: !!((el.querySelector('#po-on')||{}).checked),
+        auto: !!((el.querySelector('#po-auto')||{}).checked),
+        days: days.length?days:p.days, time
+      });
+      saveState(); toast('Расписание выплат сохранено','ok');
+      try { logAudit('Настройка выплат: дни '+S.settings.payout.days.join(',')+' в '+time+' МСК','Оплата'); } catch(e){}
+      APP.render();
+    };
+    const run = el.querySelector('#po-run');
+    if (run) run.onclick = async ()=>{
+      const pend = Finance.pending();
+      if (!pend.orders.length){ toast('В этом периоде нет неоплаченных выполненных заказов','info'); return; }
+      const ok = await confirmModal({
+        title:'Выплатить сейчас?', okText:'Выплатить '+fmtMoney(pend.total),
+        text:`Будет закрыто ${pend.orders.length} заказов. Исполнителям и менеджерам — ${fmtMoney(pend.total)}, внутренняя комиссия системы оплат ${cfgCom() }%: ${fmtMoney(pend.commission)}. На руки — ${fmtMoney(pend.net)}.`,
+        checkbox:'Проверил суммы и получателей'
+      });
+      if (!ok) return;
+      const r = Finance.runPayout({ manual:true });
+      if (r.ok){ toast(`Выплата ${fmtMoney(r.total)} проведена`,'ok'); APP.render(); }
+      else toast(r.why,'warn');
+    };
+    function cfgCom(){ return Finance.cfg().commission; }
+    const exp = el.querySelector('#po-export');
+    if (exp) exp.onclick = ()=>{
+      const pend = Finance.pending();
+      const uids = Object.keys(pend.byUser);
+      if (!uids.length){ toast('Нет данных для экспорта','info'); return; }
+      const payloads = uids.map(uid => Finance.smartcatPayload(uid, pend.orders.filter(o => Finance.debts(o).byUser[uid])));
+      const data = { schema:'smartcat.payout.batch.v1', generatedAt:new Date().toISOString(), period:{ from:new Date(pend.period.from).toISOString(), to:new Date(pend.period.to).toISOString() }, payouts: payloads, totals:{ amount:pend.total, commission:pend.commission, net:pend.net } };
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+      a.download='smartcat-payout-'+new Date().toISOString().slice(0,10)+'.json'; a.click();
+    };
+    el.querySelectorAll('[data-sc-ok]').forEach(b=>b.onclick=()=>{ Finance.approveSmartcat(b.dataset.scOk); toast('Аккаунт Smartcat подтверждён','ok'); APP.render(); });
+    el.querySelectorAll('[data-sc-no]').forEach(b=>b.onclick=()=>{ Finance.rejectSmartcat(b.dataset.scNo); toast('Запрос отклонён','warn'); APP.render(); });
+    el.querySelectorAll('[data-sc-req]').forEach(b=>b.onclick=()=>{
+      const uid=b.dataset.scReq; const usr=userById(uid); if(!usr) return;
+      const cur=Finance.scOf(uid);
+      const login = prompt('Логин в Smartcat', cur.login||'');
+      if (!login) return;
+      Finance.requestSmartcat(uid, login);
+      toast('Запрос на привязку отправлен на подтверждение','ok'); APP.render();
+    });
+  }
   function settingsView(root, section){
     const u = user();
     /* Раздел пришёл из маршрута (#/settings/profile) или это вход в настройки */
@@ -5846,6 +6016,7 @@ const cm = root.querySelector('.chat-main');
       ['reminders','Напоминания','clock'],
       ['security','Безопасность','shield'], ['keys','Горячие клавиши','terminal'],
       ['docs','Справка и документы','file'], ['about','О приложении','info'],
+      ...(['admin','top_manager','manager','executor'].includes(u.role)?[['payouts','Выплаты и Smartcat','card']]:[]),
       ...(u.role==='admin'?[['calc','Калькулятор и услуги','calc']]:[]),
       ...(u.role==='admin'?[['tech','Технические работы','alert']]:[]),
       ...(u.role==='admin'?[['product','Демо-режим и версии','flag'],['data','Данные и бекапы','db']]:[])
@@ -5881,9 +6052,12 @@ const cm = root.querySelector('.chat-main');
       if (section==='data') el.innerHTML = dataHTML();
       if (section==='product') el.innerHTML = productHTML();
       if (section==='tech') el.innerHTML = techHTML();
+      if (section==='payouts') el.innerHTML = payoutsHTML();
       /* Плавное появление секции — ДО биндинга, чтобы анимация всегда играла */
       el.classList.remove('set-sec-in'); void el.offsetWidth; el.classList.add('set-sec-in');
-      if (section==='calc') bindCalc(el); else if (section==='product') bindProduct(el); else if (section==='tech') bindTech(el); else bindSection(section, el);
+      if (section==='calc') bindCalc(el); else if (section==='product') bindProduct(el); else if (section==='tech') bindTech(el);
+      else if (section==='payouts') bindPayouts(el);
+      else bindSection(section, el);
     };
     root.innerHTML = `
       <div class="page-head"><div><h2>${__t('settings.title','Настройки')}</h2><div class="sub">${__t('settings.subtitle','Профиль, внешний вид, безопасность и документы')}</div></div></div>

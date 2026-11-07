@@ -758,3 +758,64 @@ function inlineHide(box, cb){
   box.classList.add('closing');
   setTimeout(()=>{ box.hidden = true; box.classList.remove('closing'); cb && cb(); }, 160);
 }
+
+/* ---------- Изменение ширины колонок таблиц ----------
+   Как в полноценной таблице: тянем разделитель в шапке. Ширины хранятся
+   по ключу таблицы в localStorage и применяются при каждой перерисовке. */
+const Cols = (function(){
+  const LS = k => 'aw_cols_' + k;
+  function read(key){
+    try { return JSON.parse(localStorage.getItem(LS(key)) || '[]') || []; } catch(e){ return []; }
+  }
+  function write(key, arr){ try { localStorage.setItem(LS(key), JSON.stringify(arr)); } catch(e){} }
+
+  function init(table, key){
+    if (!table || !key) return;
+    const ths = Array.from(table.querySelectorAll('thead th'));
+    if (!ths.length) return;
+    table.dataset.cols = key;
+    const widths = read(key);
+    ths.forEach((th, i) => {
+      if (widths[i]){ th.style.width = widths[i] + 'px'; th.style.minWidth = widths[i] + 'px'; }
+      if (th.classList.contains('o-act') || th.classList.contains('pl-act')) return;
+      if (th.querySelector('.col-grip')) return;
+      const g = document.createElement('span');
+      g.className = 'col-grip';
+      g.setAttribute('aria-hidden', 'true');
+      th.appendChild(g);
+    });
+  }
+
+  document.addEventListener('pointerdown', e => {
+    const g = e.target.closest('.col-grip');
+    if (!g) return;
+    const th = g.closest('th');
+    const table = th && th.closest('table');
+    const key = table && table.dataset.cols;
+    if (!key) return;
+    e.preventDefault(); e.stopPropagation();
+    const idx = Array.from(th.parentNode.children).indexOf(th);
+    const startX = e.clientX;
+    const startW = th.getBoundingClientRect().width;
+    const widths = read(key);
+    th.classList.add('col-dragging');
+    const move = ev => {
+      const w = Math.max(56, Math.round(startW + ev.clientX - startX));
+      /* min-width обязателен: при auto-раскладке одна ширина игнорируется,
+         если содержимое требует больше места. */
+      th.style.width = w + 'px';
+      th.style.minWidth = w + 'px';
+      widths[idx] = w;
+    };
+    const up = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      th.classList.remove('col-dragging');
+      write(key, widths);
+    };
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+  }, true);
+  return { init };
+})();
+window.Cols = Cols;

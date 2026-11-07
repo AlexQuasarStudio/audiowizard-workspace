@@ -1,12 +1,12 @@
 /* Audiowizard Workspace — Service Worker (кеш оболочки, обновления, офлайн) */
-const VER = '0.1-prototype.1321';
+const VER = '0.1-prototype.1322';
 const CACHE = `aw-shell-${VER}`;
 
 const PRECACHE = [
   './', './index.html', './portal.html',
   './manifest.json', './version.json',
   './css/base.css', './css/app.css',
-  './js/store.js', './js/xlsx.js', './js/ui.js', './js/ai-data.js', './js/ai.js', './js/crm.js', './js/windows.js', './js/navdrag.js', './js/app.js',
+  './js/store.js', './js/xlsx.js', './js/ui.js', './js/ai-data.js', './js/ai.js', './js/finance.js', './js/crm.js', './js/windows.js', './js/navdrag.js', './js/app.js',
   './icons/icon.svg', './icons/maskable.svg', './bg/pattern-ai.svg'
 ];
 

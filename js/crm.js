@@ -56,16 +56,23 @@ const CRM = (() => {
   function orderTotalAudio(o){ return o.audio || (o.files||[]).reduce((a,f)=>a+(f.duration||0),0); }
 
   function applyAccrual(o, sign){
-    o.executors.forEach(e=>{
-      const u = userById(e.uid);
-      if (u && u.ext){
-        u.ext.earned = Math.max(0, (u.ext.earned||0) + sign * (e.amount||0));
-      }
-      if (sign < 0) e.is_paid = false;
-    });
-    if (sign > 0 && o.status==='done' && o.executors.length && !o._accrued){
-      o._accrued = true;
+    /* Доли считает Finance: исполнители, админ (маржа) и менеджер заказа.
+       Старая логика умела только исполнителей — из-за этого баланс админа
+       и менеджеров не менялся. */
+    if (window.Finance){ Finance.accrue(o, sign); }
+    else {
+      o.executors.forEach(e=>{
+        const u = userById(e.uid);
+        if (u && u.ext) u.ext.earned = Math.max(0, (u.ext.earned||0) + sign * (e.amount||0));
+        if (sign < 0) e.is_paid = false;
+      });
     }
+    if (sign > 0 && o.status==='done' && o.executors.length && !o._accrued) o._accrued = true;
+  }
+
+  /* Доли заказа для предупреждения о превышении бюджета. */
+  function orderSplit(o){
+    return window.Finance ? Finance.split(o) : null;
   }
 
   /* ---------- Инлайн-редактирование по клику ----------
@@ -256,6 +263,23 @@ const CRM = (() => {
         });
       }
       if (!ok) return false;
+      /* Превышение бюджета: исполнители + менеджер + маржа админа больше суммы
+         заказа. Показываем дефицит и требуем осознанное подтверждение. */
+      const sp = orderSplit(o);
+      if (sp && sp.over > 0){
+        const proceed = await confirmModal({
+          title:'Бюджет заказа превышен', danger:true, okText:'Всё равно выполнить',
+          text:`Исполнителям ${fmtMoney(sp.exec)} + админу ${fmtMoney(sp.admin)} + менеджеру ${fmtMoney(sp.manager)} = ${fmtMoney(sp.exec + sp.admin + sp.manager)} при сумме заказа ${fmtMoney(sp.total)}. Не хватает ${fmtMoney(sp.over)}.`,
+          checkbox:'Понимаю, что затраты превышают сумму заказа'
+        });
+        if (!proceed) return false;
+        try {
+          const adm = (S.users || []).find(x => x.role === 'admin');
+          S.notifs.unshift({ id:uid(), icon:'i-card', title:'Превышение бюджета заказа',
+            text:`${o.order_id}: доли ${fmtMoney(sp.exec + sp.admin + sp.manager)} при сумме ${fmtMoney(sp.total)}, дефицит ${fmtMoney(sp.over)}.`,
+            t:Date.now(), read:{}, owner_id: adm ? adm.id : null });
+        } catch(e){}
+      }
     }
     if (o.status === 'done' && to !== 'done'){
       const ok = await confirmModal({
@@ -271,7 +295,12 @@ const CRM = (() => {
     if (to === 'archived') o.archived_at = Date.now();
     if (to === 'archived' || to !== 'archived' && o.status !== 'archived') {}
     if (to !== 'archived') o.archived_at = o.status==='archived' ? o.archived_at : null;
-    if (to === 'done' && !o._accrued){ applyAccrual(o, +1); o.history.push({t:Date.now(), txt:'Начислен заработок исполнителям'}); }
+    if (to === 'done' && !o._accrued){
+      applyAccrual(o, +1);
+      o.done_at = Date.now();
+      o.history.push({t:Date.now(), txt:'Начислен заработок исполнителям, менеджеру и маржа админу'});
+    }
+    if (to !== 'done') o.done_at = null;
     /* Реферальная программа: процент пригласившему за выполненный заказ */
     if (to === 'done'){
       try {
@@ -393,7 +422,7 @@ const CRM = (() => {
   }
 
   /* ---------- Таблица заказов ---------- */
-  const ofilter = { q:'', statuses:new Set(), niche:'', project:'', manager:'', archived:false,
+  const ofilter = { q:'', statuses:new Set(), niche:'', project:'', manager:'', archived:false, debt:false,
     dateFrom:'', dateTo:'', sortKey:'start_date', sortDir:1 };
     const iso2ru = iso => { if (!iso) return ''; const [y,m,d] = iso.split('-'); return d+'.'+m+'.'+y; };
     const ru2iso = s => {
@@ -442,6 +471,8 @@ const CRM = (() => {
         if (ofilter.archived && o.status !== 'archived') return false;
         if (ofilter.manager && o.manager_id !== ofilter.manager) return false;
         if (ofilter.statuses.size && !ofilter.statuses.has(o.status)) return false;
+        /* Долги: выполненные заказы, где не закрыты доли исполнителей/менеджеров */
+        if (ofilter.debt && !(window.Finance && Finance.hasDebt(o))) return false;
         if (ofilter.niche && o.nish_id !== ofilter.niche) return false;
         if (ofilter.project && o.project_id !== ofilter.project) return false;
         /* Диапазон дат (по дате начала заказа) */
@@ -472,6 +503,19 @@ const CRM = (() => {
       return arr;
     }
 
+    /* Долг по заказу — маленький маркер у суммы вместо отдельной колонки.
+       Показывается только там, где есть неоплаченные доли исполнителей
+       или менеджера по выполненному заказу. */
+    function debtMark(o){
+      if (!window.Finance) return '';
+      const d = Finance.debts(o);
+      if (!d.total) return '';
+      const parts = [];
+      if (d.exec) parts.push(`исполнителям ${fmtMoney(d.exec)}`);
+      if (d.manager) parts.push(`менеджеру ${fmtMoney(d.manager)}`);
+      const tip = `Не оплачено ${fmtMoney(d.total)}: ${parts.join(', ')}`;
+      return `<span class="o-debt" title="${esc(tip)}" aria-label="${esc(tip)}">₽</span>`;
+    }
     function rowHTML(o){
       const clList = clientsOf(o);
       const cl = clList[0] || {};
@@ -500,7 +544,7 @@ const CRM = (() => {
         <td data-l="Исполнители" class="o-ex" data-inline="executors">${exShow.length ? `<span class="ex-stack" title="${esc(exTitle)}">${exShow.map(e=>avatarHTML(e,'avatar--sm ex-av')).join('')}${exRest>0?`<span class="ex-more">+${exRest}</span>`:''}</span>` : '<span class="faint">—</span>'}</td>
         <td data-l="Начало" class="deadline-cell" data-inline="start">${start?fmtDT(start):'—'}</td>
         <td data-l="Дедлайн" class="deadline-cell ${dlCls}" data-inline="deadline">${dl?fmtDT(dl):'—'}</td>
-        <td data-l="Итого" class="pay-cell" data-inline="total">${fmtMoney(o.total)}</td>
+        <td data-l="Итого" class="pay-cell" data-inline="total">${fmtMoney(o.total)}${debtMark(o)}</td>
         <td data-l="Статус" data-inline="status">${statusChip(o.status)}</td>
         <td data-l="" class="o-act">${staff?`<button class="iconbtn row-menu" data-oid="${o.id}" title="Действия">${icon('more')}</button>`:''}</td>
       </tr>`;
@@ -554,6 +598,7 @@ const CRM = (() => {
         <div class="filters" style="margin-top:-4px">
           <div class="chips" id="f-status">
             ${Object.entries(STATUS_META).filter(([st])=>st!=='archived'||ofilter.archived).map(([st,m])=>`<span class="chip ${ofilter.statuses.has(st)?'on':''}" data-st="${st}">${m.label}</span>`).join('')}
+            <span class="chip chip--debt ${ofilter.debt?'on':''}" id="f-debt" title="Выполненные заказы с неоплаченными долями">${icon('card','ico-sm')} Долги</span>
           </div>
         </div>
         <div class="tbl-wrap o-wrap ${cardsView?'o-wrap--cards':''}" style="border-radius:var(--r-lg)">
@@ -566,6 +611,7 @@ const CRM = (() => {
       bindTable();
       fillRows(0);
       updateBulk();
+      { const otbl = root.querySelector('.o-tbl'); if (otbl && window.Cols) Cols.init(otbl, 'orders'); }
       flipPlay(root, flip0);
       if (keep){
         const q2 = root.querySelector('#'+keep.id);
@@ -647,7 +693,7 @@ const CRM = (() => {
           <span class="${dlCls}" title="Дедлайн" data-inline="deadline">${icon('calendar','ico-sm')} ${dl?fmtDT(dl):'—'}</span>
           <span title="Исполнители">${exShow.length?icon('users','ico-sm')+' '+exShow.length+(exRest?`+${exRest}`:''):''}</span>
         </div>
-        <div class="o-card__foot"><b class="mono" data-inline="total">${fmtMoney(o.total)}</b>
+        <div class="o-card__foot"><b class="mono" data-inline="total">${fmtMoney(o.total)}</b>${debtMark(o)}
           <span class="o-card__audio">${orderTotalAudio(o)?icon('play','ico-sm')+' '+fmtDur(orderTotalAudio(o)):''}</span>
         </div>
       </div>`;
@@ -829,8 +875,15 @@ const CRM = (() => {
         $$('#f-status .chip', root).forEach(c => c.classList.remove('on'));
         animateFilterChange(root, () => render(false));
       });
+      const fdebt = root.querySelector('#f-debt');
+      fdebt && fdebt.addEventListener('click', () => {
+        ofilter.debt = !ofilter.debt;
+        fdebt.classList.toggle('on', ofilter.debt);
+        animateFilterChange(root, () => render(false));
+      });
       $$('#f-status .chip', root).forEach(ch => ch.addEventListener('click', () => {
         const st = ch.dataset.st;
+        if (!st) return; /* плашка «Долги» обрабатывается выше */
         ofilter.statuses.has(st) ? ofilter.statuses.delete(st) : ofilter.statuses.add(st);
         ch.classList.toggle('on', ofilter.statuses.has(st));
         animateFilterChange(root, () => render(false));
@@ -2173,6 +2226,7 @@ const CRM = (() => {
           : `<div class="tbl-wrap pl-wrap" style="margin-top:2px"><table class="tbl">${personHead(role, psort)}<tbody id="pl-rows"></tbody></table></div>`}`;
       bindPeople();
       fillPeople(0);
+      { const ptbl = root.querySelector('.pl-wrap table.tbl'); if (ptbl && window.Cols) Cols.init(ptbl, 'people-' + role); }
       flipPlay(root, flip0);
       /* Пересчёт «до конца экрана» после отрисовки (высота шапки/футера
          зависит от вида и экрана) — и в следующем кадре, когда вёрстка осядет. */

@@ -115,6 +115,23 @@ function seedState(){
       ext:{ company:'АО «ФинКом»', roleIn:'Сотрудник', comment:'Крупный клиент, предоплата 50%.', discountApplied:false, managerId:'u-manager', status:'active', requisites:{ inn:'9705123456', kpp:'970501001', bank:'АО «Тинькофф Банк»', account:'40701810100000001234', corr:'30101810145250000974', bik:'044525974', address:'г. Москва, ул. Финансовая, д. 5' }, consentNews:true } }
   ];
 
+  /* Smartcat-аккаунты для выплат. Менеджеры тоже получают оплату через
+     Smartcat — закладываем это сразу, чтобы модель не пришлось менять. */
+  const smartcatSeed = {
+    'u-ex1': { login:'maria.kuznetsova', status:'approved', approvedBy:'u-manager', approvedAt:days(40) },
+    'u-ex2': { login:'pavel.smirnov.copy', status:'pending', requestedBy:'u-ex2', requestedAt:days(1) },
+    'u-ex3': { login:'olga.lebedeva.translations', status:'approved', approvedBy:'u-top', approvedAt:days(70) },
+    'u-ex4': { login:'dmitry.ershov.audio', status:'approved', approvedBy:'u-manager', approvedAt:days(30) },
+    'u-ex5': { login:'', status:'none' },
+    'u-ex6': { login:'', status:'none' },
+    'u-manager': { login:'andrey.denisyuk', status:'approved', approvedBy:'u-admin', approvedAt:days(90) },
+    'u-top': { login:'angelika.handzhyan', status:'approved', approvedBy:'u-admin', approvedAt:days(120) }
+  };
+  users.forEach(u => {
+    if (!u.ext) return;
+    u.ext.smartcat = smartcatSeed[u.id] || { login:'', status:'none' };
+  });
+
   const niches = [
     { id:'n1', name:'Аудио', description:'Расшифровки, стенограммы, монтаж' },
     { id:'n2', name:'Тексты', description:'Копирайтинг, рерайт, редактура' },
@@ -180,6 +197,27 @@ function seedState(){
     mk('o12','AW-1035','u-cl1','archived',21500,{ nish:'n1', project:'p1', folder:'f1', execs:[{uid:'u-ex1',amount:8700,is_paid:true}], audio:4210, date:days(40), deadline:days(33), history:[{t:days(33),txt:'Выполнено'},{t:days(3),txt:'Перемещено в архив'}] }),
     mk('o13','AW-1031','u-cl4','archived',9700,{ nish:'n2', execs:[{uid:'u-ex2',amount:4800,is_paid:true}], date:days(55), deadline:days(48), history:[{t:days(48),txt:'Выполнено'},{t:days(20),txt:'Перемещено в архив'}] })
   ];
+
+  /* Финансовые доли выполненных заказов. Хранятся в самом заказе (splitAccrual):
+     админу — маржа 25%, менеджеру заказа — 5%, исполнителям — их суммы.
+     Долг виден там, где доля ещё не оплачена — без отдельных сущностей. */
+  orders.forEach(o => {
+    if (!['done','archived'].includes(o.status)) return;
+    const mgr = o.manager_id || 'u-manager';
+    o.splitAccrual = {
+      admin: { uid:'u-admin', amount: Math.round(o.total * 0.25), paid: true },
+      manager: { uid: mgr, amount: Math.round(o.total * 0.05), paid: o.status === 'archived' },
+      exec: o.executors.reduce((a, e) => a + (e.amount || 0), 0)
+    };
+    if (!o.done_at){
+      const h = (o.history || []).reduce((a, x) => Math.max(a, x.t || 0), 0);
+      o.done_at = h || o.order_date;
+    }
+  });
+  /* Свежий выполненный заказ с долгом исполнителю — чтобы демо показывало
+     «выполнено, но не оплачено» и общий долг в таблице заказов. */
+  const o6demo = orders.find(o => o.order_id === 'AW-1047');
+  if (o6demo){ o6demo.executors.forEach(e => { e.is_paid = false; }); o6demo.done_at = days(3); }
 
   const chats = [
     { id:'ch1', type:'corporate', name:'Корпоративный чат', description:'Общий чат для всех исполнителей и менеджеров', avatar:'', is_active:true, unread:{'u-admin':1,'u-manager':0} },
@@ -247,9 +285,9 @@ function seedState(){
   ];
 
   const calcServices = {
-    n1:[ {id:'cs1', name:'Расшифровка записи', price:900, unit:'за час аудио', margin:30}, {id:'cs2', name:'Монтаж/чистка аудио', price:2500, unit:'за трек', margin:35}, {id:'cs3', name:'Заверение стенограммы', price:5600, unit:'за документ', margin:40} ],
-    n2:[ {id:'cs4', name:'Копирайтинг', price:1200, unit:'за 1000 знаков', margin:25}, {id:'cs5', name:'Рерайт', price:700, unit:'за 1000 знаков', margin:25}, {id:'cs6', name:'SEO-оптимизация', price:1500, unit:'за статью', margin:20} ],
-    n3:[ {id:'cs7', name:'Письменный перевод', price:950, unit:'за страницу', margin:30}, {id:'cs8', name:'Редактура перевода', price:500, unit:'за страницу', margin:30}, {id:'cs9', name:'Нотариальное заверение', price:2800, unit:'за документ', margin:45} ]
+    n1:[ {id:'cs1', name:'Расшифровка записи', price:900, unit:'за час аудио', margin:25}, {id:'cs2', name:'Монтаж/чистка аудио', price:2500, unit:'за трек', margin:25}, {id:'cs3', name:'Заверение стенограммы', price:5600, unit:'за документ', margin:25} ],
+    n2:[ {id:'cs4', name:'Копирайтинг', price:1200, unit:'за 1000 знаков', margin:25}, {id:'cs5', name:'Рерайт', price:700, unit:'за 1000 знаков', margin:25}, {id:'cs6', name:'SEO-оптимизация', price:1500, unit:'за статью', margin:25} ],
+    n3:[ {id:'cs7', name:'Письменный перевод', price:950, unit:'за страницу', margin:25}, {id:'cs8', name:'Редактура перевода', price:500, unit:'за страницу', margin:25}, {id:'cs9', name:'Нотариальное заверение', price:2800, unit:'за документ', margin:25} ]
   };
 
   const notifs = [
@@ -295,6 +333,13 @@ const audit = getDemoAudit();
     calcHistory:[], notifs, audit, backups:[], importLogs, importLogLines,
     settings:{ demoEnabled:true, minPrepay:50, selfDeleteDays:90, hiddenRoutes:[], balance: 100000, appBgDoodles:true,
       referral:{ enabled:true, percent:2, fixedBonus:0, karmaPerRef:2, role:'client' },
+      /* Доли от суммы заказа: админ — 25% (маржа услуг), менеджер — 5%.
+         Разница (итого − исполнители − админ − менеджер) показывается как
+         свободный остаток; отрицательная — предупреждение о превышении. */
+      finance:{ adminMargin:25, managerFee:5, payoutCommission:2 },
+      /* Выплаты исполнителям: 1-е и 15-е число в 15:00 МСК, полуинтервалы
+         [1;14] и [15;последнее число]. Полностью настраивается. */
+      payout:{ enabled:true, auto:true, days:[1,15], time:'15:00', tz:'Europe/Moscow', lastRunAt:null, history:[] },
       betaRoutes:['ai-transcribe','ai-texts','ai-translate'] },
     product:{ beta:true, version:'0.1-prototype', build:1, notes:['Прототип Audiowizard Workspace'] },
     featureUsage:[
@@ -314,13 +359,23 @@ let S;
 function loadState(){
   try{
     const raw = localStorage.getItem(LS_KEY);
-    if (raw){ S = JSON.parse(raw); if (S && S._v === 1){ migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); migrateKeys(); saveState(); return; } }
+    if (raw){ S = JSON.parse(raw); if (S && S._v === 1){ migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); migrateKeys(); migrateFinance(); saveState(); return; } }
   }catch(e){}
   S = seedState();
   saveState();
 }
 /* ---------- Демо-данные: пометки и полная очистка для продакшена ---------- */
 const SEED_DEMO_RE = /^(u-(manager|top|ex\d+|cl\d+)|(o|ch|m\d|n\d|nf\d|i\d|t\d|p\d|f\d|v\d|kb\d|kc\d)\d*$)/;
+function migrateFinance(){
+  if (!S.settings) S.settings = {};
+  S.settings.finance = Object.assign({ adminMargin:25, managerFee:5, payoutCommission:2 }, S.settings.finance || {});
+  S.settings.payout = Object.assign({ enabled:true, auto:true, days:[1,15], time:'15:00', tz:'Europe/Moscow', lastRunAt:null, history:[] }, S.settings.payout || {});
+  if (!Array.isArray(S.settings.payout.days) || !S.settings.payout.days.length) S.settings.payout.days = [1,15];
+  (S.users || []).forEach(u => {
+    if (!u.ext) return;
+    if (!u.ext.smartcat) u.ext.smartcat = { login:'', status:'none' };
+  });
+}
 function migrateDemoMarks(){
   /* Гарантия: баланс платформы есть для всех пользователей (и старых сохранений) */
   if (S.settings && S.settings.balance == null) S.settings.balance = 100000;
