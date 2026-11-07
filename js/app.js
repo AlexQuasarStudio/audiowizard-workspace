@@ -841,9 +841,11 @@ const QUICK_BY_ROLE = {
         </div></div>`;
       const history = modal ? '' : `<div class="card card-pad"><h3 style="margin-bottom:6px">История обновлений</h3>
         ${S.changelog.filter(v => !isProd() ? true : (v.id==='v0' || v.id==='cur' || !v.demo))
-          .sort((a,b)=> (a.id==='v0' ? -1 : b.id==='v0' ? 1 : (b.created_at||0)-(a.created_at||0)))
+          /* Строго от новых к старым: свежий патчноут — первой строкой,
+             «Прототип» (первая версия) уходит вниз по своей дате. */
+          .sort((a,b)=> (b.created_at||0)-(a.created_at||0))
           .map(v=>`<div class="ver-item"><span class="ver-badge">v${esc(v.version)}</span>
-          <span><b class="small">${esc(v.title)}</b>${v.content?`<p class="small muted" style="margin-top:3px">${esc(v.content)}</p>`:''}<span class="faint" style="font-size:11px">${fmtDate(v.created_at)}</span></span></div>`).join('')}</div>`;
+          <span><b class="small">${esc(v.title)}</b>${v.content?`<p class="small muted" style="margin-top:3px">${esc(v.content).replace(/\n/g,'<br>')}</p>`:''}<span class="faint" style="font-size:11px">${fmtDate(v.created_at)}</span></span></div>`).join('')}</div>`;
       const issue = modal ? '' : `<div class="card card-pad" style="border-color:color-mix(in srgb,var(--accent) 30%,transparent)"><h3 style="margin-bottom:6px">Сообщить о проблеме</h3>
         <p class="small muted" style="margin-bottom:10px">Что-то работает не так или есть идея? Напишите парой строк — мы получим сообщение.</p>
         <div class="field"><input class="input" id="ab-issue" placeholder="Коротко: что случилось или что улучшить"></div>
@@ -7661,18 +7663,23 @@ function initPWA(){
       S.changelog.push({ id:'v0', version:'0.1-prototype', title:'Прототип Audiowizard Workspace',
         content:'Первая версия приложения', created_at: Date.now()-3600000*24*20, is_published:true });
     }
-    const cur = S.changelog[0];
-    /* Если текущая версия продукта = версия записи-прототипа (v0) — не дублируем:
-       патчноут про прототип остаётся единственной записью. */
-    const isProtoCurrent = p.version === '0.1-prototype';
-    if (isProtoCurrent){
-      S.changelog = S.changelog.filter(v => v.id !== 'cur');
-      return;
-    }
-    if (cur && cur.version === p.version && cur.title === (p.notes && p.notes.length ? p.notes[0] : '')) return;
+    /* Свежая запись есть всегда и описывает текущую сборку: раньше при
+       версии-прототипе её удаляли, и последний патчноут пропадал из истории. */
+    const proto = S.changelog.find(v => v.id === 'v0');
+    const notes = (p.notes || []).map(n => String(n).trim()).filter(Boolean);
+    const build = p.build || BUILD_NUM;
+    /* Первая строка патчноутов — заголовок записи, остальные — её текст.
+       Иначе заголовок дублировался первой же строкой в описании. */
+    const ownTitle = !!(notes[0] && notes[0] !== (proto && proto.title));
+    const title = ownTitle ? notes[0] : `Сборка ${build}`;
+    const body = notes.slice(1).join('\n');
+    const content = ownTitle ? body : (body || 'Актуальная сборка приложения.');
+    const prev = S.changelog.find(v => v.id === 'cur');
+    /* Ничего не изменилось — не трогаем запись, чтобы не сдвигать её дату */
+    if (prev && prev.version === p.version && prev.title === title && prev.content === content) return;
+    S.changelog = S.changelog.filter(v => v.id !== 'cur');
     S.changelog.unshift({
-      id:'cur', version: p.version, title: (p.notes && p.notes.length ? p.notes[0] : 'Текущая версия'),
-      content: (p.notes || []).join('\n') || 'Актуальная сборка приложения.',
+      id:'cur', version: p.version, title, content,
       created_at: Date.now(), is_published:true
     });
   }
