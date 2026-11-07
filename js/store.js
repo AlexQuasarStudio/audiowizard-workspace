@@ -337,6 +337,9 @@ const audit = getDemoAudit();
          Разница (итого − исполнители − админ − менеджер) показывается как
          свободный остаток; отрицательная — предупреждение о превышении. */
       finance:{ adminMargin:25, managerFee:10, executorShare:40, payoutCommission:5 },
+      /* Платёжный провайдер не захардкожен: имя, комиссия и включённость
+         берутся отсюда, чтобы смена/отключение провайдера не требовали правок кода. */
+      integrations:{ payout:{ key:'smartcat', name:'Smartcat', commission:5, enabled:true, perUser:true } },
       /* Выплаты исполнителям: 1-е и 15-е число в 15:00 МСК, полуинтервалы
          [1;14] и [15;последнее число]. Полностью настраивается. */
       payout:{ enabled:true, auto:true, days:[1,15], time:'15:00', tz:'Europe/Moscow', lastRunAt:null, history:[] },
@@ -369,6 +372,7 @@ const SEED_DEMO_RE = /^(u-(manager|top|ex\d+|cl\d+)|(o|ch|m\d|n\d|nf\d|i\d|t\d|p
 function migrateFinance(){
   if (!S.settings) S.settings = {};
   S.settings.finance = Object.assign({ adminMargin:25, managerFee:10, executorShare:40, payoutCommission:5 }, S.settings.finance || {});
+  S.settings.integrations = Object.assign({ payout:{ key:'smartcat', name:'Smartcat', commission:5, enabled:true, perUser:true } }, S.settings.integrations || {});
   S.settings.payout = Object.assign({ enabled:true, auto:true, days:[1,15], time:'15:00', tz:'Europe/Moscow', lastRunAt:null, history:[] }, S.settings.payout || {});
   if (!Array.isArray(S.settings.payout.days) || !S.settings.payout.days.length) S.settings.payout.days = [1,15];
   (S.users || []).forEach(u => {

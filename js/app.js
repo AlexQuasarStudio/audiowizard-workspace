@@ -5863,17 +5863,20 @@ const cm = root.querySelector('.chat-main');
   /* Телефон: настройки — список разделов, выбранный открывается экраном с «Назад» */
   const isMobileSettings = () => !!(window.matchMedia && window.matchMedia('(max-width: 860px)').matches);
 
-  /* ---------- Выплаты и Smartcat ---------- */
+  /* ---------- Выплаты и платёжные провайдеры ---------- */
   function scStateBadge(st){
     const map = { approved:['badge--ok','Подтверждён'], pending:['badge--warn','Ждёт подтверждения'], rejected:['badge--err','Отклонён'], none:['badge--outline','Не привязан'] };
     const [cls,label] = map[st] || map.none;
     return `<span class="badge ${cls}">${label}</span>`;
   }
+  function payoutProvider(){ return Object.assign({ key:'smartcat', name:'Smartcat', commission:5, enabled:true }, ((S.settings.integrations||{}).payout||{})); }
   function payoutsHTML(){
     const u = me();
     const staff = ['admin','top_manager','manager'].includes(u.role);
     const p = Finance.payoutCfg();
     const cfg = Finance.cfg();
+    const prov = payoutProvider();
+    const provName = esc(prov.name || 'Smartcat');
     const pend = Finance.pending();
     const myId = u.id;
     const rows = Object.entries(pend.byUser).map(([uid, amount]) => {
@@ -5881,7 +5884,7 @@ const cm = root.querySelector('.chat-main');
       const sc = Finance.scOf(uid);
       return `<div class="row row--between" style="padding:6px 0;border-bottom:1px solid var(--border)">
         <span class="small"><b>${esc(usr.full_name)}</b> · ${esc(usr.role==='executor'?'исполнитель':usr.role==='manager'||usr.role==='top_manager'?'менеджер':'админ')}
-          <span class="faint">${sc.status==='approved'?'· Smartcat '+esc(sc.login||'—'):'· Smartcat не привязан'}</span></span>
+          <span class="faint">${sc.status==='approved'?'· '+provName+' '+esc(sc.login||'—'):'· '+provName+' не привязан'}</span></span>
         <b class="small" style="white-space:nowrap">${fmtMoney(amount)}</b>
       </div>`;
     }).join('') || '<p class="small faint">В текущем периоде долгов нет.</p>';
@@ -5891,7 +5894,7 @@ const cm = root.querySelector('.chat-main');
       return `<div class="row row--between" style="padding:5px 0"><span class="small">${esc(o.order_id)} · ${esc(names)}</span><b class="small">${fmtMoney(d.total)}</b></div>`;
     }).join('') || '<p class="small faint">Нет выполненных заказов с неоплаченными долями.</p>';
 
-    const scRows = (S.users||[]).filter(x => x.ext && ['executor','manager','top_manager'].includes(x.role)).map(x => {
+    const scRows = (S.users||[]).filter(x => x.ext && ['executor','manager','top_manager'].includes(x.role) && (staff || x.id===myId)).map(x => {
       const sc = Finance.scOf(x.id);
       return `<div class="row row--between" style="padding:6px 0;border-bottom:1px solid var(--border);gap:8px">
         <span class="small" style="min-width:0">${esc(x.full_name)} ${scStateBadge(sc.status)}<br><span class="faint">${esc(sc.login||'логин не указан')}</span></span>
@@ -5924,7 +5927,7 @@ const cm = root.querySelector('.chat-main');
       <div class="cols-2 grid" style="gap:12px">
         <div class="field"><label>Дни месяца</label><input class="input" id="po-days" value="${p.days.join(', ')}" placeholder="1, 15"></div>
         <div class="field"><label>Время (МСК)</label><input class="input" id="po-time" type="time" value="${esc(p.time)}"></div>
-        <div class="field"><label>Комиссия Smartcat, % (индивидуально)</label><input class="input" id="po-comm" type="number" min="0" max="50" step="0.5" value="${cfg.commission}"></div>
+        <div class="field"><label>Комиссия ${provName}, % (индивидуально)</label><input class="input" id="po-comm" type="number" min="0" max="50" step="0.5" value="${cfg.commission}"></div>
         <div class="field"><label>Маржа админа, %</label><input class="input" id="po-admin" type="number" min="0" max="100" step="1" value="${cfg.adminMargin}"></div>
         <div class="field"><label>Доля менеджера, %</label><input class="input" id="po-mgr" type="number" min="0" max="100" step="1" value="${cfg.managerFee}"></div>
         <div class="field"><label>Автоматически</label><label class="row small" style="gap:8px;padding-top:9px"><input type="checkbox" id="po-auto" ${p.auto?'checked':''}> по расписанию</label>
@@ -5933,7 +5936,7 @@ const cm = root.querySelector('.chat-main');
       <div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap">
         <button class="btn btn--primary btn--sm" id="po-save">Сохранить расписание</button>
         <button class="btn btn--soft btn--sm" id="po-run">Выплатить сейчас</button>
-        <button class="btn btn--ghost btn--sm" id="po-export">Экспорт для Smartcat</button>
+        <button class="btn btn--ghost btn--sm" id="po-export">Экспорт для ${provName}</button>
       </div>
     </div>`:''}
 
@@ -5943,12 +5946,12 @@ const cm = root.querySelector('.chat-main');
       <div class="row row--between" style="margin-bottom:10px"><span class="small faint">Комиссия ${cfg.commission}% / на руки</span><b class="small">${fmtMoney(pend.commission)} / ${fmtMoney(pend.net)}</b></div>
       ${staff?rows:''}
       ${staff?`<h4 class="small" style="margin:12px 0 4px">Заказы периода</h4>${list}`:''}
-      ${!staff?`<p class="small">Ваш долг по выполненным заказам: <b>${fmtMoney(myDebt)}</b></p><p class="small faint">Выплата приходит на привязанный аккаунт Smartcat или вне системы — по договорённости с менеджером. Комиссия Smartcat — ${cfg.commission}% (индивидуальна для аккаунта).</p>`:''}
-      <p class="small faint" style="margin-top:8px">Комиссия Smartcat — ${cfg.commission}% (индивидуальна для аккаунта). Сумма к зачислению = долг − комиссия.</p>
+      ${!staff?`<p class="small">Ваш долг по выполненным заказам: <b>${fmtMoney(myDebt)}</b></p><p class="small faint">Выплата приходит на привязанный аккаунт ${provName} или вне системы — по договорённости с менеджером. Комиссия ${provName} — ${cfg.commission}% (индивидуальна для аккаунта).</p>`:''}
+      <p class="small faint" style="margin-top:8px">Комиссия ${provName} — ${cfg.commission}% (индивидуальна для аккаунта). Сумма к зачислению = долг − комиссия.</p>
     </div>
 
     <div class="card card-pad">
-      <h3 style="margin-bottom:8px">Smartcat</h3>
+      <h3 style="margin-bottom:8px">${provName}</h3>
       <p class="small faint">Аккаунт прикрепляет админ или менеджер, либо исполнитель сам — с подтверждением менеджера или админа.</p>
       ${scRows}
     </div>`;
@@ -5978,7 +5981,7 @@ const cm = root.querySelector('.chat-main');
       if (!pend.orders.length){ toast('В этом периоде нет неоплаченных выполненных заказов','info'); return; }
       const ok = await confirmModal({
         title:'Выплатить сейчас?', okText:'Выплатить '+fmtMoney(pend.total),
-        text:`Будет закрыто ${pend.orders.length} заказов. Исполнителям и менеджерам — ${fmtMoney(pend.total)}, комиссия Smartcat ${cfgCom()}% (индивидуальна): ${fmtMoney(pend.commission)}. На руки — ${fmtMoney(pend.net)}.`,
+        text:`Будет закрыто ${pend.orders.length} заказов. Исполнителям и менеджерам — ${fmtMoney(pend.total)}, комиссия ${provName} ${cfgCom()}% (индивидуальна): ${fmtMoney(pend.commission)}. На руки — ${fmtMoney(pend.net)}.`,
         checkbox:'Проверил суммы и получателей'
       });
       if (!ok) return;
@@ -5998,12 +6001,12 @@ const cm = root.querySelector('.chat-main');
       a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
       a.download='smartcat-payout-'+new Date().toISOString().slice(0,10)+'.json'; a.click();
     };
-    el.querySelectorAll('[data-sc-ok]').forEach(b=>b.onclick=()=>{ Finance.approveSmartcat(b.dataset.scOk); toast('Аккаунт Smartcat подтверждён','ok'); APP.render(); });
+    el.querySelectorAll('[data-sc-ok]').forEach(b=>b.onclick=()=>{ Finance.approveSmartcat(b.dataset.scOk); toast('Аккаунт подтверждён','ok'); APP.render(); });
     el.querySelectorAll('[data-sc-no]').forEach(b=>b.onclick=()=>{ Finance.rejectSmartcat(b.dataset.scNo); toast('Запрос отклонён','warn'); APP.render(); });
     el.querySelectorAll('[data-sc-req]').forEach(b=>b.onclick=()=>{
       const uid=b.dataset.scReq; const usr=userById(uid); if(!usr) return;
       const cur=Finance.scOf(uid);
-      const login = prompt('Логин в Smartcat', cur.login||'');
+      const login = prompt('Логин в '+(payoutProvider().name||'платёжном сервисе'), cur.login||'');
       if (!login) return;
       Finance.requestSmartcat(uid, login);
       toast('Запрос на привязку отправлен на подтверждение','ok'); APP.render();
@@ -6019,7 +6022,7 @@ const cm = root.querySelector('.chat-main');
       ['reminders','Напоминания','clock'],
       ['security','Безопасность','shield'], ['keys','Горячие клавиши','terminal'],
       ['docs','Справка и документы','file'], ['about','О приложении','info'],
-      ...(['admin','top_manager','manager','executor'].includes(u.role)?[['payouts','Выплаты и Smartcat','card']]:[]),
+      ...(['admin','top_manager','manager','executor'].includes(u.role)?[['payouts','Выплаты и оплата','card']]:[]),
       ...(u.role==='admin'?[['calc','Калькулятор и услуги','calc']]:[]),
       ...(u.role==='admin'?[['tech','Технические работы','alert']]:[]),
       ...(u.role==='admin'?[['product','Демо-режим и версии','flag'],['data','Данные и бекапы','db']]:[])
