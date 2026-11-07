@@ -506,6 +506,25 @@ const CRM = (() => {
     /* Долг по заказу — маленький маркер у суммы вместо отдельной колонки.
        Показывается только там, где есть неоплаченные доли исполнителей
        или менеджера по выполненному заказу. */
+    /* Сводка долгов для админа: общая сумма и разбивка по ролям —
+       считается из выполненных заказов с неоплаченными долями. */
+    function debtSummaryHTML(){
+      if (!window.Finance) return '';
+      let exec = 0, mgr = 0, orders = 0;
+      (S.orders||[]).forEach(o => {
+        const d = Finance.debts(o);
+        if (!d.total) return;
+        orders++;
+        exec += d.exec; mgr += d.manager;
+      });
+      if (!orders) return '';
+      return `<div class="small" id="o-debt-sum" style="margin:2px 0 8px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+        <b>Долг всего: ${fmtMoney(exec + mgr)}</b>
+        <span class="faint">исполнителям — <b>${fmtMoney(exec)}</b></span>
+        <span class="faint">менеджерам — <b>${fmtMoney(mgr)}</b></span>
+        <span class="faint">заказов: ${orders}</span>
+      </div>`;
+    }
     function debtMark(o){
       if (!window.Finance) return '';
       const d = Finance.debts(o);
@@ -605,6 +624,7 @@ const CRM = (() => {
             <span class="chip chip--debt ${ofilter.debt?'on':''}" id="f-debt" title="Выполненные заказы с неоплаченными долями">${icon('card','ico-sm')} Долги</span>
           </div>
         </div>
+        ${staff?debtSummaryHTML():''}
         <div class="tbl-wrap o-wrap ${cardsView?'o-wrap--cards':''}" style="border-radius:var(--r-lg)">
           <div id="o-rows"></div>
           <button class="o-to-top" type="button" hidden aria-label="Наверх">${icon('chev-d')}</button>
