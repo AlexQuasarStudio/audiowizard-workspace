@@ -61,8 +61,10 @@ p{margin:0 0 10px}
 [data-theme="dark-mono"] .msg--own .msg__bubble .react-pill.on{background:rgba(255,255,255,.22);border-color:#f0ede8}
 [data-theme="dark-mono"] .msg--own .msg__bubble .poll,[data-theme="dark-mono"] .msg--own .msg__bubble .poll__opt{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16)}
 [data-theme="dark-mono"] .vn__play{background:#3b3733;color:#f0ede8}
-/* Светлая монохромная: свой пузырь делаем плотным тёмным — серый «микс»
-   давал слабый контраст с текстом.
+/* Светлая монохромная: свой пузырь — плотный тёмно-серый, но не чёрный:
+   чёрная подложка перетягивала внимание на себя в светлой ленте. Серый
+   «микс» темы давал слабый контраст с текстом, поэтому берём собственный
+   тёмно-серый градиент и светлый текст.
    Внутри такого пузыря НЕЛЬЗЯ пользоваться обычными токенами темы (акцент
    #14181f, text-2, faint — все тёмные и на тёмном фоне исчезают). Поэтому
    задаём локальную палитру «светлое на тёмном» и перекрываем ею все элементы
@@ -74,8 +76,8 @@ p{margin:0 0 10px}
   --own-soft:rgba(255,255,255,.10);
   --own-soft-2:rgba(255,255,255,.16);
   --own-line:rgba(255,255,255,.20);
-  background:linear-gradient(135deg,#2b3038 0%,#14181f 100%);
-  border-color:#14181f;color:var(--own-ink)
+  background:linear-gradient(135deg,#474a50 0%,#383b41 100%);
+  border-color:#3f4248;color:var(--own-ink)
 }
 [data-theme="light-mono"] .msg--own .msg__bubble .txt{color:var(--own-ink)}
 [data-theme="light-mono"] .msg--own .msg__bubble .time{color:var(--own-ink-2)}
