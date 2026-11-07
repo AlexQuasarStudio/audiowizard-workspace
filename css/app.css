@@ -1651,9 +1651,8 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
    логотип в шапке открывает её поверх страницы. */
 .about-section{display:flex;align-items:center;gap:16px}
 .about-section__logo{border:0;background:none;padding:0;margin:0;display:inline-flex;flex:none;cursor:pointer;border-radius:18px;outline:none}
-.about-section__logo .side__brand-logo{transition:box-shadow .16s var(--ease),transform .16s var(--ease)}
-.about-section__logo:hover .side__brand-logo,.about-section__logo:focus-visible .side__brand-logo{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent);transform:translateY(-1px)}
-.about-section__logo:active .side__brand-logo{transform:scale(.97)}
+.about-section__logo .side__brand-logo{transition:none}
+.about-section__logo:focus-visible .side__brand-logo{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
 .about-section__txt{min-width:0}
 @media (max-width:560px){.about-section{align-items:flex-start}}
 
@@ -1896,11 +1895,10 @@ html.splash-hold #splash{visibility:hidden}
 .msg__pin-ico .ico,.msg__poll-ico .ico{width:13px;height:13px}
 .msg__replies{display:inline-flex;align-items:center;gap:2px;margin-right:5px;background:none;border:none;color:var(--accent);font:inherit;font-size:10.5px;font-weight:700;cursor:pointer;vertical-align:middle}
 .msg__replies .ico{width:12px;height:12px}
-/* Реакции живут в одной строке с временем, галочками и счётчиком ответов.
-   Прокрутки нет: пузырь расширяется под пилюли, а если места не хватает
-   даже на максимальной ширине — пилюли переносятся, время с галочками
-   остаётся последним (правый нижний угол). */
-.msg__reactions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;min-width:0;max-width:100%;overflow:visible}
+/* Реакции — отдельной строкой и прижаты к левому краю пузыря (как в
+   референсе). Ниже идёт строка времени с галочками и счётчиком ответов,
+   прижатая вправо. Прокрутки нет: пилюли переносятся. */
+.msg__reactions{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:4px;margin-top:5px;min-width:0;max-width:100%;overflow:visible}
 .msg__reactions .react-pill{flex:none}
 
 /* --- Кнопка быстрой реакции 👍 --- */

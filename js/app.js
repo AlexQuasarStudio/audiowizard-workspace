@@ -826,31 +826,37 @@ const QUICK_BY_ROLE = {
   }
 
   function aboutWindowHTML(opts){
-      const logoBtn = !!(opts && opts.logoButton);
-      return `<div class="card card-pad row" style="gap:16px">
-        ${logoBtn
-          ? `<button type="button" class="about-section__logo" id="ab-open" title="Открыть «О приложении»" aria-label="Открыть «О приложении»"><span class="side__brand-logo logo-mark--lg">${icon('logo-full')}</span></button>`
-          : `<span class="side__brand-logo logo-mark--lg">${icon('logo-full')}</span>`}
-        <div><b style="font-size:16px">Audiowizard Workspace</b><div class="small muted">Версия ${esc((S.product||{}).version || '0.1-prototype')} · сборка ${(S.product||{}).build || 216} ${((S.product||{}).beta !== false)?'<span class="beta-badge">Beta</span>':''}</div></div>
-        <span class="spacer"></span><button class="btn btn--soft btn--sm" id="ab-tour">${icon('bulb')} Пройти тур</button><button class="btn btn--soft btn--sm" id="ab-check">${icon('refresh')} Проверить обновления</button></div>
-      ${isStaff((me() || {}).role) ? serverStateHtml() : ''}
-      <div class="card card-pad"><h3 style="margin-bottom:12px">Модели развертывания</h3>
+      const o = opts || {};
+      const logoBtn = !!o.logoButton;
+      /* Компактная модалка (по клику на лого): только шапка и серверы.
+         История версий, модели развертывания и лишние кнопки остаются
+         в полном разделе настроек. */
+      const modal = !!o.modal;
+      const models = modal ? '' : `<div class="card card-pad"><h3 style="margin-bottom:12px">Модели развертывания</h3>
         <div class="cols-2 grid">
           <div class="card card-pad" style="background:var(--bg-2)"><div class="row">${icon('cloud')}<b>On-Demand (SaaS)</b><span class="badge c-green">активна</span></div>
             <p class="small muted" style="margin-top:8px">Облачная модель: только браузер и интернет. AI-сервисы по подписке.</p></div>
           <div class="card card-pad" style="background:var(--bg-2)"><div class="row">${icon('server')}<b>On-Premise</b><span class="badge c-gray">в разработке</span></div>
             <p class="small muted" style="margin-top:8px">Локальное развертывание в контуре клиента: Docker, лицензия, защищённый репозиторий обновлений.</p></div>
-        </div></div>
-      <div class="card card-pad"><h3 style="margin-bottom:6px">История обновлений</h3>
+        </div></div>`;
+      const history = modal ? '' : `<div class="card card-pad"><h3 style="margin-bottom:6px">История обновлений</h3>
         ${S.changelog.filter(v => !isProd() ? true : (v.id==='v0' || v.id==='cur' || !v.demo))
           .sort((a,b)=> (a.id==='v0' ? -1 : b.id==='v0' ? 1 : (b.created_at||0)-(a.created_at||0)))
           .map(v=>`<div class="ver-item"><span class="ver-badge">v${esc(v.version)}</span>
-          <span><b class="small">${esc(v.title)}</b>${v.content?`<p class="small muted" style="margin-top:3px">${esc(v.content)}</p>`:''}<span class="faint" style="font-size:11px">${fmtDate(v.created_at)}</span></span></div>`).join('')}</div>
-      <div class="card card-pad" style="border-color:color-mix(in srgb,var(--accent) 30%,transparent)"><h3 style="margin-bottom:6px">Сообщить о проблеме</h3>
+          <span><b class="small">${esc(v.title)}</b>${v.content?`<p class="small muted" style="margin-top:3px">${esc(v.content)}</p>`:''}<span class="faint" style="font-size:11px">${fmtDate(v.created_at)}</span></span></div>`).join('')}</div>`;
+      const issue = modal ? '' : `<div class="card card-pad" style="border-color:color-mix(in srgb,var(--accent) 30%,transparent)"><h3 style="margin-bottom:6px">Сообщить о проблеме</h3>
         <p class="small muted" style="margin-bottom:10px">Что-то работает не так или есть идея? Напишите парой строк — мы получим сообщение.</p>
         <div class="field"><input class="input" id="ab-issue" placeholder="Коротко: что случилось или что улучшить"></div>
         <div class="field" style="margin-top:8px"><textarea class="input" id="ab-issue-detail" rows="2" placeholder="Подробности (необязательно)"></textarea></div>
         <div class="row" style="gap:8px;margin-top:8px"><button class="btn btn--primary btn--sm" id="ab-issue-send">${icon('send')} Отправить</button><span class="small faint" id="ab-issue-msg"></span></div></div>`;
+      return `<div class="card card-pad row" style="gap:16px">
+        ${logoBtn
+          ? `<button type="button" class="about-section__logo" id="ab-open" title="Открыть «О приложении»" aria-label="Открыть «О приложении»"><span class="side__brand-logo logo-mark--lg">${icon('logo-full')}</span></button>`
+          : `<span class="side__brand-logo logo-mark--lg">${icon('logo-full')}</span>`}
+        <div><b style="font-size:16px">Audiowizard Workspace</b><div class="small muted">Версия ${esc((S.product||{}).version || '0.1-prototype')} · сборка ${(S.product||{}).build || 216} ${((S.product||{}).beta !== false)?'<span class="beta-badge">Beta</span>':''}</div></div>
+        ${modal ? '' : `<span class="spacer"></span><button class="btn btn--soft btn--sm" id="ab-tour">${icon('bulb')} Пройти тур</button><button class="btn btn--soft btn--sm" id="ab-check">${icon('refresh')} Проверить обновления</button>`}</div>
+      ${isStaff((me() || {}).role) ? serverStateHtml() : ''}
+      ${models}${history}${issue}`;
     }
 
   /* Раздел настроек — тот же состав, что и в окне «О приложении»:
@@ -869,7 +875,7 @@ const QUICK_BY_ROLE = {
        а не плавающее окно оконного менеджера. */
     aboutWin = openModal({
       title:'О приложении', wide:true,
-      body:`<div class="stack about-body" id="about-win">${aboutWindowHTML()}</div>`,
+      body:`<div class="stack about-body" id="about-win">${aboutWindowHTML({ modal:true })}</div>`,
       onMount:(el)=>{ bindAboutWindow(el, me() || {}); },
       onClose:()=>{ aboutWin = null; }
     });
@@ -3227,7 +3233,8 @@ ex.innerHTML = avatarHTML(user(), '');
               ${fileHtml}
               ${artifactHtml}
               ${pollHtml}
-              <div class="msg__foot">${reactions?`<div class="msg__reactions">${reactions}</div>`:''}<span class="time">${repliesBtn}${m.edited?`<span class="msg__edited" title="Изменено ${fmtDT(m.editedAt||m.created_at)}">изменено</span>`:''}${fmtTime(m.created_at)}${own?`<span class="ticks" title="${(m.readBy||[]).length?('Прочитано'):'Доставлено, ещё не прочитано'}"><span class="ticks__ic ${(m.readBy||[]).length>0?'on':''}">${(m.readBy||[]).length>0?icon('checks','ico-sm'):icon('check','ico-sm')}</span></span>`:''}</span></div>
+              ${reactions?`<div class="msg__reactions">${reactions}</div>`:''}
+              <div class="msg__foot"><span class="time">${repliesBtn}${m.edited?`<span class="msg__edited" title="Изменено ${fmtDT(m.editedAt||m.created_at)}">изменено</span>`:''}${fmtTime(m.created_at)}${own?`<span class="ticks" title="${(m.readBy||[]).length?('Прочитано'):'Доставлено, ещё не прочитано'}"><span class="ticks__ic ${(m.readBy||[]).length>0?'on':''}">${(m.readBy||[]).length>0?icon('checks','ico-sm'):icon('check','ico-sm')}</span></span>`:''}</span></div>
             </div>
           </div>`
         };
