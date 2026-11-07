@@ -3032,14 +3032,28 @@ ex.innerHTML = avatarHTML(user(), '');
       if (ch.client_id) return [ch.client_id];
       return [...new Set(S.messages.filter(mm=>mm.chat_id===ch.id && mm.user_id).map(mm=>mm.user_id))];
     };
-    /* Уведомление упомянутому ЕГОроду: даже при выключенных уведомлениях чата */
-    const notifyMentioned = (uidv, whoName, chatName, msgText) => {
+    /* Уведомление адресату упоминания или ответа на его сообщение — даже при
+       выключенных уведомлениях чата. Ответ на своё сообщение = такой же пинг:
+       в колокольчике, в списке чатов (метка «@») и в счётчике непрочитанных.
+       Отметку непрочитанного ставим строго ДО сообщения (created_at − 1):
+       если поставить «сейчас», только что пришедший ответ окажется раньше
+       отметки и пинг не появится в списке. */
+    const notifyMentioned = (uidv, whoName, chatName, msgText, opts) => {
       const tu = userById(uidv);
       if (!tu) return;
-      pushNotifTo(tu, 'Вас упомянули в «'+chatName+'»', whoName + ': ' + String(msgText||'').slice(0,90), 'i-chats');
-      /* Непрочитанное в самом чате для упомянутого — даже если чат замьючен */
-      const ch = S.chats.find(x=>x.id===curChat);
-      if (ch){ ch.unread = ch.unread || {}; ch.unread[uidv] = ch.unread[uidv] || Date.now(); }
+      const o = opts || {};
+      const at = Number(o.at) || Date.now();
+      const isReply = o.kind === 'reply';
+      pushNotifTo(tu, (isReply ? 'Ответ на ваше сообщение в «' : 'Вас упомянули в «') + chatName + '»',
+        whoName + ': ' + String(msgText||'').slice(0,90), 'i-chats');
+      /* Непрочитанное в самом чате для адресата — даже если чат замьючен */
+      const ch = (o.chat_id && S.chats.find(x=>x.id===o.chat_id)) || S.chats.find(x=>x.id===curChat);
+      if (ch){
+        ch.unread = ch.unread || {};
+        const prev = Number(ch.unread[uidv]) || 0;
+        const mark = Math.max(0, at - 1);
+        ch.unread[uidv] = prev > 0 ? Math.min(prev, mark) : mark;
+      }
       try { saveState(); } catch(e){}
     };
 
@@ -3614,6 +3628,12 @@ const cm = root.querySelector('.chat-main');
       /* При открытии чата сразу гасим даты потока (видна лишь закреплённая). */
       setTimeout(() => { try { updateDaySep(box); } catch(e){} }, 0);
       (c.unread = c.unread||{})[u.id] = Date.now(); saveState();
+      /* Открыли чат — пинг прочитан: сразу гасим «@» и счётчик в списке,
+         не дожидаясь полной перерисовки страницы. */
+      {
+        const li = root.querySelector('.chat-item[data-ch="' + c.id + '"]');
+        if (li) li.querySelectorAll('.chat-item__at, .chat-item__unread').forEach(n => n.remove());
+      }
 
       /* Панель выражений (как у ТГ): вкладки «Смайлы» и «Опрос» */
       const EMOJI_SET = ['😀','😂','😍','👍','👏','🙌','🔥','❤️','😮','😢','🎉','☕','✅','⚠️','💡','🤝','🎧','📝','⏰','🚀','💯','🤔','😅','🫡'];
@@ -4220,18 +4240,27 @@ const cm = root.querySelector('.chat-main');
           });
         }
         const msgObj = { id:uid(), chat_id:c.id, user_id:u.id, text:clean, type:'text', created_at:Date.now(), reactions:{}, reply_to:replyTarget || undefined, reply_text: replyTextFrag || undefined, deliveredTo: deliverTo };
-        /* Ответ на сообщение = упоминание автора исходника (как ТГ) */
+        /* Ответ на сообщение = пинг его автора (как ответ в ТГ), а не только упоминание */
+        let replyAuthorId = null;
         if (replyTarget){
           const src = S.messages.find(x=>x.id===replyTarget);
-          if (src && src.user_id && src.user_id !== u.id && !mentionIds.includes(src.user_id)) mentionIds.push(src.user_id);
+          if (src && src.user_id && src.user_id !== u.id){
+            replyAuthorId = src.user_id;
+            if (!mentionIds.includes(src.user_id)) mentionIds.push(src.user_id);
+          }
         }
         if (mentionIds.length) msgObj.mentions = mentionIds;
         S.messages.push(msgObj);
-        /* Уведомления упомянутым: в колокольчик + непрочитанное чата, не зависимо от мьюта */
+        /* Уведомления упомянутым и автору исходника: в колокольчик + непрочитанное чата,
+           независимо от мьюта. Автору ответа — отдельный текст уведомления. */
         if (mentionIds.length){
           mentionIds.forEach(uid2=>{
             const tu2 = userById(uid2);
-            if (tu2 && uid2 !== u.id) notifyMentioned(uid2, u.full_name, c.name || 'чат', clean);
+            if (tu2 && uid2 !== u.id) notifyMentioned(uid2, u.full_name, c.name || 'чат', clean, {
+              kind: uid2 === replyAuthorId ? 'reply' : 'mention',
+              at: msgObj.created_at,
+              chat_id: c.id
+            });
           });
         }
         chatReplyTo = null;
@@ -5112,7 +5141,7 @@ const cm = root.querySelector('.chat-main');
           <div class="p">${chatItemPreviewHtml(c)}</div>
         </div>
         ${c.soundOff?`<span class="chat-item__mute" title="Уведомления выключены">${icon('bell','ico-sm')}<svg class="chat-item__mute-slash" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.9 1.9 14.1 14.1"/></svg></span>`:''}
-        ${un.mentioned?`<span class="chat-item__at" title="Вас упомянули">${icon('at-sign','ico-sm')}</span>`:''}
+        ${un.mentioned?`<span class="chat-item__at" title="${un.replyToMe?'Ответ на ваше сообщение':'Вас упомянули'}">${icon('at-sign','ico-sm')}</span>`:''}
         ${un.count?`<span class="chat-item__unread">${un.count}</span>`:(un.dot?`<span class="chat-item__unread chat-item__unread--dot" title="Непрочитанный"></span>`:'')}
       </div>`;
     };

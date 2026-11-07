@@ -728,13 +728,22 @@ function chatUnreadUI(chat, uidv){
   if (lastRead === undefined) return { count: 0 };
   const unread = S.messages.filter(m=>m.chat_id===chat.id && m.created_at>lastRead);
   const otherN = unread.filter(m=>m.user_id!==uidv && m.type!=='system').length;
-  /* Упомянут: в непрочитанном есть сообщение, где я в mentions (включая ответ на моё) */
-  const mentioned = unread.some(m=>m.user_id!==uidv && ((m.mentions||[]).includes(uidv)
-    || (m.reply_to && (()=>{ const s=S.messages.find(x=>x.id===m.reply_to); return s && s.user_id===uidv; })())));
-  if (otherN > 0) return { count: otherN, mentioned };
+  /* Упомянут: в непрочитанном есть сообщение, где я в mentions (включая ответ на моё).
+     replyToMe — пинг именно ответом на моё сообщение (для подсказки в списке). */
+  let mentioned = false, replyToMe = false;
+  unread.some(m=>{
+    if (m.user_id === uidv) return false;
+    if (m.reply_to){
+      const s = S.messages.find(x=>x.id===m.reply_to);
+      if (s && s.user_id === uidv){ mentioned = true; replyToMe = true; return true; }
+    }
+    if ((m.mentions||[]).includes(uidv)){ mentioned = true; return true; }
+    return false;
+  });
+  if (otherN > 0) return { count: otherN, mentioned, replyToMe };
   const anyN = unread.length;
-  if (anyN > 0) return { dot:true, mentioned };
-  return { count: 0, mentioned: false };
+  if (anyN > 0) return { dot:true, mentioned, replyToMe };
+  return { count: 0, mentioned: false, replyToMe: false };
 }
 
 /* Audit + ops queue */
