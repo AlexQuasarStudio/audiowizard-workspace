@@ -5887,13 +5887,25 @@ const cm = root.querySelector('.chat-main');
       }
     };
     const backBtn = root.querySelector('[data-set-back]');
+    /* Телефон: при «Назад» список разделов встаёт туда, где его оставили.
+       scrollIntoView уводил его на самый верх — под липкую шапку, и бургер
+       закрывал первый пункт. */
+    let navScroll = 0;
     if (backBtn) backBtn.onclick = ()=>{
       mobileState(false, true);
-      try { root.querySelector('.settings-nav').scrollIntoView({ block:'start' }); } catch(e){}
+      const nav = root.querySelector('.settings-nav');
+      if (!nav || !isMobileSettings()) return;
+      const headEl = document.querySelector('.head');
+      const headH = headEl ? Math.round(headEl.getBoundingClientRect().height) : 60;
+      /* Ниже этого порога прокручивать нельзя: список окажется под шапкой */
+      const floor = Math.max(0, Math.round(nav.getBoundingClientRect().top + window.scrollY - headH - 10));
+      const y = Math.max(floor, navScroll);
+      try { window.scrollTo({ top: y, behavior:'smooth' }); }
+      catch(e){ window.scrollTo(0, y); }
     };
     $$('[data-sec]', root).forEach(b=>b.onclick=()=>{
       section=b.dataset.sec; settingsSection=section; $$('[data-sec]',root).forEach(x=>x.classList.toggle('on', x===b)); renderSec();
-      if (isMobileSettings()) mobileState(true, true);
+      if (isMobileSettings()){ navScroll = window.scrollY; mobileState(true, true); }
     });
     renderSec();
 

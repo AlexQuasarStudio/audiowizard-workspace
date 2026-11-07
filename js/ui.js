@@ -255,16 +255,26 @@ function openWinModal({ title='', icon='app', body='', footer='', wide=false, na
       try {
         const bodyEl = win.querySelector('.aw-win__body');
         if (!bodyEl) return;
-        const cur = win.getBoundingClientRect().height;
+        /* Геометрию читаем по offsetHeight/style.top, а не по
+           getBoundingClientRect: первые 220 мс играет popIn
+           (translateY(14px) scale(.985)), и rect «меньше» и ниже реального.
+           Из-за этого сохранение центра уводило окно вниз на ~17px. */
+        const targetH = parseFloat(win.style.height);
+        const cur = isFinite(targetH) ? targetH : win.offsetHeight;
+        const curTop = parseFloat(win.style.top) || win.offsetTop || 0;
         const prev = win.style.height;
         /* Меряем естественную высоту: на время замера окно отпускаем в auto,
            иначе flex-тело растянуто и scrollHeight равен текущей высоте. */
         win.style.height = 'auto';
-        const need = Math.ceil(win.getBoundingClientRect().height);
+        const need = Math.ceil(win.offsetHeight);
         const maxH = window.innerHeight - 40;
         if (need > 0 && need < cur - 6 && need <= maxH){
+          const nh = Math.max(200, Math.min(need, maxH));
           win.classList.add('aw-win--animating');
-          win.style.height = Math.max(200, Math.min(need, maxH)) + 'px';
+          win.style.height = nh + 'px';
+          /* Поджали по контенту — возвращаем окно в центр: top считался от
+             прежней высоты, и окно оставалось смещённым вниз. */
+          win.style.top = Math.max(8, Math.round(curTop + (cur - nh) / 2)) + 'px';
           setTimeout(()=>win.classList.remove('aw-win--animating'), 340);
         } else {
           win.style.height = prev;

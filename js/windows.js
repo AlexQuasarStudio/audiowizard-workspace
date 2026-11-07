@@ -1501,9 +1501,11 @@ const Windows = (() => {
     /* Виджеты (произвольные окна) по умолчанию появляются по центру экрана,
        если не заданы явные координаты. */
     if (!(opts && opts.param && typeof opts.param.x === 'number')){
-      const r = win.getBoundingClientRect();
-      win.style.left = Math.max(8, Math.round((window.innerWidth - r.width) / 2)) + 'px';
-      win.style.top = Math.max(8, Math.round((window.innerHeight - r.height) / 2)) + 'px';
+      /* offsetWidth/offsetHeight игнорируют popIn (translateY + scale):
+         по rect окно в момент анимации выглядит меньше и ниже, поэтому
+         центрирование выходило смещённым на несколько пикселей. */
+      win.style.left = Math.max(8, Math.round((window.innerWidth - win.offsetWidth) / 2)) + 'px';
+      win.style.top = Math.max(8, Math.round((window.innerHeight - win.offsetHeight) / 2)) + 'px';
     }
     return win;
   }
