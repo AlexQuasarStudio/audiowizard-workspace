@@ -102,7 +102,8 @@ const CRM = (() => {
     let done = false;
     const finish = (save)=>{
       if (done) return; done = true;
-      const val = inp.value;
+      /* Глобальное правило: дефис/тире вместо значения = пусто */
+      const val = cleanValue(inp.value);
       el.classList.remove('inline-editing');
       el.innerHTML = prev;
       __crmInline = null;
@@ -1583,7 +1584,7 @@ const CRM = (() => {
         }, 5000);
 
         function collect(){
-          return {
+          return cleanRecord({
             order_id:sanitizeOrderId(g('#of-id').value), client_id:g('#of-client').value, client_ids:[...selClients], nish_id:g('#of-niche').value, tariff:g('#of-tariff').value,
             status:g('#of-status').value, deadline:g('#of-deadline').value||null, start:g('#of-start').value||null, total:+g('#of-total').value||0,
             managerFee: Math.max(0, Math.min(100, +g('#of-mgrfee').value || 10)),
@@ -1591,7 +1592,7 @@ const CRM = (() => {
             comment:g('#of-comment').value, project_id:g('#of-project').value, folder_id:g('#of-folder').value,
             proposed:+g('#of-proposed').value||0, forbid:g('#of-forbid').checked,
             executors:form.executors, files:form.files
-          };
+          });
         }
 
         /* закрытие — предложение черновика */
@@ -3709,7 +3710,7 @@ updatePeopleBulk();
         }
         const r = j.r, rowNo = j.rowNo;
         if (j.kind === 'clients'){
-          const fio = get(r,j.map,'fio'), email = get(r,j.map,'email'), phone = get(r,j.map,'phone').replace(/[^\d+]/g,''), comment = collectComments(r,j.map);
+          const fio = cleanValue(get(r,j.map,'fio')), email = cleanValue(get(r,j.map,'email')), phone = cleanValue(get(r,j.map,'phone')).replace(/[^\d+]/g,''), comment = collectComments(r,j.map);
           if (!fio || (!email && !phone)){ logBuf.push([`[${j.sheet}] Строка ${rowNo}: пропущена — нет ФИО или контактов`, 'err']); mark(j,'skipped',1); skipped++; return; }
           if ((email && clientKeys.has('e:' + norm(email))) || (phone && clientKeys.has('p:' + phone))){
             logBuf.push([`[${j.sheet}] Строка ${rowNo}: дубликат (${fio}) — пропущен`, 'warn']); mark(j,'skipped',1); skipped++; return;
@@ -3720,7 +3721,7 @@ updatePeopleBulk();
           S.users.push(nu); _imp.clients[j.rowNo] = nu.id; if (nu.email) clientKeys.add('e:' + norm(nu.email)); if (nu.phone) clientKeys.add('p:' + nu.phone); mark(j,'added',1); added++;
           logBuf.push([`[${j.sheet}] Строка ${rowNo}: + клиент ${fio}`, 'ok']);
         } else if (j.kind === 'executors'){
-          const fio = get(r,j.map,'fio'), email = get(r,j.map,'email'), phone = get(r,j.map,'phone').replace(/[^\d+]/g,''), spec = get(r,j.map,'spec'), comment = collectComments(r,j.map);
+          const fio = cleanValue(get(r,j.map,'fio')), email = cleanValue(get(r,j.map,'email')), phone = cleanValue(get(r,j.map,'phone')).replace(/[^\d+]/g,''), spec = cleanValue(get(r,j.map,'spec')), comment = collectComments(r,j.map);
           const earned = parseMoney(get(r,j.map,'earned'));
           if (!fio || (!email && !phone)){ logBuf.push([`[${j.sheet}] Строка ${rowNo}: пропущена — нет ФИО или контактов`, 'err']); mark(j,'skipped',1); skipped++; return; }
           if ((email && execKeys.has('e:' + norm(email))) || (phone && execKeys.has('p:' + phone))){

@@ -503,6 +503,19 @@ function saveState(){
 }
 
 /* ---------- Хелперы над состоянием ---------- */
+/* Глобальное правило: строка, состоящая только из дефисов/тире (—, –, -, −),
+   считается пустым значением — и при импорте, и при вводе. */
+const DASH_ONLY_RE = /^[\s\-—–−_]+$/;
+function cleanValue(v){
+  if (v == null) return '';
+  const s = String(v).trim();
+  return DASH_ONLY_RE.test(s) ? '' : s;
+}
+function cleanRecord(obj){
+  if (!obj || typeof obj !== 'object') return obj;
+  Object.keys(obj).forEach(k => { if (typeof obj[k] === 'string') obj[k] = cleanValue(obj[k]); });
+  return obj;
+}
 const userById = id => S.users.find(u=>u.id===id);
 const clientById = id => S.users.find(u=>u.id===id && u.role==='client');
 const clientsOf = o => ((o.client_ids && o.client_ids.length ? o.client_ids : [o.client_id]).filter(Boolean)).map(clientById).filter(Boolean);
