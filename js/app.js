@@ -3183,7 +3183,7 @@ ex.innerHTML = avatarHTML(user(), '');
           return { userId:null, own:false, sys:true, daySep:'', html:`<div class="msg-system" data-msg="${m.id}"><span>${esc(m.text)}</span></div>` };
         }
         /* Кнопка-дата: клик скроллит к первому сообщению этого дня */
-        const daySep = day !== lastDay ? `<div class="day-sep" data-ds="${m.id}" title="К первому сообщению этого дня" role="button" tabindex="0"><span>${new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long'}).format(m.created_at)}</span></div>` : '';
+        const daySep = day !== lastDay ? `<div class="day-sep" data-ds="${m.id}"><span role="button" tabindex="0" title="К первому сообщению этого дня">${new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long'}).format(m.created_at)}</span></div>` : '';
         lastDay = day;
         const own = m.user_id === u.id;
         const author = userById(m.user_id);

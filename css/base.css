@@ -43,6 +43,11 @@ p{margin:0 0 10px}
   --dur:.32s; --ease:cubic-bezier(.22,.61,.36,1);
   --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   --check-bg:var(--panel-3); --check-tick:#ffffff; --on-accent:#ffffff;
+  /* Голосовое в своём пузыре: белая кнопка воспроизведения и белая
+     «скорость», светлая волна (как было раньше и как в монотемах). */
+  --own-media-btn:#ffffff; --own-media-ink:#332c3d;
+  --own-media-wave:rgba(255,255,255,.34); --own-media-wave-on:#ffffff;
+  --own-media-chip:#ffffff; --own-media-chip-ink:#332c3d; --own-media-chip-bd:transparent;
 }
 
 /* Тёмные темы */
@@ -77,7 +82,7 @@ p{margin:0 0 10px}
   --own-soft-2:rgba(255,255,255,.16);
   --own-line:rgba(255,255,255,.20);
   background:linear-gradient(135deg,#474a50 0%,#383b41 100%);
-  border-color:#3f4248;color:var(--own-ink)
+  border-color:transparent;color:var(--own-ink)
 }
 [data-theme="light-mono"] .msg--own .msg__bubble .txt{color:var(--own-ink)}
 [data-theme="light-mono"] .msg--own .msg__bubble .time{color:var(--own-ink-2)}
@@ -122,8 +127,8 @@ p{margin:0 0 10px}
 [data-theme="light-mono"] .msg--own .msg__bubble .vn__play{background:var(--own-ink);color:#14181f}
 [data-theme="light-mono"] .msg--own .msg__bubble .vn__wave i{background:rgba(246,244,241,.35)}
 [data-theme="light-mono"] .msg--own .msg__bubble .vn__wave i.on{background:var(--own-ink)}
-[data-theme="light-mono"] .msg--own .msg__bubble .vn__speed{background:var(--own-soft-2);border-color:var(--own-line);color:var(--own-ink)}
-[data-theme="light-mono"] .msg--own .msg__bubble .vn__speed--fast{color:var(--own-ink)}
+[data-theme="light-mono"] .msg--own .msg__bubble .vn__speed{background:#fff;border-color:transparent;color:#14181f}
+[data-theme="light-mono"] .msg--own .msg__bubble .vn__speed--fast{color:#14181f}
 /* Опрос: вопрос, бейджи и варианты — светлые на тёмной подложке */
 [data-theme="light-mono"] .msg--own .msg__bubble .poll>b{color:var(--own-ink)}
 [data-theme="light-mono"] .msg--own .msg__bubble .poll__badge{background:var(--own-soft);border-color:var(--own-line);color:var(--own-ink-2)}
@@ -140,19 +145,26 @@ p{margin:0 0 10px}
    зелёный и серый, иначе статус читается ложно. */
 [data-theme="dark-mono"] .dot--online,[data-theme="light-mono"] .dot--online{background:#26b06a}
 [data-theme="dark-mono"] .dot--offline,[data-theme="light-mono"] .dot--offline{background:#9aa0a8}
-[data-theme="dark-mono"] .msg--own .vn__play{background:#f0ede8;color:#1b1918}
-[data-theme="dark-mono"] .msg--own .vn__wave i{background:rgba(240,237,232,.4)}
-[data-theme="dark-mono"] .msg--own .vn__wave i.on{background:#fcfaf6}
-[data-theme="dark-mono"] .msg--own .vn__time{color:rgba(240,237,232,.8)}
-[data-theme="dark-mono"] .msg--own .vn__speed{background:rgba(255,255,255,.14);color:#f0ede8}
-[data-theme="dark-mono"] .msg--own .vn__speed--fast{color:#fff}
+/* Кнопка, волна и время в монохроме уже светлые (общие правила выше),
+   «скорость» тоже белая — как и в цветных темах. */
+[data-theme="dark-mono"] .msg--own .msg__bubble .vn__speed{background:#fff;border-color:transparent;color:#2b2725}
+[data-theme="dark-mono"] .msg--own .msg__bubble .vn__speed--fast{color:#2b2725}
 
 /* Светлые темы */
-[data-theme="light-violet"]{--bg:#f4f2f6;--bg-2:#ebe7f0;--panel:#ffffff;--panel-2:#f3f0f7;--panel-3:#e7e2ee;--text:#262130;--text-2:#4e4759;--muted:#756d85;--faint:#8a8296;--border:#e3dee9;--border-2:#cfc7d8;--accent:#7a6899;--accent-soft:rgba(122,104,153,.12);--accent-2:#9183b3;--violet:#7a6899;--violet-soft:rgba(122,104,153,.11);--grad-brand:linear-gradient(135deg,#9183b3,#7a6899 55%,#6a5a88);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f;--own-bubble:#DCD6E3;--own-bubble-bd:#DCD6E3;--own-accent:#4F4463}
-[data-theme="light-blue"]{--bg:#f3f4f6;--bg-2:#e9ecf0;--panel:#ffffff;--panel-2:#f1f3f6;--panel-3:#e3e8ee;--text:#1e2430;--text-2:#454e5e;--muted:#6b7484;--faint:#6e7889;--border:#dfe3e9;--border-2:#c9d1db;--accent:#5b7ba6;--accent-soft:rgba(91,123,166,.12);--accent-2:#7e9ac2;--blue:#5b7ba6;--blue-soft:rgba(91,123,166,.12);--grad-brand:linear-gradient(135deg,#7e9ac2,#5b7ba6 55%,#4d6a92);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f;--own-bubble:#D5DCE6;--own-bubble-bd:#D5DCE6;--own-accent:#3B506C}
-[data-theme="light-red"]{--bg:#f6f3ee;--bg-2:#eee9e1;--panel:#fffefb;--panel-2:#f4efe7;--panel-3:#eae2d6;--text:#2b2118;--text-2:#54463a;--muted:#6f6358;--faint:#8f8276;--border:#e7dfd3;--border-2:#d5c9ba;--accent:#b4624e;--accent-soft:rgba(180,98,78,.12);--accent-2:#cd8271;--red:#b4624e;--red-soft:rgba(180,98,78,.12);--grad-brand:linear-gradient(135deg,#cd8271,#b4624e 55%,#9d5442);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f;--own-bubble:#E9D6CE;--own-bubble-bd:#E9D6CE;--own-accent:#754033}
-[data-theme="light-green"]{--bg:#f4f5f0;--bg-2:#eaede3;--panel:#fefefc;--panel-2:#f1f3ea;--panel-3:#e5e9db;--text:#22291f;--text-2:#48523f;--muted:#677059;--faint:#75806a;--border:#e2e6d8;--border-2:#ccd3bc;--accent:#5f7d59;--accent-soft:rgba(95,125,89,.13);--accent-2:#7e9a77;--green:#5f7d59;--green-soft:rgba(95,125,89,.13);--grad-brand:linear-gradient(135deg,#5f7d59,#4f6d49 55%,#44603f);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f;--own-bubble:#D6DDD2;--own-bubble-bd:#D6DDD2;--own-accent:#3E513A}
+[data-theme="light-violet"]{--bg:#f4f2f6;--bg-2:#ebe7f0;--panel:#ffffff;--panel-2:#f3f0f7;--panel-3:#e7e2ee;--text:#262130;--text-2:#4e4759;--muted:#756d85;--faint:#8a8296;--border:#e3dee9;--border-2:#cfc7d8;--accent:#7a6899;--accent-soft:rgba(122,104,153,.12);--accent-2:#9183b3;--violet:#7a6899;--violet-soft:rgba(122,104,153,.11);--grad-brand:linear-gradient(135deg,#9183b3,#7a6899 55%,#6a5a88);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f;--own-bubble:#DCD6E3;--own-bubble-bd:transparent;--own-accent:#7A6899}
+[data-theme="light-blue"]{--bg:#f3f4f6;--bg-2:#e9ecf0;--panel:#ffffff;--panel-2:#f1f3f6;--panel-3:#e3e8ee;--text:#1e2430;--text-2:#454e5e;--muted:#6b7484;--faint:#6e7889;--border:#dfe3e9;--border-2:#c9d1db;--accent:#5b7ba6;--accent-soft:rgba(91,123,166,.12);--accent-2:#7e9ac2;--blue:#5b7ba6;--blue-soft:rgba(91,123,166,.12);--grad-brand:linear-gradient(135deg,#7e9ac2,#5b7ba6 55%,#4d6a92);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f;--own-bubble:#D5DCE6;--own-bubble-bd:transparent;--own-accent:#5B7BA6}
+[data-theme="light-red"]{--bg:#f6f3ee;--bg-2:#eee9e1;--panel:#fffefb;--panel-2:#f4efe7;--panel-3:#eae2d6;--text:#2b2118;--text-2:#54463a;--muted:#6f6358;--faint:#8f8276;--border:#e7dfd3;--border-2:#d5c9ba;--accent:#b4624e;--accent-soft:rgba(180,98,78,.12);--accent-2:#cd8271;--red:#b4624e;--red-soft:rgba(180,98,78,.12);--grad-brand:linear-gradient(135deg,#cd8271,#b4624e 55%,#9d5442);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f;--own-bubble:#E9D6CE;--own-bubble-bd:transparent;--own-accent:#B4624E}
+[data-theme="light-green"]{--bg:#f4f5f0;--bg-2:#eaede3;--panel:#fefefc;--panel-2:#f1f3ea;--panel-3:#e5e9db;--text:#22291f;--text-2:#48523f;--muted:#677059;--faint:#75806a;--border:#e2e6d8;--border-2:#ccd3bc;--accent:#5f7d59;--accent-soft:rgba(95,125,89,.13);--accent-2:#7e9a77;--green:#5f7d59;--green-soft:rgba(95,125,89,.13);--grad-brand:linear-gradient(135deg,#5f7d59,#4f6d49 55%,#44603f);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f;--own-bubble:#D6DDD2;--own-bubble-bd:transparent;--own-accent:#5F7D59}
 [data-theme="light-mono"]{--bg:#f6f4f1;--bg-2:#eeece7;--panel:#fffefb;--panel-2:#f2f0ea;--panel-3:#e8e5dd;--text:#1d1b17;--text-2:#4a463f;--muted:#716c62;--faint:#7c766a;--border:#e6e2d9;--border-2:#d4cfc3;--accent:#14181f;--accent-soft:rgba(20,24,31,.08);--accent-2:#3d434d;--blue:#5f636b;--violet:#3d434d;--green:#5f636b;--red:#3d434d;--yellow:#3d434d;--grad-brand:linear-gradient(135deg,#3d434d,#14181f);--check-bg:#fffefb;--check-tick:#ffffff;--own-bubble:#C9C8C7;--own-bubble-bd:#78797B}
+/* Светлые темы: пузырь пастельный, поэтому белая кнопка остаётся, но иконка,
+   волна и «скорость» — в акценте темы: белое на светлом не читается. */
+[data-theme^="light"]{
+  --own-media-btn:#ffffff; --own-media-ink:var(--accent);
+  --own-media-wave:color-mix(in srgb,var(--own-accent,var(--accent)) 32%,transparent);
+  --own-media-wave-on:var(--own-accent,var(--accent));
+  --own-media-chip:#ffffff; --own-media-chip-ink:var(--accent);
+  --own-media-chip-bd:color-mix(in srgb,var(--accent) 14%,transparent);
+}
 
 /* Монохром: контраст цифр в «кружках» */
 [data-theme="dark-mono"] .chat-item__unread{background:var(--accent);color:#0d0e11}

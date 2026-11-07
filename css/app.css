@@ -740,9 +740,11 @@ body.zen .day-sep.on-scroll{top:0}
 /* Дата в потоке всегда видна и кликабельна: клик ведёт к первому
    сообщению этого дня. «Залипшая» сверху плашка чуть ярче — она же
    и индикатор текущего дня при прокрутке. */
-.day-sep{opacity:1;pointer-events:auto;cursor:pointer}
-.day-sep>span{opacity:.74;transition:opacity .3s var(--ease),border-color .3s var(--ease),box-shadow .3s var(--ease)}
-.day-sep:hover>span{opacity:1}
+/* Кликабельна только сама плашка-«пилюля»: полоса на всю ширину ленты
+   больше не перехватывает клики по сообщениям и пустому месту. */
+.day-sep{opacity:1;pointer-events:none;cursor:default}
+.day-sep>span{pointer-events:auto;cursor:pointer;opacity:.74;transition:opacity .3s var(--ease),border-color .3s var(--ease),box-shadow .3s var(--ease)}
+.day-sep>span:hover{opacity:1}
 .day-sep.on-scroll>span{opacity:1;border-color:color-mix(in srgb,var(--accent) 34%,var(--border-2));box-shadow:var(--sh-2)}
 /* Рассеивание при бездействии: если пользователь не скроллит ~2с,
    «залипшая» сверху дата плавно затухает, освобождая внимание.
@@ -750,6 +752,7 @@ body.zen .day-sep.on-scroll{top:0}
 /* Бездействие: залипшая дата исчезает ПОЛНОСТЬЮ (не «притухает»), а при
    скролле проявляется снова. Даты в потоке .dim не получают — они всегда видны. */
 .day-sep.dim{opacity:0;pointer-events:none}
+.day-sep.dim>span{pointer-events:none}
 .day-sep.dim>span{border-color:transparent;box-shadow:none}
 /* Групповое выделение сообщений (как в ТГ) */
 /* Выделенное сообщение: акцентная обводка (только в режиме выделения) */
@@ -1613,11 +1616,11 @@ body.win-dragging *{user-select:none!important}
 .ticks .ico{width:15px;height:15px;margin-left:1px}
 .ticks,.ticks.on{color:inherit}
 /* Свои сообщения — аккуратный цветовой акцент темы: плотная, но мягкая
-   подложка (акцент ≈46% в тёмных темах и ≈36% в светлых) и более
-   выраженная кайма. Готовые токены --own-bubble / --own-bubble-bd /
-   --own-accent лежат в css/base.css для каждой темы: если браузер не умеет
-   color-mix, пузырь не побелеет, а возьмёт ближайший оттенок темы. */
-.msg--own .msg__bubble{background:var(--own-bubble,color-mix(in srgb,var(--accent) 46%,var(--bg)));border-color:var(--own-bubble-bd,color-mix(in srgb,var(--accent) 70%,var(--bg)));border-radius:16px 16px 4px 16px}
+   подложка и БЕЗ каймы (как на эталонном макете: край читается только по
+   цвету и тени). Токены --own-bubble / --own-accent лежат в css/base.css
+   для каждой темы: если браузер не умеет color-mix, пузырь не побелеет,
+   а возьмёт ближайший оттенок темы. */
+.msg--own .msg__bubble{background:var(--own-bubble,color-mix(in srgb,var(--accent) 46%,var(--bg)));border-color:transparent;border-radius:16px 16px 4px 16px}
 /* Хвост пузыря — в стиле Telegram: отдельный «треугольник» не нужен.
    Угол пузыря у хвоста имеет меньший радиус (4px против 16px) и образует
    аккуратный носик-указатель — ровные края без пикселизации. */
@@ -1879,11 +1882,11 @@ html.splash-hold #splash{visibility:hidden}
 
 /* --- Свои сообщения: аккуратный цветовой акцент темы --- */
 /* Свои сообщения — аккуратный цветовой акцент темы: плотная, но мягкая
-   подложка (акцент ≈46% в тёмных темах и ≈36% в светлых) и более
-   выраженная кайма. Готовые токены --own-bubble / --own-bubble-bd /
-   --own-accent лежат в css/base.css для каждой темы: если браузер не умеет
-   color-mix, пузырь не побелеет, а возьмёт ближайший оттенок темы. */
-.msg--own .msg__bubble{background:var(--own-bubble,color-mix(in srgb,var(--accent) 46%,var(--bg)));border-color:var(--own-bubble-bd,color-mix(in srgb,var(--accent) 70%,var(--bg)));border-radius:16px 16px 4px 16px}
+   подложка и БЕЗ каймы (как на эталонном макете: край читается только по
+   цвету и тени). Токены --own-bubble / --own-accent лежат в css/base.css
+   для каждой темы: если браузер не умеет color-mix, пузырь не побелеет,
+   а возьмёт ближайший оттенок темы. */
+.msg--own .msg__bubble{background:var(--own-bubble,color-mix(in srgb,var(--accent) 46%,var(--bg)));border-color:transparent;border-radius:16px 16px 4px 16px}
 /* Акцентные детали внутри своего пузыря: на плотной подложке обычный
    --accent тонет — берём --own-accent (осветлённый в тёмных темах,
    углублённый в светлых). */
@@ -1900,6 +1903,17 @@ html.splash-hold #splash{visibility:hidden}
 .msg--own .msg__bubble .msg-mention--role{background:color-mix(in srgb,var(--own-accent,var(--accent)) 16%,transparent)}
 .msg--own .msg__bubble .msg-mention:hover{background:color-mix(in srgb,var(--own-accent,var(--accent)) 24%,transparent)}
 .msg--own .msg__bubble .msg__quote{border-left-color:var(--own-accent,var(--accent));background:color-mix(in srgb,var(--own-accent,var(--accent)) 10%,transparent)}
+
+/* Голосовое в СВОЁМ пузыре: белая кнопка воспроизведения, белая «скорость»
+   и светлая волна — как в прежнем дизайне (и как в монотемах). Иконка и
+   проигранная часть волны берут акцент темы, чтобы читаться на белом. */
+.msg--own .msg__bubble .vn__play{background:var(--own-media-btn,#fff);color:var(--own-media-ink,var(--accent));box-shadow:0 1px 3px rgba(0,0,0,.14)}
+.msg--own .msg__bubble .vn__play:hover{filter:none;transform:scale(1.06)}
+.msg--own .msg__bubble .vn__wave i{background:var(--own-media-wave,rgba(255,255,255,.34))}
+.msg--own .msg__bubble .vn__wave i.on{background:var(--own-media-wave-on,#fff)}
+.msg--own .msg__bubble .vn__time{color:color-mix(in srgb,currentColor 72%,transparent)}
+.msg--own .msg__bubble .vn__speed{background:var(--own-media-chip,#fff);border-color:var(--own-media-chip-bd,transparent);color:var(--own-media-chip-ink,var(--accent));border-radius:99px;padding:1px 8px;line-height:14px}
+.msg--own .msg__bubble .vn__speed--fast{color:var(--own-media-chip-ink,var(--accent))}
 
 
 /* --- Вложения в сообщении --- */
