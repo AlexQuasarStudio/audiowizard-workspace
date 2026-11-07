@@ -170,6 +170,50 @@ const Finance = (function(){
     });
     return { cuts: out.sort((a, b) => a - b), cfg: p };
   }
+  /* Ближайшая и последняя точки расписания (реальные cut, без сдвига). */
+  function nextCut(now){ return period(now).rawTo; }
+  function lastCut(now){ return period(now).rawFrom; }
+
+  /* Разовая отмена ближайшей выплаты по расписанию: одна точка, один раз.
+     Не выключает расписание целиком — только пропускает конкретный запуск. */
+  function skipNextPayout(on){
+    const p = payoutCfg();
+    p.skipNext = on ? { at: nextCut(), by: (me() || {}).id || null, madeAt: Date.now() } : null;
+    S.settings.payout = p;
+    saveState();
+    return p.skipNext;
+  }
+  function skipInfo(now){
+    const p = payoutCfg();
+    const s = p.skipNext;
+    if (!s || !s.at) return null;
+    const cut = nextCut(now);
+    /* Отметка протухла — точка уже прошла, отмена израсходована. */
+    if (Math.abs(s.at - cut) > 1000 && s.at < Date.now()){ p.skipNext = null; S.settings.payout = p; saveState(); return null; }
+    return s;
+  }
+
+  /* Планировщик: срабатывает в 15-минутном окне после точки расписания,
+     если выплаты включены и не было разовой отмены. */
+  function autoTick(now){
+    const p = payoutCfg();
+    if (!p.enabled || !p.auto) return null;
+    const t = now || Date.now();
+    const cut = lastCut(t);
+    if (t - cut > 15 * 60000) return null;
+    if (p.lastRunAt && p.lastRunAt >= cut) return null;
+    const s = p.skipNext;
+    if (s && Math.abs(s.at - cut) <= 1000){
+      p.skipNext = null;
+      p.lastRunAt = cut;
+      S.settings.payout = p;
+      saveState();
+      try { logAudit('Разовая отмена выплаты по расписанию: ' + new Date(cut).toLocaleString('ru-RU'), 'Оплата'); } catch(e){}
+      return { skipped:true, cut };
+    }
+    return runPayout({ auto:true, now:t });
+  }
+
   function period(now){
     const { cuts, cfg: p } = cutsAround(now);
     const t = now || Date.now();
@@ -223,6 +267,7 @@ const Finance = (function(){
     });
     const p = payoutCfg();
     p.lastRunAt = Date.now();
+    p.skipNext = null;
     p.history = p.history || [];
     p.history.unshift({
       t: Date.now(), by, manual: !!opts.manual, total: pend.total,
@@ -331,6 +376,7 @@ const Finance = (function(){
   }
 
   return { cfg, split, accrue, debts, hasDebt, payoutCfg, period, fmtPeriod, pending, runPayout,
+    nextCut, lastCut, skipNextPayout, skipInfo, autoTick,
     payoutOrders, excludedIds, isExcluded, setExcluded,
     scOf, scStatusLabel, requestSmartcat, approveSmartcat, rejectSmartcat, smartcatPayload, docsForOrder };
 })();

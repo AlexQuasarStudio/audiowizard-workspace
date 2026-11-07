@@ -5907,6 +5907,9 @@ const cm = root.querySelector('.chat-main');
     const prov = payoutProvider();
     const provName = esc(prov.name || 'Smartcat');
     const pend = Finance.pending();
+    const skip = Finance.skipInfo();
+    const nextCutTs = Finance.nextCut();
+    const fmtCut = ts => new Date(ts).toLocaleString('ru-RU', { day:'numeric', month:'long', hour:'2-digit', minute:'2-digit', timeZone:'Europe/Moscow' }) + ' МСК';
     const myId = u.id;
     const rows = Object.entries(pend.byUser).map(([uid, amount]) => {
       const usr = userById(uid) || { full_name:uid };
@@ -5956,6 +5959,7 @@ const cm = root.querySelector('.chat-main');
         <span class="badge ${p.enabled?'badge--ok':'badge--outline'}">${p.enabled?'Расписание включено':'Расписание выключено'}</span>
         <span class="badge badge--outline">${esc(Finance.fmtPeriod(pend.period))}</span>
       </div>
+      <p class="small" style="margin-top:8px">Ближайшая выплата по расписанию: <b>${fmtCut(nextCutTs)}</b>${skip?` · <span class="badge badge--warn">разово отменена</span>`:''}</p>
     </div>
 
     ${staff?`<div class="card card-pad">
@@ -5971,6 +5975,7 @@ const cm = root.querySelector('.chat-main');
       <div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap">
         <button class="btn btn--primary btn--sm" id="po-save">Сохранить расписание</button>
         <button class="btn btn--soft btn--sm" id="po-run">Выплатить сейчас</button>
+        ${p.enabled&&p.auto?`<button class="btn btn--ghost btn--sm" id="po-skip">${skip?'Вернуть выплату':'Отменить разово'}</button>`:''}
         <button class="btn btn--ghost btn--sm" id="po-export">Экспорт для ${provName}</button>
       </div>
     </div>`:''}
@@ -6016,6 +6021,15 @@ const cm = root.querySelector('.chat-main');
       });
       saveState(); toast('Расписание выплат сохранено','ok');
       try { logAudit('Настройка выплат: дни '+S.settings.payout.days.join(',')+' в '+time+' МСК','Оплата'); } catch(e){}
+      APP.render();
+    };
+    const skipBtn = el.querySelector('#po-skip');
+    if (skipBtn) skipBtn.onclick = ()=>{
+      const on = !Finance.skipInfo();
+      const s = Finance.skipNextPayout(on);
+      const when = s ? new Date(s.at).toLocaleString('ru-RU', { day:'numeric', month:'long', hour:'2-digit', minute:'2-digit', timeZone:'Europe/Moscow' }) + ' МСК' : '';
+      toast(on ? `Выплата ${when} отменена разово` : 'Разовая отмена снята — выплата снова в расписании', 'info');
+      try { logAudit(on ? 'Разовая отмена выплаты по расписанию' : 'Разовая отмена выплаты снята', 'Оплата'); } catch(e){}
       APP.render();
     };
     const run = el.querySelector('#po-run');
@@ -7889,8 +7903,17 @@ function initPWA(){
     return !!(EXTRA_ROUTES[name] && EXTRA_ROUTES[name].includes(role));
   }
 
+  let __autoTickAt = 0;
+  function payoutAutoTick(){
+    const t = Date.now();
+    if (t - __autoTickAt < 60000) return;
+    __autoTickAt = t;
+    try { Finance.autoTick(t); } catch(e){}
+  }
+
   function render(){
     const u = user();
+    if (u) payoutAutoTick();
     if (!u){
       const tok = parseToken();
       if (tok){
