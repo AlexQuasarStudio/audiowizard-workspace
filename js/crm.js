@@ -232,6 +232,14 @@ const CRM = (() => {
     __crmInline = { cancel: ()=>finish(false), el };
   }
 
+  /* Готовые специализации из справочника — единый источник для всех
+     выпадающих списков (карточка, таблица, новая строка). */
+  function specItems(){
+    return [...new Set((S.specializations || []).map(x => x && x.name).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'ru'))
+      .map(n => ({ value:n, label:n }));
+  }
+
   /* После сохранения инлайна не перерисовываем список сразу: иначе клик по
      соседней ячейке приходит в уже удалённый DOM и второй редактор не
      открывается. Ждём, пока закроется активный редактор, и обновляем вид. */
@@ -2273,7 +2281,7 @@ const CRM = (() => {
             <input class="input" data-f="name" placeholder="${role==='executor'?'ФИО исполнителя *':'ФИО / Компания *'}" style="min-width:180px">
             <input class="input" data-f="email" placeholder="Email" style="min-width:160px">
             <input class="input" data-f="phone" placeholder="Телефон" style="min-width:130px">
-            ${role==='executor'?`<input class="input" data-f="spec" placeholder="Специализации через запятую" style="min-width:190px">`:''}
+            ${role==='executor'?`<button type="button" class="input inline-spec-btn" data-f="spec" data-values="" title="Выбрать специализации из готовых" style="min-width:170px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Выбрать…</button>`:''}
             <button class="btn btn--primary btn--sm" type="button" data-inline-save title="Добавить">${icon('check-c','ico-sm')}</button>
             <button class="iconbtn" type="button" data-inline-cancel title="Отмена">${icon('x','ico-sm')}</button>
           </div>
@@ -2373,6 +2381,21 @@ const CRM = (() => {
         animateFilterChange(root, () => render());
       };
       $$('[data-add]', root).forEach(b=>b.onclick = ()=>openPersonForm(role, null));
+      /* Специализации в новой строке: только выбор из готового справочника. */
+      if (!root.dataset.specPickBound){
+        root.dataset.specPickBound = '1';
+        root.addEventListener('click', e=>{
+          const b = e.target.closest('[data-f="spec"].inline-spec-btn');
+          if (!b || !isStaff((me() || {}).role)) return;
+          e.preventDefault(); e.stopPropagation();
+          const cur = String(b.dataset.values || '').split(',').map(x=>x.trim()).filter(Boolean);
+          inlinePicker(b, { items: specItems(), selected: cur, placeholder:'Поиск специализации…', onSave:vals=>{
+            const arr = [...new Set((vals || []).map(x=>String(x).trim()).filter(Boolean))];
+            b.dataset.values = arr.join(',');
+            b.textContent = arr.length ? arr.join(', ') : 'Выбрать…';
+          }});
+        });
+      }
       const plTemplate = root.querySelector('#pl-inline');
       if (plTemplate){
         const spawnPersonRow = (values)=>{
@@ -2397,7 +2420,8 @@ const CRM = (() => {
           const name = (v('name')||'').trim();
           const email = (v('email')||'').trim();
           const phone = (v('phone')||'').trim();
-          const specRaw = (v('spec')||'').trim();
+          const specNode = box.querySelector('[data-f="spec"]');
+          const specRaw = String((specNode && (specNode.dataset.values || specNode.value)) || '').trim();
           const specs = specRaw ? specRaw.split(/[,;]+/).map(x=>x.trim()).filter(Boolean) : [];
           if (!name){ toast('Укажите имя', 'warn'); const i = box.querySelector('[data-f="name"]'); if (i) i.focus(); return; }
           if (!email && !phone){ toast('Нужен email или телефон', 'warn'); const i = box.querySelector('[data-f="email"]'); if (i) i.focus(); return; }
@@ -2409,11 +2433,12 @@ const CRM = (() => {
               name: (b.querySelector('[data-f="name"]')||{}).value || '',
               email: (b.querySelector('[data-f="email"]')||{}).value || '',
               phone: (b.querySelector('[data-f="phone"]')||{}).value || '',
-              spec: (b.querySelector('[data-f="spec"]')||{}).value || ''
+              spec: (()=>{ const sp = b.querySelector('[data-f="spec"]'); return (sp && (sp.dataset.values || sp.value)) || ''; })()
             }));
+          const specQ = {}; specs.forEach(sp2 => { specQ[sp2] = 3; });
           const nu = { id: uid(), username: normE.split('@')[0] || 'user'+Date.now(), email, pw:'inline123', role,
             full_name: name, phone, about:'', theme:'system', is_online:false, avatar:'', consent_marketing:false, tour_completed:false, created_at: Date.now(),
-            ext: { specializations: specs, qualification:{}, qualOverall:0, earned:0, status:'active', workStatus:'working', comment:'',
+            ext: { specializations: specs, qualification:specQ, qualOverall: specs.length ? 1 : 0, earned:0, status:'active', workStatus:'working', comment:'',
               managerId: me().id, xlsxRow: null, num: nextPersonNum() } };
           S.users.push(nu);
           /* list — копия S.users на входе в раздел; синхронизируем, иначе
@@ -2608,8 +2633,8 @@ updatePeopleBulk();
       }
       if (f === 'specs'){
         const cur = (p.ext.specializations && p.ext.specializations.length) ? p.ext.specializations : Object.keys(p.ext.qualification || {});
-        inlineField(el, { value:cur.join(', '), placeholder:'Специализации через запятую', onSave:v => {
-          const arr = [...new Set(v.split(',').map(x => x.trim()).filter(Boolean))];
+        inlinePicker(el, { items: specItems(), selected: cur, placeholder:'Поиск специализации…', onSave:vals => {
+          const arr = [...new Set((vals || []).map(x => String(x).trim()).filter(Boolean))];
           const oldQ = p.ext.qualification || {};
           const q = {};
           arr.forEach(sp => { q[sp] = oldQ[sp] || 3; });
@@ -3001,8 +3026,8 @@ updatePeopleBulk();
           specEl.style.cursor = 'pointer';
           specEl.title = 'Изменить специализации';
           specEl.onclick = ()=>{
-            inlineField(specEl, { value:(p.ext.specializations||[]).join(', '), placeholder:'Специализации через запятую', onSave:v=>{
-              const arr = [...new Set(String(v||'').split(',').map(x=>x.trim()).filter(Boolean))];
+            inlinePicker(specEl, { items: specItems(), selected: p.ext.specializations || [], placeholder:'Поиск специализации…', onSave:vals=>{
+              const arr = [...new Set((vals||[]).map(x=>String(x).trim()).filter(Boolean))];
               const oldQ = p.ext.qualification || {}; const q = {};
               arr.forEach(sp2 => { q[sp2] = oldQ[sp2] || 3; });
               p.ext.specializations = arr; p.ext.qualification = q;
