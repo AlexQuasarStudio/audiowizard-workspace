@@ -3121,13 +3121,40 @@ updatePeopleBulk();
   }
 
   function showRequisites(p){
-    const r = p.ext.requisites||{};
-    const rows = [['ИНН',r.inn],['КПП',r.kpp],['Банк',r.bank],['Расчётный счёт',r.account],['Корр. счёт',r.corr],['БИК',r.bik],['Юр. адрес',r.address]];
+    if (!p) return;
+    const r = p.ext.requisites || {};
+    const u = me();
+    const canEdit = isStaff(u.role) || (u && u.id === p.id);
+    const f = (id, label, val, ph) => `<div class="field"><label>${label}</label><input class="input" id="rq-${id}" value="${esc(val||'')}" placeholder="${ph||''}" ${canEdit?'':'readonly'}></div>`;
     openWinModal({ title:'Реквизиты', narrow:true, route:'clients',
-      body: rows.every(x=>!x[1]) ? '<p class="muted small">Реквизиты не заполнены</p>' :
-        `<div class="tbl-wrap"><table class="tbl" style="min-width:0">${rows.filter(x=>x[1]).map(x=>`<tr><td class="muted" style="border:0">${x[0]}</td><td style="border:0"><b class="mono small">${esc(x[1])}</b></td></tr>`).join('')}</table></div>`,
-      footer:`<button class="btn btn--primary" data-x>Закрыть</button>`,
-      onMount:(m2,c2)=>{ m2.querySelector('[data-x]').onclick=c2; } });
+      body:`
+        <p class="small faint" style="margin-bottom:8px">${esc(p.full_name)} · реквизиты для счетов и договоров</p>
+        <div class="cols-2 grid" style="gap:12px">
+          ${f('inn','ИНН',r.inn,'10 или 12 цифр')}
+          ${f('kpp','КПП',r.kpp,'9 цифр')}
+          ${f('bank','Банк',r.bank,'название банка')}
+          ${f('bik','БИК',r.bik,'9 цифр')}
+          ${f('account','Расчётный счёт',r.account,'20 цифр')}
+          ${f('corr','Корр. счёт',r.corr,'20 цифр')}
+        </div>
+        ${f('address','Юридический адрес',r.address,'город, улица, дом')}
+        ${canEdit?'':'<p class="small faint" style="margin-top:8px">Редактировать реквизиты может клиент или сотрудник.</p>'}`,
+      footer:`<button class="btn btn--ghost" data-x>Закрыть</button>${canEdit?'<button class="btn btn--primary" data-save>Сохранить</button>':''}`,
+      onMount:(m2,c2)=>{
+        m2.querySelector('[data-x]').onclick = c2;
+        const save = m2.querySelector('[data-save]');
+        if (save) save.onclick = ()=>{
+          const v = id => (m2.querySelector('#rq-'+id)||{}).value || '';
+          p.ext = p.ext || {};
+          p.ext.requisites = { inn:v('inn').trim(), kpp:v('kpp').trim(), bank:v('bank').trim(),
+            account:v('account').trim(), corr:v('corr').trim(), bik:v('bik').trim(), address:v('address').trim() };
+          saveState();
+          try { logAudit('Реквизиты клиента «'+p.full_name+'» обновлены','Клиенты'); } catch(e){}
+          toast('Реквизиты сохранены','ok');
+          c2();
+          try { openPersonCard(p.id, 'client'); } catch(e){}
+        };
+      } });
   }
 
   /* ==================== ПРОЕКТЫ И ПАПКИ ==================== */
