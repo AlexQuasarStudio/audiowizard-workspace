@@ -2882,6 +2882,19 @@ updatePeopleBulk();
                   ${Object.entries(p.ext.qualification||{}).map(([s,q2])=>`<div class="row row--between"><span>${esc(s)}</span>${starsHTML(q2)}</div>`).join('')||'<span class="faint">—</span>'}
                 </div>
                 ${staff?`<button class="btn btn--ghost btn--sm" data-qual style="margin-top:10px">${icon('star')} Изменить квалификацию</button>`:''}
+                ${(()=>{
+                  const sc = (window.Finance ? Finance.scOf(p.id) : (p.ext.smartcat||{login:'',status:'none'}));
+                  const label = window.Finance ? Finance.scStatusLabel(sc.status) : (sc.status||'не привязан');
+                  const canReq = isStaff(u.role) || (u && u.id === p.id);
+                  return `<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+                    <div class="row row--between"><b class="small">Smartcat</b><span class="badge badge--outline">${esc(label)}</span></div>
+                    <div class="small faint" style="margin-top:4px">${esc(sc.login||'Аккаунт не привязан')}</div>
+                    <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">
+                      ${canReq && sc.status!=='approved'?`<button class="btn btn--soft btn--sm" data-sc-req>${icon('plus')} ${sc.login?'Запросить заново':'Привязать аккаунт'}</button>`:''}
+                      ${staff && sc.status==='pending'?`<button class="btn btn--primary btn--sm" data-sc-ok>Подтвердить</button><button class="btn btn--ghost btn--sm" data-sc-no>Отклонить</button>`:''}
+                    </div>
+                  </div>`;
+                })()}
               </div>`:''}
             ${role==='client'?`
               <hr>
@@ -2967,6 +2980,20 @@ updatePeopleBulk();
             }});
           };
         }
+        /* Привязка аккаунта провайдера прямо из профиля исполнителя */
+        const scReq = mask.querySelector('[data-sc-req]');
+        if (scReq) scReq.onclick = ()=>{
+          const cur = Finance.scOf(p.id);
+          const login = prompt('Логин в '+(((S.settings.integrations||{}).payout||{}).name || 'платёжном сервисе'), cur.login||'');
+          if (!login) return;
+          Finance.requestSmartcat(p.id, login);
+          toast('Запрос на привязку отправлен на подтверждение','ok');
+          close(); openPersonCard(p.id, roleEff);
+        };
+        const scOk = mask.querySelector('[data-sc-ok]');
+        if (scOk) scOk.onclick = ()=>{ Finance.approveSmartcat(p.id); toast('Аккаунт подтверждён','ok'); close(); openPersonCard(p.id, roleEff); };
+        const scNo = mask.querySelector('[data-sc-no]');
+        if (scNo) scNo.onclick = ()=>{ Finance.rejectSmartcat(p.id); toast('Запрос отклонён','warn'); close(); openPersonCard(p.id, roleEff); };
         const editBtn = mask.querySelector('[data-pf-edit]');
         if (editBtn) editBtn.onclick = () => { close(); openPersonForm(role, p); };
         /* Смена роли — только админ; себе роль менять нельзя (защита от потери доступа) */

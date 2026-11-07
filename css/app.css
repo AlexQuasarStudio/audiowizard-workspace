@@ -2388,3 +2388,6 @@ tr.inl-tr.closing>td{padding-top:0;padding-bottom:0}
 .col-grip:hover:after,.col-dragging .col-grip:after{background:var(--accent);width:2px;left:3.5px}
 th.col-dragging{user-select:none}
 body.col-dragging,body.col-dragging *{cursor:col-resize!important;user-select:none!important}
+
+/* Список аккаунтов провайдера в выплатах: прокрутка + пагинация */
+.sc-list{max-height:300px;overflow-y:auto;border-radius:10px}

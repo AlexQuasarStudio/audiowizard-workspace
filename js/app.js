@@ -5982,7 +5982,8 @@ const cm = root.querySelector('.chat-main');
       <h3 style="margin-bottom:8px">${provName}</h3>
       <p class="small faint">Аккаунт прикрепляет админ или менеджер, либо исполнитель сам — с подтверждением менеджера или админа.</p>
       <input class="input" id="sc-q" placeholder="Поиск по имени или логину" style="margin:8px 0">
-      ${scRows}
+      <div class="sc-list" id="sc-list">${scRows}</div>
+      <button class="btn btn--ghost btn--sm" id="sc-more" style="margin-top:8px">Показать ещё</button>
     </div>`;
   }
   function bindPayouts(el){
@@ -6030,11 +6031,26 @@ const cm = root.querySelector('.chat-main');
       a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
       a.download='smartcat-payout-'+new Date().toISOString().slice(0,10)+'.json'; a.click();
     };
-    const scq = el.querySelector('#sc-q');
-    if (scq) scq.oninput = ()=>{
-      const v = scq.value.trim().toLowerCase();
-      el.querySelectorAll('[data-sc-row]').forEach(r=>{ r.hidden = !!v && !r.dataset.scRow.toLowerCase().includes(v); });
+    /* Список аккаунтов: постранично, чтобы не рендерить сотни строк сразу */
+    const scPage = 8; let scShown = scPage;
+    const scRowsAll = ()=> [...el.querySelectorAll('#sc-list [data-sc-row]')];
+    const scApply = ()=>{
+      const q = (el.querySelector('#sc-q')?.value || '').trim().toLowerCase();
+      let visible = 0;
+      scRowsAll().forEach(r=>{
+        const match = !q || r.dataset.scRow.toLowerCase().includes(q);
+        if (!match){ r.hidden = true; return; }
+        visible++;
+        r.hidden = visible > scShown;
+      });
+      const more = el.querySelector('#sc-more');
+      if (more){ const total = scRowsAll().filter(r=>!q || r.dataset.scRow.toLowerCase().includes(q)).length; more.hidden = total <= scShown; }
     };
+    const scq = el.querySelector('#sc-q');
+    if (scq) scq.oninput = ()=>{ scShown = scPage; scApply(); };
+    const scMore = el.querySelector('#sc-more');
+    if (scMore) scMore.onclick = ()=>{ scShown += scPage; scApply(); };
+    scApply();
     el.querySelectorAll('[data-sc-ok]').forEach(b=>b.onclick=()=>{ Finance.approveSmartcat(b.dataset.scOk); toast('Аккаунт подтверждён','ok'); APP.render(); });
     el.querySelectorAll('[data-sc-no]').forEach(b=>b.onclick=()=>{ Finance.rejectSmartcat(b.dataset.scNo); toast('Запрос отклонён','warn'); APP.render(); });
     el.querySelectorAll('[data-sc-req]').forEach(b=>b.onclick=()=>{
