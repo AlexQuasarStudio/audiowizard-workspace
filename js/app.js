@@ -5983,7 +5983,9 @@ const cm = root.querySelector('.chat-main');
     const u = me();
     const admin = ['admin','top_manager'].includes(u.role);
     const c = orderIdCfg();
-    const mine = admin ? c.default : ((c.byUser || {})[u.id] || c.default);
+    /* Себе — индивидуальное правило; админ/ТОП отдельно задают общее «для всех» */
+    const self = (c.byUser || {})[u.id] || c.default;
+    const mine = self;
     const pend = (c.pending || {})[u.id];
     const pendingRows = admin ? Object.entries(c.pending || {}).map(([uid, r]) => {
       const usr = (S.users || []).find(x => x.id === uid) || {};
@@ -5996,6 +5998,10 @@ const cm = root.querySelector('.chat-main');
       <h3 style="margin-bottom:6px">Нумерация заказов</h3>
       <p class="small faint">По умолчанию — AW-N. Второй вариант — латинские инициалы клиента или менеджера и число с месяцем даты через дефис. Если номер уже занят, добавляется -1, -2 и так далее.</p>
       <div class="cols-2 grid" style="gap:12px;margin-top:10px">
+        ${admin?`<div class="field"><label>Область</label><select class="input" id="oid-scope">
+          <option value="me">Для себя</option>
+          <option value="all">Для всех</option>
+        </select></div>`:''}
         <div class="field"><label>Формат</label><select class="input" id="oid-mode">
           <option value="auto" ${(mine.mode||'auto')==='auto'?'selected':''}>AW-N (по умолчанию)</option>
           <option value="initials" ${mine.mode==='initials'?'selected':''}>Инициалы + дата</option>
@@ -6010,7 +6016,7 @@ const cm = root.querySelector('.chat-main');
         </select></div>
       </div>
       <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
-        <button class="btn btn--primary btn--sm" id="oid-save">${admin ? 'Сохранить для всех' : 'Отправить на одобрение'}</button>
+        <button class="btn btn--primary btn--sm" id="oid-save">${admin ? 'Сохранить для себя' : 'Отправить на одобрение'}</button>
         ${!admin && pend ? `<span class="badge badge--warn">На одобрении: ${esc(orderIdRuleText(pend))}</span>` : ''}
         ${!admin && !pend && (c.byUser||{})[u.id] ? `<span class="badge badge--ok">Действует: ${esc(orderIdRuleText(c.byUser[u.id]))}</span>` : ''}
       </div>
@@ -6021,6 +6027,16 @@ const cm = root.querySelector('.chat-main');
     const u = me();
     const admin = ['admin','top_manager'].includes(u.role);
     const c = orderIdCfg();
+    const scopeEl = el.querySelector('#oid-scope');
+    const fill = (r) => {
+      const set = (id, v) => { const e = el.querySelector(id); if (e) e.value = v; };
+      set('#oid-mode', (r && r.mode) || 'auto');
+      set('#oid-who', (r && r.who) || 'client');
+      set('#oid-date', (r && r.date) || 'start');
+      const saveBtn = el.querySelector('#oid-save');
+      if (saveBtn && admin) saveBtn.textContent = (scopeEl && scopeEl.value === 'all') ? 'Сохранить для всех' : 'Сохранить для себя';
+    };
+    if (scopeEl) scopeEl.onchange = ()=> fill(scopeEl.value === 'all' ? c.default : ((c.byUser || {})[u.id] || c.default));
     const save = el.querySelector('#oid-save');
     if (save) save.onclick = ()=>{
       const rule = {
@@ -6028,15 +6044,20 @@ const cm = root.querySelector('.chat-main');
         who: el.querySelector('#oid-who').value,
         date: el.querySelector('#oid-date').value
       };
-      if (admin){
+      const scope = scopeEl ? scopeEl.value : 'me';
+      if (admin && scope === 'all'){
         c.default = rule;
         toast('Правило нумерации сохранено для всех', 'ok');
+      } else if (admin){
+        c.byUser = c.byUser || {};
+        c.byUser[u.id] = rule;
+        toast('Личное правило нумерации сохранено', 'ok');
       } else {
         c.pending = c.pending || {};
         c.pending[u.id] = rule;
         toast('Правило отправлено на одобрение', 'ok');
       }
-      try { logAudit(`Нумерация заказов: ${orderIdRuleText(rule)}${admin ? ' (для всех)' : ' (запрос)'}`, 'Настройки'); } catch(e){}
+      try { logAudit(`Нумерация заказов: ${orderIdRuleText(rule)}${admin ? (scope === 'all' ? ' (для всех)' : ' (для себя)') : ' (запрос)'}`, 'Настройки'); } catch(e){}
       saveState(); APP.render();
     };
     el.querySelectorAll('[data-oid-ok]').forEach(b => b.onclick = ()=>{
