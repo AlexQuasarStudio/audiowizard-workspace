@@ -1421,7 +1421,7 @@ const CRM = (() => {
             <div class="field"><label>Папка</label><select class="input" id="of-folder"><option value="">—</option></select></div>
           </div>
           <div class="field"><label>Итого, ₽ *</label><input type="number" class="input" id="of-total" min="0" value="${prefill ? prefill : (o.total||'')}" placeholder="0"></div>
-          <div class="field"><label class="row small" style="gap:8px;padding-top:6px"><input type="checkbox" id="of-test" ${o.is_test?'checked':''}> Тестовый заказ (проверка качества, без минимума)</label></div>
+          <div class="field"><label class="check" style="padding-top:6px"><input type="checkbox" id="of-test" ${o.is_test?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span><span class="small">Тестовый заказ (проверка качества, без минимума)</span></label></div>
           <div class="field"><label>Предоплата: <b id="of-prepay-val">50</b>%</label>
             <div class="seg prepay-seg" id="of-prepay-seg">
               <button type="button" data-prepay="50" class="">50%</button>
