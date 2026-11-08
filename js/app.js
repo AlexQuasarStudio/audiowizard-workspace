@@ -6201,6 +6201,10 @@ const cm = root.querySelector('.chat-main');
     };
     $$('[data-sec]', root).forEach(b=>b.onclick=()=>{
       section=b.dataset.sec; settingsSection=section; $$('[data-sec]',root).forEach(x=>x.classList.toggle('on', x===b)); renderSec();
+      /* Раздел настроек живёт в адресе: F5 не должен возвращать «Профиль» */
+      if (route.name === 'settings' && location.hash !== '#/settings/' + section){
+        try { history.replaceState(null, '', '#/settings/' + section); } catch(e){}
+      }
       if (isMobileSettings()){ navScroll = window.scrollY; mobileState(true, true); }
     });
     renderSec();
