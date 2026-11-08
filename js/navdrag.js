@@ -243,7 +243,20 @@ const NavDrag = (() => {
     }
     /* Перестановка, которая вернула тот же порядок (например, дроп в свою же
        позицию), — не событие: без тоста и без перерисовки. */
-    if (moved && reordered && JSON.stringify(V) === beforeJson){ cancel(); return; }
+    if (moved && reordered && JSON.stringify(V) === beforeJson){
+      /* Цель подсвечена, но пункт уже стоял вплотную: меняемся местами,
+         чтобы дроп на цель всегда давал видимый результат. */
+      if (target && target.classList.contains('side__link') && !src.classList.contains('side__sec')){
+        const sec = V.find(s => s.items.some(i => i.route === src.dataset.route)
+                           && s.items.some(i => i.route === target.dataset.route));
+        if (sec){
+          const a = sec.items.findIndex(i => i.route === src.dataset.route);
+          const b = sec.items.findIndex(i => i.route === target.dataset.route);
+          if (a >= 0 && b >= 0 && a !== b){ [sec.items[a], sec.items[b]] = [sec.items[b], sec.items[a]]; }
+        }
+      }
+      if (JSON.stringify(V) === beforeJson){ cancel(); return; }
+    }
     if (moved){
       /* Узел не удаляем: _persistNav вернёт его в меню и переставит без
          перерисовки контента вьюпорта. Placeholder больше не нужен. */

@@ -3555,11 +3555,12 @@ updatePeopleBulk();
         <span class="small faint">условия (И), regex · приоритет сверху вниз</span></div>
         <div class="card-b stack" style="gap:9px">
           <div id="rules-list" class="stack" style="gap:8px">
-            ${S.importRules.map(r=>`<div class="card card-pad" style="padding:11px 13px;background:var(--bg-2)">
+            ${S.importRules.map((r, idx)=>`<div class="card card-pad" data-rule-card="${r.id}" style="padding:11px 13px;background:var(--bg-2)">
               <div class="row row--between" style="gap:8px">
                 <span class="badge ${r.entity==='client'?'c-green':'c-violet'}">${r.entity==='client'?'Клиент':'Заказ'}</span>
                 <span class="small" style="flex:1;min-width:0;color:var(--text-2)">${esc(ruleLabel(r))}</span>
-                ${admin?`<button class="iconbtn" style="width:28px;height:28px" data-ruleup="${r.id}" title="Выше приоритетом">${icon('chev-u','ico-sm')}</button>
+                ${admin?`<input class="input" type="number" min="1" max="${S.importRules.length}" value="${idx+1}" data-rulepos="${r.id}" title="Приоритет: 1 — выше" style="width:54px;height:28px;padding:2px 6px;text-align:center;flex:none">
+                <button class="iconbtn" style="width:28px;height:28px" data-ruleup="${r.id}" title="Выше приоритетом">${icon('chev-u','ico-sm')}</button>
                 <button class="iconbtn" style="width:28px;height:28px" data-ruledn="${r.id}" title="Ниже приоритетом">${icon('chev-d','ico-sm')}</button>
                 <button class="iconbtn" style="width:30px;height:30px" data-editrule="${r.id}" title="Изменить">${icon('edit')}</button>
                 <button class="iconbtn" style="width:30px;height:30px" data-delrule="${r.id}" title="Удалить">${icon('trash')}</button>`:''}
@@ -4153,6 +4154,30 @@ updatePeopleBulk();
     if (admin){
       const addBtn = root.querySelector('#nr-add');
       addBtn && (addBtn.onclick = () => ruleEditor(null));
+      const reorderRuleCards = ()=>{
+        const list = root.querySelector('#rules-list');
+        if (!list) return;
+        S.importRules.forEach((r, i) => {
+          const card = list.querySelector(`[data-rule-card="${r.id}"]`);
+          if (card) list.appendChild(card);
+          const inp = list.querySelector(`[data-rulepos="${r.id}"]`);
+          if (inp){ inp.value = i + 1; inp.max = S.importRules.length; }
+        });
+      };
+      $$('[data-rulepos]', root).forEach(inp=>{
+        inp.addEventListener('change', ()=>{
+          const id = inp.dataset.rulepos;
+          const from = S.importRules.findIndex(x=>x.id===id);
+          let to = Math.max(0, Math.min(S.importRules.length-1, (parseInt(inp.value,10)||1)-1));
+          if (from < 0) return;
+          if (from === to){ inp.value = from + 1; return; }
+          const [it] = S.importRules.splice(from,1);
+          S.importRules.splice(to,0,it);
+          saveState();
+          reorderRuleCards();
+          try { logAudit(`Приоритет правила импорта: ${ruleLabel(it)} → ${to+1}`, 'Настройки'); } catch(e){}
+        });
+      });
       root.addEventListener('click', e=>{
         const ed = e.target.closest('[data-editrule]');
         if (ed){ const r = S.importRules.find(x => x.id === ed.dataset.editrule); r && ruleEditor(r); }
@@ -4170,11 +4195,10 @@ updatePeopleBulk();
             const [it] = arr.splice(i, 1);
             arr.splice(j, 0, it);
             saveState();
-            APP.render();
-            requestAnimationFrame(()=>{
-              const el = (document.querySelector(`[data-ruleup="${id}"]`) || {}).closest ? document.querySelector(`[data-ruleup="${id}"]`).closest('.card') : null;
-              if (el){ el.classList.add('rule-moved'); setTimeout(()=>el.classList.remove('rule-moved'), 520); }
-            });
+            /* Никакого render(): двигаем карточки в DOM и обновляем номера */
+            reorderRuleCards();
+            const card = root.querySelector(`[data-rule-card="${it.id}"]`);
+            if (card){ card.classList.add('rule-moved'); setTimeout(()=>card.classList.remove('rule-moved'), 520); }
           }
         }
       });
