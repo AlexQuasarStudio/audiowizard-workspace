@@ -75,19 +75,21 @@ p{margin:0 0 10px}
 [data-theme="dark-mono"] .vn__play{background:#3b3733;color:#f0ede8}
 /* Присутствие (онлайн/офлайн) — критичный элемент: в монотемах оставляем
    зелёный и серый, иначе статус читается ложно. */
-[data-theme="dark-mono"] .dot--online,[data-theme="light-mono"] .dot--online{background:#26b06a}
-[data-theme="dark-mono"] .dot--offline,[data-theme="light-mono"] .dot--offline{background:#9aa0a8}
+/* Статус аватарки — единый во всех темах: цвета онлайн/оффлайн не зависят
+   от акцента и темы (правило зафиксировано пользователем). */
+.dot--online{background:#26b06a}
+.dot--offline{background:#9aa0a8;opacity:1}
 /* Кнопка, волна и время в монохроме уже светлые (общие правила выше),
    «скорость» тоже белая — как и в цветных темах. */
 [data-theme="dark-mono"] .msg--own .msg__bubble .vn__speed{background:#fff;border-color:transparent;color:#2b2725}
 [data-theme="dark-mono"] .msg--own .msg__bubble .vn__speed--fast{color:#2b2725}
 
 /* Светлые темы */
-[data-theme="light-violet"]{--bg:#f4f2f6;--bg-2:#ebe7f0;--panel:#ffffff;--panel-2:#f3f0f7;--panel-3:#e7e2ee;--text:#262130;--text-2:#4e4759;--muted:#756d85;--faint:#8a8296;--border:#e3dee9;--border-2:#cfc7d8;--accent:#7a6899;--accent-soft:rgba(122,104,153,.12);--accent-2:#9183b3;--violet:#7a6899;--violet-soft:rgba(122,104,153,.11);--grad-brand:linear-gradient(135deg,#9183b3,#7a6899 55%,#6a5a88);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f;--own-bubble:#C4BBD6;--own-bubble-bd:transparent;--own-accent:#7A6899}
-[data-theme="light-blue"]{--bg:#f3f4f6;--bg-2:#e9ecf0;--panel:#ffffff;--panel-2:#f1f3f6;--panel-3:#e3e8ee;--text:#1e2430;--text-2:#454e5e;--muted:#6b7484;--faint:#6e7889;--border:#dfe3e9;--border-2:#c9d1db;--accent:#5b7ba6;--accent-soft:rgba(91,123,166,.12);--accent-2:#7e9ac2;--blue:#5b7ba6;--blue-soft:rgba(91,123,166,.12);--grad-brand:linear-gradient(135deg,#7e9ac2,#5b7ba6 55%,#4d6a92);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f;--own-bubble:#B2C1D5;--own-bubble-bd:transparent;--own-accent:#5B7BA6}
-[data-theme="light-red"]{--bg:#f6f3ee;--bg-2:#eee9e1;--panel:#fffefb;--panel-2:#f4efe7;--panel-3:#eae2d6;--text:#2b2118;--text-2:#54463a;--muted:#6f6358;--faint:#8f8276;--border:#e7dfd3;--border-2:#d5c9ba;--accent:#b4624e;--accent-soft:rgba(180,98,78,.12);--accent-2:#cd8271;--red:#b4624e;--red-soft:rgba(180,98,78,.12);--grad-brand:linear-gradient(135deg,#cd8271,#b4624e 55%,#9d5442);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f;--own-bubble:#D8B3AA;--own-bubble-bd:transparent;--own-accent:#B4624E}
-[data-theme="light-green"]{--bg:#f4f5f0;--bg-2:#eaede3;--panel:#fefefc;--panel-2:#f1f3ea;--panel-3:#e5e9db;--text:#22291f;--text-2:#48523f;--muted:#677059;--faint:#75806a;--border:#e2e6d8;--border-2:#ccd3bc;--accent:#5f7d59;--accent-soft:rgba(95,125,89,.13);--accent-2:#7e9a77;--green:#5f7d59;--green-soft:rgba(95,125,89,.13);--grad-brand:linear-gradient(135deg,#5f7d59,#4f6d49 55%,#44603f);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f;--own-bubble:#B3C2AF;--own-bubble-bd:transparent;--own-accent:#5F7D59}
-[data-theme="light-mono"]{--bg:#f6f4f1;--bg-2:#eeece7;--panel:#fffefb;--panel-2:#f2f0ea;--panel-3:#e8e5dd;--text:#1d1b17;--text-2:#4a463f;--muted:#716c62;--faint:#7c766a;--border:#e6e2d9;--border-2:#d4cfc3;--accent:#14181f;--accent-soft:rgba(20,24,31,.08);--accent-2:#3d434d;--blue:#5f636b;--violet:#3d434d;--green:#5f636b;--red:#3d434d;--yellow:#3d434d;--grad-brand:linear-gradient(135deg,#3d434d,#14181f);--check-bg:#fffefb;--check-tick:#ffffff;--own-bubble:#C9C8C7;--own-bubble-bd:transparent}
+[data-theme="light-violet"]{--bg:#f4f2f6;--bg-2:#ebe7f0;--panel:#ffffff;--panel-2:#f3f0f7;--panel-3:#e7e2ee;--text:#262130;--text-2:#4e4759;--muted:#756d85;--faint:#8a8296;--border:#e3dee9;--border-2:#cfc7d8;--accent:#7a6899;--accent-soft:rgba(122,104,153,.12);--accent-2:#9183b3;--violet:#7a6899;--violet-soft:rgba(122,104,153,.11);--grad-brand:linear-gradient(135deg,#9183b3,#7a6899 55%,#6a5a88);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f;--own-bubble:#CFC8DD;--own-bubble-bd:transparent;--own-accent:#7A6899}
+[data-theme="light-blue"]{--bg:#f3f4f6;--bg-2:#e9ecf0;--panel:#ffffff;--panel-2:#f1f3f6;--panel-3:#e3e8ee;--text:#1e2430;--text-2:#454e5e;--muted:#6b7484;--faint:#6e7889;--border:#dfe3e9;--border-2:#c9d1db;--accent:#5b7ba6;--accent-soft:rgba(91,123,166,.12);--accent-2:#7e9ac2;--blue:#5b7ba6;--blue-soft:rgba(91,123,166,.12);--grad-brand:linear-gradient(135deg,#7e9ac2,#5b7ba6 55%,#4d6a92);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f;--own-bubble:#C3CFE0;--own-bubble-bd:transparent;--own-accent:#5B7BA6}
+[data-theme="light-red"]{--bg:#f6f3ee;--bg-2:#eee9e1;--panel:#fffefb;--panel-2:#f4efe7;--panel-3:#eae2d6;--text:#2b2118;--text-2:#54463a;--muted:#6f6358;--faint:#8f8276;--border:#e7dfd3;--border-2:#d5c9ba;--accent:#b4624e;--accent-soft:rgba(180,98,78,.12);--accent-2:#cd8271;--red:#b4624e;--red-soft:rgba(180,98,78,.12);--grad-brand:linear-gradient(135deg,#cd8271,#b4624e 55%,#9d5442);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f;--own-bubble:#E3C4BC;--own-bubble-bd:transparent;--own-accent:#B4624E}
+[data-theme="light-green"]{--bg:#f4f5f0;--bg-2:#eaede3;--panel:#fefefc;--panel-2:#f1f3ea;--panel-3:#e5e9db;--text:#22291f;--text-2:#48523f;--muted:#677059;--faint:#75806a;--border:#e2e6d8;--border-2:#ccd3bc;--accent:#5f7d59;--accent-soft:rgba(95,125,89,.13);--accent-2:#7e9a77;--green:#5f7d59;--green-soft:rgba(95,125,89,.13);--grad-brand:linear-gradient(135deg,#5f7d59,#4f6d49 55%,#44603f);--yellow:#a07f3f;--orange:#9c6b3f;--tint-wait:#a07f3f;--own-bubble:#C4D0C0;--own-bubble-bd:transparent;--own-accent:#5F7D59}
+[data-theme="light-mono"]{--bg:#f6f4f1;--bg-2:#eeece7;--panel:#fffefb;--panel-2:#f2f0ea;--panel-3:#e8e5dd;--text:#1d1b17;--text-2:#4a463f;--muted:#716c62;--faint:#7c766a;--border:#e6e2d9;--border-2:#d4cfc3;--accent:#14181f;--accent-soft:rgba(20,24,31,.08);--accent-2:#3d434d;--blue:#5f636b;--violet:#3d434d;--green:#5f636b;--red:#3d434d;--yellow:#3d434d;--grad-brand:linear-gradient(135deg,#3d434d,#14181f);--check-bg:#fffefb;--check-tick:#ffffff;--own-bubble:#D4D3D2;--own-bubble-bd:transparent}
 /* Светлые темы: пузырь пастельный, поэтому белая кнопка остаётся, но иконка,
    волна и «скорость» — в акценте темы: белое на светлом не читается. */
 [data-theme^="light"]{
@@ -117,8 +119,7 @@ p{margin:0 0 10px}
 .avatar--lg{width:48px;height:48px;font-size:16px}
 .avatar .dot{position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;border:1.5px solid var(--panel);z-index:2}
 .avatar--sm .dot{width:9px;height:9px;right:-1px;bottom:-1px;border-width:1.5px}
-.dot--online{background:var(--green)}
-.dot--offline{background:var(--faint);opacity:1}
+/* см. фиксированные цвета статусов выше */
 
 /* ---------- Кнопки ---------- */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 16px;border-radius:11px;border:1px solid var(--border-2);background:var(--panel-2);color:var(--text);font-weight:600;font-size:13.5px;cursor:pointer;transition:all var(--dur) var(--ease);white-space:nowrap;user-select:none;text-decoration:none}

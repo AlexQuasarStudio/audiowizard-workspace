@@ -619,15 +619,21 @@ const CRM = (() => {
         <div id="o-bulk"></div>
         <div class="inline-add" id="o-inline" hidden>
           <div class="inline-add__row">
-            <input class="input" data-f="id" placeholder="ID (пусто = авто AW-N)" style="font-family:var(--mono);max-width:150px">
+            <span class="row" data-id-wrap style="gap:4px">
+              <input class="input" data-f="id" placeholder="ID (пусто = авто AW-N)" style="font-family:var(--mono);max-width:150px">
+              <button class="iconbtn" type="button" data-gen-id title="Сгенерировать ID" aria-label="Сгенерировать ID">${icon('refresh','ico-sm')}</button>
+            </span>
             <input class="input" data-f="client" placeholder="Клиент (ФИО/название)" style="min-width:170px">
-            <input class="input" data-f="total" placeholder="Сумма, ₽" type="number" min="0" style="max-width:120px">
+            <span class="row" data-total-wrap style="gap:6px">
+              <input class="input" data-f="total" placeholder="Сумма, ₽" type="number" min="0" style="max-width:120px">
+              <label class="row tiny faint" style="gap:4px;white-space:nowrap" title="Тестовый заказ: минимумы не применяются"><input type="checkbox" data-f="test">тест</label>
+            </span>
             <input class="input" data-f="start" type="date" title="Начало (по умолчанию сегодня)" style="max-width:150px" value="${new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)}">
             <input class="input" data-f="execs" placeholder="Исполнители через запятую" title="Исполнители" style="min-width:170px">
             <select class="input" data-f="status" title="Статус">
               ${Object.entries(STATUS_META).filter(([st])=>st!=='archived').map(([st,mt])=>`<option value="${st}" ${st==='waiting'?'selected':''}>${mt.label}</option>`).join('')}
             </select>
-            <input class="input" data-f="deadline" placeholder="дд.мм.гггг" title="Дедлайн" style="max-width:150px"${window.matchMedia && window.matchMedia('(max-width:960px)').matches ? ' type="date"' : ''}>
+            <input class="input" data-f="deadline" type="date" title="Дедлайн" style="max-width:150px">
             <button class="btn btn--primary btn--sm" type="button" data-inline-save title="Создать заказ">${icon('check-c','ico-sm')}</button>
             <button class="iconbtn" type="button" data-inline-cancel title="Отмена">${icon('x','ico-sm')}</button>
           </div>
@@ -968,6 +974,14 @@ const CRM = (() => {
             });
             checkInlineOrderId(box);
           }
+          const gen = box.querySelector('[data-gen-id]');
+          if (gen) gen.onclick = ()=>{
+            const inp = box.querySelector('[data-f="id"]');
+            if (!inp) return;
+            inp.value = generateOrderId();
+            checkInlineOrderId(box);
+            inp.focus();
+          };
           const f = box.querySelector('[data-f="id"]');
           if (f) requestAnimationFrame(()=>f.focus());
           return box;
@@ -1005,11 +1019,15 @@ const CRM = (() => {
           const id = sanitizeOrderId(v('id'));
           const cl = (v('client')||'').trim();
           const total = parseFloat(v('total'))||0;
+          const isTest = !!((box.querySelector('[data-f="test"]')||{}).checked);
           const dlRaw = (v('deadline') || '').trim();
-          const dlTs = dlRaw ? parseDateText(dlRaw) : null;
+          const dlTs = dlRaw
+            ? (/^\d{4}-\d{2}-\d{2}$/.test(dlRaw) ? new Date(dlRaw + 'T00:00:00').getTime() : parseDateText(dlRaw))
+            : null;
           if (!cl){ toast('Укажите клиента', 'warn'); focusField('client'); return; }
+          if (!isTest && total < 500){ toast('Минимальная стоимость заказа — 500 ₽ (кроме тестового)','warn'); focusField('total'); return; }
           if (dlRaw && dlTs == null){
-            toast('Дедлайн в формате дд.мм.гггг', 'err');
+            toast('Укажите дату дедлайна', 'err');
             const f = box.querySelector('[data-f="deadline"]');
             if (f){ f.classList.add('is-bad'); f.focus(); }
             return;
@@ -1036,8 +1054,9 @@ const CRM = (() => {
           if (execMissing.length) toast('Исполнители не найдены: ' + execMissing.join(', '), 'warn');
           const execShare = Math.round(total * ((window.Finance ? Finance.cfg().executorShare : 40) / 100));
           const execs = execUsers.map(u2 => ({ uid: u2.id, amount: execUsers.length ? Math.round(execShare / execUsers.length) : 0, is_paid:false }));
+          if (!isTest && execs.some(e => e.amount < 100)){ toast('Оплата исполнителя — не ниже 100 ₽ (кроме тестового)','warn'); return; }
           const no = { id: uid(), order_id: oid, client_id: client.id, order_date: now, deadline: dlTs,
-            status: statusRaw, total, certification_amount: 0, need_cert:false, start_date: (stTs || now), manager_id: me().id,
+            status: statusRaw, total, is_test: isTest, certification_amount: 0, need_cert:false, start_date: (stTs || now), manager_id: me().id,
             comment:'', project_id:'', folder_id:'', nish_id:'', executors:execs, audio:0, files:[], proposed_price:0, paid_amount:0,
             forbid_download:false, portfolio_ban:true, nda:false, history:[{ t: now, txt:'Заказ создан (инлайн)' }], created_at: now };
           if (no.deadline && no.start_date && no.deadline < no.start_date){ toast('Дедлайн раньше даты создания — исправьте','err'); return; }
@@ -1189,6 +1208,9 @@ const CRM = (() => {
         if (copy){ e.stopPropagation(); navigator.clipboard && navigator.clipboard.writeText(copy.dataset.copy); toast(`ID «${copy.dataset.copy}» скопирован`, 'ok'); return; }
         const menu = e.target.closest('.row-menu');
         if (menu){ const r = menu.getBoundingClientRect(); orderContextMenu(menu.dataset.oid, r.left, r.bottom + 4, menu); return; }
+        /* Значок долга — только подсказка, в инлайн правки суммы не ведёт. */
+        const debtEl = e.target.closest('.o-debt');
+        if (debtEl){ e.preventDefault(); e.stopPropagation(); toast(debtEl.getAttribute('aria-label') || 'Долг по заказу', 'info'); return; }
         const inl = e.target.closest('[data-inline]');
         if (inl && staff){
           if (e.target.closest('.inline-input,.inline-pick')) return;
@@ -1349,6 +1371,7 @@ const CRM = (() => {
             <div class="field"><label>Папка</label><select class="input" id="of-folder"><option value="">—</option></select></div>
           </div>
           <div class="field"><label>Итого, ₽ *</label><input type="number" class="input" id="of-total" min="0" value="${prefill ? prefill : (o.total||'')}" placeholder="0"></div>
+          <div class="field"><label class="row small" style="gap:8px;padding-top:6px"><input type="checkbox" id="of-test" ${o.is_test?'checked':''}> Тестовый заказ (проверка качества, без минимума)</label></div>
           <div class="field"><label>Предоплата: <b id="of-prepay-val">50</b>%</label>
             <div class="seg prepay-seg" id="of-prepay-seg">
               <button type="button" data-prepay="50" class="">50%</button>
@@ -1629,7 +1652,7 @@ const CRM = (() => {
         function collect(){
           return cleanRecord({
             order_id:sanitizeOrderId(g('#of-id').value), client_id:g('#of-client').value, client_ids:[...selClients], nish_id:g('#of-niche').value, tariff:g('#of-tariff').value,
-            status:g('#of-status').value, deadline:g('#of-deadline').value||null, start:g('#of-start').value||null, total:+g('#of-total').value||0,
+            status:g('#of-status').value, deadline:g('#of-deadline').value||null, start:g('#of-start').value||null, total:+g('#of-total').value||0, is_test:!!(g('#of-test')||{}).checked,
             managerFee: Math.max(0, Math.min(100, +g('#of-mgrfee').value || 10)),
             prepay:+g('#of-prepay').value, cert:g('#of-cert').value, need_cert:g('#of-need-cert').checked,
             comment:g('#of-comment').value, project_id:g('#of-project').value, folder_id:g('#of-folder').value,
@@ -1666,6 +1689,8 @@ const CRM = (() => {
         mask.querySelector('[data-save]').onclick = async ()=>{
           const c = collect();
           if (!c.client_id || !c.nish_id || !c.total){ toast('Заполните клиента, нишу и сумму','err'); return; }
+          if (!c.is_test && c.total < 500){ toast('Минимальная стоимость заказа — 500 ₽ (кроме тестового)','err'); const tf=g('#of-total'); if(tf){ tf.classList.add('is-bad'); tf.focus(); } return; }
+          if (!c.is_test && c.executors.some(e=>(e.amount||0) < 100)){ toast('Оплата исполнителя — не ниже 100 ₽ (кроме тестового)','err'); return; }
           if (!c.order_id){ c.order_id = generateOrderId(); }
           if (S.orders.some(x=>x.order_id===c.order_id && x.id!==o.id)){
             toast(`ID ${c.order_id} уже занят — выберите другой`, 'err');
@@ -1742,7 +1767,7 @@ const CRM = (() => {
     return `<div class="executor-pick__item ${sel?'sel':''}" data-uid="${e.id}" data-name="${esc(e.full_name+' '+e.ext.specializations.join(' '))}">
       ${avatarHTML(e,'avatar--sm')}<span style="flex:1;min-width:0"><b style="font-size:12.5px">${esc(e.full_name)}</b><br><span class="faint executor-pick__spec" style="font-size:11px">${esc(e.ext.specializations.join(', '))}</span></span>
       ${starsHTML(e.ext.qualOverall||0)}
-      <span class="executor-pick__amount">${sel?`<input type="number" class="ex-amount input" value="${sel.amount||''}" placeholder="₽">`:''}</span>
+      <span class="executor-pick__amount">${sel?`<input type="number" class="ex-amount input" min="100" value="${sel.amount||''}" placeholder="₽">`:''}</span>
       ${sel?`<span class="executor-pick__share"><input type="number" class="ex-share input" min="0" max="100" value="${sel.share!=null?sel.share:''}" placeholder="%"> <span class="tiny faint">%</span></span>`:''}</div>`;
   }
 
@@ -1995,12 +2020,12 @@ const CRM = (() => {
       if (kind === 'orders'){
         /* Колонки: 0 чекбокс, 1 заказ, 2 клиент, 3 исполнители,
            4 начало, 5 дедлайн, 6 итого, 7 статус */
-        put(1, '[data-f="id"]');
+        put(1, '[data-id-wrap]');
         put(2, '[data-f="client"]');
         put(3, '[data-f="execs"]');
         put(4, '[data-f="start"]');
         put(5, '[data-f="deadline"]');
-        put(6, '[data-f="total"]');
+        put(6, '[data-total-wrap]');
         put(7, '[data-f="status"]');
       } else {
         /* Люди: имя — в колонку «ФИО», контакты — в соседнюю */
@@ -3218,24 +3243,33 @@ updatePeopleBulk();
   function changeQualification(p, closeCard){
     const u = me();
     const bypass = ['admin','top_manager'].includes(u.role);
+    /* Если квалификация ещё не заполнена (например, у демо-исполнителя) —
+       показываем строки по специализациям со значением по умолчанию. */
+    const qSpecs = Object.keys(p.ext.qualification || {});
+    if (!qSpecs.length) (p.ext.specializations || []).forEach(x => { if (!qSpecs.includes(x)) qSpecs.push(x); });
     openWinModal({
       narrow:true, title:'Квалификация исполнителя',
-      body:`<div class="stack" style="gap:10px">${Object.keys(p.ext.qualification||{}).map(s=>`
+      body:`<div class="stack" style="gap:10px">${qSpecs.map(s=>{
+        const cur = p.ext.qualification[s] || 3;
+        return `
         <div class="row row--between"><span class="small">${esc(s)}</span>
-        <div class="seg" data-q-spec="${esc(s)}">${[1,2,3].map(v=>`<button data-v="${v}" class="${p.ext.qualification[s]===v?'on':''}">${'★'.repeat(v)||v}</button>`).join('')}</div></div>`).join('')}
+        <div class="seg q-stars" data-q-spec="${esc(s)}" data-value="${cur}">${[1,2,3].map(v=>`<button type="button" data-v="${v}" class="${v<=cur?'on':''}" aria-label="${v} из 3">★</button>`).join('')}</div></div>`;
+      }).join('')}
         <p class="small faint">Изменение рейтинга требует одобрения всех менеджеров. Администратор и ТОП-менеджер меняют без голосования.</p>
       </div>`,
       footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-ok>Сохранить</button>`,
       onMount:(mask, close)=>{
         $$('[data-q-spec] button', mask).forEach(b=>b.onclick=()=>{
-          const seg = b.closest('.seg');
-          $$('button', seg).forEach(x=>x.classList.remove('on')); b.classList.add('on');
+          const seg = b.closest('.seg'); const v = +b.dataset.v;
+          seg.dataset.value = String(v);
+          /* Подсвечиваем выбранную звезду и все младшие — как в рейтинге. */
+          $$('button', seg).forEach(x=>x.classList.toggle('on', +x.dataset.v <= v));
         });
         mask.querySelector('[data-x]').onclick = close;
         mask.querySelector('[data-ok]').onclick = ()=>{
           $$('[data-q-spec]', mask).forEach(seg=>{
-            const on = seg.querySelector('button.on');
-            if (on) p.ext.qualification[seg.dataset.qSpec] = +on.dataset.v;
+            const v = +seg.dataset.value;
+            if (v) p.ext.qualification[seg.dataset.qSpec] = v;
           });
           const vals = Object.values(p.ext.qualification);
           p.ext.qualOverall = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : 0;
