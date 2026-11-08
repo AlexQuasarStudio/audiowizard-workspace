@@ -67,7 +67,7 @@ function toast(msg, kind='info', title='', opts={}){
   el.innerHTML = `${icon(icons[kind]||'info')}<div class="toast__body">${
     title?`<b class="toast__title">${esc(title)}</b>`:''}<span class="toast__msg">${msg}</span></div>`
     + `<div class="toast__side"><button class="t-close" aria-label="Закрыть">${icon('x','ico-sm')}</button>${
-      action?`<button class="t-act">${icon('refresh','ico-sm')}${esc(action.label)}</button>`:''}</div>`;
+      action?`<button class="t-act">${action.icon?icon(action.icon,'ico-sm'):''}${esc(action.label)}</button>`:''}</div>`;
   host.appendChild(el);
   if (action){
     const tAct = el.querySelector('.t-act');

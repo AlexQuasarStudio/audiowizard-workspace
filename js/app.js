@@ -7615,7 +7615,7 @@ function initPWA(){
   function notifyUpdate(){
     toast('Новая версия загружена. Установить сейчас?', 'info', 'Доступно обновление', {
       action: {
-        label:'Обновить',
+        label:'Обновить', icon:'refresh',
         onClick:()=>{
           try { swReg && swReg.waiting && swReg.waiting.postMessage({type:'SKIP_WAITING'}); } catch(e){}
           setTimeout(()=>location.reload(), 300);
@@ -7655,7 +7655,7 @@ function initPWA(){
       if (window.__buildNotified === srv) return;
       window.__buildNotified = srv;
       toast(`Открыта сборка ${cur}, на сервере уже ${srv}. Обновите страницу, чтобы увидеть изменения.`,
-        'info', 'Доступно обновление', { action:{ label:'Обновить', onClick: hardReload } });
+        'info', 'Доступно обновление', { action:{ label:'Обновить', icon:'refresh', onClick: hardReload } });
     }catch(e){}
   }
   async function hardReload(){

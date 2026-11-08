@@ -247,7 +247,7 @@ const NavDrag = (() => {
       drag = null; downTarget = null; downPos = null;
       document.body.classList.remove('menu-dragging');
       if (reordered && beforeOrder){
-        toast('Порядок меню обновлён', 'ok', '', { action: { label:'Отменить', onClick: () => {
+        toast('Порядок меню обновлён', 'ok', '', { action: { label:'Отменить', icon:'x-c', onClick: () => {
           if (restoreOrder(beforeOrder)) { persist(); toast('Порядок восстановлен', 'ok'); }
         } } });
       }
