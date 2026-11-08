@@ -3403,10 +3403,10 @@ updatePeopleBulk();
           p.ext.qualOverall = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : 0;
           logAudit(`Квалификация ${p.full_name} обновлена${bypass?' (без голосования)':''}`,'Исполнитель');
           saveState(); toast(bypass?'Квалификация обновлена':'Отправлено на голосование менеджерам','ok');
-          /* Сначала даём окнам закрыться (и точке в меню — погаснуть плавно),
-             и только потом перерисовываем раздел: render() сразу убивал анимацию. */
+          /* Окна закрываются, точка в меню гаснет; render() отложится сам
+             (см. общий guard в APP.render) и не оборвёт анимацию. */
           close(); closeCard && closeCard();
-          setTimeout(()=>APP.render(), 280);
+          APP.render();
         };
       }
     });

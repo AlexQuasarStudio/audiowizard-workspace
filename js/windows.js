@@ -15,6 +15,12 @@ const Windows = (() => {
   // Реестр открытых окон: route → [ { win, minimized, html, scrollTop, hiddenPos } ]
   const registry = new Map();
 
+  /* Сколько длится закрытие окна (180 мс) + гашение точки в меню (200 мс).
+     Пока идёт этот интервал, раздел перерисовывать нельзя: render() заменяет
+     меню и обрывает анимацию точки. */
+  const CLOSE_FADE_MS = 380;
+  const closingUntil = new Map();
+
   const winsFor = route => (registry.get(route) || []).filter(r => !r.win._closing);
   const allWins = () => Array.from(registry.values()).flat().filter(r => !r.win._closing);
 
@@ -108,6 +114,21 @@ const Windows = (() => {
     if (!link) return;
     link.classList.toggle('has-win', !!open);
     if (open) link.classList.remove('win-dot--pop'); /* без пульсации при открытии окна */
+  }
+  /* Отмечаем маршрут закрывающегося окна. closeAll() сразу чистит реестр,
+     поэтому ориентироваться только на registry нельзя. */
+  function markClosing(route){
+    closingUntil.set(route, Date.now() + CLOSE_FADE_MS);
+    setTimeout(() => {
+      const until = closingUntil.get(route) || 0;
+      if (until <= Date.now()) closingUntil.delete(route);
+    }, CLOSE_FADE_MS + 20);
+  }
+  /* Окно этого маршрута ещё закрывается, точка в меню ещё гаснет. */
+  function isClosing(route){
+    const until = closingUntil.get(route) || 0;
+    if (until <= Date.now()){ closingUntil.delete(route); return false; }
+    return true;
   }
   function refreshAllIndicators(){
     document.querySelectorAll('a.side__link.has-win').forEach(l => l.classList.remove('has-win', 'win-dot--pop'));
@@ -787,6 +808,7 @@ const Windows = (() => {
       if (win._closing) return;
       const rt = win._route || route;
       win._closing = true;
+      markClosing(rt);
       win.classList.add('aw-win--closing');
       setTimeout(() => {
         win.remove();
@@ -1690,7 +1712,7 @@ const Windows = (() => {
     return win;
   }
 
-  return { spawn, spawnCustom, refreshAllIndicators, hasWindow, hasOpenWins, hasMinimized, hasExpanded, restoreAll, minimizeWin, restoreWindow, closeAll, minimizeAll, closeWindow, showPreview, restoreSavedWins };
+  return { spawn, spawnCustom, refreshAllIndicators, hasWindow, isClosing, hasOpenWins, hasMinimized, hasExpanded, restoreAll, minimizeWin, restoreWindow, closeAll, minimizeAll, closeWindow, showPreview, restoreSavedWins };
 })();
 
 /* Браузер: const верхнего уровня не создаёт window.Windows — вешаем явно */

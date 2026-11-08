@@ -8149,6 +8149,15 @@ function initPWA(){
       }
       renderLogin(); return;
     }
+    /* Окно текущего раздела ещё закрывается. Сначала даём ему доиграть
+       анимацию и погаснуть точке в меню, и только потом перерисовываем
+       раздел: render() заменяет меню и обрывает гашение. */
+    if (window.Windows && Windows.isClosing && Windows.isClosing(route.name) && !Windows.hasWindow(route.name)){
+      clearTimeout(render._afterClose);
+      render._afterClose = setTimeout(()=>{ render._afterClose = null; render(); }, 400);
+      return;
+    }
+    if (render._afterClose){ clearTimeout(render._afterClose); render._afterClose = null; }
     const main = document.createElement('div');
     const name = route.name;
     const viewFn = NAV_VIEWS[name];
