@@ -158,6 +158,10 @@ const NavDrag = (() => {
     document.querySelectorAll('.menu-drop-hover, .menu-drop-hover-sec').forEach(x => x.classList.remove('menu-drop-hover', 'menu-drop-hover-sec'));
     const sEl = el.classList.contains('side__sec');
     const target = dropTargetAt(cx, cy);
+    /* Запоминаем подсвеченную цель: при отпускании она важнее повторного
+       elementFromPoint — иначе дроп в зазор у края подсвеченной цели
+       сбрасывался и пункт «возвращался на место». */
+    drag._hover = target || null;
     if (target){
       const tLink = target.classList.contains('side__link');
       /* Пункт можно нести в любой раздел: подсвечиваем и ссылки, и разделы.
@@ -178,11 +182,16 @@ const NavDrag = (() => {
     if (!drag) return;
     const src = drag.el;
     const under = document.elementFromPoint(cx, cy);
+    const navNow = document.querySelector('.side__nav');
     let target = null;
-    if (under){
+    if (under && (!navNow || navNow.contains(under))){
       const link = under.closest('.side__link');
       const sec = under.closest('.side__sec');
       target = (link && link !== src) ? link : (sec && sec !== src ? sec : null);
+    }
+    /* Подсвеченная цель — приоритет: пользователь видел её и отпустил там. */
+    if (!target && drag._hover && drag._hover.isConnected && (!navNow || navNow.contains(drag._hover))){
+      target = drag._hover;
     }
     /* Валидация: пункт принимается любой ссылкой (в т.ч. из другого раздела)
        и любым разделом (вставка в конец раздела); раздел — только разделом. */
@@ -194,6 +203,7 @@ const NavDrag = (() => {
     let moved = false;
     let reordered = false; /* порядок меню реально изменился (а не создано окно) */
     const V = window.NAV || [];
+    const beforeJson = JSON.stringify(V);
     const persist = () => { window.APP && window.APP._persistNav && window.APP._persistNav(); };
 
     if (target){
@@ -235,6 +245,9 @@ const NavDrag = (() => {
       try { Windows.spawn(src.dataset.route, { x: cx, y: cy, forceRight: true }); } catch(e){}
       moved = true;
     }
+    /* Перестановка, которая вернула тот же порядок (например, дроп в свою же
+       позицию), — не событие: без тоста и без перерисовки. */
+    if (moved && reordered && JSON.stringify(V) === beforeJson){ cancel(); return; }
     if (moved){
       // Удалить перетаскиваемый элемент и placeholder (старые ссылки умрут с render в _persistNav)
       if (src.isConnected && src.parentNode === document.body) src.remove();
