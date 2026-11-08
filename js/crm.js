@@ -3078,6 +3078,35 @@ updatePeopleBulk();
     if (ordersRefresh) ordersRefresh(o);
   }
 
+  /* Карточка штрафов: одна разметка и для первого рендера, и для
+     точечного обновления — профиль остаётся открытым после штрафа. */
+  function finesCardHTML(p){
+    const list = window.Finance ? Finance.finesFor(p.id) : [];
+    const total = list.reduce((a,f) => a + (Number(f.amount) || 0), 0);
+    return `<div class="row row--between" style="align-items:center"><b class="small">Штрафы</b><button type="button" class="rev-link" data-fines>История →</button></div>
+      <div class="small faint" style="margin-top:4px">${list.length ? `${list.length} действующих на ${fmtMoney(total)}` : 'Штрафов нет'}</div>
+      ${list.slice(0,3).map(f=>`<div class="row row--between" style="gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span class="small" style="min-width:0">${esc(f.reason)}<br><span class="faint">${fmtDate(f.created_at)}</span></span><b class="small neg" style="white-space:nowrap">−${fmtMoney(f.amount)}</b></div>`).join('')}`;
+  }
+
+  /* После штрафа обновляем числа в уже открытом профиле: закрывается только
+     окно штрафа, карточка человека остаётся на месте. */
+  function updateProfileMoney(p){
+    if (!p) return;
+    const host = document.querySelector(`[data-person-id="${p.id}"]`);
+    if (!host) return;
+    const bal = host.querySelector('[data-bal]');
+    if (bal){
+      bal.textContent = fmtMoney(p.ext.earned);
+      bal.classList.toggle('neg', Number(p.ext.earned) < 0);
+    }
+    const card = host.querySelector('[data-fines-card]');
+    if (card){
+      card.innerHTML = finesCardHTML(p);
+      const fh = card.querySelector('[data-fines]');
+      fh && (fh.onclick = ()=>openFinesHistory(p));
+    }
+  }
+
   /* Стабильные номера людей (вариант 2): монотонный счётчик, каждой новой
      записи номер присваивается один раз и не переиспользуется после удаления. */
   function nextPersonNum(){
@@ -3193,8 +3222,6 @@ updatePeopleBulk();
     const mt = roleEff==='executor' ? executorMetrics(p) : clientMetrics(p);
     const managers = S.users.filter(x=>['manager','top_manager'].includes(x.role));
     const bl = p.ext.status==='blacklisted';
-    const fines = p.role==='executor' && window.Finance ? Finance.finesFor(p.id) : [];
-    const finesTotal = fines.reduce((a,f) => a + (Number(f.amount) || 0), 0);
 
     openWinModal({
       wide:true, title: roleEff==='executor'?'Профиль исполнителя':(isStaffUser?'Профиль сотрудника':'Карточка клиента'),
@@ -3288,8 +3315,9 @@ updatePeopleBulk();
         <div class="stack" style="gap:14px">
           <div class="cols-2 grid small" style="gap:8px">
             <div class="stat-mini"><b>${mt.orders}</b><span>заказов</span></div>
+            ${isStaffUser?`<div class="stat-mini"><b data-bal class="${(Number(p.ext.earned)||0)<0?'neg':''}">${fmtMoney(Number(p.ext.earned)||0)}</b><span>баланс</span></div>`:''}
             ${roleEff==='executor'?`
-              <div class="stat-mini"><b class="${Number(p.ext.earned)<0?'neg':''}">${fmtMoney(p.ext.earned)}</b><span>баланс</span></div>
+              <div class="stat-mini"><b data-bal class="${Number(p.ext.earned)<0?'neg':''}">${fmtMoney(p.ext.earned)}</b><span>баланс</span></div>
               <div class="stat-mini"><b>${mt.done}</b><span>выполнено</span></div>
               <div class="stat-mini"><b>${mt.success}%</b><span>успешных</span></div>
               <div class="stat-mini"><b>${mt.revision}</b><span>доработок</span></div>
@@ -3307,15 +3335,12 @@ updatePeopleBulk();
             </div>
           </div>`:''}
           ${staff && p.role==='executor'?`
-          <div class="card card-pad">
-            <div class="row row--between" style="align-items:center"><b class="small">Штрафы</b><button type="button" class="rev-link" data-fines>История →</button></div>
-            <div class="small faint" style="margin-top:4px">${fines.length ? `${fines.length} действующих на ${fmtMoney(finesTotal)}` : 'Штрафов нет'}</div>
-            ${fines.slice(0,3).map(f=>`<div class="row row--between" style="gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span class="small" style="min-width:0">${esc(f.reason)}<br><span class="faint">${fmtDate(f.created_at)}</span></span><b class="small neg" style="white-space:nowrap">−${fmtMoney(f.amount)}</b></div>`).join('')}
-          </div>`:''}
+          <div class="card card-pad" data-fines-card>${finesCardHTML(p)}</div>`:''}
         </div>
       </div>`,
       footer:`<button class="btn btn--ghost" data-x>Закрыть</button>`,
       onMount:(mask, close)=>{
+        mask.dataset.personId = p.id;
         mask.querySelector('[data-x]').onclick = close;
         const dmBtn = mask.querySelector('[data-pf-dm]');
         if (dmBtn) dmBtn.onclick = ()=>{ close(); window.openDirectChat(p.id); };
@@ -3475,9 +3500,9 @@ updatePeopleBulk();
           saveState(); toast(toBl?'Добавлен в чёрный список':'Разблокирован','ok'); close(); refreshPerson(p);
         });
         const fb = mask.querySelector('[data-fine]');
-        fb && (fb.onclick = ()=>openFineModal(p, roleEff, close));
+        fb && (fb.onclick = ()=>openFineModal(p));
         const fh = mask.querySelector('[data-fines]');
-        fh && (fh.onclick = ()=>openFinesHistory(p, roleEff, close));
+        fh && (fh.onclick = ()=>openFinesHistory(p));
         const rq = mask.querySelector('[data-req]');
         rq && (rq.onclick = ()=>showRequisites(p));
         const cme = mask.querySelector('[data-cm-edit]');
@@ -3486,7 +3511,7 @@ updatePeopleBulk();
     });
   }
 
-  function openFineModal(p, role, closeProfile){
+  function openFineModal(p){
     const bal = Number(p.ext.earned) || 0;
     openWinModal({
       title:'Штраф исполнителю', icon:'alert', narrow:true,
@@ -3507,16 +3532,15 @@ updatePeopleBulk();
           const rec = Finance.fine(p.id, amount, reason);
           if (!rec){ toast('Не удалось назначить штраф','err'); return; }
           close();
-          if (closeProfile) closeProfile();
           refreshPerson(p);
+          updateProfileMoney(p);
           toast(`Штраф ${fmtMoney(amount)} назначен`, 'ok');
-          setTimeout(()=>openPersonCard(p.id, role), 420);
         };
       }
     });
   }
 
-  function openFinesHistory(p, role, closeProfile){
+  function openFinesHistory(p){
     const all = window.Finance ? Finance.finesAll(p.id) : [];
     const active = all.filter(f => !f.revoked_at);
     const revoked = all.filter(f => f.revoked_at);
@@ -3551,10 +3575,9 @@ updatePeopleBulk();
           if (!ok) return;
           Finance.revokeFine(f.id, 'Отменён вручную');
           close();
-          if (closeProfile) closeProfile();
           refreshPerson(p);
+          updateProfileMoney(p);
           toast('Штраф отменён, сумма возвращена на баланс','ok');
-          setTimeout(()=>openPersonCard(p.id, role), 420);
         });
       }
     });
