@@ -207,11 +207,33 @@ const APP = (() => {
   function platformBalance(){
     return noDemo(S.users || []).reduce((sum, u) => sum + (Number(u.ext && u.ext.earned) || 0), 0);
   }
+  /* Что видит текущий пользователь в плашке баланса: стафф — общий баланс
+     платформы, исполнитель — свой личный. Клиентам внутренние деньги
+     платформы не показываем совсем. */
+  function balanceVisible(){
+    const u = user();
+    return !!u && u.role !== 'client';
+  }
+  function myBalance(){
+    const u = user();
+    if (!u) return 0;
+    if (isStaff(u.role)) return platformBalance();
+    return window.Finance ? Finance.balanceOf(u.id) : Math.round(Number(u.ext && u.ext.earned) || 0);
+  }
+  function balanceCaption(){
+    const u = user();
+    return u && isStaff(u.role) ? 'Баланс платформы' : 'Мой баланс';
+  }
   /* Обновляем плашки без полного рендера оболочки: штраф или выплата
      должны менять цифру сразу. */
   function refreshSideBalance(){
-    const txt = fmtMoney(platformBalance());
+    const txt = fmtMoney(myBalance());
     document.querySelectorAll('#side-balance .side__balance-meta b, #net-pill b').forEach(b => { b.textContent = txt; });
+    const cap = balanceCaption();
+    const lbl = document.querySelector('#side-balance .side__balance-meta > span');
+    if (lbl) lbl.textContent = cap;
+    const pill = document.querySelector('#net-pill');
+    if (pill) pill.title = cap;
   }
   window.refreshSideBalance = refreshSideBalance;
 
@@ -242,11 +264,11 @@ const APP = (() => {
             ${navInnerHTML(u)}
           </nav>
           <div class="side__foot">
-            <button class="side__balance" id="side-balance" type="button" title="История баланса">
+            ${balanceVisible()?`<button class="side__balance" id="side-balance" type="button" title="История баланса">
               <span class="side__balance-ico">${icon('card','ico-sm')}</span>
-              <span class="side__balance-meta"><span>Баланс платформы</span><b>${fmtMoney(platformBalance())}</b></span>
+              <span class="side__balance-meta"><span>${balanceCaption()}</span><b>${fmtMoney(myBalance())}</b></span>
               <span class="side__balance-chev">${icon('chev-r','ico-sm')}</span>
-            </button>
+            </button>`:''}
             <div class="side__user" id="side-user" data-tour="user">
               ${avatarHTML(u)}
               <span class="side__user-meta"><b>${esc(u.full_name)}</b><span>${ROLE_LABEL[u.role]}</span></span>
@@ -268,7 +290,7 @@ const APP = (() => {
               <button class="iconbtn head-actions__arrow" id="btn-actions-arrow" title="Выбрать действие" aria-label="Выбрать действие" aria-haspopup="true">${icon('chev-d','ico-sm')}</button>
             </div>
             <div class="head__pill head__pill--balance">
-              <span class="head-balance" id="net-pill" title="Баланс платформы">${icon('card','ico-sm')}<b>${fmtMoney(platformBalance())}</b></span>
+              ${balanceVisible()?`<span class="head-balance" id="net-pill" title="${balanceCaption()}">${icon('card','ico-sm')}<b>${fmtMoney(myBalance())}</b></span>`:''}
 
               <span class="sep" aria-hidden="true"></span>
               <button class="iconbtn" id="btn-bell" data-tour="bell" aria-label="Уведомления"><span class="bell-ico">${icon('bell')}${unread?`<span class="bell-cnt">${unread>99?'99+':unread}</span>`:''}</span></button>
@@ -1114,26 +1136,48 @@ const QUICK_BY_ROLE = {
   /* ---------- Баланс: история списаний и начислений ---------- */
   function showBalanceHistory(){
     const u = user();
+    if (!u) return;
+    const staff = isStaff(u.role);
     const ops = [];
-    /* 1) Аудит: финансовые действия */
-    noDemo(S.audit || []).forEach(a => {
-      const txt = a.action || '';
-      if (/начислен|начисление|платёж|платеж|оплат|списани|баланс/i.test(txt)){
-        ops.push({ t:a.t, kind: /списани|платёж|платеж|оплат/.test(txt) ? 'out' : 'in', text: txt, user:a.user });
-      }
-    });
-    /* 2) История заказов: финансовые события */
-    noDemo(S.orders || []).forEach(o => {
-      (o.history || []).forEach(h => {
-        const txt = h.txt || '';
-        if (/начислен|заработок|оплата|платёж|платеж|списани|аннулирован/i.test(txt)){
-          ops.push({ t:h.t, kind: /списани|аннулирован|платёж|платеж|оплат/.test(txt) ? 'out' : 'in', text: (o.order_id ? o.order_id + ': ' : '') + txt, user:u.full_name });
+    if (staff){
+      /* Стафф видит деньги платформы: аудит + финансовые события заказов. */
+      noDemo(S.audit || []).forEach(a => {
+        const txt = a.action || '';
+        if (/начислен|начисление|платёж|платеж|оплат|списани|баланс/i.test(txt)){
+          ops.push({ t:a.t, kind: /списани|платёж|платеж|оплат/.test(txt) ? 'out' : 'in', text: txt, user:a.user });
         }
       });
-    });
+      noDemo(S.orders || []).forEach(o => {
+        (o.history || []).forEach(h => {
+          const txt = h.txt || '';
+          if (/начислен|заработок|оплата|платёж|платеж|списани|аннулирован/i.test(txt)){
+            ops.push({ t:h.t, kind: /списани|аннулирован|платёж|платеж|оплат/.test(txt) ? 'out' : 'in',
+              text: (o.order_id ? o.order_id + ': ' : '') + txt, user: (clientById(o.client_id) || {}).full_name || '' });
+          }
+        });
+      });
+    } else {
+      /* Личная история: только свои заказы, выплаты и штрафы. Раньше в
+         плашке были чужие операции, а итог — общий баланс платформы,
+         поэтому цифра не сходилась с профилем. */
+      noDemo(S.orders || []).forEach(o => {
+        if (!(o.executors || []).some(e => e.uid === u.id)) return;
+        (o.history || []).forEach(h => {
+          const txt = h.txt || '';
+          if (!/начислен|заработок|оплат|платёж|платеж|выплат|аннулирован|корректировк|вычитка/i.test(txt)) return;
+          ops.push({ t:h.t, kind: /начислен|заработок|возврат/i.test(txt) ? 'in' : 'out',
+            text: (o.order_id ? o.order_id + ': ' : '') + txt, user:'' });
+        });
+      });
+      (S.fines || []).filter(f => f.uid === u.id).forEach(f => {
+        ops.push({ t:f.created_at, kind:'out', text:'Штраф: ' + f.reason, user:'' });
+        if (f.revoked_at) ops.push({ t:f.revoked_at, kind:'in', text:'Штраф отменён: ' + f.reason, user:'' });
+      });
+    }
     ops.sort((a,b)=>b.t-a.t);
     const top = ops.slice(0, 20);
-    const total = platformBalance();
+    const total = staff ? platformBalance() : (window.Finance ? Finance.balanceOf(u.id) : Math.round(Number(u.ext && u.ext.earned) || 0));
+    const totalLabel = staff ? 'Баланс платформы' : 'Мой баланс';
     /* Плашка-панель (как уведомления): открывается под балансом,
        закрывается по клику мимо или по Esc. */
     const oldPanel = document.querySelector('.bal-panel');
@@ -1141,13 +1185,13 @@ const QUICK_BY_ROLE = {
     const panel = document.createElement('div');
     panel.className = 'bal-panel';
     panel.innerHTML = `
-      <div class="bal-head">${icon('card')} История баланса <span class="spacer"></span>
+      <div class="bal-head">${icon('card')} ${staff ? 'История баланса' : 'Моя история баланса'} <span class="spacer"></span>
         <button class="iconbtn bal-close" aria-label="Закрыть">${icon('x','ico-sm')}</button></div>
       <div class="bal-list">${top.length
         ? top.map(op => `<div class="bal-item ${op.kind}"><span class="bal-ico">${icon(op.kind==='out'?'minus':'plus','ico-sm')}</span>
-            <span class="bal-main"><span class="t">${esc(op.text)}</span><span class="d">${esc(op.user||'')} · ${fmtDT(op.t)}</span></span></div>`).join('')
+            <span class="bal-main"><span class="t">${esc(op.text)}</span><span class="d">${esc(op.user||'')}${op.user?' · ':''}${fmtDT(op.t)}</span></span></div>`).join('')
         : `<div class="empty">${icon('card')}<span>Операций пока нет</span></div>`}</div>
-      <div class="bal-foot"><span>Баланс платформы</span><b>${fmtMoney(total)}</b></div>`;
+      <div class="bal-foot"><span>${totalLabel}</span><b>${fmtMoney(total)}</b></div>`;
     document.body.appendChild(panel);
     /* Позиция задаётся в CSS — та же, что у панели уведомлений
        (top от --head-h, right 14px), чтобы плашки стояли ровно друг под другом. */
@@ -2095,7 +2139,11 @@ ex.innerHTML = avatarHTML(user(), '');
     });
     const donut = donutSegs.join('') + donutHits.join('');
 
-    const topExecs = noDemo(S.users.filter(x=>x.role==='executor'&&x.ext.status==='active')).sort((a,b)=>b.ext.earned-a.ext.earned).slice(0,4);
+    const topExecs = noDemo(S.users.filter(x=>x.role==='executor'&&x.ext.status==='active')).sort((a,b)=>{
+      const ba = window.Finance ? Finance.balanceOf(a.id) : (Number(a.ext.earned)||0);
+      const bb = window.Finance ? Finance.balanceOf(b.id) : (Number(b.ext.earned)||0);
+      return bb - ba;
+    }).slice(0,4);
     const topClients = noDemo(S.users.filter(x=>x.role==='client')).map(c=>({c, sum:noDemo(S.orders).filter(o=>(o.client_ids?.includes(c.id)||o.client_id===c.id)&&o.status!=='archived').reduce((a,o)=>a+o.total,0)})).sort((a,b)=>b.sum-a.sum).slice(0,4);
     const recent = orders.slice().sort((a,b)=>b.created_at-a.created_at).slice(0,5);
 
@@ -2189,7 +2237,7 @@ ex.innerHTML = avatarHTML(user(), '');
       <div class="cols-2 grid" style="margin-top:12px">
         <div class="card"><div class="card-h"><h3>ТОП исполнителей</h3><a href="#/executors" class="small">Все →</a></div>
           <div class="card-b stack" style="gap:2px">
-            ${topExecs.map((e2,i)=>`<div class="list-row"><span class="rank rank--${i+1}">${i+1}</span>${avatarHTML(e2)}<span style="flex:1;min-width:0"><b class="small">${esc(e2.full_name)}</b><div class="cell-sub">${esc(e2.ext.specializations[0]||'')}</div></span><b class="small ${Number(e2.ext.earned)<0?'neg':''}">${fmtMoney(e2.ext.earned)}</b></div>`).join('')}
+            ${topExecs.map((e2,i)=>{const bal = window.Finance ? Finance.balanceOf(e2.id) : (Number(e2.ext.earned)||0); return `<div class="list-row"><span class="rank rank--${i+1}">${i+1}</span>${avatarHTML(e2)}<span style="flex:1;min-width:0"><b class="small">${esc(e2.full_name)}</b><div class="cell-sub">${esc(e2.ext.specializations[0]||'')}</div></span><b class="small ${bal<0?'neg':''}">${fmtMoney(bal)}</b></div>`;}).join('')}
           </div></div>
         <div class="card"><div class="card-h"><h3>ТОП клиентов</h3><a href="#/clients" class="small">Все →</a></div>
           <div class="card-b stack" style="gap:2px">
@@ -7328,7 +7376,11 @@ const cm = root.querySelector('.chat-main');
       });
       if (!ok) return;
       const r = Finance.runPayout({ manual:true });
-      if (r.ok){ toast(`Выплата ${fmtMoney(r.total)} проведена`,'ok'); APP.render(); }
+      if (r.ok){
+        toast(`Выплата ${fmtMoney(r.total)} проведена`,'ok');
+        if (typeof CRM !== 'undefined' && CRM.refreshMoneyUsers) CRM.refreshMoneyUsers(Object.keys(r.byUser || {}));
+        APP.render();
+      }
       else toast(r.why,'warn');
     };
     function cfgCom(){ return Finance.cfg().commission; }
@@ -9544,7 +9596,14 @@ function initPWA(){
     const t = Date.now();
     if (t - __autoTickAt < 60000) return;
     __autoTickAt = t;
-    try { Finance.autoTick(t); } catch(e){}
+    try {
+      const r = Finance.autoTick(t);
+      /* Банк-выплата по расписанию меняет балансы — обновляем открытые
+         карточки, чтобы они не показывали сумму до выплаты. */
+      if (r && r.ok && r.byUser && typeof CRM !== 'undefined' && CRM.refreshMoneyUsers){
+        CRM.refreshMoneyUsers(Object.keys(r.byUser));
+      }
+    } catch(e){}
   }
 
   function render(){

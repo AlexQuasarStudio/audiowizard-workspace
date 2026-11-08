@@ -99,17 +99,30 @@ const Finance = (function(){
     return o.manager_id || ((S.users || []).find(u => u.role === 'manager') || {}).id || null;
   }
 
+  /* Баланс и долг — единственный источник цифр для интерфейса.
+     balanceOf — начислено минус выплачено и штрафы (может быть отрицательным);
+     debtsOf — сколько ещё не выплачено по выполненным заказам. */
+  function balanceOf(uid){
+    const u = (S.users || []).find(x => x.id === uid);
+    return Math.round(Number(u && u.ext && u.ext.earned) || 0);
+  }
+  function debtsOf(uid){
+    return (S.orders || []).reduce((sum, o) => sum + (debts(o).byUser[uid] || 0), 0);
+  }
+
   /* Начисление при переходе в «Выполнено» и его отмена.
      Исполнителям — их суммы, админу — маржа, менеджеру заказа — его доля.
-     Состав начисления хранится в самом заказе (o.splitAccrual) — этого
-     достаточно, чтобы корректно отменить статус и показать долги. */
+     Каждая доля помечается accrued:true, чтобы при отмене снять ровно
+     начисленное и не списать дважды то, что уже выплачено. Маржа админа
+     сразу уходит в вывод (paid:true) и на балансе не задерживается,
+     поэтому при отмене её не трогаем. */
   function accrue(o, sign){
     if (!o) return;
     const s = split(o);
     const adm = adminUser();
     const mgrId = managerIdOf(o);
     if (sign > 0){
-      (o.executors || []).forEach(e => addEarned(e.uid, Number(e.amount) || 0));
+      (o.executors || []).forEach(e => { addEarned(e.uid, Number(e.amount) || 0); e.accrued = true; });
       if (!o.splitAccrual){
         o.splitAccrual = {
           admin: adm ? { uid: adm.id, amount: s.admin, paid: true } : null,
@@ -125,12 +138,15 @@ const Finance = (function(){
         if (mgrId) addEarned(mgrId, s.manager);
       }
     } else {
-      (o.executors || []).forEach(e => { addEarned(e.uid, -(Number(e.amount) || 0)); e.is_paid = false; });
+      (o.executors || []).forEach(e => {
+        /* Вычитка, добавленная уже после выполнения, не начислялась —
+           при отмене статуса её снимать нельзя. */
+        if (e.accrued === false) return;
+        addEarned(e.uid, -(Number(e.amount) || 0));
+        e.accrued = false;
+      });
       const a = o.splitAccrual;
-      if (a){
-        if (a.admin) addEarned(a.admin.uid, -a.admin.amount);
-        if (a.manager) addEarned(a.manager.uid, -a.manager.amount);
-      }
+      if (a && a.manager && Number(a.manager.amount) > 0) addEarned(a.manager.uid, -a.manager.amount);
       o.splitAccrual = null;
     }
   }
@@ -141,6 +157,9 @@ const Finance = (function(){
   function debts(o){
     const out = { exec: 0, manager: 0, total: 0, count: 0, byUser: {} };
     if (!o || !['done', 'archived'].includes(o.status)) return out;
+    /* Архив без начисления (в архив ушёл незавершённый заказ) денег не
+       образует: долг есть только у заказов, которые начислялись. */
+    if (o.status === 'archived' && !o.splitAccrual && !o._accrued) return out;
     (o.executors || []).forEach(e => {
       const amount = Number(e.amount) || 0;
       if (!amount) return;
@@ -181,7 +200,9 @@ const Finance = (function(){
   /* Все выполненные заказы с неоплаченными долями — без привязки к периоду:
      к моменту выплаты в неё попадает всё, что ещё не оплачено. */
   function payoutOrders(){
-    return (S.orders || []).filter(o => o.status === 'done' && debts(o).total > 0);
+    /* Архив — финансово тот же «выполнен», поэтому долги по нему тоже
+       должны попадать в выплату, иначе деньги зависают вне выплат. */
+    return (S.orders || []).filter(o => ['done','archived'].includes(o.status) && debts(o).total > 0);
   }
 
   /* --- Расписание выплат (по умолчанию 1-е и 15-е, 15:00 МСК) --- */
@@ -446,7 +467,7 @@ const Finance = (function(){
     };
   }
 
-  return { cfg, split, accrue, addEarned, credit, withdraw, finesFor, finesAll, fineSum, fine, revokeFine, debts, hasDebt, payoutCfg, period, fmtPeriod, pending, runPayout,
+  return { cfg, split, accrue, addEarned, credit, withdraw, balanceOf, debtsOf, finesFor, finesAll, fineSum, fine, revokeFine, debts, hasDebt, payoutCfg, period, fmtPeriod, pending, runPayout,
     nextCut, lastCut, skipNextPayout, skipInfo, autoTick,
     payoutOrders, excludedIds, isExcluded, setExcluded,
     scOf, scStatusLabel, requestSmartcat, approveSmartcat, rejectSmartcat, smartcatPayload, docsForOrder };

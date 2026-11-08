@@ -59,6 +59,13 @@ const CRM = (() => {
 
   function orderTotalAudio(o){ return o.audio || (o.files||[]).reduce((a,f)=>a+(f.duration||0),0); }
 
+  /* Завершённые финансово статусы: архив — тот же «выполнен», начисления
+     при переходе между ними не снимаются и не дублируются. */
+  const completedStatus = st => st === 'done' || st === 'archived';
+  /* Баланс человека — только через Finance: одна и та же цифра в списке,
+     таблице и профиле. */
+  const balOf = p => window.Finance ? Finance.balanceOf(p.id) : Math.round(Number(p && p.ext && p.ext.earned) || 0);
+
   function applyAccrual(o, sign){
     /* Доли считает Finance: исполнители, админ (маржа) и менеджер заказа.
        Старая логика умела только исполнителей — из-за этого баланс админа
@@ -68,10 +75,12 @@ const CRM = (() => {
       o.executors.forEach(e=>{
         const u = userById(e.uid);
         if (u && u.ext) u.ext.earned = (u.ext.earned||0) + sign * (e.amount||0);
-        if (sign < 0) e.is_paid = false;
       });
     }
     if (sign > 0 && o.status==='done' && o.executors.length && !o._accrued) o._accrued = true;
+    /* Открытые карточки и профили обновляем сразу: иначе список и профиль
+       показывают разные балансы до перерисовки раздела. */
+    refreshMoneyUsers([...(o.executors||[]).map(e=>e.uid), o.manager_id].filter(Boolean));
   }
 
   /* Доли заказа для предупреждения о превышении бюджета. */
@@ -294,7 +303,7 @@ const CRM = (() => {
         } catch(e){}
       }
     }
-    if (o.status === 'done' && to !== 'done'){
+    if (completedStatus(o.status) && !completedStatus(to) && (o.splitAccrual || o._accrued)){
       const ok = await confirmModal({
         title:'Снять статус «Выполнено»?', okText:'Изменить статус', danger:true,
         text:'Все начисленные оплаты исполнителям будут аннулированы. Это действие нельзя отменить.'
@@ -308,12 +317,14 @@ const CRM = (() => {
     if (to === 'archived') o.archived_at = Date.now();
     if (to === 'archived' || to !== 'archived' && o.status !== 'archived') {}
     if (to !== 'archived') o.archived_at = o.status==='archived' ? o.archived_at : null;
-    if (to === 'done' && !o._accrued){
+    /* Начисляем только если по заказу ещё нет начисления: у выполненных
+       из старых сохранений splitAccrual есть, а _accrued мог не сохраниться. */
+    if (to === 'done' && !o._accrued && !o.splitAccrual){
       applyAccrual(o, +1);
       o.done_at = Date.now();
       o.history.push({t:Date.now(), txt:'Начислен заработок исполнителям, менеджеру и маржа админу'});
     }
-    if (to !== 'done') o.done_at = null;
+    if (!completedStatus(to)) o.done_at = null;
     /* Реферальная программа: процент пригласившему за выполненный заказ */
     if (to === 'done'){
       try {
@@ -390,6 +401,7 @@ const CRM = (() => {
     logAudit(`Оплата исполнителям по ${o.order_id}: ${fmtMoney(paidSum)}${(amount != null && executorEntry) ? ' (частично)' : ''} — ${targets.map(e=>(userById(e.uid)||{}).full_name).join(', ')}`, 'Заказ');
     toast(`Оплачено ${fmtMoney(paidSum)}${(amount != null && executorEntry) ? ' (частично)' : ''}`, 'ok');
     saveState(); refreshOrder(o);
+    refreshMoneyUsers(targets.map(t => t.uid));
   }
 
   /* Частичная оплата одного исполнителя: можно закрыть часть доли
@@ -2006,6 +2018,15 @@ const CRM = (() => {
              перезапишет o.executors, и сравнивать будет не с чем. */
           const prevStatus = o.status;
           const prevExecs = (o.executors || []).map(e => ({ ...e }));
+          /* Статус меняется прямо в форме — проводим его через ту же логику
+             начислений, что и кнопки статуса: иначе «Выполнено» из формы
+             не начисляло заработок, а снятие статуса его не отменяло. */
+          const wasDone = completedStatus(prevStatus);
+          const willDone = completedStatus(c.status);
+          if (wasDone && !willDone && (o.splitAccrual || o._accrued)){
+            applyAccrual(o, -1);
+            o._accrued = false;
+          }
           Object.assign(o, c, {
             deadline: c.deadline ? new Date(c.deadline).getTime() : null,
             start_date: c.start ? new Date(c.start).getTime() : (o.order_date || Date.now()),
@@ -2016,7 +2037,7 @@ const CRM = (() => {
              paid подрезается. Переплата сверх баланса фиксируется в истории
              как неудержанная, чтобы не терять её молча. */
           const adjustments = [];
-          const wasAccrued = !!o.splitAccrual && ['done','archived'].includes(prevStatus) && ['done','archived'].includes(o.status);
+          const wasAccrued = !!o.splitAccrual && wasDone && willDone;
           const adjustBalance = (uid, delta) => {
             const u2 = S.users.find(x => x.id === uid);
             if (!u2 || !delta) return 0;
@@ -2036,7 +2057,10 @@ const CRM = (() => {
             const delta = amt - oldAmt;
             const exUser = S.users.find(x => x.id === e.uid);
             const nm = (exUser || {}).full_name || e.uid;
-            const applied = wasAccrued ? adjustBalance(e.uid, delta) : 0;
+            /* Вычитка, назначенная после выполнения, на балансе не лежала —
+               дельту по ней не начисляем и не списываем. */
+            const accrues = !(e.is_review && e.accrued === false);
+            const applied = wasAccrued && accrues ? adjustBalance(e.uid, delta) : 0;
             if (delta > 0 && applied > 0) adjustments.push(`${nm}: доля увеличена на ${fmtMoney(delta)} — баланс вырос на ${fmtMoney(applied)}`);
             if (delta < 0){
               const need = -delta, done = -applied;
@@ -2070,8 +2094,15 @@ const CRM = (() => {
             o.history.push({ t:Date.now(), txt:'Заказ отредактирован' });
             logAudit(`Изменён заказ ${o.order_id}`, 'Заказ');
           }
+          /* Заказ ввели в «Выполнено» через форму — начисляем доли. */
+          if (!wasDone && willDone && o.status === 'done' && !o.splitAccrual){
+            applyAccrual(o, +1);
+            o.done_at = o.done_at || Date.now();
+            o.history.push({ t:Date.now(), txt:'Начислен заработок исполнителям, менеджеру и маржа админу' });
+          }
           if (c.executors.length) notifyParticipants(o, 'Назначены исполнители');
           saveState();
+          refreshMoneyUsers([...c.executors.map(e=>e.uid), ...prevExecs.map(e=>e.uid), o.manager_id].filter(Boolean));
           DraftsDB.del('order-form');
           toast(`Заказ ${o.order_id} сохранён`, 'ok');
           if (adjustments.length) toast('Корректировка: ' + adjustments.join('; '), 'info');
@@ -2167,12 +2198,17 @@ const CRM = (() => {
             if (!ok) return;
           }
           o.executors = o.executors || [];
-          o.executors.push({ uid:uidv, amount, percent:pct, is_review:true, is_paid:false, paid:0 });
+          const rvEntry = { uid:uidv, amount, percent:pct, is_review:true, is_paid:false, paid:0, accrued:false };
+          o.executors.push(rvEntry);
+          /* Заказ уже выполнен — вычитку начисляем сразу. Иначе при выплате
+             её сумма списалась бы с баланса, не будучи начисленной. */
+          if (completedStatus(o.status) && window.Finance){ Finance.credit(uidv, amount); rvEntry.accrued = true; }
           o.reviewFee = pct;
           o.history = o.history || [];
           o.history.push({ t:Date.now(), txt:`Вычитка: ${(userById(uidv)||{}).full_name || uidv} — ${fmtMoney(amount)} (${pct}%)` });
           logAudit(`Вычитка по ${o.order_id}: ${(userById(uidv)||{}).full_name || uidv} — ${fmtMoney(amount)}`, 'Заказ');
           saveState();
+          refreshMoneyUsers([uidv]);
           close2(); closeCard();
           refreshOrder(o);
           toast(`Вычитка назначена: ${fmtMoney(amount)}`, 'ok');
@@ -2286,11 +2322,13 @@ const CRM = (() => {
           if ('reviewAdd' in t.dataset){ openReviewDialog(o, close); return; }
           if ('reviewDel' in t.dataset){
             const rv = (o.executors||[]).find(e=>e.is_review);
+            if (rv && rv.accrued !== false && window.Finance) Finance.withdraw(rv.uid, Number(rv.amount) || 0);
             o.executors = (o.executors||[]).filter(e=>!e.is_review);
             o.history = o.history || [];
             o.history.push({ t:Date.now(), txt:`Вычитка снята${rv?` (${(userById(rv.uid)||{}).full_name||''})`:''}` });
             logAudit(`Вычитка снята: ${o.order_id}`, 'Заказ');
             saveState(); close(); refreshOrder(o);
+            refreshMoneyUsers(rv?[rv.uid]:[]);
             setTimeout(()=>openOrderDetail(o.id), 120);
             return;
           }
@@ -3263,7 +3301,7 @@ updatePeopleBulk();
         <td><span class="row row--start" style="gap:10px">${avatarHTML(p)}<span style="min-width:0"><b class="small" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" data-inline="name">${esc(p.full_name)}</b><span class="small faint">${esc(p.username||'')}</span></span></span></td>
         ${role==='executor'
           ? `<td class="small muted" data-inline="specs">${p.ext.qualification && Object.keys(p.ext.qualification).length ? esc(Object.keys(p.ext.qualification).join(', ')) : '—'}</td>
-             <td class="mono">${mt.orders}</td><td class="mono">${mt.done}</td><td class="mono ${Number(p.ext.earned)<0?'neg':''}">${fmtMoney(p.ext.earned)}</td>
+             <td class="mono">${mt.orders}</td><td class="mono">${mt.done}</td><td class="mono ${balOf(p)<0?'neg':''}">${fmtMoney(balOf(p))}</td>
              <td><span data-inline="workStatus">${bl?'<span class="badge c-red">ЧС</span>':'<span class="badge '+(p.ext.workStatus==='working'?'c-green':'c-gray')+'">'+(p.ext.workStatus==='working'?'Работаю':'Не работаю')+'</span>'}</span></td>
              ${rowMenuCell(p, staff)}`
           : `<td class="small muted" data-inline="email">${esc(p.email)}</td>
@@ -3292,7 +3330,7 @@ updatePeopleBulk();
         <div class="cols-3 grid small" style="gap:6px;margin-top:12px">
           <div class="stat-mini"><b>${mt.orders}</b><span>заказов</span></div>
           <div class="stat-mini"><b>${mt.done}</b><span>выполнено</span></div>
-          <div class="stat-mini"><b class="${Number(p.ext.earned)<0?'neg':''}">${fmtMoney(p.ext.earned)}</b><span>баланс</span></div>
+          <div class="stat-mini"><b class="${balOf(p)<0?'neg':''}">${fmtMoney(balOf(p))}</b><span>баланс</span></div>
         </div>
         <div class="row small" style="margin-top:10px;gap:6px;flex-wrap:wrap">
           <span data-inline="workStatus"><span class="badge ${p.ext.workStatus==='working'?'c-green':'c-gray'}">${p.ext.workStatus==='working'?'Работаю':'Не работаю'}</span></span>
@@ -3316,6 +3354,19 @@ updatePeopleBulk();
   function refreshOrder(o){
     if (ordersRefresh) ordersRefresh(o);
   }
+  /* Обновить денежные цифры у людей во всех открытых местах сразу:
+     карточка/строка в списке, открытый профиль и плашка баланса. Без этого
+     после начисления, штрафа или выплаты список мог показать старую сумму,
+     пока профиль уже открывался с новой. */
+  function refreshMoneyUsers(ids){
+    (ids || []).forEach(id => {
+      const p = userById(id);
+      if (!p) return;
+      try { refreshPerson(p); } catch(e){}
+      try { updateProfileMoney(p); } catch(e){}
+    });
+    try { window.refreshSideBalance && window.refreshSideBalance(); } catch(e){}
+  }
 
   /* Карточка штрафов: одна разметка и для первого рендера, и для
      точечного обновления — профиль остаётся открытым после штрафа. */
@@ -3335,8 +3386,12 @@ updatePeopleBulk();
     if (!host) return;
     const bal = host.querySelector('[data-bal]');
     if (bal){
-      bal.textContent = fmtMoney(p.ext.earned);
-      bal.classList.toggle('neg', Number(p.ext.earned) < 0);
+      bal.textContent = fmtMoney(balOf(p));
+      bal.classList.toggle('neg', balOf(p) < 0);
+    }
+    const debt = host.querySelector('[data-debt]');
+    if (debt){
+      debt.textContent = fmtMoney(window.Finance ? Finance.debtsOf(p.id) : 0);
     }
     const card = host.querySelector('[data-fines-card]');
     if (card){
@@ -3554,9 +3609,10 @@ updatePeopleBulk();
         <div class="stack" style="gap:14px">
           <div class="cols-2 grid small" style="gap:8px">
             <div class="stat-mini"><b>${mt.orders}</b><span>заказов</span></div>
-            ${isStaffUser?`<div class="stat-mini"><b data-bal class="${(Number(p.ext.earned)||0)<0?'neg':''}">${fmtMoney(Number(p.ext.earned)||0)}</b><span>баланс</span></div>`:''}
+            ${isStaffUser?`<div class="stat-mini"><b data-bal class="${balOf(p)<0?'neg':''}">${fmtMoney(balOf(p))}</b><span>баланс</span></div>`:''}
             ${roleEff==='executor'?`
-              <div class="stat-mini"><b data-bal class="${Number(p.ext.earned)<0?'neg':''}">${fmtMoney(p.ext.earned)}</b><span>баланс</span></div>
+              <div class="stat-mini"><b data-bal class="${balOf(p)<0?'neg':''}">${fmtMoney(balOf(p))}</b><span>баланс</span></div>
+              <div class="stat-mini"><b data-debt>${fmtMoney(window.Finance ? Finance.debtsOf(p.id) : 0)}</b><span>к выплате</span></div>
               <div class="stat-mini"><b>${mt.done}</b><span>выполнено</span></div>
               <div class="stat-mini"><b>${mt.success}%</b><span>успешных</span></div>
               <div class="stat-mini"><b>${mt.revision}</b><span>доработок</span></div>
@@ -3751,7 +3807,7 @@ updatePeopleBulk();
   }
 
   function openFineModal(p){
-    const bal = Number(p.ext.earned) || 0;
+    const bal = balOf(p);
     openWinModal({
       title:'Штраф исполнителю', icon:'alert', narrow:true,
       body:`<div class="stack" style="gap:12px">
@@ -3784,7 +3840,7 @@ updatePeopleBulk();
     const active = all.filter(f => !f.revoked_at);
     const revoked = all.filter(f => f.revoked_at);
     const sum = active.reduce((a,f) => a + (Number(f.amount) || 0), 0);
-    const bal = Number(p.ext.earned) || 0;
+    const bal = balOf(p);
     openWinModal({
       title:'Штрафы исполнителя', icon:'alert', wide:true,
       body:`<div class="rev-cards">
@@ -5370,5 +5426,5 @@ updatePeopleBulk();
   window.openInvites = openInvites;
 
   return { ordersView, openOrderForm, openOrderDetail, openCalculator, openTicket, orderContextMenu,
-    peopleView, projectsView, toolsView, kanbanView, setStatus, payOrder, generateOrderId, openPersonForm, openPersonCard };
+    peopleView, projectsView, toolsView, kanbanView, setStatus, payOrder, generateOrderId, openPersonForm, openPersonCard, refreshMoneyUsers };
 })();
