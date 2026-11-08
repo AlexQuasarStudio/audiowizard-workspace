@@ -435,11 +435,47 @@ const CRM = (() => {
     APP.render();
   }
 
-  function generateOrderId(){
-    /* Номер уникален глобально в системе: максимум существующего AW-N + 1 */
-    let max = 1042;
-    S.orders.forEach(o => { const m = /^AW-(\d+)$/.exec(o.order_id || ''); if (m) max = Math.max(max, +m[1]); });
-    return `AW-${max + 1}`;
+  /* Латиница для инициалов (номер заказа должен быть читаемым в любой раскладке) */
+  const ID_TRANSLIT = { а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'e',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'ts',ч:'ch',ш:'sh',щ:'sch',ъ:'',ы:'y',ь:'',э:'e',ю:'yu',я:'ya' };
+  function idInitials(name){
+    const words = String(name || '').toLowerCase().match(/[а-яёa-z]+/g) || [];
+    const skip = new Set(['ооо','оао','зао','ип','llc','ltd','inc','the']);
+    const sig = words.filter(w => !skip.has(w));
+    return (sig.slice(0, 3).map(w => ID_TRANSLIT[w[0]] || w[0]).join('') || 'ord').toUpperCase();
+  }
+  function idDateDM(ts){
+    const d = ts ? new Date(ts) : new Date();
+    return String(d.getDate()).padStart(2, '0') + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  function idRuleFor(uid){
+    const c = (S.settings && S.settings.orderIds) || {};
+    return (c.byUser && c.byUser[uid]) || c.default || { mode:'auto' };
+  }
+  function idFormContext(){
+    const clEl = document.querySelector('#of-client');
+    const stEl = document.querySelector('#of-start');
+    const dlEl = document.querySelector('#of-deadline');
+    const cl = clEl ? S.users.find(u => u.id === clEl.value) : null;
+    const ts = el => el && el.value ? new Date(el.value + 'T00:00:00').getTime() : null;
+    return { clientName: cl && cl.full_name, start: ts(stEl), deadline: ts(dlEl) };
+  }
+  /* Номер заказа: по правилу пользователя (или общему), дубликаты получают -1, -2… */
+  function generateOrderId(ctx){
+    const c = ctx || idFormContext();
+    const rule = idRuleFor((me() || {}).id);
+    let base;
+    if (rule.mode === 'initials'){
+      const who = rule.who === 'manager' ? ((me() || {}).full_name || '') : (c.clientName || '');
+      const ts = rule.date === 'end' ? (c.deadline || c.start) : (c.start || c.deadline);
+      base = idInitials(who) + idDateDM(ts);
+    } else {
+      let max = 1042;
+      S.orders.forEach(o => { const m = /^AW-(\d+)$/.exec(o.order_id || ''); if (m) max = Math.max(max, +m[1]); });
+      base = `AW-${max + 1}`;
+    }
+    let id = base, n = 0;
+    while (S.orders.some(o => o.order_id === id)) { n++; id = base + '-' + n; }
+    return id;
   }
 
   /* Номер заказа — только латиница: кириллические двойники переводим
@@ -1023,7 +1059,12 @@ const CRM = (() => {
           if (gen) gen.onclick = ()=>{
             const inp = box.querySelector('[data-f="id"]');
             if (!inp) return;
-            inp.value = generateOrderId();
+            const cl = (box.querySelector('[data-f="client"]') || {}).value || '';
+            const st = (box.querySelector('[data-f="start"]') || {}).value || '';
+            const dl = (box.querySelector('[data-f="deadline"]') || {}).value || '';
+            inp.value = generateOrderId({ clientName: cl,
+              start: st ? new Date(st + 'T00:00:00').getTime() : null,
+              deadline: dl ? new Date(dl + 'T00:00:00').getTime() : null });
             checkInlineOrderId(box);
             inp.focus();
           };
@@ -1082,7 +1123,7 @@ const CRM = (() => {
           }
           const client = S.users.find(x => x.role==='client' && (norm(x.full_name)===norm(cl) || norm(x.email)===norm(cl)));
           if (!client){ toast('Клиент не найден. Сначала добавьте его в список (кнопка «Добавить клиента»)','warn'); return; }
-          let oid = id || generateOrderId();
+          let oid = id || generateOrderId({ clientName: client.full_name, start: stTs, deadline: dlTs });
           if (id && orderIdTaken(id)){
             toast(`ID ${id} уже занят — выберите другой`, 'err');
             const f = box.querySelector('[data-f="id"]');

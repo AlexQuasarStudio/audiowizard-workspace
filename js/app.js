@@ -144,6 +144,10 @@ const APP = (() => {
     const sc = navEl.scrollTop;
     navEl.innerHTML = navInnerHTML(u);
     navEl.scrollTop = sc;
+    /* Сброс порядка — мягко проявляем меню вместо мгновенной подмены */
+    if (!window.matchMedia || !window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+      try { navEl.animate([{ opacity:.45 }, { opacity:1 }], { duration:200, easing:'ease-out' }); } catch(e){}
+    }
   }
 
   /* Перестановка меню без перерисовки вьюпорта: двигаем существующие узлы
@@ -153,6 +157,9 @@ const APP = (() => {
     const u = user();
     if (!navEl || !u) return false;
     const nav = navFor(u);
+    /* FLIP: запоминаем позиции до перестановки и плавно догоняем новые */
+    const flipNodes = [...navEl.querySelectorAll('.side__link, .side__sec')];
+    const flipBefore = new Map(flipNodes.map(n => [n, n.getBoundingClientRect()]));
     const heads = [...navEl.querySelectorAll(':scope > .side__sec[data-sec-title]')];
     const pairs = [];
     for (const sec of nav){
@@ -177,6 +184,16 @@ const APP = (() => {
       h.remove();
     });
     pairs.forEach(([h, box]) => { navEl.appendChild(h); navEl.appendChild(box); });
+    if (!window.matchMedia || !window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+      flipNodes.forEach(n => {
+        const a = flipBefore.get(n);
+        if (!a || !n.isConnected) return;
+        const b = n.getBoundingClientRect();
+        const dx = a.left - b.left, dy = a.top - b.top;
+        if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+        try { n.animate([{ transform:`translate(${dx}px,${dy}px)` }, { transform:'none' }], { duration:200, easing:'cubic-bezier(.22,.61,.36,1)' }); } catch(e){}
+      });
+    }
     clearHoverMarks();
     return true;
   }
@@ -5951,6 +5968,90 @@ const cm = root.querySelector('.chat-main');
   /* Телефон: настройки — список разделов, выбранный открывается экраном с «Назад» */
   const isMobileSettings = () => !!(window.matchMedia && window.matchMedia('(max-width: 860px)').matches);
 
+  /* ---------- Нумерация заказов ---------- */
+  function orderIdCfg(){
+    const c = S.settings.orderIds = Object.assign(
+      { default:{ mode:'auto', who:'client', date:'start' }, byUser:{}, pending:{} },
+      S.settings.orderIds || {});
+    return c;
+  }
+  function orderIdRuleText(r){
+    if (!r || r.mode !== 'initials') return 'AW-N (по умолчанию)';
+    return `Инициалы ${r.who === 'manager' ? 'менеджера' : 'клиента'} · ${r.date === 'end' ? 'дедлайн' : 'начало'}`;
+  }
+  function orderIdsHTML(){
+    const u = me();
+    const admin = ['admin','top_manager'].includes(u.role);
+    const c = orderIdCfg();
+    const mine = admin ? c.default : ((c.byUser || {})[u.id] || c.default);
+    const pend = (c.pending || {})[u.id];
+    const pendingRows = admin ? Object.entries(c.pending || {}).map(([uid, r]) => {
+      const usr = (S.users || []).find(x => x.id === uid) || {};
+      return `<div class="row row--between" style="padding:6px 0;border-bottom:1px solid var(--border);gap:8px">
+        <span class="small" style="min-width:0">${esc(usr.full_name || uid)} · ${esc(orderIdRuleText(r))}</span>
+        <span class="row" style="gap:6px;flex:none"><button class="btn btn--sm btn--primary" data-oid-ok="${uid}">Одобрить</button><button class="btn btn--sm btn--ghost" data-oid-no="${uid}">Отклонить</button></span>
+      </div>`;
+    }).join('') : '';
+    return `<div class="card card-pad">
+      <h3 style="margin-bottom:6px">Нумерация заказов</h3>
+      <p class="small faint">По умолчанию — AW-N. Второй вариант — латинские инициалы клиента или менеджера и число с месяцем даты. Если номер уже занят, добавляется -1, -2 и так далее.</p>
+      <div class="cols-2 grid" style="gap:12px;margin-top:10px">
+        <div class="field"><label>Формат</label><select class="input" id="oid-mode">
+          <option value="auto" ${(mine.mode||'auto')==='auto'?'selected':''}>AW-N (по умолчанию)</option>
+          <option value="initials" ${mine.mode==='initials'?'selected':''}>Инициалы + дата</option>
+        </select></div>
+        <div class="field"><label>Чьи инициалы</label><select class="input" id="oid-who">
+          <option value="client" ${(mine.who||'client')==='client'?'selected':''}>Клиента</option>
+          <option value="manager" ${mine.who==='manager'?'selected':''}>Менеджера</option>
+        </select></div>
+        <div class="field"><label>Дата в номере</label><select class="input" id="oid-date">
+          <option value="start" ${(mine.date||'start')==='start'?'selected':''}>Начало заказа</option>
+          <option value="end" ${mine.date==='end'?'selected':''}>Дедлайн</option>
+        </select></div>
+      </div>
+      <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn btn--primary btn--sm" id="oid-save">${admin ? 'Сохранить для всех' : 'Отправить на одобрение'}</button>
+        ${!admin && pend ? `<span class="badge badge--warn">На одобрении: ${esc(orderIdRuleText(pend))}</span>` : ''}
+        ${!admin && !pend && (c.byUser||{})[u.id] ? `<span class="badge badge--ok">Действует: ${esc(orderIdRuleText(c.byUser[u.id]))}</span>` : ''}
+      </div>
+      ${admin && pendingRows ? `<div style="margin-top:12px"><b class="small">Запросы менеджеров</b>${pendingRows}</div>` : ''}
+    </div>`;
+  }
+  function bindOrderIds(el){
+    const u = me();
+    const admin = ['admin','top_manager'].includes(u.role);
+    const c = orderIdCfg();
+    const save = el.querySelector('#oid-save');
+    if (save) save.onclick = ()=>{
+      const rule = {
+        mode: el.querySelector('#oid-mode').value,
+        who: el.querySelector('#oid-who').value,
+        date: el.querySelector('#oid-date').value
+      };
+      if (admin){
+        c.default = rule;
+        toast('Правило нумерации сохранено для всех', 'ok');
+      } else {
+        c.pending = c.pending || {};
+        c.pending[u.id] = rule;
+        toast('Правило отправлено на одобрение', 'ok');
+      }
+      try { logAudit(`Нумерация заказов: ${orderIdRuleText(rule)}${admin ? ' (для всех)' : ' (запрос)'}`, 'Настройки'); } catch(e){}
+      saveState(); APP.render();
+    };
+    el.querySelectorAll('[data-oid-ok]').forEach(b => b.onclick = ()=>{
+      const uid = b.dataset.oidOk;
+      c.byUser = c.byUser || {};
+      c.byUser[uid] = c.pending[uid];
+      delete c.pending[uid];
+      saveState(); toast('Правило одобрено', 'ok'); APP.render();
+    });
+    el.querySelectorAll('[data-oid-no]').forEach(b => b.onclick = ()=>{
+      delete c.pending[b.dataset.oidNo];
+      saveState(); toast('Запрос отклонён', 'info'); APP.render();
+    });
+  }
+
   /* ---------- Выплаты и платёжные провайдеры ---------- */
   function scStateBadge(st){
     const map = { approved:['badge--ok','Подтверждён'], pending:['badge--warn','Ждёт подтверждения'], rejected:['badge--err','Отклонён'], none:['badge--outline','Не привязан'] };
@@ -6175,6 +6276,7 @@ const cm = root.querySelector('.chat-main');
       ['security','Безопасность','shield'], ['keys','Горячие клавиши','terminal'],
       ['docs','Справка и документы','file'],
       ...(['admin','top_manager','manager','executor'].includes(u.role)?[['payouts','Выплаты и оплата','card']]:[]),
+      ...(['admin','top_manager','manager'].includes(u.role)?[['orderids','Нумерация заказов','cart']]:[]),
       ...(u.role==='admin'?[['calc','Калькулятор и услуги','calc']]:[]),
       ...(u.role==='admin'?[['tech','Технические работы','alert']]:[]),
       ...(u.role==='admin'?[['product','Демо-режим и версии','flag'],['data','Данные и бекапы','db']]:[]),
@@ -6213,10 +6315,12 @@ const cm = root.querySelector('.chat-main');
       if (section==='product') el.innerHTML = productHTML();
       if (section==='tech') el.innerHTML = techHTML();
       if (section==='payouts') el.innerHTML = payoutsHTML();
+      if (section==='orderids') el.innerHTML = orderIdsHTML();
       /* Плавное появление секции — ДО биндинга, чтобы анимация всегда играла */
       el.classList.remove('set-sec-in'); void el.offsetWidth; el.classList.add('set-sec-in');
       if (section==='calc') bindCalc(el); else if (section==='product') bindProduct(el); else if (section==='tech') bindTech(el);
       else if (section==='payouts') bindPayouts(el);
+      else if (section==='orderids') bindOrderIds(el);
       else bindSection(section, el);
     };
     root.innerHTML = `
