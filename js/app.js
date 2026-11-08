@@ -6031,8 +6031,8 @@ const cm = root.querySelector('.chat-main');
         <div class="field"><label>Мин. сумма заказа, ₽</label><input class="input" id="po-min-total" type="number" min="0" step="50" value="${cfg.minOrderTotal}"></div>
         <div class="field"><label>Мин. оплата исполнителя, ₽</label><input class="input" id="po-min-exec" type="number" min="0" step="10" value="${cfg.minExecutorPay}"></div>
         <div class="field"><label>Автоматически</label>
-          <label class="check" style="padding-top:6px"><input type="checkbox" id="po-auto" ${p.auto?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span><span class="small">по расписанию</span></label>
-          <label class="check"><input type="checkbox" id="po-on" ${p.enabled?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span><span class="small">выплаты включены</span></label></div>
+          <label class="check" style="display:flex;padding-top:6px"><input type="checkbox" id="po-auto" ${p.auto?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span><span class="small">по расписанию</span></label>
+          <label class="check" style="display:flex;margin-top:6px"><input type="checkbox" id="po-on" ${p.enabled?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span><span class="small">выплаты включены</span></label></div>
       </div>
       <div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap">
         <button class="btn btn--primary btn--sm" id="po-save">Сохранить расписание</button>
