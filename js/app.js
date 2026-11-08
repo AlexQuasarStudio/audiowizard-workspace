@@ -3001,47 +3001,43 @@ ex.innerHTML = avatarHTML(user(), '');
       out.className = 'chart-sel' + (opts.top ? ' chart-sel--top' : '');
       wrap.appendChild(out);
     }
-    const band = document.createElementNS('http://www.w3.org/2000/svg','rect');
-    band.setAttribute('class','chart-sel-band');
-    band.style.display = 'none';
-    svg.appendChild(band);
-    let a = -1, b = -1, drag = false, moved = false;
-    const idxOf = g => {
-      const key = opts.indexAttr || 'i';
-      const raw = g && g.dataset ? g.dataset[key] : null;
-      const i = raw != null && raw !== '' ? Number(raw) : hits.indexOf(g);
-      return Math.max(0, Math.min(n - 1, isNaN(i) ? 0 : i));
+    const NS = 'http://www.w3.org/2000/svg';
+    const layer = document.createElementNS(NS, 'g');
+    layer.setAttribute('class', 'chart-sel-bands');
+    svg.appendChild(layer);
+
+    /* Выделение — набор диапазонов. Мышь без модификаторов заменяет выбор,
+       Shift расширяет последний диапазон от его края, Ctrl/Cmd добавляет
+       или убирает точку — как в таблицах и дашбордах. */
+    let ranges = [];
+    let drag = null;
+    let moved = false;
+
+    const rangesWord = c => {
+      if (c % 10 === 1 && c % 100 !== 11) return 'диапазон';
+      if (c % 10 >= 2 && c % 10 <= 4 && !(c % 100 >= 12 && c % 100 <= 14)) return 'диапазона';
+      return 'диапазонов';
     };
-    const toSvg = (x, y) => {
-      const m = svg.getScreenCTM && svg.getScreenCTM();
-      if (!m) return { x:0, y:0 };
-      const p = svg.createSVGPoint(); p.x = x; p.y = y;
-      const q = p.matrixTransform(m.inverse());
-      return { x:q.x, y:q.y };
+    const normalize = list => {
+      const src = list.map(([a,b]) => [Math.min(a,b), Math.max(a,b)]).sort((x,y) => x[0] - y[0]);
+      const res = [];
+      src.forEach(r => {
+        const last = res[res.length - 1];
+        if (last && r[0] <= last[1] + 1) last[1] = Math.max(last[1], r[1]);
+        else res.push([r[0], r[1]]);
+      });
+      return res;
     };
-    const paint = () => {
-      if (a < 0){
-        band.style.display = 'none';
-        out.classList.remove('on');
-        out.textContent = '';
-        return;
+    const covers = i => ranges.some(([lo,hi]) => i >= lo && i <= hi);
+    const preview = () => {
+      if (!drag) return ranges;
+      const t = [Math.min(drag.start, drag.end), Math.max(drag.start, drag.end)];
+      if (drag.mode === 'replace') return [t];
+      if (drag.mode === 'extend' && drag.base != null){
+        return normalize([...ranges.slice(0, -1), [Math.min(drag.base, t[0]), Math.max(drag.base, t[1])]]);
       }
-      const lo = Math.min(a,b), hi = Math.max(a,b);
-      const r1 = hits[lo].getBoundingClientRect(), r2 = hits[hi].getBoundingClientRect();
-      const p1 = toSvg(r1.left, r1.top), p2 = toSvg(r2.right, r2.bottom);
-      band.setAttribute('x', p1.x);
-      band.setAttribute('y', 0);
-      band.setAttribute('width', Math.max(2, p2.x - p1.x));
-      band.setAttribute('height', (svg.viewBox && svg.viewBox.baseVal.height) || p2.y);
-      band.style.display = '';
-      let sum = 0;
-      for (let i = lo; i <= hi; i++) sum += valueAt(i);
-      out.innerHTML = `<b>${esc(labelAt(lo))} — ${esc(labelAt(hi))}</b> · ${period(hi - lo + 1)} · <b>${fmt(sum)}</b><span class="chart-sel__hint">клик — сбросить</span>`;
-      out.classList.add('on');
+      return normalize([...ranges, t]);
     };
-    const clear = () => { a = b = -1; drag = false; moved = false; paint(); };
-    /* Индекс ищем по координате курсора: после setPointerCapture события
-       приходят на сам svg, а не на конкретный столбец. */
     const idxAt = e => {
       let best = 0, bestD = Infinity;
       for (let i = 0; i < hits.length; i++){
@@ -3052,9 +3048,61 @@ ex.innerHTML = avatarHTML(user(), '');
       }
       return best;
     };
+    const toSvg = (x, y) => {
+      const m = svg.getScreenCTM && svg.getScreenCTM();
+      if (!m) return { x:0, y:0 };
+      const p = svg.createSVGPoint(); p.x = x; p.y = y;
+      const q = p.matrixTransform(m.inverse());
+      return { x:q.x, y:q.y };
+    };
+    const paint = () => {
+      const list = preview();
+      layer.innerHTML = '';
+      if (!list.length){
+        out.classList.remove('on');
+        out.textContent = '';
+        out.title = '';
+        return;
+      }
+      const idx = new Set();
+      list.forEach(([lo,hi]) => { for (let i = lo; i <= hi; i++) idx.add(i); });
+      list.forEach(([lo,hi]) => {
+        const r1 = hits[lo] && hits[lo].getBoundingClientRect();
+        const r2 = hits[hi] && hits[hi].getBoundingClientRect();
+        if (!r1 || !r2) return;
+        const p1 = toSvg(r1.left, r1.top), p2 = toSvg(r2.right, r2.bottom);
+        const rect = document.createElementNS(NS, 'rect');
+        rect.setAttribute('class', 'chart-sel-band');
+        rect.setAttribute('x', p1.x);
+        rect.setAttribute('y', 0);
+        rect.setAttribute('width', Math.max(2, p2.x - p1.x));
+        rect.setAttribute('height', (svg.viewBox && svg.viewBox.baseVal.height) || p2.y);
+        layer.appendChild(rect);
+      });
+      let sum = 0;
+      idx.forEach(i => { sum += valueAt(i); });
+      const first = Math.min(...idx), last = Math.max(...idx);
+      const head = list.length > 1
+        ? `${list.length} ${rangesWord(list.length)}`
+        : `${esc(labelAt(first))} — ${esc(labelAt(last))}`;
+      out.innerHTML = `<b>${head}</b> · ${period(idx.size)} · <b>${fmt(sum)}</b><span class="chart-sel__hint">Shift — расширить · Ctrl — добавить</span>`;
+      out.title = 'Shift — расширить выделение, Ctrl/Cmd — добавить или убрать точку, клик — сбросить';
+      out.classList.add('on');
+    };
     svg.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
-      drag = true; moved = false; a = b = idxAt(e);
+      const i = idxAt(e);
+      let mode = e.shiftKey ? 'extend' : ((e.ctrlKey || e.metaKey) ? 'add' : 'replace');
+      let base = null;
+      if (mode === 'extend'){
+        if (!ranges.length) mode = 'replace';
+        else {
+          const last = ranges[ranges.length - 1];
+          base = i <= last[0] ? last[1] : last[0];
+        }
+      }
+      drag = { start:i, end:i, mode, base };
+      moved = false;
       wrap.classList.add('is-selecting');
       try { svg.setPointerCapture(e.pointerId); } catch(err){}
       paint();
@@ -3062,20 +3110,51 @@ ex.innerHTML = avatarHTML(user(), '');
     svg.addEventListener('pointermove', e => {
       if (!drag) return;
       const i = idxAt(e);
-      if (i !== b){ b = i; moved = true; }
+      if (i !== drag.end){ drag.end = i; moved = true; }
       paint();
     });
     const end = e => {
       if (!drag) return;
-      drag = false;
+      const { start, end: endIdx, mode, base } = drag;
+      const lo = Math.min(start, endIdx), hi = Math.max(start, endIdx);
+      drag = null;
       wrap.classList.remove('is-selecting');
       try { svg.releasePointerCapture(e.pointerId); } catch(err){}
-      if (!moved){ clear(); return; }
+      if (mode === 'replace'){
+        ranges = moved ? [[lo, hi]] : [];
+      } else if (mode === 'extend'){
+        if (!moved){
+          if (ranges.length){
+            const last = ranges[ranges.length - 1];
+            const b = endIdx <= last[0] ? last[1] : last[0];
+            ranges = normalize([...ranges.slice(0, -1), [Math.min(b, endIdx), Math.max(b, endIdx)]]);
+          }
+        } else if (base != null){
+          ranges = normalize([...ranges.slice(0, -1), [Math.min(base, lo), Math.max(base, hi)]]);
+        }
+      } else if (mode === 'add'){
+        if (!moved){
+          if (covers(endIdx)){
+            const next = [];
+            ranges.forEach(([a2,b2]) => {
+              if (endIdx < a2 || endIdx > b2){ next.push([a2,b2]); return; }
+              if (a2 <= endIdx - 1) next.push([a2, endIdx - 1]);
+              if (endIdx + 1 <= b2) next.push([endIdx + 1, b2]);
+            });
+            ranges = normalize(next);
+          } else {
+            ranges = normalize([...ranges, [endIdx, endIdx]]);
+          }
+        } else {
+          ranges = normalize([...ranges, [lo, hi]]);
+        }
+      }
+      moved = false;
       paint();
     };
     svg.addEventListener('pointerup', end);
-    svg.addEventListener('pointercancel', () => { drag = false; wrap.classList.remove('is-selecting'); });
-    return { clear };
+    svg.addEventListener('pointercancel', () => { drag = null; wrap.classList.remove('is-selecting'); paint(); });
+    return { clear(){ ranges = []; drag = null; paint(); } };
   }
 
   function bindRegHover(wrap, items){
