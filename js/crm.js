@@ -3509,6 +3509,7 @@ updatePeopleBulk();
   }
   function applyRules(kind, ctx, clientObj, orderObj, cb, label){
     (S.importRules||[]).forEach(r=>{
+      if (r.enabled === false) return;
       if (r.entity !== kind) return;
       const conds = (r.conditions && r.conditions.length) ? r.conditions : [{ field:'comment', op:'contains', value: r.trigger_text || '' }];
       if (!conds.every(c => evalCondition(c, ctx))) return;
@@ -3555,11 +3556,12 @@ updatePeopleBulk();
         <span class="small faint">условия (И), regex · приоритет сверху вниз</span></div>
         <div class="card-b stack" style="gap:9px">
           <div id="rules-list" class="stack" style="gap:8px">
-            ${S.importRules.map((r, idx)=>`<div class="card card-pad" data-rule-card="${r.id}" style="padding:11px 13px;background:var(--bg-2)">
+            ${S.importRules.map((r, idx)=>`<div class="card card-pad${r.enabled===false?' rule-off':''}" data-rule-card="${r.id}" style="padding:11px 13px;background:var(--bg-2)">
               <div class="row row--between" style="gap:8px">
                 <span class="badge ${r.entity==='client'?'c-green':'c-violet'}">${r.entity==='client'?'Клиент':'Заказ'}</span>
                 <span class="small" style="flex:1;min-width:0;color:var(--text-2)">${esc(ruleLabel(r))}</span>
-                ${admin?`<input class="input" type="number" min="1" max="${S.importRules.length}" value="${idx+1}" data-rulepos="${r.id}" title="Приоритет: 1 — выше" style="width:54px;height:28px;padding:2px 6px;text-align:center;flex:none">
+                ${admin?`<label class="check" title="${r.enabled===false?'Правило выключено':'Правило включено'}" style="margin:0;flex:none"><input type="checkbox" data-ruleenabled="${r.id}" ${r.enabled!==false?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span></label>
+                <input class="input" type="number" min="1" max="${S.importRules.length}" value="${idx+1}" data-rulepos="${r.id}" title="Приоритет: 1 — выше" style="width:54px;height:28px;padding:2px 6px;text-align:center;flex:none">
                 <button class="iconbtn" style="width:28px;height:28px" data-ruleup="${r.id}" title="Выше приоритетом">${icon('chev-u','ico-sm')}</button>
                 <button class="iconbtn" style="width:28px;height:28px" data-ruledn="${r.id}" title="Ниже приоритетом">${icon('chev-d','ico-sm')}</button>
                 <button class="iconbtn" style="width:30px;height:30px" data-editrule="${r.id}" title="Изменить">${icon('edit')}</button>
@@ -4164,6 +4166,18 @@ updatePeopleBulk();
           if (inp){ inp.value = i + 1; inp.max = S.importRules.length; }
         });
       };
+      $$('[data-ruleenabled]', root).forEach(cb=>{
+        cb.addEventListener('change', ()=>{
+          const r = S.importRules.find(x=>x.id===cb.dataset.ruleenabled);
+          if (!r) return;
+          r.enabled = cb.checked;
+          saveState();
+          const card = cb.closest('[data-rule-card]');
+          if (card) card.classList.toggle('rule-off', !cb.checked);
+          cb.closest('label').title = cb.checked ? 'Правило включено' : 'Правило выключено';
+          try { logAudit(`${cb.checked?'Включено':'Отключено'} правило импорта: ${ruleLabel(r)}`, 'Настройки'); } catch(e){}
+        });
+      });
       $$('[data-rulepos]', root).forEach(inp=>{
         inp.addEventListener('change', ()=>{
           const id = inp.dataset.rulepos;

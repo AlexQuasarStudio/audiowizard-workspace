@@ -2097,6 +2097,8 @@ body.pills-hide .head{pointer-events:none}
 /* Правило импорта, которое переставили: мягкая подсветка, чтобы было видно,
    куда оно уехало в приоритете */
 .rule-moved{animation:ruleMoved .5s var(--ease)}
+/* Отключённое правило импорта: карточка приглушена, но остаётся на месте */
+.rule-off{opacity:.55}
 @keyframes ruleMoved{0%{box-shadow:0 0 0 2px var(--accent)}70%{box-shadow:0 0 0 2px var(--accent-soft)}100%{box-shadow:none}}
 
 /* ---- Документы: аккордеон (шапка сворачивает тело) ---- */
