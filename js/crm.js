@@ -1382,7 +1382,9 @@ const CRM = (() => {
     };
     const clients = S.users.filter(x=>x.role==='client' && x.ext.status!=='blacklisted');
     const executors = S.users.filter(x=>x.role==='executor' && x.ext.status!=='blacklisted' && x.ext.workStatus==='working');
-    const form = { executors: [...o.executors], files: [...(o.files||[])], calcSum: 0 };
+    /* Копии, а не ссылки: иначе правка суммы в форме сразу меняет заказ,
+       и при сохранении не с чем сравнить прежнюю оплаченную часть. */
+    const form = { executors: (o.executors||[]).map(e=>({...e})), files: [...(o.files||[])], calcSum: 0 };
 
     const m = openWinModal({
       wide:true, title: isEdit ? `Заказ ${o.order_id}` : 'Новый заказ', route:'orders',
@@ -1762,19 +1764,44 @@ const CRM = (() => {
             okText: isEdit?'Сохранить':'Создать заказ'
           });
           if (!ok) return;
+          /* Снимок прежних долей ДО Object.assign: иначе c.executors уже
+             перезапишет o.executors, и сравнивать будет не с чем. */
+          const prevExecs = (o.executors || []).map(e => ({ ...e }));
           Object.assign(o, c, {
             deadline: c.deadline ? new Date(c.deadline).getTime() : null,
             start_date: c.start ? new Date(c.start).getTime() : (o.order_date || Date.now()),
             audio: form.files.reduce((a,f)=>a+(f.duration||0),0)
           });
-          /* Частичные оплаты переживают редактирование: paid переносим,
-             подрезаем по новой сумме, is_paid — производный признак. */
+          /* Правка оплаченного заказа пересчитывает последствия:
+             уменьшили долю ниже уже выплаченного — переплата вычитается из
+             заработка исполнителя (его баланса), paid подрезается;
+             увеличили — paid сохраняется, долг растёт сам (amount − paid).
+             Все корректировки фиксируются в истории заказа и аудите. */
+          const adjustments = [];
           o.executors = c.executors.map(e => {
             const amt = Number(e.amount) || 0;
-            const old = (o.executors || []).find(x => x.uid === e.uid) || {};
-            const paid = Math.max(0, Math.min(amt, Number(old.paid != null ? old.paid : (old.is_paid ? amt : 0)) || 0));
+            const old = prevExecs.find(x => x.uid === e.uid) || {};
+            const oldAmt = Number(old.amount) || 0;
+            const oldPaid = Math.max(0, Math.min(oldAmt, Number(old.paid != null ? old.paid : (old.is_paid ? oldAmt : 0)) || 0));
+            const paid = Math.max(0, Math.min(amt, oldPaid));
+            const over = oldPaid - amt;
+            const exUser = S.users.find(x => x.id === e.uid);
+            const nm = (exUser || {}).full_name || e.uid;
+            if (over > 0){
+              if (exUser){
+                exUser.ext = exUser.ext || {};
+                exUser.ext.earned = Math.max(0, Math.round((exUser.ext.earned || 0) - over));
+              }
+              adjustments.push(`${nm}: переплата ${fmtMoney(over)} списана из заработка`);
+            } else if (amt > oldPaid && oldPaid > 0){
+              adjustments.push(`${nm}: долг вырос на ${fmtMoney(amt - oldPaid)}`);
+            }
             return { ...e, paid, is_paid: amt > 0 && paid >= amt };
           });
+          if (adjustments.length){
+            o.history.push({ t: Date.now(), txt: 'Корректировка оплат при редактировании: ' + adjustments.join('; ') });
+            try { logAudit(`Корректировка оплат ${o.order_id}: ${adjustments.join('; ')}`, 'Оплата'); } catch(e){}
+          }
           if (!isEdit){
             o.history.push({ t:Date.now(), txt:'Заказ создан' });
             if (c.prepay < S.settings.minPrepay) o.nda = false;
@@ -1788,6 +1815,7 @@ const CRM = (() => {
           saveState();
           DraftsDB.del('order-form');
           toast(`Заказ ${o.order_id} сохранён`, 'ok');
+          if (adjustments.length) toast('Корректировка: ' + adjustments.join('; '), 'info');
           close(); APP.render();
         };
       }
