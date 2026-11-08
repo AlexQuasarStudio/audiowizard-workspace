@@ -2405,6 +2405,8 @@ const CRM = (() => {
 
   function peopleView(root, role){
     const u = me(); const staff = isStaff(u.role);
+    /* Таблица/карточки — независимо для клиентов и исполнителей */
+    const viewKey = role === 'client' ? 'clientsView' : 'executorsView';
     /* Миграция к стабильным номерам: записи без ext.num получают следующий
        монотонный номер (по порядку в списке). Повторный вход не дублирует
        счётчик: номера уже стоят у записей, так что nextPersonNum вызывается
@@ -2458,7 +2460,7 @@ const CRM = (() => {
       const flip0 = flipSnap(root);
       const ae2 = document.activeElement;
       const keep2 = (ae2 && ae2.id === 'pl-q') ? { s:ae2.selectionStart, e:ae2.selectionEnd } : null;
-      const cardsView = (S.settings.peopleView || 'cards') === 'cards';
+      const cardsView = (S.settings[viewKey] || S.settings.peopleView || 'cards') === 'cards';
       const filtered = filteredAll();
       root.innerHTML = `
         <div class="page-head">
@@ -2528,7 +2530,7 @@ const CRM = (() => {
     function fillPeople(startIdx){
       const host = root.querySelector('#pl-rows');
       if (!host) return;
-      const cardsView = (S.settings.peopleView || 'cards') === 'cards';
+      const cardsView = (S.settings[viewKey] || S.settings.peopleView || 'cards') === 'cards';
       const filtered = filteredAll();
       if (startIdx === 0){
         host.innerHTML = '';
@@ -2560,7 +2562,7 @@ const CRM = (() => {
     function bindPeople(){
       const pv = $('#pl-view', root);
       if (pv) pv.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
-        S.settings.peopleView = b.dataset.view; saveState();
+        S.settings[viewKey] = b.dataset.view; saveState();
         pv.querySelectorAll('[data-view]').forEach(x => x.classList.toggle('on', x === b));
         render();
         animateViewSwitch(root);
