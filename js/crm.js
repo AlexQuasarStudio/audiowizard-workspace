@@ -1451,6 +1451,98 @@ const CRM = (() => {
   }
 
   /* ---------- Форма заказа ---------- */
+  /* ---------- Оптимальный срок и рекомендации исполнителей ---------- */
+  const DAY_MS = 86400000;
+  const DEADLINE_FALLBACK = { n1:3, n2:4, n3:5 };
+  function orderDoneAt(o){
+    const h = (o.history || []).find(x => String((x && x.txt) || '').includes('Выполнено'));
+    return (h && h.t) ? h.t : (o.updated_at || o.created_at);
+  }
+  function daysWord(n){
+    if (n % 10 === 1 && n % 100 !== 11) return 'день';
+    if (n % 10 >= 2 && n % 10 <= 4 && !(n % 100 >= 12 && n % 100 <= 14)) return 'дня';
+    return 'дней';
+  }
+  function ordersWord(n){
+    if (n % 10 === 1 && n % 100 !== 11) return 'заказ';
+    if (n % 10 >= 2 && n % 10 <= 4 && !(n % 100 >= 12 && n % 100 <= 14)) return 'заказа';
+    return 'заказов';
+  }
+  /* Срок считаем по фактическим срокам «создан → выполнен»: сначала заказы
+     этого клиента в нише, затем вся ниша, затем все выполненные. Запас —
+     не менее 1 дня и 10%: страховка для несрочных заказов. */
+  function recommendDeadline(opts = {}){
+    const nishId = opts.nishId || '';
+    const clientId = opts.clientId || '';
+    const done = (S.orders || []).filter(o => ['done','archived'].includes(o.status) && o.created_at);
+    const span = o => {
+      const d = (Number(orderDoneAt(o)) - Number(o.created_at)) / DAY_MS;
+      return d >= 0.25 && d <= 365 ? d : null;
+    };
+    const ofClient = o => o.client_id === clientId || (Array.isArray(o.client_ids) && o.client_ids.includes(clientId));
+    const collect = list => list.map(span).filter(v => v != null).sort((a,b) => a - b);
+    const median = arr => arr.length ? arr[(arr.length - 1) >> 1] : null;
+    let vals = [], source = '';
+    if (nishId && clientId){
+      vals = collect(done.filter(o => o.nish_id === nishId && ofClient(o)));
+      source = 'заказам этого клиента';
+    }
+    if (vals.length < 3 && nishId){
+      vals = collect(done.filter(o => o.nish_id === nishId));
+      source = 'заказам этой ниши';
+    }
+    if (vals.length < 3){
+      vals = collect(done);
+      source = 'всем выполненным заказам';
+    }
+    const med = median(vals);
+    const base = med ? Math.max(1, Math.ceil(med)) : (DEADLINE_FALLBACK[nishId] || 4);
+    const buffer = Math.max(1, Math.ceil(base * 0.1));
+    return { days: base + buffer, base, buffer, sample: vals.length, source: vals.length ? source : 'типовому сроку ниши' };
+  }
+  /* Кого предложить: опыт с этим клиентом, профильная специализация, работа
+     в нише, свободная загрузка и высокий рейтинг. Причины показываем рядом. */
+  function recommendExecutors(opts = {}){
+    const clientId = opts.clientId || '';
+    const nishId = opts.nishId || '';
+    const limit = opts.limit || 3;
+    const done = (S.orders || []).filter(o => ['done','archived'].includes(o.status));
+    const active = (S.orders || []).filter(o => ['waiting','work'].includes(o.status));
+    const specOf = new Set((S.specializations || []).filter(s => !nishId || s.nish_id === nishId).map(s => s.name));
+    const byOrder = (o, id) => (o.executors || []).some(e => e.uid === id);
+    return (S.users || [])
+      .filter(x => x.role === 'executor' && x.ext && x.ext.status === 'active' && x.ext.workStatus !== 'not_working')
+      .map(x => {
+        const reasons = [];
+        let score = 0;
+        const mine = done.filter(o => byOrder(o, x.id));
+        const clientOnes = clientId ? mine.filter(o => o.client_id === clientId || (Array.isArray(o.client_ids) && o.client_ids.includes(clientId))) : [];
+        if (clientOnes.length){
+          score += 5 + Math.min(3, clientOnes.length);
+          reasons.push(`${clientOnes.length} ${ordersWord(clientOnes.length)} этому клиенту`);
+        }
+        if (nishId && (x.ext.specializations || []).some(s => specOf.has(s))){
+          score += 4;
+          reasons.push('профильная специализация');
+        }
+        const nicheOnes = nishId ? mine.filter(o => o.nish_id === nishId) : [];
+        if (nicheOnes.length){
+          score += Math.min(3, nicheOnes.length);
+          reasons.push(`${nicheOnes.length} по нише`);
+        }
+        const load = active.filter(o => byOrder(o, x.id)).length;
+        if (!load){ score += 3; reasons.push('свободен'); }
+        else if (load <= 2){ score += 1; reasons.push(`загрузка ${load}`); }
+        else { score -= 1; reasons.push(`загрузка ${load}`); }
+        const rating = Number(x.ext.qualOverall) || 0;
+        if (rating >= 4.5){ score += 1; reasons.push(`рейтинг ${String(rating.toFixed(1)).replace('.', ',')}`); }
+        return { user:x, score, reasons };
+      })
+      .filter(r => r.score > 0)
+      .sort((a,b) => b.score - a.score)
+      .slice(0, limit);
+  }
+
   async function openOrderForm(editId, prefill=0){
     const u = me();
     const isEdit = !!editId;
@@ -1498,7 +1590,7 @@ const CRM = (() => {
             ${TARIFFS.map(t=>`<option value="${t.id}" ${o.tariff===t.id?'selected':''}>${esc(t.label)}</option>`).join('')}</select></div>
           <div class="cols-2 grid" style="gap:13px">
             <div class="field"><label>Дата начала работ</label><input type="date" class="input" id="of-start"></div>
-            <div class="field"><label>Дедлайн</label><input type="datetime-local" class="input" id="of-deadline"></div>
+            <div class="field"><label>Дедлайн</label><input type="datetime-local" class="input" id="of-deadline"><div class="small" id="of-deadline-hint" style="color:var(--muted);margin-top:4px"></div></div>
           </div>
           <div class="cols-2 grid" style="gap:13px">
             <div class="field"><label>Проект</label><select class="input" id="of-project"><option value="">—</option></select></div>
@@ -1532,6 +1624,7 @@ const CRM = (() => {
         <div class="stack" style="gap:13px">
           <div class="field"><label>Исполнители</label>
             <div class="input-wrap">${icon('search')}<input class="input" id="of-ex-search" placeholder="Живой поиск исполнителя…" style="padding-left:36px"></div>
+            <div id="of-recs"></div>
             <div class="executor-pick" id="of-exec-list">
               ${executors.map(e=>execPickItem(e, form)).join('')}
             </div>
@@ -1560,7 +1653,7 @@ const CRM = (() => {
         const renderChips = () => {
           g('#of-client').value = selClients[0] || '';
           g('#of-client-chips').innerHTML = selClients.map(id => `<span class="chip on" data-rc="${id}">${esc(clName(id))}${icon('x','ico-sm')}</span>`).join('') || '<span class="tiny faint">Клиент не выбран</span>';
-          g('#of-client-chips').querySelectorAll('[data-rc]').forEach(ch => ch.onclick = () => { selClients = selClients.filter(x => x !== ch.dataset.rc); renderChips(); syncPf(); });
+          g('#of-client-chips').querySelectorAll('[data-rc]').forEach(ch => ch.onclick = () => { selClients = selClients.filter(x => x !== ch.dataset.rc); renderChips(); syncPf(); paintDeadlineHint(); paintRecs(); applyDeadline(false); });
         };
         const renderLive = (q) => {
           const live = g('#of-client-live');
@@ -1570,7 +1663,7 @@ const CRM = (() => {
           live.querySelectorAll('[data-cl]').forEach(b => b.onclick = () => {
             const id = b.dataset.cl;
             selClients = selClients.includes(id) ? selClients.filter(x => x !== id) : [...selClients, id];
-            g('#of-client-search').value = ''; renderChips(); live.hidden = true; syncPf();
+            g('#of-client-search').value = ''; renderChips(); live.hidden = true; syncPf(); paintDeadlineHint(); paintRecs(); applyDeadline(false);
           });
         };
         g('#of-client-search').addEventListener('input', e => renderLive(e.target.value));
@@ -1725,6 +1818,69 @@ const CRM = (() => {
         g('#of-ex-search').addEventListener('input', execSearch);
         renderExecList(); updExecSum();
 
+        /* Срок: рекомендуем по фактам и подставляем, пока дедлайн не тронули руками */
+        let deadlineTouched = !!o.deadline;
+        function paintDeadlineHint(){
+          const box = g('#of-deadline-hint');
+          if (!box) return;
+          const nid = g('#of-niche').value;
+          if (!nid){ box.innerHTML = ''; return; }
+          const rec = recommendDeadline({ nishId:nid, clientId: selClients[0] || '' });
+          const sample = rec.sample ? ` (${rec.sample})` : '';
+          let tail = '';
+          if (deadlineTouched){
+            tail = ' · <button type="button" class="rev-link" data-dl-apply>подставить</button>';
+          } else {
+            const v = g('#of-deadline').value;
+            if (v) tail = ` · до ${fmtDate(new Date(v).getTime())}`;
+          }
+          box.innerHTML = `Рекомендуем <b>${rec.days} ${daysWord(rec.days)}</b> — медиана ${rec.base} ${daysWord(rec.base)} по ${rec.source}${sample} + запас ${rec.buffer} ${daysWord(rec.buffer)}${tail}`;
+        }
+        function applyDeadline(force){
+          const nid = g('#of-niche').value;
+          if (!nid) return;
+          if (deadlineTouched && !force) return;
+          const rec = recommendDeadline({ nishId:nid, clientId: selClients[0] || '' });
+          const st = g('#of-start').value ? new Date(g('#of-start').value + 'T00:00:00') : new Date();
+          st.setHours(18, 0, 0, 0);
+          const due = new Date(st.getTime() + rec.days * DAY_MS);
+          g('#of-deadline').value = new Date(due - due.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+          deadlineTouched = false;
+          paintDeadlineHint();
+        }
+        g('#of-deadline').addEventListener('input', ()=>{ deadlineTouched = true; paintDeadlineHint(); });
+        g('#of-start').addEventListener('change', ()=>applyDeadline(false));
+        g('#of-deadline-hint').addEventListener('click', e=>{ if (e.target.closest('[data-dl-apply]')) applyDeadline(true); });
+
+        /* Кого предложить в исполнители: опыт с клиентом, ниша, загрузка */
+        function paintRecs(){
+          const box = g('#of-recs');
+          if (!box) return;
+          const hasNiche = !!g('#of-niche').value;
+          const recs = recommendExecutors({ clientId: selClients[0] || '', nishId: g('#of-niche').value })
+            .filter(r => !form.executors.some(e => e.uid === r.user.id));
+          if (!recs.length){ box.innerHTML = ''; return; }
+          box.innerHTML = `<div class="card card-pad" style="background:var(--bg-2);padding:10px 12px;margin-bottom:10px">
+            <div class="row row--between"><b class="small">${icon('sparkle','ico-sm')} Рекомендуем</b><span class="tiny faint">${hasNiche?'по опыту, нише и загрузке':'выберите нишу — учтём специализацию'}</span></div>
+            <div class="stack" style="gap:6px;margin-top:8px">
+              ${recs.map(r=>`<div class="row" style="gap:8px">
+                ${avatarHTML(r.user,'avatar--sm')}
+                <span style="flex:1;min-width:0"><b style="font-size:12.5px">${esc(r.user.full_name)}</b><br><span class="tiny faint">${esc(r.reasons.join(' · '))}</span></span>
+                <button class="btn btn--soft btn--sm" type="button" data-rec="${r.user.id}">${icon('plus')} Добавить</button>
+              </div>`).join('')}
+            </div></div>`;
+          box.querySelectorAll('[data-rec]').forEach(b => b.onclick = ()=>{
+            const id = b.dataset.rec;
+            if (form.executors.some(e => e.uid === id)) return;
+            form.executors.push({ uid:id, amount:0, is_paid:false });
+            splitShares();
+            renderExecList(); updExecSum(); paintRecs();
+            toast('Исполнитель добавлен в заказ', 'ok');
+          });
+        }
+        paintRecs();
+        if (!isEdit) applyDeadline(false); else paintDeadlineHint();
+
         /* файлы */
         const drop = g('#of-drop'), fileInp = g('#of-file');
         drop.onclick = ()=>fileInp.click();
@@ -1769,7 +1925,7 @@ const CRM = (() => {
           $$('#of-calc-svcs input:checked', mask).forEach(inp=>{ sum += (svcs[+inp.dataset.svc]||{}).price||0; });
           if (sum > 0){ g('#of-total').value = sum + form.calcSum; }
         };
-        g('#of-niche').addEventListener('change', renderSvcs); renderSvcs();
+        g('#of-niche').addEventListener('change', ()=>{ renderSvcs(); applyDeadline(false); paintRecs(); }); renderSvcs();
         g('#of-open-calc').onclick = ()=>openCalculator({ onResult: v=>{ form.calcSum = v; g('#of-total').value = (+g('#of-total').value||0) + v; } });
 
         /* автосохранение черновика */
