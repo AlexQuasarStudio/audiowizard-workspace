@@ -672,10 +672,7 @@ const CRM = (() => {
               <button class="iconbtn" type="button" data-gen-id title="Сгенерировать ID" aria-label="Сгенерировать ID">${icon('refresh','ico-sm')}</button>
             </span>
             <input class="input" data-f="client" placeholder="Клиент (ФИО/название)" style="min-width:170px">
-            <span class="row" data-total-wrap style="gap:6px">
-              <input class="input" data-f="total" placeholder="Сумма, ₽" type="number" min="0" style="max-width:120px">
-              <label class="row tiny faint" style="gap:4px;white-space:nowrap" title="Тестовый заказ: минимумы не применяются"><input type="checkbox" data-f="test">тест</label>
-            </span>
+            <input class="input" data-f="total" placeholder="Сумма, ₽" type="number" min="0" style="max-width:120px">
             <input class="input" data-f="start" type="date" title="Начало (по умолчанию сегодня)" style="max-width:150px" value="${new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)}">
             <input class="input" data-f="execs" placeholder="Исполнители через запятую" title="Исполнители" style="min-width:170px">
             <select class="input" data-f="status" title="Статус">
@@ -1067,7 +1064,8 @@ const CRM = (() => {
           const id = sanitizeOrderId(v('id'));
           const cl = (v('client')||'').trim();
           const total = parseFloat(v('total'))||0;
-          const isTest = !!((box.querySelector('[data-f="test"]')||{}).checked);
+          /* В инлайне тестовой отметки нет: минимумы действуют всегда,
+             тестовый заказ оформляется через форму с чекбоксом. */
           const minTotal = window.Finance ? Finance.cfg().minOrderTotal : 500;
           const minExec = window.Finance ? Finance.cfg().minExecutorPay : 100;
           const dlRaw = (v('deadline') || '').trim();
@@ -1075,7 +1073,7 @@ const CRM = (() => {
             ? (/^\d{4}-\d{2}-\d{2}$/.test(dlRaw) ? new Date(dlRaw + 'T00:00:00').getTime() : parseDateText(dlRaw))
             : null;
           if (!cl){ toast('Укажите клиента', 'warn'); focusField('client'); return; }
-          if (!isTest && total < minTotal){ toast(`Минимальная стоимость заказа — ${fmtMoney(minTotal)} (кроме тестового)`,'warn'); focusField('total'); return; }
+          if (total < minTotal){ toast(`Минимальная стоимость заказа — ${fmtMoney(minTotal)} (кроме тестового)`,'warn'); focusField('total'); return; }
           if (dlRaw && dlTs == null){
             toast('Укажите дату дедлайна', 'err');
             const f = box.querySelector('[data-f="deadline"]');
@@ -1104,9 +1102,9 @@ const CRM = (() => {
           if (execMissing.length) toast('Исполнители не найдены: ' + execMissing.join(', '), 'warn');
           const execShare = Math.round(total * ((window.Finance ? Finance.cfg().executorShare : 40) / 100));
           const execs = execUsers.map(u2 => ({ uid: u2.id, amount: execUsers.length ? Math.round(execShare / execUsers.length) : 0, is_paid:false }));
-          if (!isTest && execs.some(e => e.amount < minExec)){ toast(`Оплата исполнителя — не ниже ${fmtMoney(minExec)} (кроме тестового)`,'warn'); return; }
+          if (execs.some(e => e.amount < minExec)){ toast(`Оплата исполнителя — не ниже ${fmtMoney(minExec)} (кроме тестового)`,'warn'); return; }
           const no = { id: uid(), order_id: oid, client_id: client.id, order_date: now, deadline: dlTs,
-            status: statusRaw, total, is_test: isTest, certification_amount: 0, need_cert:false, start_date: (stTs || now), manager_id: me().id,
+            status: statusRaw, total, is_test: false, certification_amount: 0, need_cert:false, start_date: (stTs || now), manager_id: me().id,
             comment:'', project_id:'', folder_id:'', nish_id:'', executors:execs, audio:0, files:[], proposed_price:0, paid_amount:0,
             forbid_download:false, portfolio_ban:true, nda:false, history:[{ t: now, txt:'Заказ создан (инлайн)' }], created_at: now };
           if (no.deadline && no.start_date && no.deadline < no.start_date){ toast('Дедлайн раньше даты создания — исправьте','err'); return; }
@@ -2112,7 +2110,7 @@ const CRM = (() => {
         put(3, '[data-f="execs"]');
         put(4, '[data-f="start"]');
         put(5, '[data-f="deadline"]');
-        put(6, '[data-total-wrap]');
+        put(6, '[data-f="total"]');
         put(7, '[data-f="status"]');
       } else {
         /* Люди: имя — в колонку «ФИО», контакты — в соседнюю */
