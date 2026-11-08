@@ -204,7 +204,7 @@ const NavDrag = (() => {
     let reordered = false; /* порядок меню реально изменился (а не создано окно) */
     const V = window.NAV || [];
     const beforeJson = JSON.stringify(V);
-    const persist = () => { window.APP && window.APP._persistNav && window.APP._persistNav(); };
+    const persist = (el) => { window.APP && window.APP._persistNav && window.APP._persistNav(el); };
 
     if (target){
       // Перестановка в модели → _persistNav() перерисует меню в новом порядке
@@ -249,14 +249,14 @@ const NavDrag = (() => {
        позицию), — не событие: без тоста и без перерисовки. */
     if (moved && reordered && JSON.stringify(V) === beforeJson){ cancel(); return; }
     if (moved){
-      // Удалить перетаскиваемый элемент и placeholder (старые ссылки умрут с render в _persistNav)
-      if (src.isConnected && src.parentNode === document.body) src.remove();
+      /* Узел не удаляем: _persistNav вернёт его в меню и переставит без
+         перерисовки контента вьюпорта. Placeholder больше не нужен. */
       if (drag.placeholder && drag.placeholder.isConnected) drag.placeholder.remove();
       if (drag.guide) drag.guide.remove();
       const nav = document.querySelector('.side__nav');
       if (nav) nav.classList.remove('menu-drag-active');
       const beforeOrder = drag._order;
-      persist();
+      persist(src);
       drag = null; downTarget = null; downPos = null;
       document.body.classList.remove('menu-dragging');
       if (reordered && beforeOrder){

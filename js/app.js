@@ -110,6 +110,40 @@ const APP = (() => {
     return n;
   }
 
+  /* Перестановка меню без перерисовки вьюпорта: двигаем существующие узлы
+     боковой навигации по актуальному NAV. Контент и скролл не трогаем. */
+  function reorderNavDom(){
+    const navEl = document.querySelector('.side__nav');
+    const u = user();
+    if (!navEl || !u) return false;
+    const nav = navFor(u);
+    const heads = [...navEl.querySelectorAll(':scope > .side__sec[data-sec-title]')];
+    const pairs = [];
+    for (const sec of nav){
+      const head = heads.find(h => h.dataset.secTitle === sec.sec);
+      const box = head && head.nextElementSibling && head.nextElementSibling.classList.contains('side__sec-items')
+        ? head.nextElementSibling : null;
+      if (!head || !box) return false;
+      const links = new Map([...box.querySelectorAll('.side__link')].map(l => [l.dataset.route, l]));
+      for (const it of sec.items){
+        const link = links.get(it.route);
+        if (!link) return false;
+        link.dataset.sec = sec.sec;
+      }
+      sec.items.forEach(it => box.appendChild(links.get(it.route)));
+      pairs.push([head, box]);
+    }
+    const wanted = new Set(nav.map(s => s.sec));
+    heads.forEach(h => {
+      if (wanted.has(h.dataset.secTitle)) return;
+      const box = h.nextElementSibling;
+      if (box && box.classList.contains('side__sec-items')) box.remove();
+      h.remove();
+    });
+    pairs.forEach(([h, box]) => { navEl.appendChild(h); navEl.appendChild(box); });
+    return true;
+  }
+
   function renderShell(content){
     const u = user();
     const isMobile = window.matchMedia('(max-width:960px)').matches;
@@ -8206,10 +8240,26 @@ function initPWA(){
 
   /* Экспортируем хелперы персистентности для NavDrag */
   window.APP = {
-    _persistNav: () => {
+    _persistNav: (movedEl) => {
       prefsFor().navCustom = true;
       prefsFor().navCustomOrder = JSON.parse(JSON.stringify(NAV.map(s => ({ sec:s.sec, items:s.items.map(it => ({ route:it.route, title:it.title, icon:it.icon, roles:it.roles })) }))));
-      saveState(); render();
+      saveState();
+      const navEl = document.querySelector('.side__nav');
+      if (navEl && movedEl && movedEl.dataset && movedEl.dataset.route){
+        /* Возвращаем «гостя» в меню до перестановки: рендер контента не нужен */
+        movedEl.classList.remove('menu-drag-live');
+        movedEl.style.cssText = '';
+        const secName = ((NAV.find(s => s.items.some(i => i.route === movedEl.dataset.route)) || {}).sec) || '';
+        let head = null;
+        navEl.querySelectorAll(':scope > .side__sec[data-sec-title]').forEach(h => { if (h.dataset.secTitle === secName) head = h; });
+        const box = head && head.nextElementSibling && head.nextElementSibling.classList.contains('side__sec-items')
+          ? head.nextElementSibling : null;
+        if (box) { box.appendChild(movedEl); movedEl.dataset.sec = secName; }
+        else movedEl.remove();
+      }
+      if (navEl && reorderNavDom()) return;
+      if (movedEl && movedEl.isConnected) movedEl.remove();
+      render();
     },
     _navCtx: e => {
       e.preventDefault();
