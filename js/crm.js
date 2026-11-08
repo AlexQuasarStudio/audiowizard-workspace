@@ -383,6 +383,7 @@ const CRM = (() => {
       const pay = (amount != null && executorEntry) ? Math.max(0, Math.min(due, Number(amount)||0)) : due;
       e.paid = Math.min(amt, already + pay);
       e.is_paid = amt > 0 && e.paid >= amt;
+      if (pay > 0 && window.Finance && Finance.withdraw) Finance.withdraw(e.uid, pay);
       paidSum += pay;
     });
     if (!paidSum){ toast('Сумма к оплате нулевая','info'); return; }
@@ -428,8 +429,16 @@ const CRM = (() => {
   function returnToUnpaid(o){
     if (!o) return;
     let n = 0;
-    (o.executors || []).forEach(e => { if (e.is_paid || (Number(e.paid)||0) > 0){ e.is_paid = false; e.paid = 0; n++; } });
-    if (o.splitAccrual && o.splitAccrual.manager && o.splitAccrual.manager.paid){ o.splitAccrual.manager.paid = false; n++; }
+    (o.executors || []).forEach(e => {
+      const amount = Number(e.amount) || 0;
+      const paid = Math.max(0, Math.min(amount, Number(e.paid) || 0));
+      if (paid > 0 && window.Finance && Finance.credit) Finance.credit(e.uid, paid);
+      if (e.is_paid || paid > 0){ e.is_paid = false; e.paid = 0; n++; }
+    });
+    if (o.splitAccrual && o.splitAccrual.manager && o.splitAccrual.manager.paid){
+      if (window.Finance && Finance.credit) Finance.credit(o.splitAccrual.manager.uid, o.splitAccrual.manager.amount);
+      o.splitAccrual.manager.paid = false; n++;
+    }
     if (!n){ toast('У заказа нет оплаченных долей','info'); return; }
     o.history = o.history || [];
     o.history.push({ t: Date.now(), txt: 'Возврат в неоплаченные (вручную)' });
@@ -1839,18 +1848,28 @@ const CRM = (() => {
           if (!ok) return;
           /* Снимок прежних долей ДО Object.assign: иначе c.executors уже
              перезапишет o.executors, и сравнивать будет не с чем. */
+          const prevStatus = o.status;
           const prevExecs = (o.executors || []).map(e => ({ ...e }));
           Object.assign(o, c, {
             deadline: c.deadline ? new Date(c.deadline).getTime() : null,
             start_date: c.start ? new Date(c.start).getTime() : (o.order_date || Date.now()),
             audio: form.files.reduce((a,f)=>a+(f.duration||0),0)
           });
-          /* Правка оплаченного заказа пересчитывает последствия:
-             уменьшили долю ниже уже выплаченного — переплата вычитается из
-             заработка исполнителя (его баланса), paid подрезается;
-             увеличили — paid сохраняется, долг растёт сам (amount − paid).
-             Все корректировки фиксируются в истории заказа и аудите. */
+          /* Правка оплаченного заказа меняет баланс ровно на дельту доли:
+             увеличили — баланс и долг растут; уменьшили — баланс падает,
+             paid подрезается. Переплата сверх баланса фиксируется в истории
+             как неудержанная, чтобы не терять её молча. */
           const adjustments = [];
+          const wasAccrued = !!o.splitAccrual && ['done','archived'].includes(prevStatus) && ['done','archived'].includes(o.status);
+          const adjustBalance = (uid, delta) => {
+            const u2 = S.users.find(x => x.id === uid);
+            if (!u2 || !delta) return 0;
+            u2.ext = u2.ext || {};
+            const before = Number(u2.ext.earned) || 0;
+            if (delta > 0 && window.Finance && Finance.credit) Finance.credit(uid, delta);
+            else if (delta < 0 && window.Finance && Finance.withdraw) Finance.withdraw(uid, -delta);
+            return (Number(u2.ext.earned) || 0) - before;
+          };
           o.executors = c.executors.map(e => {
             const amt = Number(e.amount) || 0;
             const old = prevExecs.find(x => x.uid === e.uid) || {};
@@ -1858,19 +1877,30 @@ const CRM = (() => {
             const oldPaid = Math.max(0, Math.min(oldAmt, Number(old.paid != null ? old.paid : (old.is_paid ? oldAmt : 0)) || 0));
             const paid = Math.max(0, Math.min(amt, oldPaid));
             const over = oldPaid - amt;
+            const delta = amt - oldAmt;
             const exUser = S.users.find(x => x.id === e.uid);
             const nm = (exUser || {}).full_name || e.uid;
-            if (over > 0){
-              if (exUser){
-                exUser.ext = exUser.ext || {};
-                exUser.ext.earned = Math.max(0, Math.round((exUser.ext.earned || 0) - over));
-              }
-              adjustments.push(`${nm}: переплата ${fmtMoney(over)} списана из заработка`);
-            } else if (amt > oldPaid && oldPaid > 0){
-              adjustments.push(`${nm}: долг вырос на ${fmtMoney(amt - oldPaid)}`);
+            const applied = wasAccrued ? adjustBalance(e.uid, delta) : 0;
+            if (delta > 0 && applied > 0) adjustments.push(`${nm}: доля увеличена на ${fmtMoney(delta)} — баланс вырос на ${fmtMoney(applied)}`);
+            if (delta < 0){
+              const need = -delta, done = -applied;
+              adjustments.push(`${nm}: доля уменьшена на ${fmtMoney(need)} — баланс уменьшен на ${fmtMoney(done)}${done < need ? `, не удержано ${fmtMoney(need - done)}` : ''}`);
             }
+            if (over > 0) adjustments.push(`${nm}: paid подрезан до ${fmtMoney(paid)} (переплата ${fmtMoney(over)})`);
             return { ...e, paid, is_paid: amt > 0 && paid >= amt };
           });
+          /* Исполнитель убран из заказа — снимаем и его начисление. */
+          if (wasAccrued){
+            prevExecs.forEach(old => {
+              if (c.executors.some(e => e.uid === old.uid)) return;
+              const oldAmt = Number(old.amount) || 0;
+              if (!oldAmt) return;
+              const exUser = S.users.find(x => x.id === old.uid);
+              const nm = (exUser || {}).full_name || old.uid;
+              const applied = adjustBalance(old.uid, -oldAmt);
+              adjustments.push(`${nm}: убран из заказа — баланс уменьшен на ${fmtMoney(-applied)}${-applied < oldAmt ? `, не удержано ${fmtMoney(oldAmt + applied)}` : ''}`);
+            });
+          }
           if (adjustments.length){
             o.history.push({ t: Date.now(), txt: 'Корректировка оплат при редактировании: ' + adjustments.join('; ') });
             try { logAudit(`Корректировка оплат ${o.order_id}: ${adjustments.join('; ')}`, 'Оплата'); } catch(e){}
@@ -2970,7 +3000,7 @@ updatePeopleBulk();
       const thNum = `<th class="pl-num-h" style="width:34px;text-align:left;color:var(--faint)">№</th>`;
       const th = (key, label) => `<th class="sortable${psort.key===key?' sort-on':''}${psort.key===key&&psort.dir<0?' sort-desc':''}" data-psort="${key}">${label}</th>`;
       return role==='executor'
-        ? `<thead><tr>${thSel}${thNum}${th('name','Исполнитель')}<th>Специализации</th>${th('orders','Заказы')}<th>Выполнено</th>${th('earned','Заработано')}<th>Статус</th><th class="pl-act"></th></tr></thead>`
+        ? `<thead><tr>${thSel}${thNum}${th('name','Исполнитель')}<th>Специализации</th>${th('orders','Заказы')}<th>Выполнено</th>${th('earned','Баланс')}<th>Статус</th><th class="pl-act"></th></tr></thead>`
         : `<thead><tr>${thSel}${thNum}${th('name','Клиент')}<th>Контакт</th>${th('orders','Заказы')}${th('sum','Сумма')}<th>Статус</th><th class="pl-act"></th></tr></thead>`;
     }
     /* «…» в конце строки — те же действия, что по правому клику (как в заказах) */
@@ -3021,7 +3051,7 @@ updatePeopleBulk();
         <div class="cols-3 grid small" style="gap:6px;margin-top:12px">
           <div class="stat-mini"><b>${mt.orders}</b><span>заказов</span></div>
           <div class="stat-mini"><b>${mt.done}</b><span>выполнено</span></div>
-          <div class="stat-mini"><b>${fmtMoney(p.ext.earned)}</b><span>заработано</span></div>
+          <div class="stat-mini"><b>${fmtMoney(p.ext.earned)}</b><span>баланс</span></div>
         </div>
         <div class="row small" style="margin-top:10px;gap:6px;flex-wrap:wrap">
           <span data-inline="workStatus"><span class="badge ${p.ext.workStatus==='working'?'c-green':'c-gray'}">${p.ext.workStatus==='working'?'Работаю':'Не работаю'}</span></span>
@@ -3255,7 +3285,7 @@ updatePeopleBulk();
           <div class="cols-2 grid small" style="gap:8px">
             <div class="stat-mini"><b>${mt.orders}</b><span>заказов</span></div>
             ${role==='executor'?`
-              <div class="stat-mini"><b>${fmtMoney(p.ext.earned)}</b><span>заработано</span></div>
+              <div class="stat-mini"><b>${fmtMoney(p.ext.earned)}</b><span>баланс</span></div>
               <div class="stat-mini"><b>${mt.done}</b><span>выполнено</span></div>
               <div class="stat-mini"><b>${mt.success}%</b><span>успешных</span></div>
               <div class="stat-mini"><b>${mt.revision}</b><span>доработок</span></div>
@@ -3745,7 +3775,7 @@ updatePeopleBulk();
 
     function detectSheetKind(rows){
       const header = (rows.find(r => r && r.some(c => (c||'').trim())) || []).map(normHeader).join(' | ');
-      if (/заработано|умения|специализац/.test(header)) return { kind:'executors', confident:true };
+      if (/заработано|баланс|умения|специализац/.test(header)) return { kind:'executors', confident:true };
       if (/номер клиента|номера исполнителей|дедлайн|id заказа/.test(header)) return { kind:'orders', confident:true };
       if (/фио\/компания|e-mail|номер телефона/.test(header)) return { kind:'clients', confident:true };
       if (/фио|компания/.test(header)) return { kind:'clients', confident:false };
@@ -3766,7 +3796,7 @@ updatePeopleBulk();
       } else if (entity === 'executors'){
         m.fio = find('фио','имя'); m.email = find('e-mail','email','почта'); m.phone = find('телефон','тел');
         m.spec = find('спец','умения','специализац'); m.comment = find('комментарий');
-        m.earned = find('заработано'); m.orderids = find('id заказов','заказы');
+        m.earned = find('баланс','заработано'); m.orderids = find('id заказов','заказы');
         const dflt = [0,1,2,3,4,5,6], keys = ['fio','email','phone','spec','comment','earned','orderids'];
         keys.forEach((k,i)=>{ if (m[k] == null || m[k] < 0) m[k] = header.length >= 7 ? dflt[i] : -1; });
       } else {
@@ -4174,7 +4204,7 @@ updatePeopleBulk();
         return [['ФИО/Компания','Логин','Email','Телефон','Комментарий','Статус','№ строки'],
           ...noDemo(S.users.filter(x=>x.role==='client')).map((x,i)=>[x.full_name,x.username,x.email,x.phone,x.ext.comment,x.ext.status,x.ext.xlsxRow||(i+2)])];
       }
-      return [['ФИО','Логин','Email','Телефон','Специализации','Заработано','Статус','№ строки'],
+      return [['ФИО','Логин','Email','Телефон','Специализации','Баланс','Статус','№ строки'],
         ...noDemo(S.users.filter(x=>x.role==='executor')).map((x,i)=>[x.full_name,x.username,x.email,x.phone,x.ext.specializations.join(', '),x.ext.earned,x.ext.status,x.ext.xlsxRow||(i+2)])];
     };
     const emitCsv = (ent, nid) => {

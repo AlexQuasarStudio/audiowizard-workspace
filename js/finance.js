@@ -46,6 +46,10 @@ const Finance = (function(){
     u.ext = u.ext || {};
     u.ext.earned = Math.max(0, Math.round((u.ext.earned || 0) + delta));
   }
+  /* Баланс — это начислено минус выведено. Выплата (полная или частичная)
+     уменьшает баланс получателя, включая админа и менеджера. */
+  function credit(uid, amount){ addEarned(uid, Math.max(0, Number(amount) || 0)); }
+  function withdraw(uid, amount){ addEarned(uid, -(Math.max(0, Number(amount) || 0))); }
 
   function adminUser(){ return (S.users || []).find(u => u.role === 'admin') || null; }
   function managerIdOf(o){
@@ -69,7 +73,12 @@ const Finance = (function(){
           manager: mgrId ? { uid: mgrId, amount: s.manager, paid: false } : null,
           exec: s.exec
         };
-        if (adm) addEarned(adm.id, s.admin);
+        if (adm){
+          /* Маржа админа помечена paid:true — это сразу вывод средств,
+             поэтому баланс админа не накапливает её. */
+          addEarned(adm.id, s.admin);
+          withdraw(adm.id, s.admin);
+        }
         if (mgrId) addEarned(mgrId, s.manager);
       }
     } else {
@@ -268,8 +277,19 @@ const Finance = (function(){
     if (!pend.orders.length) return { ok:false, why:'Нет выполненных заказов с неоплаченными долями' };
     const by = (me() || {}).id || 'system';
     pend.orders.forEach(o => {
-      (o.executors || []).forEach(e => { e.is_paid = true; e.paid = Number(e.amount) || 0; });
-      if (o.splitAccrual && o.splitAccrual.manager) o.splitAccrual.manager.paid = true;
+      (o.executors || []).forEach(e => {
+        const amt = Number(e.amount) || 0;
+        const already = Math.max(0, Math.min(amt, Number(e.paid) || 0));
+        const due = Math.max(0, amt - already);
+        if (due > 0) withdraw(e.uid, due);
+        e.paid = amt;
+        e.is_paid = amt > 0;
+      });
+      if (o.splitAccrual && o.splitAccrual.manager && !o.splitAccrual.manager.paid){
+        const m = o.splitAccrual.manager;
+        if (Number(m.amount) > 0) withdraw(m.uid, m.amount);
+        m.paid = true;
+      }
       o.history = o.history || [];
       o.history.push({ t: Date.now(), txt: `Выплата${opts.manual ? ' (вручную)' : ' по расписанию'}: ${fmtMoney(pend.total)}` });
     });
@@ -383,7 +403,7 @@ const Finance = (function(){
     };
   }
 
-  return { cfg, split, accrue, debts, hasDebt, payoutCfg, period, fmtPeriod, pending, runPayout,
+  return { cfg, split, accrue, addEarned, credit, withdraw, debts, hasDebt, payoutCfg, period, fmtPeriod, pending, runPayout,
     nextCut, lastCut, skipNextPayout, skipInfo, autoTick,
     payoutOrders, excludedIds, isExcluded, setExcluded,
     scOf, scStatusLabel, requestSmartcat, approveSmartcat, rejectSmartcat, smartcatPayload, docsForOrder };
