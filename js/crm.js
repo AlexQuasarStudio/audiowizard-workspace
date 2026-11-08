@@ -1020,12 +1020,14 @@ const CRM = (() => {
           const cl = (v('client')||'').trim();
           const total = parseFloat(v('total'))||0;
           const isTest = !!((box.querySelector('[data-f="test"]')||{}).checked);
+          const minTotal = window.Finance ? Finance.cfg().minOrderTotal : 500;
+          const minExec = window.Finance ? Finance.cfg().minExecutorPay : 100;
           const dlRaw = (v('deadline') || '').trim();
           const dlTs = dlRaw
             ? (/^\d{4}-\d{2}-\d{2}$/.test(dlRaw) ? new Date(dlRaw + 'T00:00:00').getTime() : parseDateText(dlRaw))
             : null;
           if (!cl){ toast('Укажите клиента', 'warn'); focusField('client'); return; }
-          if (!isTest && total < 500){ toast('Минимальная стоимость заказа — 500 ₽ (кроме тестового)','warn'); focusField('total'); return; }
+          if (!isTest && total < minTotal){ toast(`Минимальная стоимость заказа — ${fmtMoney(minTotal)} (кроме тестового)`,'warn'); focusField('total'); return; }
           if (dlRaw && dlTs == null){
             toast('Укажите дату дедлайна', 'err');
             const f = box.querySelector('[data-f="deadline"]');
@@ -1054,7 +1056,7 @@ const CRM = (() => {
           if (execMissing.length) toast('Исполнители не найдены: ' + execMissing.join(', '), 'warn');
           const execShare = Math.round(total * ((window.Finance ? Finance.cfg().executorShare : 40) / 100));
           const execs = execUsers.map(u2 => ({ uid: u2.id, amount: execUsers.length ? Math.round(execShare / execUsers.length) : 0, is_paid:false }));
-          if (!isTest && execs.some(e => e.amount < 100)){ toast('Оплата исполнителя — не ниже 100 ₽ (кроме тестового)','warn'); return; }
+          if (!isTest && execs.some(e => e.amount < minExec)){ toast(`Оплата исполнителя — не ниже ${fmtMoney(minExec)} (кроме тестового)`,'warn'); return; }
           const no = { id: uid(), order_id: oid, client_id: client.id, order_date: now, deadline: dlTs,
             status: statusRaw, total, is_test: isTest, certification_amount: 0, need_cert:false, start_date: (stTs || now), manager_id: me().id,
             comment:'', project_id:'', folder_id:'', nish_id:'', executors:execs, audio:0, files:[], proposed_price:0, paid_amount:0,
@@ -1689,8 +1691,10 @@ const CRM = (() => {
         mask.querySelector('[data-save]').onclick = async ()=>{
           const c = collect();
           if (!c.client_id || !c.nish_id || !c.total){ toast('Заполните клиента, нишу и сумму','err'); return; }
-          if (!c.is_test && c.total < 500){ toast('Минимальная стоимость заказа — 500 ₽ (кроме тестового)','err'); const tf=g('#of-total'); if(tf){ tf.classList.add('is-bad'); tf.focus(); } return; }
-          if (!c.is_test && c.executors.some(e=>(e.amount||0) < 100)){ toast('Оплата исполнителя — не ниже 100 ₽ (кроме тестового)','err'); return; }
+          const minTotal = window.Finance ? Finance.cfg().minOrderTotal : 500;
+          const minExec = window.Finance ? Finance.cfg().minExecutorPay : 100;
+          if (!c.is_test && c.total < minTotal){ toast(`Минимальная стоимость заказа — ${fmtMoney(minTotal)} (кроме тестового)`,'err'); const tf=g('#of-total'); if(tf){ tf.classList.add('is-bad'); tf.focus(); } return; }
+          if (!c.is_test && c.executors.some(e=>(e.amount||0) < minExec)){ toast(`Оплата исполнителя — не ниже ${fmtMoney(minExec)} (кроме тестового)`,'err'); return; }
           if (!c.order_id){ c.order_id = generateOrderId(); }
           if (S.orders.some(x=>x.order_id===c.order_id && x.id!==o.id)){
             toast(`ID ${c.order_id} уже занят — выберите другой`, 'err');
@@ -1767,7 +1771,7 @@ const CRM = (() => {
     return `<div class="executor-pick__item ${sel?'sel':''}" data-uid="${e.id}" data-name="${esc(e.full_name+' '+e.ext.specializations.join(' '))}">
       ${avatarHTML(e,'avatar--sm')}<span style="flex:1;min-width:0"><b style="font-size:12.5px">${esc(e.full_name)}</b><br><span class="faint executor-pick__spec" style="font-size:11px">${esc(e.ext.specializations.join(', '))}</span></span>
       ${starsHTML(e.ext.qualOverall||0)}
-      <span class="executor-pick__amount">${sel?`<input type="number" class="ex-amount input" min="100" value="${sel.amount||''}" placeholder="₽">`:''}</span>
+      <span class="executor-pick__amount">${sel?`<input type="number" class="ex-amount input" min="${window.Finance?Finance.cfg().minExecutorPay:100}" value="${sel.amount||''}" placeholder="₽">`:''}</span>
       ${sel?`<span class="executor-pick__share"><input type="number" class="ex-share input" min="0" max="100" value="${sel.share!=null?sel.share:''}" placeholder="%"> <span class="tiny faint">%</span></span>`:''}</div>`;
   }
 

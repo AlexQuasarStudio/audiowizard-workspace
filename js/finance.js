@@ -15,7 +15,11 @@ const Finance = (function(){
       adminMargin: clamp(f.adminMargin ?? 25, 0, 100),
       managerFee: clamp(f.managerFee ?? 10, 0, 100),
       executorShare: clamp(f.executorShare ?? 40, 0, 100),
-      commission: clamp(f.payoutCommission ?? 5, 0, 50)
+      commission: clamp(f.payoutCommission ?? 5, 0, 50),
+      /* Минимумы — настраиваемые, не хардкод: 500 ₽ за заказ и 100 ₽ исполнителю
+         по умолчанию; тестовый заказ их обходит. */
+      minOrderTotal: Math.round(clamp(f.minOrderTotal ?? 500, 0, 10000000)),
+      minExecutorPay: Math.round(clamp(f.minExecutorPay ?? 100, 0, 10000000))
     };
   }
 

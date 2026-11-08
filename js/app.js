@@ -5969,6 +5969,8 @@ const cm = root.querySelector('.chat-main');
         <div class="field"><label>Время (МСК)</label><input class="input" id="po-time" type="time" value="${esc(p.time)}"></div>
         <div class="field"><label>Маржа админа, %</label><input class="input" id="po-admin" type="number" min="0" max="100" step="1" value="${cfg.adminMargin}"></div>
         <div class="field"><label>Доля менеджера, %</label><input class="input" id="po-mgr" type="number" min="0" max="100" step="1" value="${cfg.managerFee}"></div>
+        <div class="field"><label>Мин. сумма заказа, ₽</label><input class="input" id="po-min-total" type="number" min="0" step="50" value="${cfg.minOrderTotal}"></div>
+        <div class="field"><label>Мин. оплата исполнителя, ₽</label><input class="input" id="po-min-exec" type="number" min="0" step="10" value="${cfg.minExecutorPay}"></div>
         <div class="field"><label>Автоматически</label><label class="row small" style="gap:8px;padding-top:9px"><input type="checkbox" id="po-auto" ${p.auto?'checked':''}> по расписанию</label>
           <label class="row small" style="gap:8px"><input type="checkbox" id="po-on" ${p.enabled?'checked':''}> выплаты включены</label></div>
       </div>
@@ -6010,10 +6012,12 @@ const cm = root.querySelector('.chat-main');
     if (save) save.onclick = ()=>{
       const days = String((el.querySelector('#po-days')||{}).value||'').split(/[^0-9]+/).map(Number).filter(d=>d>=1&&d<=28);
       const time = ((el.querySelector('#po-time')||{}).value||'15:00').trim() || '15:00';
-      const comm = cfg.commission;
+      /* cfg в этом обработчике нет: комиссия — ориентир провайдера, здесь не сохраняется */
       const adm = Math.max(0, Math.min(100, Number((el.querySelector('#po-admin')||{}).value)||0));
       const mgr = Math.max(0, Math.min(100, Number((el.querySelector('#po-mgr')||{}).value)||0));
-      S.settings.finance = Object.assign({}, S.settings.finance, { adminMargin:adm, managerFee:mgr });
+      const minTotal = Math.max(0, Math.round(Number((el.querySelector('#po-min-total')||{}).value) || 0));
+      const minExec = Math.max(0, Math.round(Number((el.querySelector('#po-min-exec')||{}).value) || 0));
+      S.settings.finance = Object.assign({}, S.settings.finance, { adminMargin:adm, managerFee:mgr, minOrderTotal:minTotal, minExecutorPay:minExec });
       S.settings.payout = Object.assign({}, p, {
         enabled: !!((el.querySelector('#po-on')||{}).checked),
         auto: !!((el.querySelector('#po-auto')||{}).checked),
