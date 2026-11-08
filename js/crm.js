@@ -4093,6 +4093,12 @@ updatePeopleBulk();
             <select class="input" id="re-entity">${[['client','Клиент'],['order','Заказ']].map(([v,t])=>`<option value="${v}" ${rule.entity===v?'selected':''}>${t}</option>`).join('')}</select></div>
             <div class="small muted" style="align-self:end;padding-bottom:8px">Все условия объединяются через <b>И</b>; в значении можно использовать регулярные выражения.</div>
           </div>
+          <div class="row wrap" style="align-items:flex-end">
+            <div class="field" style="width:170px"><label>Приоритет</label>
+              <input class="input" id="re-pos" type="number" min="1" max="${S.importRules.length + (isNew ? 1 : 0)}" value="${isNew ? S.importRules.length + 1 : (S.importRules.findIndex(x => x.id === rule.id) + 1)}"></div>
+            <div class="field" style="flex:1"><label>Статус</label>
+              <label class="check" style="display:flex"><input type="checkbox" id="re-enabled" ${rule.enabled !== false ? 'checked' : ''}><span class="box"><svg><use href="#i-check-c"/></svg></span><span class="small">Правило включено</span></label></div>
+          </div>
           <div class="stack" style="gap:8px" id="re-conds"></div>
           <button class="btn btn--ghost btn--sm" id="re-addcond">${icon('plus')} Добавить условие</button>
           <hr>
@@ -4141,11 +4147,20 @@ updatePeopleBulk();
             if (!conds.length){ toast('Добавьте хотя бы одно условие', 'err'); return; }
             const a = g2('#re-action').value;
             const valEl = g2('#re-val');
+            rule.enabled = !!(g2('#re-enabled') || {}).checked;
             rule.conditions = conds;
             rule.action_type = a;
             rule.action_value = a === 'discount' ? '' : (valEl ? valEl.value : '');
             if (isNew) S.importRules.push(rule);
             else Object.assign(existing, rule);
+            /* Приоритет прямо в редакторе: переносим правило на выбранную позицию */
+            const posRaw = parseInt(((g2('#re-pos') || {}).value || ''), 10);
+            const want = Math.max(1, Math.min(S.importRules.length, posRaw || S.importRules.length));
+            const cur = S.importRules.findIndex(x => x.id === rule.id);
+            if (cur >= 0 && cur !== want - 1){
+              const [it] = S.importRules.splice(cur, 1);
+              S.importRules.splice(want - 1, 0, it);
+            }
             logAudit((isNew ? 'Создано' : 'Изменено') + ' правило импорта', 'Настройки');
             saveState(); toast('Правило сохранено', 'ok'); close(); APP.render();
           };
