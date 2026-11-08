@@ -2279,28 +2279,165 @@ ex.innerHTML = avatarHTML(user(), '');
       return parts[0] + (parts[1] ? ' ' + parts[1][0] + '.' : '');
     });
   }
+  function revExecFullNames(o){
+    return (o.executors || []).map(e => userById(e.uid)).filter(Boolean).map(x => x.full_name);
+  }
   const revPlural = n => (n%10===1 && n%100!==11) ? 'заказ'
     : ((n%10>=2 && n%10<=4 && !(n%100>=12 && n%100<=14)) ? 'заказа' : 'заказов');
-  /* Выгрузка детализации в CSV: «;» + BOM — открывается в Excel без плясок */
-  function revExportCsv(rows, total, from, to){
-    const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-    const num = v => (Math.round((v || 0) * 100) / 100).toFixed(2).replace('.', ',');
-    const lines = [['Заказ','Клиент','Ниша','Исполнители','Дата выполнения','Сумма','Доля, %'].map(q).join(';')];
+  /* ---------- Экспорт детализации: сводка + расшифровка ---------- */
+  const REV_COLS = ['Заказ','Клиент','Ниша','Проект','Менеджер','Исполнители','Выполнен','Сумма','Доля, %','Исполнителям','Менеджеру','Админу','Остаток','Оплачено клиентом','Долг','Долг исполнителям','Долг менеджеру','Статус'];
+  const revNum = v => (Math.round((Number(v) || 0) * 100) / 100).toFixed(2).replace('.', ',');
+  function revData(rows, total, from, to){
+    const u = user();
+    const days = Math.max(1, Math.round((revDayStart(to - 1) - revDayStart(from)) / DAY) + 1);
+    const allDone = ordersFor(u).filter(o => o.status === 'done');
+    const allTotal = allDone.reduce((a,o) => a + (Number(o.total) || 0), 0);
+    const top = rows.reduce((a,x) => (!a || (Number(x.o.total)||0) > (Number(a.o.total)||0)) ? x : a, null);
+    const list = rows.map(x => {
+      const o = x.o;
+      const sp = window.Finance ? Finance.split(o) : { exec:0, manager:0, admin:0, left:0 };
+      const dbt = window.Finance ? Finance.debts(o) : { total:0, exec:0, manager:0 };
+      const mgr = userById(o.manager_id) || {};
+      return {
+        order_id: o.order_id || '',
+        client: revClientName(o),
+        niche: nicheName(o.nish_id),
+        project: (S.projects.find(p => p.id === o.project_id) || {}).name || '',
+        manager: mgr.full_name || '',
+        executors: revExecFullNames(o).join(', '),
+        done_at: revISO(x.at),
+        total: Number(o.total) || 0,
+        share: total ? (Number(o.total) || 0) / total * 100 : 0,
+        exec_total: sp.exec || 0,
+        manager_fee: sp.manager || 0,
+        admin: sp.admin || 0,
+        left: sp.left || 0,
+        paid_amount: Number(o.paid_amount) || 0,
+        debt: dbt.total || 0,
+        debt_exec: dbt.exec || 0,
+        debt_manager: dbt.manager || 0,
+        status: (STATUS_META[o.status] || {}).label || o.status || ''
+      };
+    });
+    /* Расшифровка по исполнителям и по дням — для отдельных листов Excel */
+    const byExecutor = [];
     rows.forEach(x => {
       const o = x.o;
-      const share = total ? (o.total / total * 100) : 0;
-      lines.push([o.order_id || '', revClientName(o), nicheName(o.nish_id), revExecNames(o).join(', '),
-        revISO(x.at), num(o.total), share.toFixed(1).replace('.', ',')].map(q).join(';'));
+      (o.executors || []).forEach(e => {
+        const ex = userById(e.uid) || {};
+        const amount = Number(e.amount) || 0;
+        const paid = Math.max(0, Math.min(amount, Number(e.paid != null ? e.paid : (e.is_paid ? amount : 0)) || 0));
+        byExecutor.push({ order_id: o.order_id || '', executor: ex.full_name || e.uid, amount, paid, debt: Math.max(0, amount - paid) });
+      });
     });
-    lines.push(['Итого', rows.length + ' ' + revPlural(rows.length), '', '', '', num(total), '100,0'].map(q).join(';'));
-    const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type:'text/csv;charset=utf-8' });
+    const dayMap = new Map();
+    rows.forEach(x => {
+      const d = revISO(x.at);
+      const cur = dayMap.get(d) || { date: d, orders: 0, revenue: 0 };
+      cur.orders += 1;
+      cur.revenue += Number(x.o.total) || 0;
+      dayMap.set(d, cur);
+    });
+    const byDay = [...dayMap.values()].sort((a,b) => a.date.localeCompare(b.date));
+    return {
+      meta: {
+        generated_at: new Date().toISOString(),
+        generated_by: u ? u.full_name : '',
+        period: { from: revISO(from), to: revISO(to - DAY), days, label: fmtDate(from) + ' — ' + fmtDate(to - DAY) },
+        preset: revRange ? revRange.preset : 'custom',
+        note: 'Только выполненные заказы'
+      },
+      totals: {
+        revenue: total,
+        orders: rows.length,
+        avg: rows.length ? Math.round(total / rows.length) : 0,
+        top: top ? (Number(top.o.total) || 0) : 0,
+        share_of_all: allTotal ? total / allTotal * 100 : 0
+      },
+      rows: list,
+      byExecutor,
+      byDay
+    };
+  }
+  function revDownload(name, blob){
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = 'vyruchka_' + revISO(from) + '_' + revISO(to - DAY) + '.csv';
+    a.href = url; a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url), 1000);
-    toast('Детализация выгружена в CSV', 'ok');
+    setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  }
+  function revFileName(data, ext){
+    return 'vyruchka_' + data.meta.period.from + '_' + data.meta.period.to + '.' + ext;
+  }
+  function revSum(data, key){
+    return data.rows.reduce((a,r) => a + (Number(r[key]) || 0), 0);
+  }
+  function revExportCsv(data){
+    const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const lines = [REV_COLS.map(q).join(';')];
+    data.rows.forEach(r => {
+      lines.push([r.order_id, r.client, r.niche, r.project, r.manager, r.executors, r.done_at,
+        revNum(r.total), r.share.toFixed(1).replace('.', ','), revNum(r.exec_total),
+        revNum(r.manager_fee), revNum(r.admin), revNum(r.left), revNum(r.paid_amount),
+        revNum(r.debt), revNum(r.debt_exec), revNum(r.debt_manager), r.status].map(q).join(';'));
+    });
+    lines.push(['Итого', data.rows.length + ' ' + revPlural(data.rows.length), '', '', '', '', '',
+      revNum(data.totals.revenue), '100,0', revNum(revSum(data,'exec_total')),
+      revNum(revSum(data,'manager_fee')), revNum(revSum(data,'admin')), revNum(revSum(data,'left')),
+      revNum(revSum(data,'paid_amount')), revNum(revSum(data,'debt')), revNum(revSum(data,'debt_exec')),
+      revNum(revSum(data,'debt_manager')), ''].map(q).join(';'));
+    revDownload(revFileName(data, 'csv'), new Blob(['\ufeff' + lines.join('\r\n')], { type:'text/csv;charset=utf-8' }));
+    toast(`Детализация: ${data.rows.length} ${revPlural(data.rows.length)} в CSV`, 'ok');
+  }
+  function revExportXlsx(data){
+    const header = REV_COLS;
+    const rows = data.rows.map(r => [r.order_id, r.client, r.niche, r.project, r.manager, r.executors,
+      r.done_at, r.total, +r.share.toFixed(1), r.exec_total, r.manager_fee, r.admin, r.left,
+      r.paid_amount, r.debt, r.debt_exec, r.debt_manager, r.status]);
+    rows.push(['Итого', data.rows.length + ' ' + revPlural(data.rows.length), '', '', '', '', '',
+      data.totals.revenue, 100, revSum(data,'exec_total'), revSum(data,'manager_fee'),
+      revSum(data,'admin'), revSum(data,'left'), revSum(data,'paid_amount'),
+      revSum(data,'debt'), revSum(data,'debt_exec'), revSum(data,'debt_manager'), '']);
+    const summary = [
+      ['Детализация выручки', ''],
+      ['Период', data.meta.period.label],
+      ['Дней', data.meta.period.days],
+      ['Выручка', data.totals.revenue],
+      ['Заказов', data.totals.orders],
+      ['Средний чек', data.totals.avg],
+      ['Крупнейший заказ', data.totals.top],
+      ['Доля от всей выручки, %', +data.totals.share_of_all.toFixed(1)],
+      ['Сформировано', new Date().toLocaleString('ru-RU')],
+      ['Пользователь', data.meta.generated_by],
+      ['Примечание', data.meta.note]
+    ];
+    const execSum = k => data.byExecutor.reduce((a,r) => a + (Number(r[k]) || 0), 0);
+    const execRows = [['Заказ','Исполнитель','Доля','Оплачено','Долг']];
+    data.byExecutor.forEach(r => execRows.push([r.order_id, r.executor, r.amount, r.paid, r.debt]));
+    execRows.push(['Итого', '', execSum('amount'), execSum('paid'), execSum('debt')]);
+    const dayRows = [['Дата','Заказов','Выручка']];
+    data.byDay.forEach(r => dayRows.push([r.date, r.orders, r.revenue]));
+    dayRows.push(['Итого', data.totals.orders, data.totals.revenue]);
+    const book = { 'Сводка': summary, 'Заказы': [header, ...rows], 'Исполнители': execRows, 'По дням': dayRows };
+    revDownload(revFileName(data, 'xlsx'), new Blob([AWX.writeSheets(book)], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    toast(`Детализация: ${data.rows.length} ${revPlural(data.rows.length)} в Excel`, 'ok');
+  }
+  function revExportJson(data){
+    revDownload(revFileName(data, 'json'), new Blob([JSON.stringify(data, null, 2)], { type:'application/json;charset=utf-8' }));
+    toast('Детализация выгружена в JSON', 'ok');
+  }
+  function revCopyTsv(data){
+    const lines = [REV_COLS.join('\t')];
+    data.rows.forEach(r => {
+      lines.push([r.order_id, r.client, r.niche, r.project, r.manager, r.executors, r.done_at,
+        revNum(r.total), r.share.toFixed(1).replace('.', ','), revNum(r.exec_total),
+        revNum(r.manager_fee), revNum(r.admin), revNum(r.left), revNum(r.paid_amount),
+        revNum(r.debt), revNum(r.debt_exec), revNum(r.debt_manager), r.status].join('\t'));
+    });
+    const text = lines.join('\n');
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(()=>toast('Таблица скопирована','ok')).catch(()=>toast('Не удалось скопировать','err'));
+    } else toast('Копирование недоступно','warn');
   }
   function drawRevenueDetail(box, u, base, firstAt){
     const from = revRange.from, to = revRange.to;
@@ -2310,6 +2447,7 @@ ex.innerHTML = avatarHTML(user(), '');
     const avg = rows.length ? total / rows.length : 0;
     const top = rows.reduce((a,x) => (!a || (x.o.total||0) > (a.o.total||0)) ? x : a, null);
     const days = Math.max(1, Math.round((revDayStart(to - 1) - revDayStart(from)) / DAY) + 1);
+    const data = revData(rows, total, from, to);
 
     const presetHtml = REV_PRESETS.map(p =>
       `<button type="button" class="btn btn--sm ${revRange.preset === p.id ? 'btn--primary' : 'btn--ghost'}" data-rp="${p.id}">${p.label}</button>`).join('');
@@ -2321,6 +2459,7 @@ ex.innerHTML = avatarHTML(user(), '');
           <label>с <input type="date" id="rev-from" value="${revISO(from)}" aria-label="Начало периода"></label>
           <label>по <input type="date" id="rev-to" value="${revISO(to - DAY)}" aria-label="Конец периода"></label>
           <button type="button" class="btn btn--ghost btn--sm" data-rev-apply>Применить</button>
+          <button type="button" class="btn btn--soft btn--sm" data-rev-export>${icon('export','ico-sm')} Экспорт</button>
         </div>
       </div>
       <div class="rev-period small muted">${fmtDate(from)} — ${fmtDate(to - DAY)} · ${days} ${days===1?'день':(days<5?'дня':'дней')} · только выполненные заказы</div>
@@ -2334,7 +2473,6 @@ ex.innerHTML = avatarHTML(user(), '');
       ${rows.length ? `
       <div class="row row--between rev-actions">
         <b class="small">Заказы периода</b>
-        <button type="button" class="btn btn--ghost btn--sm" data-rev-csv>${icon('clip','ico-sm')} Экспорт CSV</button>
       </div>
       <div class="tbl-wrap rev-tbl"><table class="tbl">
         <thead><tr><th>Заказ</th><th>Клиент</th><th>Ниша</th><th>Исполнители</th><th>Выполнен</th><th class="pay-cell">Сумма</th><th class="pay-cell">Доля</th></tr></thead>
@@ -2369,8 +2507,14 @@ ex.innerHTML = avatarHTML(user(), '');
       revRange = { preset:'custom', from:f, to: t2 + DAY };
       drawRevenueDetail(box, u, base, firstAt);
     };
-    const csvBtn = box.querySelector('[data-rev-csv]');
-    if (csvBtn) csvBtn.onclick = () => revExportCsv(rows, total, from, to);
+    const expBtn = box.querySelector('[data-rev-export]');
+    if (expBtn) expBtn.onclick = () => showDropdown(expBtn, [
+      { label:'Excel (.xlsx)', icon:'table', onClick:()=>revExportXlsx(data) },
+      { label:'CSV для Excel', icon:'export', onClick:()=>revExportCsv(data) },
+      { label:'JSON (данные)', icon:'file', onClick:()=>revExportJson(data) },
+      '-',
+      { label:'Копировать таблицу', icon:'copy', onClick:()=>revCopyTsv(data) }
+    ], { alignRight:true });
   }
   function openRevenueDetail(){
     const u = user();
@@ -5743,18 +5887,20 @@ const cm = root.querySelector('.chat-main');
   /* ---------- Тикеты ---------- */
   function ticketsView(root){
     const u = user();
+    const counts = () => `${noDemo(S.tickets).length} всего · новых: ${noDemo(S.tickets).filter(t=>t.status==='new').length} · в работе: ${noDemo(S.tickets).filter(t=>t.status==='in_progress').length} · решено: ${noDemo(S.tickets).filter(t=>t.status==='resolved').length}`;
+    const ticketRow = (t) => {
+      const author = userById(t.user_id)||{};
+      return `<div class="ticket-row" data-t="${t.id}">
+        <span class="badge ${({new:'c-red',in_progress:'c-yellow',resolved:'c-green'})[t.status]}"><span class="dot"></span>${({new:'Новое',in_progress:'В работе',resolved:'Решено'})[t.status]}</span>
+        <span style="flex:1;min-width:0"><b class="small">#${t.id.slice(0,4).toUpperCase()} · ${esc(t.subject)}</b>
+        <div class="cell-sub">${esc(author.full_name||'')}${t.order_id?` · заказ ${esc(t.order_id)}`:''} · ${timeAgo(t.created_at)}</div></span>
+        <button class="btn btn--ghost btn--sm" data-next="${t.id}">${t.status==='new'?'Взять в работу':t.status==='in_progress'?'Решить':'Архив'}</button>
+      </div>`;
+    };
     root.innerHTML = `
-      <div class="page-head"><div><h2>Тикеты</h2><div class="sub">${noDemo(S.tickets).length} всего · новых: ${noDemo(S.tickets).filter(t=>t.status==='new').length} · в работе: ${noDemo(S.tickets).filter(t=>t.status==='in_progress').length} · решено: ${noDemo(S.tickets).filter(t=>t.status==='resolved').length}</div></div>
+      <div class="page-head"><div><h2>Тикеты</h2><div class="sub" id="tk-count">${counts()}</div></div>
           ${u.role==='admin'?`<div class="page-actions"><button class="btn btn--ghost btn--sm" id="tk-exp">${icon('export')} Экспорт CSV</button></div>`:''}</div>
-      ${noDemo(S.tickets).map(t=>{
-        const author = userById(t.user_id)||{};
-        return `<div class="ticket-row" data-t="${t.id}">
-          <span class="badge ${({new:'c-red',in_progress:'c-yellow',resolved:'c-green'})[t.status]}"><span class="dot"></span>${({new:'Новое',in_progress:'В работе',resolved:'Решено'})[t.status]}</span>
-          <span style="flex:1;min-width:0"><b class="small">#${t.id.slice(0,4).toUpperCase()} · ${esc(t.subject)}</b>
-          <div class="cell-sub">${esc(author.full_name||'')}${t.order_id?` · заказ ${esc(t.order_id)}`:''} · ${timeAgo(t.created_at)}</div></span>
-          <button class="btn btn--ghost btn--sm" data-next="${t.id}">${t.status==='new'?'Взять в работу':t.status==='in_progress'?'Решить':'Архив'}</button>
-        </div>`;
-      }).join('') || `<div class="empty">${icon('tickets')}<span>Тикетов нет</span></div>`}`;
+      <div id="tk-list">${noDemo(S.tickets).map(ticketRow).join('') || `<div class="empty">${icon('tickets')}<span>Тикетов нет</span></div>`}</div>`;
     const tkExp = root.querySelector('#tk-exp');
     if (tkExp) tkExp.onclick = ()=>{
       const rows = [['№','Статус','Тема','Сообщение','Автор','Заказ','Создан']];
@@ -5770,7 +5916,14 @@ const cm = root.querySelector('.chat-main');
       t.status = t.status==='new'?'in_progress':t.status==='in_progress'?'resolved':'resolved';
       if (t.status==='resolved') t.resolved_at = Date.now();
       logAudit(`Тикет: ${t.subject} → ${t.status}`, 'Тикет');
-      saveState(); toast('Статус тикета обновлён','ok'); APP.render();
+      saveState(); toast('Статус тикета обновлён','ok');
+      /* Обновляем только эту строку и счётчики, раздел не перерисовываем */
+      const row = b.closest('.ticket-row');
+      const meta = {new:['c-red','Новое','Взять в работу'], in_progress:['c-yellow','В работе','Решить'], resolved:['c-green','Решено','Архив']}[t.status];
+      const badge = row && row.querySelector('.badge');
+      if (badge && meta){ badge.className = 'badge ' + meta[0]; badge.innerHTML = '<span class="dot"></span>' + meta[1]; b.textContent = meta[2]; }
+      const cnt = root.querySelector('#tk-count');
+      if (cnt) cnt.textContent = counts();
     });
     const openTicket = (t)=>{
       if (!t) return;
@@ -5779,14 +5932,27 @@ const cm = root.querySelector('.chat-main');
         footer:`<button class="btn btn--primary" data-x>Закрыть</button>`,
         onMount:(m2,c2)=>m2.querySelector('[data-x]').onclick=c2 });
     };
-    $$('.ticket-row', root).forEach(r=>{
+    const bindTicketRow = (r)=>{
       const open = e=>{ if (e.target.closest('button')) return; openTicket(S.tickets.find(x=>x.id===r.dataset.t)); };
       r.onclick = open;
       /* Двойной клик по строке — та же модалка (единое правило) */
       r.addEventListener('dblclick', open);
-    });
+    };
+    $$('.ticket-row', root).forEach(bindTicketRow);
+    /* Новый тикет из любого раздела: добавляем строку на место, без render */
+    window.__ticketCreated = (t) => {
+      if (!root.isConnected || !t) return;
+      const list = root.querySelector('#tk-list');
+      if (!list) return;
+      const empty = list.querySelector('.empty');
+      if (empty) empty.remove();
+      list.insertAdjacentHTML('afterbegin', ticketRow(t));
+      const row = list.querySelector(`.ticket-row[data-t="${t.id}"]`);
+      if (row) bindTicketRow(row);
+      const cnt = root.querySelector('#tk-count');
+      if (cnt) cnt.textContent = counts();
+    };
   }
-
   /* ---------- Идеи ---------- */
   function ideasView(root){
     const u = user();

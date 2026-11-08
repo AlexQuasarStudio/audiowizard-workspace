@@ -10,6 +10,10 @@ const CRM = (() => {
   /* Групповое выделение персон (клиенты/исполнители): живущее на уровне модуля,
      т.к. personRow/personCard определяются вне peopleView. */
   const psel = new Set();
+  /* Точечное обновление текущего списка после закрытия окна: без полной
+     перерисовки раздела и без мигания меню. */
+  let ordersRefresh = null;
+  let peopleRefresh = null;
   /* Состояние drag-выделения таблиц/карточек. Живёт на уровне модуля, чтобы
      сбрасываться ОДНИМ постоянным обработчиком mouseup и по Esc.
      Раньше mouseup-слушатели вешались с {once:true}: после первого отпускания
@@ -347,7 +351,7 @@ const CRM = (() => {
     S.orders = S.orders.filter(x=>x.id!==o.id);
     logAudit(`Удалён заказ ${o.order_id}`, 'Заказ'); saveState();
     toast(`Заказ ${o.order_id} удалён`, 'ok');
-    APP.render();
+    refreshOrder(o);
   }
 
   function payOrder(o, executorEntry, amount){
@@ -384,7 +388,7 @@ const CRM = (() => {
     if (!paidSum){ toast('Сумма к оплате нулевая','info'); return; }
     logAudit(`Оплата исполнителям по ${o.order_id}: ${fmtMoney(paidSum)}${(amount != null && executorEntry) ? ' (частично)' : ''} — ${targets.map(e=>(userById(e.uid)||{}).full_name).join(', ')}`, 'Заказ');
     toast(`Оплачено ${fmtMoney(paidSum)}${(amount != null && executorEntry) ? ' (частично)' : ''}`, 'ok');
-    saveState(); APP.render();
+    saveState(); refreshOrder(o);
   }
 
   /* Частичная оплата одного исполнителя: можно закрыть часть доли
@@ -432,7 +436,7 @@ const CRM = (() => {
     try { logAudit(`Заказ ${o.order_id} возвращён в неоплаченные`, 'Оплата'); } catch(e){}
     saveState();
     toast(`Заказ ${o.order_id} снова в неоплаченных`,'ok');
-    APP.render();
+    refreshOrder(o);
   }
 
   /* Латиница для инициалов (номер заказа должен быть читаемым в любой раскладке) */
@@ -1346,6 +1350,36 @@ const CRM = (() => {
       });
     }
 
+    /* Точечное обновление одного заказа: строка/карточка на месте,
+       раздел и меню не перерисовываются. */
+    ordersRefresh = (o) => {
+      if (!root.isConnected || !o) return;
+      const cardsView = (S.settings.ordersView || 'table') === 'cards';
+      list = computeList();
+      const row = root.querySelector(`tr[data-oid="${o.id}"]`);
+      const card = root.querySelector(`.o-card[data-oid="${o.id}"]`);
+      if (!list.some(x => x.id === o.id)){
+        if (row){ row.remove(); shown = Math.max(0, shown - 1); }
+        if (card){ card.remove(); shown = Math.max(0, shown - 1); }
+        updateCount();
+        return;
+      }
+      if (cardsView && card) card.outerHTML = cardHTML(o);
+      else if (!cardsView && row) row.outerHTML = rowHTML(o);
+      else if (!card && !row){
+        const host = root.querySelector('#o-rows');
+        const target = host && (cardsView ? host.querySelector('.o-cards') : host.querySelector('tbody'));
+        if (target){
+          target.insertAdjacentHTML('afterbegin', cardsView ? cardHTML(o) : rowHTML(o));
+          shown = Math.min(shown + 1, list.length);
+        }
+      } else {
+        /* Вид переключился, пока окно было открыто — обновляем список локально */
+        render(false);
+        return;
+      }
+      updateCount();
+    };
     render(firstEntry);
     firstEntry = false;
     CRM._ordersRerender = () => render(false);
@@ -1379,7 +1413,7 @@ const CRM = (() => {
       items.push({ label: bl ? 'Убрать из ЧС' : 'Добавить в ЧС', icon:'x-c', danger:!bl, onClick:()=>{
         p.ext.status = bl ? 'active' : 'blacklisted';
         logAudit(`${bl?'Убран из ЧС':'Добавлен в ЧС'}: ${p.full_name}`,'Безопасность');
-        saveState(); toast(bl?'Разблокирован':'Добавлен в ЧС','ok'); APP.render();
+        saveState(); toast(bl?'Разблокирован':'Добавлен в ЧС','ok'); refreshPerson(p);
       }});
       items.push({ label:'Редактировать', icon:'edit', onClick:()=>openPersonForm(role, p) });
     }
@@ -1855,7 +1889,7 @@ const CRM = (() => {
           DraftsDB.del('order-form');
           toast(`Заказ ${o.order_id} сохранён`, 'ok');
           if (adjustments.length) toast('Корректировка: ' + adjustments.join('; '), 'info');
-          close(); APP.render();
+          close(); refreshOrder(o);
         };
       }
     });
@@ -1990,7 +2024,7 @@ const CRM = (() => {
         mask.addEventListener('click', async e=>{
           const t = e.target.closest('[data-st],[data-pay],[data-dl],[data-pay-client],[data-ticket],[data-edit],[data-del],[data-arch],[data-fee-edit]');
           if (!t) return;
-          if (t.dataset.st) { await setStatus(o, t.dataset.st); close(); APP.render(); }
+          if (t.dataset.st) { await setStatus(o, t.dataset.st); close(); refreshOrder(o); }
           if ('feeEdit' in t.dataset){
             const ceil = u.role==='admin' ? 100 : u.role==='top_manager' ? (feeCeil.top_manager ?? 10) : (feeCeil.manager ?? 15);
             openWinModal({ narrow:true, title:'Гонорар менеджера',
@@ -2020,7 +2054,7 @@ const CRM = (() => {
             ex.approved_by_admin = true;
             logAudit(`Согласовано превышение оплаты: ${o.order_id} (${fmtMoney(ex.amount)})`, 'Оплата');
             saveState(); toast('Превышение согласовано — менеджер может провести оплату', 'ok');
-            close(); APP.render();
+            close(); refreshOrder(o);
           }
           if ('pay' in t.dataset){ openPayDialog(o, o.executors.find(x=>x.uid===t.dataset.pay), close); return; }
           if ('payClient' in t.dataset){
@@ -2032,7 +2066,7 @@ const CRM = (() => {
                   const v = +m2.querySelector('#pay-v').value || 0;
                   o.paid_amount = Math.min(o.total, paid + v);
                   logAudit(`Платёж по ${o.order_id}: ${fmtMoney(v)}`,'Заказ');
-                  saveState(); toast('Платёж отмечен','ok'); close2(); APP.render();
+                  saveState(); toast('Платёж отмечен','ok'); close2(); refreshOrder(o);
                 };
               } });
           }
@@ -2042,8 +2076,8 @@ const CRM = (() => {
           if ('ticket' in t.dataset){ close(); CRM.openTicket(o.order_id); }
           if ('orderChat' in t.dataset){ close(); ensureOrderChat(o); }
           if ('edit' in t.dataset){ close(); openOrderForm(o.id); }
-          if ('del' in t.dataset){ await deleteOrder(o); close(); APP.render(); }
-          if ('arch' in t.dataset){ await setStatus(o, o.status==='archived' ? (o.history.some(h=>h.txt.includes('Выполнено'))?'done':'work') : 'archived'); close(); APP.render(); }
+          if ('del' in t.dataset){ await deleteOrder(o); close(); refreshOrder(o); }
+          if ('arch' in t.dataset){ await setStatus(o, o.status==='archived' ? (o.history.some(h=>h.txt.includes('Выполнено'))?'done':'work') : 'archived'); close(); refreshOrder(o); }
         });
       }
     });
@@ -2895,6 +2929,39 @@ updatePeopleBulk();
       personContextMenu(uid, role, e.clientX, e.clientY);
     });
 
+    /* Точечное обновление одной карточки/строки после закрытия окна:
+       раздел и меню остаются на месте, перерисовывается только человек.
+       Если он перестал проходить фильтр — убираем его из списка. */
+    peopleRefresh = (p) => {
+      if (!root.isConnected || !p) return;
+      if (!list.some(x => x.id === p.id)) list.push(p);
+      const cardsView = (S.settings[viewKey] || S.settings.peopleView || 'cards') === 'cards';
+      const card = root.querySelector(`.person-card[data-uid="${p.id}"]`);
+      const row = root.querySelector(`tr[data-uid="${p.id}"]`);
+      const shownNow = () => root.querySelectorAll('#pl-rows > .person-card, #pl-rows > tr[data-uid]').length;
+      if (p.role !== role){
+        const i = list.findIndex(x => x.id === p.id);
+        if (i >= 0) list.splice(i, 1);
+      }
+      if (p.role !== role || !filteredAll().some(x => x.id === p.id)){
+        if (card) card.remove();
+        if (row) row.remove();
+        updateCount(shownNow());
+        return;
+      }
+      const numEl = (card && card.querySelector('.x-num')) || (row && row.querySelector('.pl-num'));
+      const num = numEl ? String(numEl.textContent || '').trim() : '';
+      if (card) card.outerHTML = personCard(p, role, staff, num);
+      if (row) row.outerHTML = personRow(p, role, staff, num);
+      if (!card && !row){
+        const host = root.querySelector('#pl-rows');
+        if (host){
+          if (!host.querySelector('.person-card, tr[data-uid], #pl-sentinel')) host.innerHTML = '';
+          host.insertAdjacentHTML('afterbegin', cardsView ? personCard(p, role, staff, num) : personRow(p, role, staff, num));
+        }
+      }
+      updateCount(shownNow());
+    };
     render();
   }
 
@@ -2970,6 +3037,15 @@ updatePeopleBulk();
     </div>`;
   }
 
+  /* Обновить человека в текущем списке (если он на экране). */
+  function refreshPerson(p){
+    if (peopleRefresh) peopleRefresh(p);
+  }
+  /* Обновить заказ в текущем списке (если он на экране). */
+  function refreshOrder(o){
+    if (ordersRefresh) ordersRefresh(o);
+  }
+
   /* Стабильные номера людей (вариант 2): монотонный счётчик, каждой новой
      записи номер присваивается один раз и не переиспользуется после удаления. */
   function nextPersonNum(){
@@ -3040,7 +3116,7 @@ updatePeopleBulk();
           }
           if (isNew) logAudit('Добавлен ' + (role==='executor'?'исполнитель':'клиент') + ': ' + p.full_name, 'Люди');
           else logAudit('Профиль обновлён: ' + p.full_name, 'Люди');
-          saveState(); close(); APP.render(); toast(isNew?((role==='executor'?'Исполнитель':'Клиент') + ' добавлен'):'Профиль обновлён','ok');
+          saveState(); close(); refreshPerson(p); toast(isNew?((role==='executor'?'Исполнитель':'Клиент') + ' добавлен'):'Профиль обновлён','ok');
         };
       }
     });
@@ -3287,7 +3363,7 @@ updatePeopleBulk();
           saveState();
           close();
           openPersonCard(p.id, to==='executor' ? 'executor' : 'client');
-          APP.render();
+          refreshPerson(p);
           toast('Роль изменена: '+(ROLE_LABEL[to]||to), 'ok');
         };
         /* Карма: быстрые ±5 и правка с причиной (staff) */
@@ -3327,13 +3403,13 @@ updatePeopleBulk();
           /* Сетевой статус следует за рабочим: «Не работаю» = офлайн. */
           p.is_online = (b.dataset.ws === 'working');
           logAudit(`Рабочий статус: ${p.full_name} → ${b.dataset.ws}`,'Исполнитель');
-          saveState(); close(); APP.render(); toast('Рабочий статус обновлён','ok');
+          saveState(); close(); refreshPerson(p); toast('Рабочий статус обновлён','ok');
         });
         const qa = mask.querySelector('[data-qual]');
         qa && (qa.onclick = ()=>changeQualification(p, close));
         const tr = mask.querySelector('[data-transfer]');
         tr && (tr.onclick = ()=>{
-          showDropdown(tr, managers.map(m2=>({ label:m2.full_name, icon:'user-plus', onClick:()=>{ p.ext.managerId=m2.id; logAudit(`${role==='client'?'Клиент':'Исполнитель'} ${p.full_name} передан: ${m2.full_name}`,'Передача'); saveState(); toast(`Передано: ${m2.full_name}`,'ok'); close(); APP.render(); } })));
+          showDropdown(tr, managers.map(m2=>({ label:m2.full_name, icon:'user-plus', onClick:()=>{ p.ext.managerId=m2.id; logAudit(`${role==='client'?'Клиент':'Исполнитель'} ${p.full_name} передан: ${m2.full_name}`,'Передача'); saveState(); toast(`Передано: ${m2.full_name}`,'ok'); close(); refreshPerson(p); } })));
         });
         const blb = mask.querySelector('[data-bl]');
         blb && (blb.onclick = async ()=>{
@@ -3349,14 +3425,14 @@ updatePeopleBulk();
                   p.ext.status = 'blacklisted';
                   p.ext.comment = (p.ext.comment? p.ext.comment+'\n' : '') + `[ЧС ${fmtDate(Date.now())}] ${reason}`;
                   logAudit(`Добавлен в ЧС: ${p.full_name} — ${reason}`,'Безопасность');
-                  saveState(); close2(); close(); APP.render(); toast('Добавлен в чёрный список','ok');
+                  saveState(); close2(); close(); refreshPerson(p); toast('Добавлен в чёрный список','ok');
                 };
               } });
             return;
           }
           p.ext.status = toBl?'blacklisted':'active';
           logAudit(`${toBl?'Добавлен в ЧС':'Убран из ЧС'}: ${p.full_name}`,'Безопасность');
-          saveState(); toast(toBl?'Добавлен в чёрный список':'Разблокирован','ok'); close(); APP.render();
+          saveState(); toast(toBl?'Добавлен в чёрный список':'Разблокирован','ok'); close(); refreshPerson(p);
         });
         const fb = mask.querySelector('[data-fine]');
         fb && (fb.onclick = ()=>wipModal('Индивидуальная система штрафов'));
@@ -3403,10 +3479,10 @@ updatePeopleBulk();
           p.ext.qualOverall = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : 0;
           logAudit(`Квалификация ${p.full_name} обновлена${bypass?' (без голосования)':''}`,'Исполнитель');
           saveState(); toast(bypass?'Квалификация обновлена':'Отправлено на голосование менеджерам','ok');
-          /* Окна закрываются, точка в меню гаснет; render() отложится сам
-             (см. общий guard в APP.render) и не оборвёт анимацию. */
+          /* Окна закрываются, точка в меню гаснет; обновляем только
+             карточку/строку человека — раздел не перерисовываем. */
           close(); closeCard && closeCard();
-          APP.render();
+          refreshPerson(p);
         };
       }
     });
@@ -3427,7 +3503,7 @@ updatePeopleBulk();
           p.ext.comment = mask.querySelector('#cm-pub').value;
           p.ext.commentPersonal = mask.querySelector('#cm-priv').value;
           logAudit(`Комментарий обновлён: ${p.full_name}`,'Комментарий');
-          saveState(); close(); closeCard && closeCard(); APP.render();
+          saveState(); close(); closeCard && closeCard(); refreshPerson(p);
         };
       }
     });
@@ -3573,6 +3649,18 @@ updatePeopleBulk();
 
   function toolsView(root){
     const u = me(); const admin = u.role==='admin';
+    const ruleCard = (r, idx) => `<div class="card card-pad${r.enabled===false?' rule-off':''}" data-rule-card="${r.id}" style="padding:11px 13px;background:var(--bg-2)">
+      <div class="row row--between" style="gap:8px">
+        <span class="badge ${r.entity==='client'?'c-green':'c-violet'}">${r.entity==='client'?'Клиент':'Заказ'}</span>
+        <span class="small" style="flex:1;min-width:0;color:var(--text-2)">${esc(ruleLabel(r))}</span>
+        ${admin?`<label class="check" title="${r.enabled===false?'Правило выключено':'Правило включено'}" style="margin:0;flex:none"><input type="checkbox" data-ruleenabled="${r.id}" ${r.enabled!==false?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span></label>
+        <input class="input" type="number" min="1" max="${S.importRules.length}" value="${idx+1}" data-rulepos="${r.id}" title="Приоритет: 1 — выше" style="width:54px;height:28px;padding:2px 6px;text-align:center;flex:none">
+        <button class="iconbtn" style="width:28px;height:28px" data-ruleup="${r.id}" title="Выше приоритетом">${icon('chev-u','ico-sm')}</button>
+        <button class="iconbtn" style="width:28px;height:28px" data-ruledn="${r.id}" title="Ниже приоритетом">${icon('chev-d','ico-sm')}</button>
+        <button class="iconbtn" style="width:30px;height:30px" data-editrule="${r.id}" title="Изменить">${icon('edit')}</button>
+        <button class="iconbtn" style="width:30px;height:30px" data-delrule="${r.id}" title="Удалить">${icon('trash')}</button>`:''}
+      </div></div>`;
+    let bindRuleRows = () => {};
     root.innerHTML = `
       <div class="page-head"><div><h2>Импорт и экспорт</h2><div class="sub">${window.__lastImport ? 'Добавлено '+(window.__lastImport.added||0)+' · пропущено '+(window.__lastImport.skipped||0)+' · ошибок '+(window.__lastImport.errs||0) : 'Нет импортов за эту сессию'}</div></div>${me().role==='admin'?`<div class="page-actions"><button class="btn btn--ghost btn--sm" id="il-exp">${icon('export')} Экспорт журнала</button></div>`:''}</div>
       <div class="cols-2 grid">
@@ -3602,17 +3690,7 @@ updatePeopleBulk();
         <span class="small faint">условия (И), regex · приоритет сверху вниз</span></div>
         <div class="card-b stack" style="gap:9px">
           <div id="rules-list" class="stack" style="gap:8px">
-            ${S.importRules.map((r, idx)=>`<div class="card card-pad${r.enabled===false?' rule-off':''}" data-rule-card="${r.id}" style="padding:11px 13px;background:var(--bg-2)">
-              <div class="row row--between" style="gap:8px">
-                <span class="badge ${r.entity==='client'?'c-green':'c-violet'}">${r.entity==='client'?'Клиент':'Заказ'}</span>
-                <span class="small" style="flex:1;min-width:0;color:var(--text-2)">${esc(ruleLabel(r))}</span>
-                ${admin?`<label class="check" title="${r.enabled===false?'Правило выключено':'Правило включено'}" style="margin:0;flex:none"><input type="checkbox" data-ruleenabled="${r.id}" ${r.enabled!==false?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span></label>
-                <input class="input" type="number" min="1" max="${S.importRules.length}" value="${idx+1}" data-rulepos="${r.id}" title="Приоритет: 1 — выше" style="width:54px;height:28px;padding:2px 6px;text-align:center;flex:none">
-                <button class="iconbtn" style="width:28px;height:28px" data-ruleup="${r.id}" title="Выше приоритетом">${icon('chev-u','ico-sm')}</button>
-                <button class="iconbtn" style="width:28px;height:28px" data-ruledn="${r.id}" title="Ниже приоритетом">${icon('chev-d','ico-sm')}</button>
-                <button class="iconbtn" style="width:30px;height:30px" data-editrule="${r.id}" title="Изменить">${icon('edit')}</button>
-                <button class="iconbtn" style="width:30px;height:30px" data-delrule="${r.id}" title="Удалить">${icon('trash')}</button>`:''}
-              </div></div>`).join('') || '<p class="small faint">Правил пока нет</p>'}
+            ${S.importRules.map(ruleCard).join('') || '<p class="small faint">Правил пока нет</p>'}
           </div>
           ${admin?`<button class="btn btn--soft btn--sm" id="nr-add">${icon('plus')} Новое правило</button>`:''}
           <hr>
@@ -4208,7 +4286,25 @@ updatePeopleBulk();
               S.importRules.splice(want - 1, 0, it);
             }
             logAudit((isNew ? 'Создано' : 'Изменено') + ' правило импорта', 'Настройки');
-            saveState(); toast('Правило сохранено', 'ok'); close(); APP.render();
+            saveState(); toast('Правило сохранено', 'ok'); close();
+            /* Обновляем только карточку правила, раздел не перерисовываем */
+            const idx2 = S.importRules.findIndex(x => x.id === rule.id);
+            if (idx2 >= 0){
+              const card = root.querySelector(`[data-rule-card="${rule.id}"]`);
+              if (card) card.outerHTML = ruleCard(S.importRules[idx2], idx2);
+              else {
+                const listEl = root.querySelector('#rules-list');
+                if (listEl){
+                  if (!listEl.querySelector('[data-rule-card]')) listEl.innerHTML = '';
+                  listEl.insertAdjacentHTML('beforeend', ruleCard(S.importRules[idx2], idx2));
+                }
+              }
+              S.importRules.forEach((r2, i2) => {
+                const inp = root.querySelector(`[data-rulepos="${r2.id}"]`);
+                if (inp){ inp.value = i2 + 1; inp.max = S.importRules.length; }
+              });
+              bindRuleRows();
+            }
           };
         }
       });
@@ -4239,7 +4335,10 @@ updatePeopleBulk();
           try { c.animate([{ transform:`translateY(${dy}px)` }, { transform:'none' }], { duration:190, easing:'cubic-bezier(.22,.61,.36,1)' }); } catch(e){}
         });
       };
+      bindRuleRows = () => {
       $$('[data-ruleenabled]', root).forEach(cb=>{
+        if (cb.dataset.ruleBound) return;
+        cb.dataset.ruleBound = '1';
         cb.addEventListener('change', ()=>{
           const r = S.importRules.find(x=>x.id===cb.dataset.ruleenabled);
           if (!r) return;
@@ -4252,6 +4351,8 @@ updatePeopleBulk();
         });
       });
       $$('[data-rulepos]', root).forEach(inp=>{
+        if (inp.dataset.ruleBound) return;
+        inp.dataset.ruleBound = '1';
         inp.addEventListener('change', ()=>{
           const id = inp.dataset.rulepos;
           const from = S.importRules.findIndex(x=>x.id===id);
@@ -4265,11 +4366,27 @@ updatePeopleBulk();
           try { logAudit(`Приоритет правила импорта: ${ruleLabel(it)} → ${to+1}`, 'Настройки'); } catch(e){}
         });
       });
+      };
+      bindRuleRows();
       root.addEventListener('click', e=>{
         const ed = e.target.closest('[data-editrule]');
         if (ed){ const r = S.importRules.find(x => x.id === ed.dataset.editrule); r && ruleEditor(r); }
         const del = e.target.closest('[data-delrule]');
-        if (del){ S.importRules = S.importRules.filter(x => x.id !== del.dataset.delrule); logAudit('Удалено правило импорта', 'Настройки'); saveState(); toast('Правило удалено', 'ok'); APP.render(); }
+        if (del){
+          S.importRules = S.importRules.filter(x => x.id !== del.dataset.delrule);
+          logAudit('Удалено правило импорта', 'Настройки');
+          saveState(); toast('Правило удалено', 'ok');
+          const card = root.querySelector(`[data-rule-card="${del.dataset.delrule}"]`);
+          if (card) card.remove();
+          if (!root.querySelector('[data-rule-card]')){
+            const listEl = root.querySelector('#rules-list');
+            if (listEl) listEl.innerHTML = '<p class="small faint">Правил пока нет</p>';
+          }
+          S.importRules.forEach((r2, i2) => {
+            const inp = root.querySelector(`[data-rulepos="${r2.id}"]`);
+            if (inp){ inp.value = i2 + 1; inp.max = S.importRules.length; }
+          });
+        }
         /* Приоритет правил: порядок в списке = порядок применения (сверху вниз) */
         const up = e.target.closest('[data-ruleup]');
         const dn = e.target.closest('[data-ruledn]');
@@ -4592,10 +4709,12 @@ updatePeopleBulk();
         mask.querySelector('[data-send]').onclick = ()=>{
           const sub = mask.querySelector('#tk-sub').value.trim();
           if (!sub){ toast('Укажите тему','err'); return; }
-          S.tickets.unshift({ id:uid(), user_id:me().id, order_id:orderRef||null, subject:sub, message:mask.querySelector('#tk-msg').value, status:'new', created_at:Date.now(), resolved_at:null, attachments: files.length ? files : undefined });
+          const ticket = { id:uid(), user_id:me().id, order_id:orderRef||null, subject:sub, message:mask.querySelector('#tk-msg').value, status:'new', created_at:Date.now(), resolved_at:null, attachments: files.length ? files : undefined };
+          S.tickets.unshift(ticket);
           logAudit(`Создан тикет: ${sub}` + (files.length ? ` (+${files.length} файл(ов))` : ''), 'Тикет');
           saveState(); toast('Тикет создан — менеджеры увидят его в разделе «Тикеты»','ok');
-          close(); APP.render();
+          close();
+          if (window.__ticketCreated) window.__ticketCreated(ticket);
         };
       }
     });
