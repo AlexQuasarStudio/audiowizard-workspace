@@ -1962,6 +1962,70 @@ const CRM = (() => {
   }
 
   /* ---------- Деталь заказа ---------- */
+  /* Вычитка/доработка после сдачи: отдельная строка в исполнителях с
+     пометкой is_review. Ставка по умолчанию — из настроек финансов (10%),
+     в заказе её можно поменять. Сумма входит в бюджет исполнителей и не
+     должна выводить его за потолок executorShare. Оплата исполнителю при
+     этом не уменьшается — вычитка идёт отдельной строкой бюджета. */
+  function openReviewDialog(o, closeCard){
+    const c = window.Finance ? Finance.cfg() : { executorShare:40, reviewFee:10 };
+    const execs = (o.executors || []).filter(e => !e.is_review);
+    const base = execs.reduce((a,e) => a + (Number(e.amount) || 0), 0);
+    const cur = (o.executors || []).reduce((a,e) => a + (Number(e.amount) || 0), 0);
+    const cap = Math.round((Number(o.total) || 0) * (c.executorShare || 40) / 100);
+    const free = Math.max(0, cap - cur);
+    const defPct = o.reviewFee != null ? o.reviewFee : (c.reviewFee != null ? c.reviewFee : 10);
+    const busy = new Set((o.executors || []).map(e => e.uid));
+    const candidates = (S.users || []).filter(x => x.role === 'executor' && x.ext && x.ext.status === 'active' && !busy.has(x.id));
+    if (!candidates.length){ toast('Нет свободных исполнителей для вычитки', 'warn'); return; }
+    const opts = candidates.map(x => `<option value="${x.id}">${esc(x.full_name)}</option>`).join('');
+    openWinModal({
+      narrow:true, title:'Вычитка / доработка', icon:'check-c',
+      body:`<div class="stack" style="gap:12px">
+        <div class="field"><label>Кто вычитывает</label><select class="input" id="rv-user">${opts}</select></div>
+        <div class="field"><label>Ставка, % от суммы исполнителям</label><input class="input" id="rv-pct" type="number" min="0" max="50" step="1" value="${defPct}"></div>
+        <div class="row row--between small"><span class="muted">Сумма вычитки</span><b id="rv-sum">${fmtMoney(Math.round(base * defPct / 100))}</b></div>
+        <p class="small faint" style="margin:0">База: ${fmtMoney(base)} · потолок бюджета исполнителей ${fmtMoney(cap)} · свободно ${fmtMoney(free)}. Из оплаты исполнителя ничего не вычитается.</p>
+      </div>`,
+      footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-rv-save>Назначить</button>`,
+      onMount:(m2, close2)=>{
+        const pctInp = m2.querySelector('#rv-pct');
+        const sumEl = m2.querySelector('#rv-sum');
+        const paint = ()=>{ const pct = Math.min(50, Math.max(0, +pctInp.value || 0)); sumEl.textContent = fmtMoney(Math.round(base * pct / 100)); };
+        pctInp.addEventListener('input', paint);
+        m2.querySelector('[data-x]').onclick = close2;
+        m2.querySelector('[data-rv-save]').onclick = async ()=>{
+          const uidv = m2.querySelector('#rv-user').value;
+          const pct = Math.min(50, Math.max(0, +pctInp.value || 0));
+          const amount = Math.round(base * pct / 100);
+          if (!uidv){ toast('Выберите исполнителя','warn'); return; }
+          if (!amount){ toast('Сумма вычитки нулевая','warn'); return; }
+          /* Потолок бюджета исполнителей: как и при смене статуса, не
+             блокируем молча, а показываем дефицит и просим подтвердить. */
+          if (amount > free){
+            const ok = await (window.confirmModal ? confirmModal({
+              title:'Бюджет исполнителей превышен', danger:true, okText:'Всё равно назначить',
+              text:`Вычитка ${fmtMoney(amount)} при свободных ${fmtMoney(free)} из потолка ${fmtMoney(cap)}. Не хватает ${fmtMoney(amount - free)}.`,
+              checkbox:'Понимаю, что вычитка выходит за потолок бюджета исполнителей'
+            }) : Promise.resolve(true));
+            if (!ok) return;
+          }
+          o.executors = o.executors || [];
+          o.executors.push({ uid:uidv, amount, percent:pct, is_review:true, is_paid:false, paid:0 });
+          o.reviewFee = pct;
+          o.history = o.history || [];
+          o.history.push({ t:Date.now(), txt:`Вычитка: ${(userById(uidv)||{}).full_name || uidv} — ${fmtMoney(amount)} (${pct}%)` });
+          logAudit(`Вычитка по ${o.order_id}: ${(userById(uidv)||{}).full_name || uidv} — ${fmtMoney(amount)}`, 'Заказ');
+          saveState();
+          close2(); closeCard();
+          refreshOrder(o);
+          toast(`Вычитка назначена: ${fmtMoney(amount)}`, 'ok');
+          setTimeout(()=>openOrderDetail(o.id), 120);
+        };
+      }
+    });
+  }
+
   function openOrderDetail(oid){
     const o = S.orders.find(x=>x.id===oid); if (!o) return;
     const u = me(); const staff = isStaff(u.role);
@@ -2030,9 +2094,17 @@ const CRM = (() => {
             ${paymentBlock}
             <div class="card card-pad"><b class="small">Исполнители</b>
               <div class="stack" style="gap:9px;margin-top:9px">
-                ${o.executors.map(e=>{const ex=userById(e.uid); return ex?`<div class="row">${avatarHTML(ex,'avatar--sm')}<span style="flex:1;min-width:0"><b class="small">${esc(ex.full_name)}</b><br><span class="faint" style="font-size:11px">${esc(ex.ext.specializations.join(', '))}</span></span><b class="small" style="flex:none;white-space:nowrap">${fmtMoney(e.amount)}</b>${(Number(e.paid)||0)>0?`<span class="tiny faint" style="flex:none">оплачено ${fmtMoney(e.paid)}</span>`:''}${staff&&o.status==='done'?`<button class="btn btn--sm ${e.is_paid?'btn--ghost':'btn--soft'}" data-pay="${e.uid}" style="flex:none;white-space:nowrap">${e.is_paid?'Оплачен':((Number(e.paid)||0)>0?'Доплатить':'Оплатить')}</button>`:''}
+                ${o.executors.map(e=>{const ex=userById(e.uid); return ex?`<div class="row">${avatarHTML(ex,'avatar--sm')}<span style="flex:1;min-width:0"><b class="small">${esc(ex.full_name)}</b><br><span class="faint" style="font-size:11px">${esc(ex.ext.specializations.join(', '))}</span></span><b class="small" style="flex:none;white-space:nowrap">${fmtMoney(e.amount)}</b>${e.is_review?'<span class="badge c-violet" style="flex:none">вычитка</span>':''}${(Number(e.paid)||0)>0?`<span class="tiny faint" style="flex:none">оплачено ${fmtMoney(e.paid)}</span>`:''}${staff&&o.status==='done'?`<button class="btn btn--sm ${e.is_paid?'btn--ghost':'btn--soft'}" data-pay="${e.uid}" style="flex:none;white-space:nowrap">${e.is_paid?'Оплачен':((Number(e.paid)||0)>0?'Доплатить':'Оплатить')}</button>`:''}
                 ${staff&&u.role==='admin'&&(e.amount||0)>30000&&!e.approved_by_admin&&!e.is_paid?`<button class="btn btn--sm btn--ghost" data-approve="${e.uid}" title="Согласовать превышение">${icon('check-c')} Согласовать</button>`:''}</div>`:''}).join('') || '<span class="faint small">Не назначены</span>'}
               </div>
+              ${staff?`<div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
+                ${(()=>{
+                  const rv = (o.executors||[]).find(e=>e.is_review);
+                  if (!rv) return `<button class="btn btn--ghost btn--sm" data-review-add>${icon('user-plus')} На вычитку</button>`;
+                  const ru = userById(rv.uid);
+                  return `<span class="small faint">Вычитка: <b style="color:var(--text-2)">${esc(ru?ru.full_name:'—')}</b> · ${fmtMoney(rv.amount)}</span><button class="btn btn--ghost btn--sm" data-review-del>Убрать</button>`;
+                })()}
+              </div>`:''}
             </div>
             <div class="card card-pad"><b class="small">История заказа</b>
               <div class="stack small" style="gap:7px;margin-top:9px">
@@ -2052,9 +2124,20 @@ const CRM = (() => {
         : (u.role==='executor' && o.status==='work' ? `<span class="spacer"></span><button class="btn btn--primary" data-st="done">Сдать работу</button>` : ''),
       onMount: (mask, close)=>{
         mask.addEventListener('click', async e=>{
-          const t = e.target.closest('[data-st],[data-pay],[data-dl],[data-pay-client],[data-ticket],[data-edit],[data-del],[data-arch],[data-fee-edit]');
+          const t = e.target.closest('[data-st],[data-pay],[data-dl],[data-pay-client],[data-ticket],[data-edit],[data-del],[data-arch],[data-fee-edit],[data-review-add],[data-review-del]');
           if (!t) return;
           if (t.dataset.st) { await setStatus(o, t.dataset.st); close(); refreshOrder(o); }
+          if ('reviewAdd' in t.dataset){ openReviewDialog(o, close); return; }
+          if ('reviewDel' in t.dataset){
+            const rv = (o.executors||[]).find(e=>e.is_review);
+            o.executors = (o.executors||[]).filter(e=>!e.is_review);
+            o.history = o.history || [];
+            o.history.push({ t:Date.now(), txt:`Вычитка снята${rv?` (${(userById(rv.uid)||{}).full_name||''})`:''}` });
+            logAudit(`Вычитка снята: ${o.order_id}`, 'Заказ');
+            saveState(); close(); refreshOrder(o);
+            setTimeout(()=>openOrderDetail(o.id), 120);
+            return;
+          }
           if ('feeEdit' in t.dataset){
             const ceil = u.role==='admin' ? 100 : u.role==='top_manager' ? (feeCeil.top_manager ?? 10) : (feeCeil.manager ?? 15);
             openWinModal({ narrow:true, title:'Гонорар менеджера',

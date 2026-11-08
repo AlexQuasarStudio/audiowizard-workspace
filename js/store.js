@@ -347,7 +347,7 @@ const audit = getDemoAudit();
       /* Доли от суммы заказа: админ — 25% (маржа услуг), менеджер — 5%.
          Разница (итого − исполнители − админ − менеджер) показывается как
          свободный остаток; отрицательная — предупреждение о превышении. */
-      finance:{ adminMargin:25, managerFee:10, executorShare:40, payoutCommission:5, minOrderTotal:500, minExecutorPay:100 },
+      finance:{ adminMargin:25, managerFee:10, executorShare:40, payoutCommission:5, minOrderTotal:500, minExecutorPay:100, reviewFee:10 },
       /* Платёжный провайдер не захардкожен: имя, комиссия и включённость
          берутся отсюда, чтобы смена/отключение провайдера не требовали правок кода. */
       integrations:{ payout:{ key:'smartcat', name:'Smartcat', commission:5, enabled:true, perUser:true } },
@@ -383,7 +383,7 @@ function loadState(){
 const SEED_DEMO_RE = /^(u-(manager|top|ex\d+|cl\d+)|(o|ch|m\d|n\d|nf\d|i\d|t\d|p\d|f\d|v\d|kb\d|kc\d)\d*$)/;
 function migrateFinance(){
   if (!S.settings) S.settings = {};
-  S.settings.finance = Object.assign({ adminMargin:25, managerFee:10, executorShare:40, payoutCommission:5, minOrderTotal:500, minExecutorPay:100 }, S.settings.finance || {});
+  S.settings.finance = Object.assign({ adminMargin:25, managerFee:10, executorShare:40, payoutCommission:5, minOrderTotal:500, minExecutorPay:100, reviewFee:10 }, S.settings.finance || {});
   /* Старые сохранения держали прежний дефолт 5% — поднимаем до 10%,
      если пользователь явно не менял значение (метка версии дефолтов). */
   if (S.settings.finance._defaultsVersion !== 2){

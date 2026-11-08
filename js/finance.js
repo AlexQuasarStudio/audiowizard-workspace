@@ -15,6 +15,9 @@ const Finance = (function(){
       adminMargin: clamp(f.adminMargin ?? 25, 0, 100),
       managerFee: clamp(f.managerFee ?? 10, 0, 100),
       executorShare: clamp(f.executorShare ?? 40, 0, 100),
+      /* Ставка за вычитку/доработку после сдачи — по умолчанию 10% от
+         суммы исполнителям; настраивается глобально и в самом заказе. */
+      reviewFee: clamp(f.reviewFee ?? 10, 0, 50),
       commission: clamp(f.payoutCommission ?? 5, 0, 50),
       /* Минимумы — настраиваемые, не хардкод: 500 ₽ за заказ и 100 ₽ исполнителю
          по умолчанию; тестовый заказ их обходит. */

@@ -2256,8 +2256,13 @@ ex.innerHTML = avatarHTML(user(), '');
       i => i/13*212+4, v => 58-(v/maxV)*44);
     bindSparkHover(root.querySelector('#rev-chart svg'), root.querySelector('#rev-tip'),
       i => (i/13)*(W-8)+4, v => H-8-(v/maxV)*(H-24));
+    bindChartSelect(root.querySelector('.chart-wrap--hero'), { items: series.map((v,i)=>({ label: sparkLabels[i], value: v })), hit:'.spark-hits rect' });
+    bindChartSelect(root.querySelector('#rev-chart'), { items: series.map((v,i)=>({ label: sparkLabels[i], value: v })), hit:'.spark-hits rect', top:true });
     const regWrap = root.querySelector('.chart-wrap--reg');
-    if (regWrap) bindRegHover(regWrap, reg14);
+    if (regWrap){
+      bindRegHover(regWrap, reg14);
+      bindChartSelect(regWrap, { items: reg14, hit:'[data-ri]', indexAttr:'ri', value:i=>Number(reg14[i].total)||0, top:true, period:c=>`${c} ${dayPlural(c)}` });
+    }
     /* Donut: сегмент под курсором показывается в центре и подсвечивает легенду */
     const donutSvg = root.querySelector('#donut');
     if (donutSvg){
@@ -2586,7 +2591,11 @@ ex.innerHTML = avatarHTML(user(), '');
       drawRevenueDetail(box, u, base, firstAt);
     };
     const dailyWrap = box.querySelector('.rev-charts .rev-chart-block .chart-wrap');
-    if (dailyWrap) bindChartBars(dailyWrap, series.items, item => `<b>${esc(item.fullLabel)}</b><span>${fmtMoney(item.value)} · ${item.count} ${revPlural(item.count)}</span>`);
+    if (dailyWrap){
+      bindChartBars(dailyWrap, series.items, item => `<b>${esc(item.fullLabel)}</b><span>${fmtMoney(item.value)} · ${item.count} ${revPlural(item.count)}</span>`);
+      bindChartSelect(dailyWrap, { items: series.items, top:true,
+        period:c => series.bucketDays === 1 ? `${c} ${dayPlural(c)}` : series.bucketDays === 7 ? `${c} нед.` : `${c} мес.` });
+    }
     const expBtn = box.querySelector('[data-rev-export]');
     if (expBtn) expBtn.onclick = () => showDropdown(expBtn, [
       { label:'Excel (.xlsx)', icon:'table', onClick:()=>revExportXlsx(data) },
@@ -2779,7 +2788,10 @@ ex.innerHTML = avatarHTML(user(), '');
       </table></div>` : `<div class="empty" style="padding:26px 0">${icon('orders')}<span>Активных заказов сейчас нет</span></div>`}
     `;
     const dlWrap = box.querySelector('.rev-chart-block .chart-wrap');
-    if (dlWrap) bindChartBars(dlWrap, deadline, item => `<b>${esc(item.label)}</b><span>${item.value} · ${fmtMoney(item.sum)}</span>`);
+    if (dlWrap){
+      bindChartBars(dlWrap, deadline, item => `<b>${esc(item.label)}</b><span>${item.value} · ${fmtMoney(item.sum)}</span>`);
+      bindChartSelect(dlWrap, { items: deadline, value:i=>Number(deadline[i].sum)||0, top:true, period:c=>`${c} ${revPlural(c)}` });
+    }
     const exp = box.querySelector('[data-active-export]');
     if (exp) exp.onclick = () => showDropdown(exp, [
       { label:'Excel (.xlsx)', icon:'table', onClick:() => activeExportXlsx(data) },
@@ -2962,6 +2974,104 @@ ex.innerHTML = avatarHTML(user(), '');
       hit.addEventListener('mouseleave', () => { g.classList.remove('on'); tip.classList.remove('on'); });
     });
     wrap.addEventListener('mouseleave', () => tip.classList.remove('on'));
+  }
+
+  /* Выделение области на графике: тянем по дням/столбцам — считаем сумму
+     за отрезок; одиночный клик снимает выделение. */
+  function bindChartSelect(wrap, opts = {}){
+    if (!wrap) return;
+    const svg = wrap.querySelector('svg');
+    const items = opts.items || [];
+    const n = items.length;
+    if (!svg || !n) return;
+    const hitSel = opts.hit || '.chart-hit';
+    const hits = [...svg.querySelectorAll(hitSel)];
+    if (!hits.length) return;
+    const valueAt = opts.value || (i => Number((items[i] || {}).value) || 0);
+    const labelAt = opts.label || (i => (items[i] || {}).label || '');
+    const fmt = opts.fmt || fmtMoney;
+    const period = opts.period || (c => `${c} ${dayPlural(c)}`);
+    let out = wrap.querySelector('.chart-sel');
+    if (!out){
+      out = document.createElement('div');
+      out.className = 'chart-sel' + (opts.top ? ' chart-sel--top' : '');
+      wrap.appendChild(out);
+    }
+    const band = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    band.setAttribute('class','chart-sel-band');
+    band.style.display = 'none';
+    svg.appendChild(band);
+    let a = -1, b = -1, drag = false, moved = false;
+    const idxOf = g => {
+      const key = opts.indexAttr || 'i';
+      const raw = g && g.dataset ? g.dataset[key] : null;
+      const i = raw != null && raw !== '' ? Number(raw) : hits.indexOf(g);
+      return Math.max(0, Math.min(n - 1, isNaN(i) ? 0 : i));
+    };
+    const toSvg = (x, y) => {
+      const m = svg.getScreenCTM && svg.getScreenCTM();
+      if (!m) return { x:0, y:0 };
+      const p = svg.createSVGPoint(); p.x = x; p.y = y;
+      const q = p.matrixTransform(m.inverse());
+      return { x:q.x, y:q.y };
+    };
+    const paint = () => {
+      if (a < 0){
+        band.style.display = 'none';
+        out.classList.remove('on');
+        out.textContent = '';
+        return;
+      }
+      const lo = Math.min(a,b), hi = Math.max(a,b);
+      const r1 = hits[lo].getBoundingClientRect(), r2 = hits[hi].getBoundingClientRect();
+      const p1 = toSvg(r1.left, r1.top), p2 = toSvg(r2.right, r2.bottom);
+      band.setAttribute('x', p1.x);
+      band.setAttribute('y', 0);
+      band.setAttribute('width', Math.max(2, p2.x - p1.x));
+      band.setAttribute('height', (svg.viewBox && svg.viewBox.baseVal.height) || p2.y);
+      band.style.display = '';
+      let sum = 0;
+      for (let i = lo; i <= hi; i++) sum += valueAt(i);
+      out.innerHTML = `<b>${esc(labelAt(lo))} — ${esc(labelAt(hi))}</b> · ${period(hi - lo + 1)} · <b>${fmt(sum)}</b><span class="chart-sel__hint">клик — сбросить</span>`;
+      out.classList.add('on');
+    };
+    const clear = () => { a = b = -1; drag = false; moved = false; paint(); };
+    /* Индекс ищем по координате курсора: после setPointerCapture события
+       приходят на сам svg, а не на конкретный столбец. */
+    const idxAt = e => {
+      let best = 0, bestD = Infinity;
+      for (let i = 0; i < hits.length; i++){
+        const r = hits[i].getBoundingClientRect();
+        if (e.clientX >= r.left && e.clientX <= r.right) return i;
+        const d = Math.abs(e.clientX - (r.left + r.width / 2));
+        if (d < bestD){ bestD = d; best = i; }
+      }
+      return best;
+    };
+    svg.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      drag = true; moved = false; a = b = idxAt(e);
+      wrap.classList.add('is-selecting');
+      try { svg.setPointerCapture(e.pointerId); } catch(err){}
+      paint();
+    });
+    svg.addEventListener('pointermove', e => {
+      if (!drag) return;
+      const i = idxAt(e);
+      if (i !== b){ b = i; moved = true; }
+      paint();
+    });
+    const end = e => {
+      if (!drag) return;
+      drag = false;
+      wrap.classList.remove('is-selecting');
+      try { svg.releasePointerCapture(e.pointerId); } catch(err){}
+      if (!moved){ clear(); return; }
+      paint();
+    };
+    svg.addEventListener('pointerup', end);
+    svg.addEventListener('pointercancel', () => { drag = false; wrap.classList.remove('is-selecting'); });
+    return { clear };
   }
 
   function bindRegHover(wrap, items){
@@ -3202,7 +3312,11 @@ ex.innerHTML = avatarHTML(user(), '');
       drawRegDetail(box, u, base, firstAt, close);
     };
     const regWrap = box.querySelector('.rev-chart-block .chart-wrap');
-    if (regWrap) bindChartBars(regWrap, series.items, item => `<b>${esc(item.fullLabel)}</b><span>+${item.total} · ${item.clients} клиентов, ${item.executors} исполнителей</span>`);
+    if (regWrap){
+      bindChartBars(regWrap, series.items, item => `<b>${esc(item.fullLabel)}</b><span>+${item.total} · ${item.clients} клиентов, ${item.executors} исполнителей</span>`);
+      bindChartSelect(regWrap, { items: series.items, value:i=>Number(series.items[i].total)||0, top:true,
+        period:c => series.bucketDays === 1 ? `${c} ${dayPlural(c)}` : series.bucketDays === 7 ? `${c} нед.` : `${c} мес.` });
+    }
     const exp = box.querySelector('[data-reg-export]');
     if (exp) exp.onclick = () => showDropdown(exp, [
       { label:'Excel (.xlsx)', icon:'table', onClick:() => regExportXlsx(data) },
