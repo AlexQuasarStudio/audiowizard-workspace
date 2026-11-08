@@ -4744,6 +4744,10 @@ updatePeopleBulk();
         <div class="calc-history" id="cx-hist" style="margin-top:12px">${S.calcHistory.slice(-6).reverse().map(h=>`<div data-h="${h.result}">${esc(h.expression)} = ${h.result}</div>`).join('')}</div>
         <div class="small faint" style="margin-top:12px">Отметьте услуги — их стоимость прибавится к результату.</div>
         <div id="cx-svcs" style="margin-top:8px"></div>
+        <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
+          <button class="btn btn--ghost btn--sm" type="button" data-cx-export>${icon('export')} Экспорт услуг</button>
+          ${me().role==='admin' ? `<button class="btn btn--ghost btn--sm" type="button" data-cx-import>${icon('import')} Импорт услуг</button>` : ''}
+        </div>
         <div class="card card-pad" style="margin-top:12px;background:var(--panel-2)">
           <b class="small">Скидки</b>
           <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
@@ -4819,10 +4823,26 @@ updatePeopleBulk();
         };
         g2('#cx-hours').addEventListener('input', paintDiscount);
         g2('#cx-promo').addEventListener('input', paintDiscount);
-        g2('#cx-svcs').innerHTML = S.niches.map(n=>`
-          <div class="small"><b style="margin-bottom:4px;display:block">${esc(n.name)}</b>
-          ${(S.calcServices[n.id]||[]).map(s=>`<label class="svc-row check"><input type="checkbox" data-sv="${n.id}|${esc(s.name)}|${s.price}"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(s.name)} <span class="faint">${esc(s.unit||'')}</span></span><b>${fmtMoney(s.price)}</b></label>`).join('')}</div>`).join('');
+        const paintSvcs = ()=>{
+          g2('#cx-svcs').innerHTML = S.niches.map(n=>`
+            <div class="small"><b style="margin-bottom:4px;display:block">${esc(n.name)}</b>
+            ${(S.calcServices[n.id]||[]).map(s=>`<label class="svc-row check"><input type="checkbox" data-sv="${n.id}|${esc(s.name)}|${s.price}"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(s.name)} <span class="faint">${esc(s.unit||'')}</span></span><b>${fmtMoney(s.price)}</b></label>`).join('')}</div>`).join('');
+        };
+        paintSvcs();
         g2('#cx-svcs').addEventListener('change', ()=>{ if (!isNaN(val)) g2('#cx-val').textContent = fmtMoney(val + svcSum()); paintDiscount(); });
+        /* Услуги правятся в настройках, но выгрузить и догрузить их можно прямо здесь */
+        const svcExportBtn = mask.querySelector('[data-cx-export]');
+        if (svcExportBtn) svcExportBtn.onclick = ()=>{ if (window.CalcServices) window.CalcServices.exportServices('xlsx'); };
+        const svcImportBtn = mask.querySelector('[data-cx-import]');
+        if (svcImportBtn) svcImportBtn.onclick = async ()=>{
+          if (!window.CalcServices) return;
+          const r = await window.CalcServices.importServices();
+          if (r && r.changed){
+            paintSvcs();
+            g2('#cx-val').textContent = fmtMoney((isNaN(val) ? 0 : val) + svcSum());
+            paintDiscount();
+          }
+        };
         g2('#cx-hist').querySelectorAll('[data-h]').forEach(h=>h.onclick = ()=>{ g2('#cx-in').value = h.dataset.h; upd(); });
         mask.querySelector('[data-x]').onclick = close;
         const applyResult = ()=>{

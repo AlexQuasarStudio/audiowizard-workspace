@@ -7307,6 +7307,206 @@ const cm = root.querySelector('.chat-main');
   let todoFilter = 'all';
   function todoType(t){ return TODO_TYPES[t && t.type] ? t.type : 'task'; }
 
+  /* ---------- Услуги калькулятора: экспорт и импорт ---------- */
+  /* Один формат на все виды выгрузки: ниша, услуга, цена, единица, маржа.
+     Импорт узнаёт колонки по заголовку, нишу — по названию или id. */
+  function calcSvcRows(){
+    const out = [['Ниша','Услуга','Цена','Единица','Маржа']];
+    (S.niches || []).forEach(n => (S.calcServices[n.id] || []).forEach(s => {
+      out.push([n.name, s.name, Number(s.price) || 0, s.unit || '', Number(s.margin) || 0]);
+    }));
+    return out;
+  }
+  function calcSvcCsv(){
+    const cell = v => /[;"\n]/.test(String(v)) ? '"' + String(v).replace(/"/g,'""') + '"' : String(v);
+    return '\ufeff' + calcSvcRows().map(r => r.map(cell).join(';')).join('\r\n');
+  }
+  function calcSvcJson(){
+    const services = {};
+    (S.niches || []).forEach(n => {
+      services[n.name] = (S.calcServices[n.id] || []).map(s => ({ name:s.name, price:Number(s.price)||0, unit:s.unit||'', margin:Number(s.margin)||0 }));
+    });
+    return JSON.stringify({ version:1, exported_at:new Date().toISOString(),
+      niches:(S.niches||[]).map(n=>({ id:n.id, name:n.name })), services }, null, 2);
+  }
+  function calcSvcDownload(name, content, mime){
+    const blob = new Blob([content], { type:mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  }
+  function exportCalcServices(kind){
+    const k = kind === 'csv' || kind === 'json' ? kind : 'xlsx';
+    const stamp = new Date().toISOString().slice(0,10);
+    if (k === 'csv') calcSvcDownload(`uslugi_${stamp}.csv`, calcSvcCsv(), 'text/csv;charset=utf-8');
+    else if (k === 'json') calcSvcDownload(`uslugi_${stamp}.json`, calcSvcJson(), 'application/json');
+    else calcSvcDownload(`uslugi_${stamp}.xlsx`, AWX.writeSheets({ 'Услуги': calcSvcRows() }), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    logAudit(`Экспорт услуг калькулятора (${k.toUpperCase()})`, 'Настройки');
+    toast(`Услуги выгружены: ${k.toUpperCase()}`, 'ok');
+  }
+  function calcSvcNum(v){
+    const s = String(v == null ? '' : v).replace(/[₽\s\u00a0]/g, '').replace(',', '.');
+    if (s === '') return 0;
+    const n = Number(s);
+    return isFinite(n) ? n : null;
+  }
+  function calcSvcNiche(v){
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    if (!s) return null;
+    const n = (S.niches || []).find(x => x.id.toLowerCase() === s || x.name.toLowerCase() === s);
+    return n ? n.id : null;
+  }
+  function calcSvcParseCsv(text){
+    const src = String(text || '').replace(/^\ufeff/, '');
+    const first = src.split(/\r?\n/)[0] || '';
+    const delim = (first.match(/;/g)||[]).length >= (first.match(/,/g)||[]).length ? ';' : ',';
+    const rows = []; let row = [], cur = '', q = false;
+    for (let i = 0; i < src.length; i++){
+      const ch = src[i];
+      if (q){
+        if (ch === '"'){ if (src[i+1] === '"'){ cur += '"'; i++; } else q = false; }
+        else cur += ch;
+      }
+      else if (ch === '"') q = true;
+      else if (ch === delim){ row.push(cur); cur = ''; }
+      else if (ch === '\n'){ row.push(cur); rows.push(row); row = []; cur = ''; }
+      else if (ch !== '\r') cur += ch;
+    }
+    row.push(cur);
+    if (row.length > 1 || row[0] !== '') rows.push(row);
+    return rows;
+  }
+  const CALC_SVC_HEADERS = {
+    niche:['ниша','категория','направление'],
+    name:['услуга','название','наименование'],
+    price:['цена','цена, ₽','стоимость','цена руб'],
+    unit:['единица','ед.','единица измерения','за что'],
+    margin:['маржа','маржа, %','маржа %','маржа платформы']
+  };
+  function calcSvcParseTable(rows){
+    const items = [], errors = [];
+    const norm = v => String(v == null ? '' : v).trim().toLowerCase();
+    const head = (rows[0] || []).map(norm);
+    const idx = key => {
+      for (const nm of CALC_SVC_HEADERS[key]){ const i = head.indexOf(nm); if (i >= 0) return i; }
+      return -1;
+    };
+    let cols = { niche:idx('niche'), name:idx('name'), price:idx('price'), unit:idx('unit'), margin:idx('margin') };
+    const hasHeader = cols.name >= 0 || cols.niche >= 0 || cols.price >= 0;
+    if (!hasHeader) cols = { niche:0, name:1, price:2, unit:3, margin:4 };
+    for (let r = hasHeader ? 1 : 0; r < rows.length; r++){
+      const row = rows[r] || [];
+      const name = String(row[cols.name] == null ? '' : row[cols.name]).trim();
+      if (!name) continue;
+      const nid = calcSvcNiche(row[cols.niche]);
+      if (!nid){ errors.push(`строка ${r+1}: ниша «${String(row[cols.niche]||'').trim()||'—'}» не найдена`); continue; }
+      const price = cols.price >= 0 ? calcSvcNum(row[cols.price]) : 0;
+      if (price == null || price < 0){ errors.push(`строка ${r+1}: цена не число`); continue; }
+      const margin = cols.margin >= 0 ? calcSvcNum(row[cols.margin]) : 0;
+      items.push({ nid, name, price:Math.round(price), unit:String(row[cols.unit]||'').trim(),
+        margin:Math.min(90, Math.max(0, Math.round(margin || 0))) });
+    }
+    return { items, errors };
+  }
+  function calcSvcParseJson(data){
+    const items = [], errors = [];
+    const push = (nid, s) => {
+      const name = String((s && s.name) || '').trim();
+      if (!name) return;
+      const price = calcSvcNum(s.price);
+      if (price == null || price < 0){ errors.push(`«${name}»: цена не число`); return; }
+      items.push({ nid, name, price:Math.round(price), unit:String(s.unit || '').trim(),
+        margin:Math.min(90, Math.max(0, Math.round(calcSvcNum(s.margin) || 0))) });
+    };
+    const fromMap = (map, allowId) => {
+      Object.entries(map || {}).forEach(([key, list]) => {
+        const nid = calcSvcNiche(key) || (allowId && S.calcServices[key] ? key : null);
+        if (!nid){ errors.push(`ниша «${key}» не найдена`); return; }
+        (Array.isArray(list) ? list : []).forEach(s => push(nid, s));
+      });
+    };
+    if (Array.isArray(data)){
+      data.forEach(x => {
+        const nid = calcSvcNiche(x.niche || x.nish_id || x.niche_name);
+        if (!nid) errors.push(`«${x.name || '—'}»: ниша не найдена`); else push(nid, x);
+      });
+    } else if (data && data.services && typeof data.services === 'object'){
+      fromMap(data.services, false);
+    } else if (data && data.calcServices && typeof data.calcServices === 'object'){
+      fromMap(data.calcServices, true);
+    } else {
+      errors.push('неизвестный формат JSON');
+    }
+    return { items, errors };
+  }
+  function calcSvcApply(items){
+    let added = 0, updated = 0;
+    items.forEach(it => {
+      const list = S.calcServices[it.nid] = S.calcServices[it.nid] || [];
+      const ex = list.find(s => String(s.name).trim().toLowerCase() === it.name.toLowerCase());
+      if (ex){ ex.price = it.price; ex.unit = it.unit; ex.margin = it.margin; updated++; }
+      else { list.push({ id:'cs' + uid(), name:it.name, price:it.price, unit:it.unit, margin:it.margin }); added++; }
+    });
+    return { added, updated };
+  }
+  function calcSvcPickFile(){
+    return new Promise(res => {
+      const inp = document.createElement('input');
+      inp.type = 'file';
+      inp.accept = '.xlsx,.csv,.json';
+      inp.style.display = 'none';
+      document.body.appendChild(inp);
+      inp.addEventListener('change', () => { const f = inp.files && inp.files[0]; inp.remove(); res(f || null); });
+      inp.click();
+    });
+  }
+  async function importCalcServices(file){
+    const f = file || await calcSvcPickFile();
+    if (!f) return null;
+    const nm = String(f.name || '').toLowerCase();
+    let parsed = null;
+    try {
+      if (nm.endsWith('.json')) parsed = calcSvcParseJson(JSON.parse(await f.text()));
+      else if (nm.endsWith('.csv')) parsed = calcSvcParseTable(calcSvcParseCsv(await f.text()));
+      else {
+        const wb = await AWX.read(f);
+        const sh = (wb.sheets || [])[0];
+        parsed = calcSvcParseTable(sh ? sh.rows : []);
+      }
+    } catch(e){
+      toast('Не удалось прочитать файл: ' + ((e && e.message) || e), 'err');
+      return null;
+    }
+    if (!parsed || !parsed.items.length){
+      toast((parsed && parsed.errors[0]) || 'В файле не нашлось услуг', 'warn');
+      return null;
+    }
+    const ok = await confirmModal({
+      title:'Импорт услуг',
+      okText:'Импортировать',
+      text:`В файле ${parsed.items.length} ${parsed.items.length === 1 ? 'услуга' : 'услуг'}${parsed.errors.length ? `, пропущено ${parsed.errors.length}` : ''}. Совпадающие по нише и названию обновятся, новые добавятся.`
+    });
+    if (!ok) return null;
+    const res = calcSvcApply(parsed.items);
+    logAudit(`Импорт услуг: добавлено ${res.added}, обновлено ${res.updated}${parsed.errors.length ? `, пропущено ${parsed.errors.length}` : ''}`, 'Настройки');
+    saveState();
+    toast(`Импорт услуг: +${res.added} · обновлено ${res.updated}${parsed.errors.length ? ` · пропущено ${parsed.errors.length}` : ''}`, 'ok');
+    return { changed:true, added:res.added, updated:res.updated, skipped:parsed.errors.length };
+  }
+  function calcSvcRowsHTML(nid){
+    return (S.calcServices[nid] || []).map(s => `<tr data-sid="${s.id}">
+      <td><input class="input" data-f="name" value="${esc(s.name)}" style="padding:6px 10px"></td>
+      <td><input class="input" data-f="price" type="number" min="0" value="${s.price}" style="padding:6px 10px;width:100px"></td>
+      <td><input class="input" data-f="unit" value="${esc(s.unit||'')}" style="padding:6px 10px"></td>
+      <td><input class="input" data-f="margin" type="number" min="0" max="90" value="${s.margin||0}" style="padding:6px 10px;width:76px"></td>
+      <td style="width:40px"><button class="iconbtn" data-del="${s.id}" title="Удалить услугу">${icon('trash')}</button></td>
+    </tr>`).join('');
+  }
+  /* Калькулятор в CRM живёт отдельным файлом — отдаём ему те же функции */
+  window.CalcServices = { exportServices:exportCalcServices, importServices:importCalcServices };
+
   function settingsView(root, section){
     const u = user();
     /* Раздел пришёл из маршрута (#/settings/profile) или это вход в настройки */
@@ -7474,13 +7674,7 @@ const cm = root.querySelector('.chat-main');
       </div>`;
     }
     function calcHTML(){
-      const rows = nid => (S.calcServices[nid]||[]).map(s=>`<tr data-sid="${s.id}">
-          <td><input class="input" data-f="name" value="${esc(s.name)}" style="padding:6px 10px"></td>
-          <td><input class="input" data-f="price" type="number" min="0" value="${s.price}" style="padding:6px 10px;width:100px"></td>
-          <td><input class="input" data-f="unit" value="${esc(s.unit||'')}" style="padding:6px 10px"></td>
-          <td><input class="input" data-f="margin" type="number" min="0" max="90" value="${s.margin||0}" style="padding:6px 10px;width:76px"></td>
-          <td style="width:40px"><button class="iconbtn" data-del="${s.id}" title="Удалить услугу">${icon('trash')}</button></td>
-        </tr>`).join('');
+      const rows = nid => calcSvcRowsHTML(nid);
       return `<div class="card card-pad" style="margin-bottom:12px"><h3 style="margin-bottom:6px">Гонорары менеджеров</h3>
         <p class="small muted" style="margin-bottom:10px">Потолок гонорара — процент от суммы заказа, выше которого менеджер не поднимет свой гонорар. Меняет только администратор.</p>
         <div class="cols-2 grid" style="gap:13px">
@@ -7489,7 +7683,14 @@ const cm = root.querySelector('.chat-main');
         </div>
         <button class="btn btn--primary btn--sm" id="fee-save" style="margin-top:10px">Сохранить потолки</button>
       </div><div class="card card-pad"><h3 style="margin-bottom:6px">Услуги калькулятора</h3>
-        <p class="small muted" style="margin-bottom:12px">Перечень услуг, стоимость и маржа платформы — по нишам. Настраивается администратором — владельцем платформы. Калькулятор принимает ввод с клавиатуры.</p>
+        <p class="small muted" style="margin-bottom:10px">Перечень услуг, стоимость и маржа платформы — по нишам. Настраивается администратором — владельцем платформы. Калькулятор принимает ввод с клавиатуры.</p>
+        <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <button class="btn btn--ghost btn--sm" data-svc-export="xlsx" type="button">${icon('export')} XLSX</button>
+          <button class="btn btn--ghost btn--sm" data-svc-export="csv" type="button">CSV</button>
+          <button class="btn btn--ghost btn--sm" data-svc-export="json" type="button">JSON</button>
+          <span class="spacer"></span>
+          <button class="btn btn--soft btn--sm" data-svc-import type="button">${icon('import')} Импорт услуг</button>
+        </div>
         ${S.niches.map(n=>`<div class="card card-pad" style="background:var(--bg-2);margin-top:10px">
           <div class="row row--between"><b class="small">${esc(n.name)}</b>
             <button class="btn btn--ghost btn--sm" data-add="${n.id}">${icon('plus')} Услуга</button></div>
@@ -8000,6 +8201,16 @@ const cm = root.querySelector('.chat-main');
     function bindCalc(el){
       if (el.dataset.calcBound){ return; }
       el.dataset.calcBound = '1';
+      el.querySelectorAll('[data-svc-export]').forEach(b => {
+        b.onclick = () => exportCalcServices(b.dataset.svcExport);
+      });
+      const svcImport = el.querySelector('[data-svc-import]');
+      if (svcImport) svcImport.onclick = async () => {
+        const r = await importCalcServices();
+        if (r && r.changed){
+          el.querySelectorAll('tbody[data-niche]').forEach(tb => { tb.innerHTML = calcSvcRowsHTML(tb.dataset.niche); });
+        }
+      };
       const feeSave = el.querySelector('#fee-save');
       if (feeSave) feeSave.onclick = ()=>{
         const m = Math.max(0, Math.min(100, +el.querySelector('#fee-manager').value || 0));
