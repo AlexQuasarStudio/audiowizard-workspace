@@ -183,14 +183,16 @@ const NavDrag = (() => {
     const under = document.elementFromPoint(cx, cy);
     const navNow = document.querySelector('.side__nav');
     let target = null;
-    if (under && (!navNow || navNow.contains(under))){
+    /* Приоритет — подсвеченная цель. Пользователь отпускает там, где видел
+       рамку, а elementFromPoint к моменту mouseup может попасть в соседний
+       пункт (курсор на границе) и перестановка уходила «на одно выше». */
+    if (drag._hover && drag._hover.isConnected && (!navNow || navNow.contains(drag._hover)) && drag._hover !== src){
+      target = drag._hover;
+    }
+    if (!target && under && (!navNow || navNow.contains(under))){
       const link = under.closest('.side__link');
       const sec = under.closest('.side__sec');
       target = (link && link !== src) ? link : (sec && sec !== src ? sec : null);
-    }
-    /* Подсвеченная цель — приоритет: пользователь видел её и отпустил там. */
-    if (!target && drag._hover && drag._hover.isConnected && (!navNow || navNow.contains(drag._hover))){
-      target = drag._hover;
     }
     /* Валидация: пункт принимается любой ссылкой (в т.ч. из другого раздела)
        и любым разделом (вставка в конец раздела); раздел — только разделом. */
@@ -210,8 +212,21 @@ const NavDrag = (() => {
       // Перестановка в модели → _persistNav() перерисует меню в новом порядке
       if (src.classList.contains('side__sec')){
         const from = V.findIndex(x => x.sec === src.dataset.secTitle);
-        const to = V.findIndex(x => x.sec === target.dataset.secTitle);
-        if (from >= 0 && to >= 0 && from !== to){ const [s] = V.splice(from, 1); V.splice(to, 0, s); moved = true; reordered = true; }
+        if (from >= 0){
+          const [s] = V.splice(from, 1);
+          /* Индекс цели считаем ПОСЛЕ изъятия раздела: при переносе сверху
+             вниз прежний индекс сдвигался на единицу, и раздел вставал не
+             за целью, а на её место. Половина курсора решает «до/после». */
+          const idx = V.findIndex(x => x.sec === target.dataset.secTitle);
+          if (idx >= 0){
+            const tr = target.getBoundingClientRect();
+            const before = cy < (tr.top + tr.height / 2);
+            V.splice(before ? idx : idx + 1, 0, s);
+            moved = true; reordered = true;
+          } else {
+            V.splice(from, 0, s); /* цель пропала — вернуть раздел на место */
+          }
+        }
       } else if (src.classList.contains('side__link')){
         /* Переносим пункт в любой раздел: вынимаем из своего, вставляем в целевой */
         const fromSec = V.find(x => x.sec === src.dataset.sec);
