@@ -5994,7 +5994,7 @@ const cm = root.querySelector('.chat-main');
     }).join('') : '';
     return `<div class="card card-pad">
       <h3 style="margin-bottom:6px">Нумерация заказов</h3>
-      <p class="small faint">По умолчанию — AW-N. Второй вариант — латинские инициалы клиента или менеджера и число с месяцем даты. Если номер уже занят, добавляется -1, -2 и так далее.</p>
+      <p class="small faint">По умолчанию — AW-N. Второй вариант — латинские инициалы клиента или менеджера и число с месяцем даты через дефис. Если номер уже занят, добавляется -1, -2 и так далее.</p>
       <div class="cols-2 grid" style="gap:12px;margin-top:10px">
         <div class="field"><label>Формат</label><select class="input" id="oid-mode">
           <option value="auto" ${(mine.mode||'auto')==='auto'?'selected':''}>AW-N (по умолчанию)</option>

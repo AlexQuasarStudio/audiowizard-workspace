@@ -467,7 +467,7 @@ const CRM = (() => {
     if (rule.mode === 'initials'){
       const who = rule.who === 'manager' ? ((me() || {}).full_name || '') : (c.clientName || '');
       const ts = rule.date === 'end' ? (c.deadline || c.start) : (c.start || c.deadline);
-      base = idInitials(who) + idDateDM(ts);
+      base = idInitials(who) + '-' + idDateDM(ts);
     } else {
       let max = 1042;
       S.orders.forEach(o => { const m = /^AW-(\d+)$/.exec(o.order_id || ''); if (m) max = Math.max(max, +m[1]); });
