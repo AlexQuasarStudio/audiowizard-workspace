@@ -2046,9 +2046,11 @@ const CRM = (() => {
 
   /* Закрытие: сначала плавно схлопываем строку, потом убираем её из списка
      и возвращаем плашку на исходное место в разметке. */
-  /* Esc убирает все новые строки активного раздела — фокус на вводе не нужен.
-     Capture: срабатываем раньше обработчиков полей, чтобы убрать строки целиком.
-     Если открыт поповер выбора или правится ячейка — сначала закрывается он. */
+  /* Esc убирает новые строки активного раздела по одной — фокус на вводе
+     не нужен. Сначала закрывается строка с фокусом, иначе самая новая
+     (первая в DOM: строки вставляются сверху). Capture: срабатываем раньше
+     обработчиков полей. Если открыт поповер выбора или правится ячейка —
+     сначала закрывается он. */
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
     if (__crmInline) return;
@@ -2062,7 +2064,10 @@ const CRM = (() => {
     const rows = [...document.querySelectorAll('.inline-add[data-clone="1"]')].filter(b => b.isConnected && !b.hidden);
     if (!rows.length) return;
     e.preventDefault(); e.stopPropagation();
-    rows.forEach(b => inlineClose(b, null));
+    const focused = document.activeElement && document.activeElement.closest
+      ? document.activeElement.closest('.inline-add[data-clone="1"]') : null;
+    const target = (focused && focused.isConnected && !focused.hidden) ? focused : rows[0];
+    inlineClose(target, null);
   }, true);
 
   function inlineClose(box, root, cb){
