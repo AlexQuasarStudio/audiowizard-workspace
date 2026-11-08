@@ -4215,11 +4215,23 @@ updatePeopleBulk();
       const reorderRuleCards = ()=>{
         const list = root.querySelector('#rules-list');
         if (!list) return;
+        /* FLIP: карточки плавно съезжают на новые места, как пункты меню */
+        const cards = [...list.querySelectorAll('[data-rule-card]')];
+        const before = new Map(cards.map(c => [c, c.getBoundingClientRect()]));
         S.importRules.forEach((r, i) => {
           const card = list.querySelector(`[data-rule-card="${r.id}"]`);
           if (card) list.appendChild(card);
           const inp = list.querySelector(`[data-rulepos="${r.id}"]`);
           if (inp){ inp.value = i + 1; inp.max = S.importRules.length; }
+        });
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        cards.forEach(c => {
+          const a = before.get(c);
+          if (!a || !c.isConnected) return;
+          const b = c.getBoundingClientRect();
+          const dy = a.top - b.top;
+          if (Math.abs(dy) < 1) return;
+          try { c.animate([{ transform:`translateY(${dy}px)` }, { transform:'none' }], { duration:190, easing:'cubic-bezier(.22,.61,.36,1)' }); } catch(e){}
         });
       };
       $$('[data-ruleenabled]', root).forEach(cb=>{
