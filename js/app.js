@@ -161,13 +161,16 @@ const APP = (() => {
     const flipNodes = [...navEl.querySelectorAll('.side__link, .side__sec')];
     const flipBefore = new Map(flipNodes.map(n => [n, n.getBoundingClientRect()]));
     const heads = [...navEl.querySelectorAll(':scope > .side__sec[data-sec-title]')];
+    /* Ссылки ищем по всему меню, а не внутри текущего раздела: иначе перенос
+       пункта в другой раздел не находил его в целевой коробке и запускал
+       полную перерисовку меню без FLIP. */
+    const links = new Map([...navEl.querySelectorAll('.side__link[data-route]')].map(l => [l.dataset.route, l]));
     const pairs = [];
     for (const sec of nav){
       const head = heads.find(h => h.dataset.secTitle === sec.sec);
       const box = head && head.nextElementSibling && head.nextElementSibling.classList.contains('side__sec-items')
         ? head.nextElementSibling : null;
       if (!head || !box) return false;
-      const links = new Map([...box.querySelectorAll('.side__link')].map(l => [l.dataset.route, l]));
       for (const it of sec.items){
         const link = links.get(it.route);
         if (!link) return false;
@@ -8594,22 +8597,28 @@ function initPWA(){
 
   /* Экспортируем хелперы персистентности для NavDrag */
   window.APP = {
-    _persistNav: (movedEl) => {
+    _persistNav: (movedEl, placeholder) => {
       prefsFor().navCustom = true;
       prefsFor().navCustomOrder = JSON.parse(JSON.stringify(NAV.map(s => ({ sec:s.sec, items:s.items.map(it => ({ route:it.route, title:it.title, icon:it.icon, roles:it.roles })) }))));
       saveState();
       const navEl = document.querySelector('.side__nav');
       if (navEl && movedEl && movedEl.dataset && movedEl.dataset.route){
-        /* Возвращаем «гостя» в меню до перестановки: рендер контента не нужен */
+        /* Возвращаем «гостя» в меню до перестановки: рендер контента не нужен.
+           Если плейсхолдер ещё жив — ставим узел ровно на его место, чтобы
+           FLIP считал позиции от настоящего старого порядка. */
         movedEl.classList.remove('menu-drag-live');
         movedEl.style.cssText = '';
-        const secName = ((NAV.find(s => s.items.some(i => i.route === movedEl.dataset.route)) || {}).sec) || '';
-        let head = null;
-        navEl.querySelectorAll(':scope > .side__sec[data-sec-title]').forEach(h => { if (h.dataset.secTitle === secName) head = h; });
-        const box = head && head.nextElementSibling && head.nextElementSibling.classList.contains('side__sec-items')
-          ? head.nextElementSibling : null;
-        if (box) { box.appendChild(movedEl); movedEl.dataset.sec = secName; }
-        else movedEl.remove();
+        if (placeholder && placeholder.isConnected && placeholder.parentNode){
+          placeholder.parentNode.replaceChild(movedEl, placeholder);
+        } else {
+          const secName = ((NAV.find(s => s.items.some(i => i.route === movedEl.dataset.route)) || {}).sec) || '';
+          let head = null;
+          navEl.querySelectorAll(':scope > .side__sec[data-sec-title]').forEach(h => { if (h.dataset.secTitle === secName) head = h; });
+          const box = head && head.nextElementSibling && head.nextElementSibling.classList.contains('side__sec-items')
+            ? head.nextElementSibling : null;
+          if (box) { box.appendChild(movedEl); movedEl.dataset.sec = secName; }
+          else movedEl.remove();
+        }
       }
       if (navEl && reorderNavDom()){ clearHoverMarks(); return; }
       if (movedEl && movedEl.isConnected) movedEl.remove();
