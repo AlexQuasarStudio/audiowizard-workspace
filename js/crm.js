@@ -3432,7 +3432,7 @@ updatePeopleBulk();
           '<div class="field"><label>Email</label><input class="input" id="pf-email" value="'+esc(p.email)+'"></div>' +
           '<div class="field"><label>Телефон</label><input class="input" id="pf-phone" value="'+esc(p.phone)+'"></div>' +
         '</div>' +
-        (isNew ? '<div class="field"><label>Пароль</label><input class="input" id="pf-pw" value="'+esc(p.pw||'client123')+'"></div>' : '') +
+        (isNew ? '<div class="field"><label>Пароль</label><input class="input" id="pf-pw" value="client123"></div>' : '') +
         '<div class="field"><label>О себе</label><textarea class="input" id="pf-about" rows="2">'+esc(p.about||'')+'</textarea></div>' +
         (role==='executor' ? '<div class="field"><label>Менеджер</label><select class="input" id="pf-manager">'+manOpts+'</select></div>' : '') +
         (role==='client' ? '<div class="row row--between" style="padding:10px 12px;background:var(--panel-2);border-radius:12px"><label class="check" style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="pf-thinking" '+((p.ext&&p.ext.thinking)?'checked':'')+'><span class="box"><svg><use href="#i-check-c"/></svg></span><span class="small"><b>Клиент «думает»</b><br><span class="faint">Напоминать менеджеру и удалить данные по сроку</span></span></label></div>' +
@@ -3444,11 +3444,17 @@ updatePeopleBulk();
       footer: '<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-save>'+(isNew?'Добавить':'Сохранить')+'</button>',
       onMount: (mask, close)=>{
         mask.querySelector('[data-x]').onclick = close;
-        mask.querySelector('[data-save]').onclick = ()=>{
+        mask.querySelector('[data-save]').onclick = async ()=>{
           const name = mask.querySelector('#pf-name').value.trim();
           if (!name){ toast('Введите имя','warn'); return; }
           p.full_name = name; p.email = mask.querySelector('#pf-email').value.trim(); p.phone = mask.querySelector('#pf-phone').value.trim(); p.about = mask.querySelector('#pf-about').value.trim();
-          if (isNew){ p.pw = mask.querySelector('#pf-pw').value || 'client123'; p.username = 'user_'+uid().slice(0,5); if (p.ext) p.ext.num = nextPersonNum(); S.users.push(p); }
+          if (isNew){
+            const rawPw = mask.querySelector('#pf-pw').value || 'client123';
+            p.username = 'user_'+uid().slice(0,5);
+            if (p.ext) p.ext.num = nextPersonNum();
+            try { await pwSet(p, rawPw); } catch(err){ p.pw = rawPw; }
+            S.users.push(p);
+          }
           if (role==='executor'){ p.ext.managerId = mask.querySelector('#pf-manager').value; }
           if (role==='client'){
             p.ext = p.ext || {};

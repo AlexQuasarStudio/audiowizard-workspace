@@ -1,5 +1,5 @@
 /* Audiowizard Workspace — Service Worker (кеш оболочки, обновления, офлайн) */
-const VER = '0.1-prototype.1398';
+const VER = '0.1-prototype.1399';
 const CACHE = `aw-shell-${VER}`;
 
 const PRECACHE = [
@@ -47,6 +47,21 @@ self.addEventListener('fetch', e => {
       fetch(req).catch(() =>
         caches.match(req).then(r => r || caches.match('./index.html'))
       )
+    );
+    return;
+  }
+
+  // Тяжёлый узор: кеш-первым. Кеш пересоздаётся вместе с версией сборки,
+  // поэтому устаревший рисунок не залипнет, а маски не тянут 680 КБ заново.
+  if (url.pathname.endsWith('/bg/pattern-ai.svg')){
+    e.respondWith(
+      caches.match(req).then(hit => hit || fetch(req).then(res => {
+        if (res && res.ok && res.status === 200){
+          const copy = res.clone();
+          caches.open(CACHE).then(c => c.put(req, copy));
+        }
+        return res;
+      }))
     );
     return;
   }

@@ -61,6 +61,64 @@ const DAY = 86400000;
 const today = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
 
 const fmtMoney = n => new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:0}).format(n||0);
+
+/* ---------- Пароли ----------
+   Открытым текстом пароли не храним: PBKDF2-SHA-256 с индивидуальной солью
+   (WebCrypto). Старые записи с полем pw переводим на хэш при первой проверке
+   и фоновой миграцией при запуске. Это защищает localStorage от чтения
+   паролей, но не заменяет серверную авторизацию: роли и права по-прежнему
+   считаются на клиенте. */
+const PW_ITER = 120000;
+const PW_ENC = (typeof TextEncoder !== 'undefined') ? new TextEncoder() : null;
+function pwAvailable(){
+  return !!(PW_ENC && globalThis.crypto && globalThis.crypto.subtle && globalThis.crypto.getRandomValues);
+}
+function pwSalt(){
+  const a = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(a);
+  return Array.from(a, b => b.toString(16).padStart(2, '0')).join('');
+}
+function pwHex(buf){
+  return Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join('');
+}
+async function pwDerive(pw, salt, iter){
+  const key = await globalThis.crypto.subtle.importKey('raw', PW_ENC.encode(String(pw)), 'PBKDF2', false, ['deriveBits']);
+  const bits = await globalThis.crypto.subtle.deriveBits(
+    { name:'PBKDF2', hash:'SHA-256', salt: PW_ENC.encode(String(salt)), iterations: iter }, key, 256);
+  return pwHex(bits);
+}
+async function pwSet(user, pw){
+  if (!user || pw == null) return false;
+  /* Без WebCrypto (старый браузер) остаётся прежний режим — поле pw. */
+  if (!pwAvailable()){ user.pw = String(pw); delete user.pwHash; return false; }
+  const salt = pwSalt();
+  user.pwHash = { v:1, algo:'pbkdf2-sha256', salt, iter:PW_ITER, hash: await pwDerive(pw, salt, PW_ITER) };
+  delete user.pw;
+  return true;
+}
+async function pwVerify(user, pw){
+  if (!user) return false;
+  if (user.pwHash && pwAvailable()){
+    const h = await pwDerive(pw, user.pwHash.salt, user.pwHash.iter || PW_ITER);
+    return h === user.pwHash.hash;
+  }
+  if (user.pw != null && String(user.pw) === String(pw)){
+    try { if (await pwSet(user, pw)) saveState(); } catch(e){}
+    return true;
+  }
+  return false;
+}
+/* Фоновая миграция: старые сохранения и демо-сид получают хэши без
+   изменения сценария входа (пароль тот же). */
+async function pwMigrateAll(){
+  if (!pwAvailable()) return 0;
+  let n = 0;
+  for (const u of (S.users || []).filter(x => x && x.pw != null && !x.pwHash)){
+    try { if (await pwSet(u, u.pw)) n++; } catch(e){}
+  }
+  if (n) saveState();
+  return n;
+}
 const fmtNum = n => new Intl.NumberFormat('ru-RU').format(n||0);
 const fmtDate = t => t ? new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'short',year:'numeric'}).format(new Date(t)) : '—';
 const fmtDT = t => t ? new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(t)) : '—';

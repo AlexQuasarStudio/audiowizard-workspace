@@ -245,6 +245,14 @@ const APP = (() => {
     const collapsed = document.body.classList.contains('side-collapsed');
     const nav = navFor(u);
     const unread = unreadTotal();
+    /* Один h1 на страницу: у разделов остаются h2 в шапке, а этот скрыт
+       визуально — скринридер получает понятный заголовок страницы. */
+    const h1Text = (() => {
+      if (route.name === 'err' || !isKnownRoute(route.name)) return 'Страница не найдена';
+      if (u && !canOpenRoute(route.name, u.role)) return 'Доступ запрещён';
+      const item = NAV_DEFAULT.reduce((acc, s) => acc || s.items.find(i => i.route === route.name), null);
+      return item ? item.title : 'Audiowizard Workspace';
+    })();
 
     const navScrollMem = document.querySelector('.side__nav')?.scrollTop || 0;
     /* #bg-doodles создаётся ОДИН раз в boot() и живёт вне #app: иначе каждый
@@ -298,6 +306,7 @@ const APP = (() => {
           </div>
         </header>
         <div class="m-search-back" id="m-search-back" hidden></div>
+        <h1 class="sr-only" id="page-h1">${esc(h1Text)}</h1>
         <main class="main view" id="main"></main>
         <footer class="foot">
           <a href="#/docs" data-doc="Пользовательское соглашение">Пользовательское соглашение</a>
@@ -1356,7 +1365,7 @@ const QUICK_BY_ROLE = {
     const eye = $('#jf-eye'); let shown=false;
     eye.onclick = ()=>{ shown=!shown; $('#jf-pw').type = shown?'text':'password'; };
     $('#join-cancel').onclick = e=>{ e.preventDefault(); location.hash=''; };
-    $('#join-form').onsubmit = e=>{
+    $('#join-form').onsubmit = async e=>{
       e.preventDefault();
       const name = $('#jf-name').value.trim();
       const login = norm($('#jf-login').value);
@@ -1368,10 +1377,11 @@ const QUICK_BY_ROLE = {
       if (S.users.some(x=>norm(x.email)===email)){ $('#login-error').innerHTML = `<div class="auth-error">${icon('x-c','ico-sm')} Email уже используется</div>`; return; }
       /* Повторная проверка токена: мог быть использован между открытием и отправкой */
       if (!inviteValid(inv)){ renderJoin(inv); return; }
-      const nu = { id:uid(), username:login, email, pw, role:inv.role, full_name:name,
+      const nu = { id:uid(), username:login, email, role:inv.role, full_name:name,
         phone:'', about:'', mode:'system', accent:'violet', is_online:true, avatar:'',
         consent_marketing:false, tour_completed:false, created_at:Date.now(),
         ext:{ status:'active', workStatus:'work' } };
+      try { await pwSet(nu, pw); } catch(err){ nu.pw = pw; }
       S.users.push(nu);
       /* Приглашение по токену → тоже считается рефералом пригласившего */
       if (inv.token){ consumeInvite(inv.token, nu.id); }
@@ -1476,11 +1486,14 @@ const QUICK_BY_ROLE = {
     };
     paintEye();
     $('#eye').onclick = ()=>{ shown = !shown; $('#pw').type = shown ? 'text' : 'password'; paintEye(); };
-    $('#login-form').onsubmit = e=>{
+    $('#login-form').onsubmit = async e=>{
       e.preventDefault();
       const lg = norm($('#lg').value), pw = $('#pw').value;
-      const u2 = S.users.find(x=>(norm(x.username)===lg||norm(x.email)===lg) && x.pw===pw);
-      if (!u2){ $('#login-error').innerHTML = `<div class="auth-error">${icon('x-c','ico-sm')} Неверный логин или пароль</div>`; return; }
+      const u2 = S.users.find(x=>norm(x.username)===lg||norm(x.email)===lg);
+      /* Сверка через PBKDF2: в сохранении нет открытого пароля. */
+      let pwOk = false;
+      if (u2){ try { pwOk = await pwVerify(u2, pw); } catch(err){ pwOk = false; } }
+      if (!u2 || !pwOk){ $('#login-error').innerHTML = `<div class="auth-error">${icon('x-c','ico-sm')} Неверный логин или пароль</div>`; return; }
       if (u2.role==='client' && tab==='staff' || ['admin','top_manager','manager'].includes(u2.role) && tab==='client'){
         $('#login-error').innerHTML = `<div class="auth-error">${icon('info')} Это ${ROLE_LABEL[u2.role].toLowerCase()} — выберите соответствующую вкладку входа</div>`; return;
       }
@@ -9501,10 +9514,11 @@ function initPWA(){
         `linear-gradient(125deg, ${C1} 0%, ${C2} 26%, ${C3} 52%, ${C4} 78%, ${C5} 100%)`
       : `radial-gradient(145% 125% at 100% 100%, ${C5} 10%, transparent 62%),` +
         `linear-gradient(125deg, ${C2} 0%, ${C3} 44%, ${C4} 74%, ${C5} 100%)`;
-    /* версия в URL обязательна: иначе браузер отдаёт старую маску из кэша
-       и любые правки узора не видны */
-    const bgVer = window.__BUILD_NUM__ || '';
-    const maskUrl = 'url("bg/pattern-ai.svg' + (bgVer ? '?v=' + bgVer : '') + '")';
+    /* Один URL на все места (preload, маски CSS и слой): версия в query
+       делала из той же картинки второй сетевой запрос — браузер видел
+       другой ключ кэша. Свежесть узора обеспечивает service worker:
+       PRECACHE обновляется вместе со сборкой. */
+    const maskUrl = 'url("bg/pattern-ai.svg")';
     const cacheKey = cur + '|' + t + '|bg11';
     /* Единая отрисовка: маску ставим ВСЕГДА. После перерисовки разметки
        (#bg-doodles пересоздаётся при навигации) слой терял маску и узор «отваливался». */
@@ -9585,6 +9599,14 @@ function initPWA(){
   /* Доступ по роли: маршрут должен быть разрешён в NAV (или в EXTRA_ROUTES).
      Раньше «Ниши и специализации» и «Журнал аудита» были скрыты из меню,
      но открывались по прямой ссылке #/audit и #/niches. */
+  /* Маршрут существует в приложении (неважно, доступен ли роли): нужно,
+     чтобы неизвестный адрес показывал 404, а не «403 Доступ запрещён». */
+  function isKnownRoute(name){
+    if (!name) return false;
+    if (name === 'err') return true;
+    return !!(NAV_VIEWS[name] || EXTRA_ROUTES[name] ||
+      NAV_DEFAULT.some(s => s.items.some(i => i.route === name)));
+  }
   function canOpenRoute(name, role){
     if (name === 'err') return true;
     if (NAV_DEFAULT.some(s => s.items.some(i => i.route === name && i.roles.includes(role)))) return true;
@@ -9636,9 +9658,10 @@ function initPWA(){
     const main = document.createElement('div');
     const name = route.name;
     const viewFn = NAV_VIEWS[name];
-    if (!canOpenRoute(name, u.role)) errView(main, '403');
+    if (name === 'err') errView(main, route.param || '404');
+    else if (!isKnownRoute(name)) errView(main, '404');
+    else if (!canOpenRoute(name, u.role)) errView(main, '403');
     else if (viewFn) viewFn(main);
-    else if (name==='err') errView(main, route.param||'404');
     else errView(main, '404');
     /* Beta-режим: значок рядом с названием раздела */
     try {
@@ -9811,6 +9834,9 @@ function initPWA(){
   function boot(){
     try {
       loadState();
+      /* Пароли в сохранении — только хэши. Миграция фоном: вход не ждёт её,
+         а старый открытый pw нужен лишь до первого успешного входа. */
+      setTimeout(() => { try { pwMigrateAll(); } catch(e){} }, 0);
       /* Согласование номера сборки: настройки показывают фактическую сборку приложения */
       S.product = S.product || {};
       if (S.product.build !== BUILD_NUM){ S.product.build = BUILD_NUM; try { saveState(); } catch(e){} }

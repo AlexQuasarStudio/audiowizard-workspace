@@ -1,0 +1,18 @@
+{
+  "name": "audiowizard-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Audiowizard Workspace — прототип CRM: статический интерфейс, PWA и сервис-воркер",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "serve": "node tests/serve.js 8777",
+    "check": "node tests/check.js",
+    "smoke": "node tests/smoke.js",
+    "test": "node tests/check.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.0"
+  }
+}

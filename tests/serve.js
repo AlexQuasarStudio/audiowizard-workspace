@@ -50,7 +50,12 @@ const server = http.createServer((req, res) => {
       fs.createReadStream(file, { start, end }).pipe(res);
       return;
     }
-    res.writeHead(200, { 'Content-Type': type, 'Content-Length': st.size, 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-store' });
+    /* Картинки (/bg/) — долгий кэш: узор 680 КБ иначе скачивается заново
+       на каждую маску (preload + splash + auth + фон приложения). Код и
+       стили по-прежнему no-store, чтобы правки подхватывались сразу.
+       Меняя рисунок, переименуйте файл — иначе браузер отдаст старый. */
+    const cache = /^\/bg\//.test(url) ? 'public, max-age=31536000, immutable' : 'no-store';
+    res.writeHead(200, { 'Content-Type': type, 'Content-Length': st.size, 'Accept-Ranges': 'bytes', 'Cache-Control': cache });
     fs.createReadStream(file).pipe(res);
   });
 });

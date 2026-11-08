@@ -52,7 +52,15 @@ const roleBadge = r => {
 /* ---------- Тосты ---------- */
 function toast(msg, kind='info', title='', opts={}){
   let host = $('.toasts');
-  if (!host){ host = document.createElement('div'); host.className='toasts'; document.body.appendChild(host); }
+  if (!host){
+    host = document.createElement('div'); host.className='toasts';
+    /* Скринридер озвучивает тосты: без live-региона сообщения об ошибках и
+       подтверждения проходили мимо незрячих пользователей. */
+    host.setAttribute('role', 'status');
+    host.setAttribute('aria-live', 'polite');
+    host.setAttribute('aria-atomic', 'false');
+    document.body.appendChild(host);
+  }
   const icons = { ok:'check-c', err:'x-c', warn:'alert', info:'info' };
   const el = document.createElement('div');
   el.classList.add('toast', 'toast--' + kind);

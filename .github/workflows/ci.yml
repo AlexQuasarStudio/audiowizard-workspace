@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Установить зависимости
+        run: npm install --no-audit --no-fund
+
+      - name: Установить Chromium для тестов
+        run: npx playwright install --with-deps chromium
+
+      - name: Синтаксис скриптов
+        run: npm run check
+
+      - name: Smoke-тест в браузере
+        run: |
+          node tests/serve.js 8777 &
+          sleep 1
+          BASE_URL=http://localhost:8777 npm run smoke
