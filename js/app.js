@@ -2589,7 +2589,7 @@ ex.innerHTML = avatarHTML(user(), '');
     if (!revRange) revRange = revRangeFor('30', firstAt);
     openWinModal({
       title:'Детализация выручки', icon:'chart', wide:true,
-      body:'<div id="rev-detail"></div>',
+      body:'<div id="rev-detail" style="min-height:620px"></div>',
       onMount:(host) => {
         const box = host.querySelector('#rev-detail');
         if (box) drawRevenueDetail(box, u, base, firstAt);

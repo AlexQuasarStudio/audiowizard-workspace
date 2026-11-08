@@ -120,17 +120,15 @@ def main():
     os.makedirs(os.path.join(proj, "assets"), exist_ok=True)
     wav_path = os.path.join(proj, "assets", "demo-podcast.wav")
     size = synth(segs, duration, wav_path)
-    import base64
-    b64 = base64.b64encode(open(wav_path, "rb").read()).decode("ascii")
+    # Аудио живёт отдельным файлом: base64 раздувал JS на 8.4 МБ и грузился
+    # вместе с приложением, хотя нужен только на разделе ИИ-стенограмм.
     js = ("/* Сгенерировано tools/make_ai_assets.py — не редактировать вручную */\n"
-          "const AI_DATA = " + json.dumps(data, ensure_ascii=False, separators=(",", ":")) + ";\n"
-          "const AI_AUDIO_B64 = \"" + b64 + "\";\n")
+          "const AI_DATA = " + json.dumps(data, ensure_ascii=False, separators=(",", ":")) + ";\n")
     with open(os.path.join(proj, "js", "ai-data.js"), "w", encoding="utf-8") as f:
         f.write(js)
-    os.remove(wav_path)
     words = sum(len(s["words"]) for s in segs)
     low = sum(1 for s in segs for w in s["words"] if w.get("alts"))
-    print(f"OK: {len(segs)} сегментов, {words} слов, {low} неуверенных, {duration}с, аудио {size//1024} КБ (встроен в ai-data.js)")
+    print(f"OK: {len(segs)} сегментов, {words} слов, {low} неуверенных, {duration}с, аудио {size//1024} КБ → assets/demo-podcast.wav")
 
 if __name__ == "__main__":
     main()

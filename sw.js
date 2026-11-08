@@ -1,5 +1,5 @@
 /* Audiowizard Workspace — Service Worker (кеш оболочки, обновления, офлайн) */
-const VER = '0.1-prototype.1389';
+const VER = '0.1-prototype.1390';
 const CACHE = `aw-shell-${VER}`;
 
 const PRECACHE = [
@@ -7,6 +7,7 @@ const PRECACHE = [
   './manifest.json', './version.json',
   './css/base.css', './css/app.css',
   './js/store.js', './js/xlsx.js', './js/ui.js', './js/ai-data.js', './js/ai.js', './js/finance.js', './js/crm.js', './js/windows.js', './js/navdrag.js', './js/app.js',
+  './assets/demo-podcast.wav',
   './icons/icon.svg', './icons/maskable.svg', './bg/pattern-ai.svg'
 ];
 
@@ -53,7 +54,8 @@ self.addEventListener('fetch', e => {
   // Статика и версия: сеть-первым (свежая версия всегда), кэш — офлайн-фолбэк
   e.respondWith(
     fetch(req).then(res => {
-      if (res && res.ok && !url.pathname.includes('version.json')) {
+      /* 206 (Range) не кешируем: частичный ответ в кеше ломает офлайн-аудио. */
+      if (res && res.ok && res.status === 200 && !url.pathname.includes('version.json')) {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put(req, copy));
       }

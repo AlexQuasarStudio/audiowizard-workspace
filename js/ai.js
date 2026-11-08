@@ -6,6 +6,8 @@
    ============================================================ */
 'use strict';
 
+const AI_AUDIO_SRC = 'assets/demo-podcast.wav';
+
 const AI = (() => {
 
   /* ==================== ОБЩЕЕ ==================== */
@@ -250,7 +252,7 @@ const AI = (() => {
 
     function resetSource(){
       T.uploading = false; T.sourceName = null; T.processed = false; T.scale = 1;
-      setAudio(new Audio('data:audio/wav;base64,' + AI_AUDIO_B64));
+      setAudio(new Audio(AI_AUDIO_SRC));
     }
     function setAudio(a){
       if (T.audio){
@@ -273,7 +275,7 @@ const AI = (() => {
       };
       Object.entries(T._handlers).forEach(([ev,fn])=>T.audio.addEventListener(ev, fn));
     }
-    if (!T.audio) setAudio(new Audio('data:audio/wav;base64,' + AI_AUDIO_B64));
+    if (!T.audio) setAudio(new Audio(AI_AUDIO_SRC));
     bindAudio();
     if (T.audio) g('#ai-play').innerHTML = T.audio.paused ? icon('play') : icon('pause');
 
