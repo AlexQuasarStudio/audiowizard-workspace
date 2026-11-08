@@ -141,10 +141,13 @@ const NavDrag = (() => {
        .side__link вне меню (например, боковое подменю настроек) не являются
        целями и не должны подсвечиваться при драге. */
     if (!nav.contains(under)) return null;
+    /* Пункты меняются только с пунктами, разделы — только с разделами:
+       раздел не подсвечиваем как цель для пункта и наоборот. */
+    const draggingSec = !!(drag && drag.el && drag.el.classList.contains('side__sec'));
     const link = under.closest('.side__link');
-    if (link && link !== drag.el && nav.contains(link)) return link;
+    if (!draggingSec && link && link !== drag.el && nav.contains(link)) return link;
     const sec = under.closest('.side__sec');
-    if (sec && sec !== drag.el && nav.contains(sec)) return sec;
+    if (draggingSec && sec && sec !== drag.el && nav.contains(sec)) return sec;
     return null;
   }
 
@@ -163,12 +166,8 @@ const NavDrag = (() => {
        сбрасывался и пункт «возвращался на место». */
     drag._hover = target || null;
     if (target){
-      const tLink = target.classList.contains('side__link');
-      /* Пункт можно нести в любой раздел: подсвечиваем и ссылки, и разделы.
-         Раздел-источник — только ссылки не принимает (цель-раздел допустима). */
-      if (sEl && !tLink){ target.classList.add('menu-drop-hover-sec'); }
-      if (!sEl && tLink){ target.classList.add('menu-drop-hover'); }
-      if (!sEl && !tLink){ /* пункт держим над разделом — показываем как цель вставки */ target.classList.add('menu-drop-hover-sec'); }
+      /* Цель уже совместима: пункт подсвечивает только пункт, раздел — раздел. */
+      target.classList.add(target.classList.contains('side__link') ? 'menu-drop-hover' : 'menu-drop-hover-sec');
     }
     /* Ghost окна (зона справа) — только для пунктов: разделы во вьюпорт не переносятся */
     if (!sEl && !target && cx >= navRight()){
@@ -198,7 +197,8 @@ const NavDrag = (() => {
     if (target){
       const tLink = target.classList.contains('side__link');
       const sSec = src.classList.contains('side__sec');
-      if (sSec && tLink) target = null;
+      /* Пункт → только пункт, раздел → только раздел. */
+      if (tLink === sSec) target = null;
     }
     let moved = false;
     let reordered = false; /* порядок меню реально изменился (а не создано окно) */
@@ -230,24 +230,6 @@ const NavDrag = (() => {
               const tr = target.getBoundingClientRect();
               const before = cy < (tr.top + tr.height / 2);
               toSec.items.splice(before ? toIdx : toIdx + 1, 0, item);
-              moved = true; reordered = true;
-            }
-          } else {
-            /* Бросок на раздел → вставляем по позиции курсора среди пунктов,
-               а не всегда в конец: подсветка раздела должна означать место. */
-            const toSec = V.find(x => x.sec === target.dataset.secTitle);
-            if (toSec){
-              let idx = toSec.items.length;
-              const box = target.nextElementSibling;
-              if (box && box.classList.contains('side__sec-items')){
-                const links = [...box.querySelectorAll('.side__link')];
-                const at = links.findIndex(l => {
-                  const r = l.getBoundingClientRect();
-                  return cy < r.top + r.height / 2;
-                });
-                idx = at < 0 ? links.length : at;
-              }
-              toSec.items.splice(Math.max(0, Math.min(idx, toSec.items.length)), 0, item);
               moved = true; reordered = true;
             }
           }
