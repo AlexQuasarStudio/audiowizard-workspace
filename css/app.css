@@ -176,7 +176,13 @@ body.pills-hide .head__mtools{pointer-events:none}
 body.pills-move .head__search .fake-input,
 body.pills-move .head__pill--balance,
 body.pills-move .head__ops{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
-.head__right,.head__search,.head__mtools{will-change:transform,opacity,filter}
+/* will-change на контейнере создаёт backdrop root и гасит backdrop-filter
+   у плашек: blur(16px) перестаёт размывать фон. Держим промоушен только
+   пока плашки действительно едут, а в покое отдаём слой обратно. */
+.head__right,.head__search,.head__mtools{will-change:auto}
+body.pills-anim .head__right,
+body.pills-anim .head__search,
+body.pills-anim .head__mtools{will-change:transform,opacity,filter}
 /* Скрытая плашка: гасим клики у ВСЕХ потомков (кнопок), иначе клик по
    невидимому контейнеру уходит на внутренние элементы и «будит» плашку. */
 .head__right[data-pill-hidden="1"],

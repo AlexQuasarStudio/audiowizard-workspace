@@ -352,10 +352,16 @@ const APP = (() => {
           document.body.classList.toggle('pills-move', false);
         });
         if (Math.abs(window.__pTarget - window.__pOff) > 0.005) window.__pRaf = requestAnimationFrame(pillTick);
-        else pillLastT = 0;
+        else {
+          pillLastT = 0;
+          document.body.classList.remove('pills-anim');
+        }
       };
       const paint = t => {
         window.__pTarget = Math.min(1, Math.max(0, t));
+        /* Промоушен слоя нужен только на время движения: статичный
+           will-change на контейнере гасил фирменное размытие плашек. */
+        if (window.__pTarget !== window.__pOff) document.body.classList.add('pills-anim');
         if (!window.__pRaf) window.__pRaf = requestAnimationFrame(pillTick);
       };
       const reveal = () => paint(0);
