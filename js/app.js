@@ -110,6 +110,42 @@ const APP = (() => {
     return n;
   }
 
+  /* HTML боковой навигации — единый шаблон для полной отрисовки и точечного
+     обновления меню (сброс порядка, перестановка) без перерисовки контента. */
+  function navInnerHTML(u2){
+    const nav = navFor(u2);
+    return nav.map(sec=>`<div class="side__sec ${prefsFor().closedSecs && prefsFor().closedSecs.includes(sec.sec)?'closed':''}" data-sec-title="${esc(sec.sec)}">${esc(sec.sec)}<svg class="ico ico-sm sec-arrow"><use href="#i-chev-d"/></svg></div><div class="side__sec-items" data-sec-items="${esc(sec.sec)}">${sec.items.map(it=>`
+              ${(() => {
+                /* Единый индикатор: точка окна и точка непрочитанных — одна и та же.
+                   Раньше это были две разные точки в разных углах, и при закрытии
+                   окна «точка» визуально телепортировалась наверх. */
+                const isChats = it.route === 'chats';
+                const isTickets = it.route === 'tickets' && isStaff(u2.role);
+                const cnt = isChats ? unreadChats(u2) : isTickets ? noDemo(S.tickets).filter(t => t.status === 'new').length : 0;
+                return `<a class="side__link ${route.name===it.route?'on':''}${cnt?' has-unread':''}" href="#/${it.route}" title="${esc(it.title)}" draggable="false" data-tour="${it.route==='orders'?'orders-link':''}" data-route="${esc(it.route)}" data-sec="${esc(sec.sec)}">
+                ${icon(it.icon)}<span class="lbl">${it.title}</span><span class="win-dot"></span>
+                ${cnt?`<span class="side__link__cnt">${cnt}</span>`:''}
+              </a>`;
+              })()}`).join('')}</div>`).join('');
+  }
+
+  /* Снять подсветку цели: после перестановки она не должна «залипать». */
+  function clearHoverMarks(){
+    document.querySelectorAll('.menu-drop-hover, .menu-drop-hover-sec')
+      .forEach(x => x.classList.remove('menu-drop-hover', 'menu-drop-hover-sec'));
+  }
+
+  /* Обновить только боковое меню (сброс порядка и т.п.) — без рендера контента. */
+  function renderNavOnly(){
+    const navEl = document.querySelector('.side__nav');
+    const u = user();
+    if (!navEl || !u){ render(); return; }
+    clearHoverMarks();
+    const sc = navEl.scrollTop;
+    navEl.innerHTML = navInnerHTML(u);
+    navEl.scrollTop = sc;
+  }
+
   /* Перестановка меню без перерисовки вьюпорта: двигаем существующие узлы
      боковой навигации по актуальному NAV. Контент и скролл не трогаем. */
   function reorderNavDom(){
@@ -141,6 +177,7 @@ const APP = (() => {
       h.remove();
     });
     pairs.forEach(([h, box]) => { navEl.appendChild(h); navEl.appendChild(box); });
+    clearHoverMarks();
     return true;
   }
 
@@ -168,19 +205,7 @@ const APP = (() => {
             <button class="iconbtn side__burger" id="burger" aria-label="Меню" title="Свернуть/развернуть меню">${icon('menu')}</button>
           </div>
           <nav class="side__nav" data-tour="nav">
-            ${nav.map(sec=>`<div class="side__sec ${prefsFor().closedSecs && prefsFor().closedSecs.includes(sec.sec)?'closed':''}" data-sec-title="${esc(sec.sec)}">${esc(sec.sec)}<svg class="ico ico-sm sec-arrow"><use href="#i-chev-d"/></svg></div><div class="side__sec-items" data-sec-items="${esc(sec.sec)}">${sec.items.map(it=>`
-              ${(() => {
-                /* Единый индикатор: точка окна и точка непрочитанных — одна и та же.
-                   Раньше это были две разные точки в разных углах, и при закрытии
-                   окна «точка» визуально телепортировалась наверх. */
-                const isChats = it.route === 'chats';
-                const isTickets = it.route === 'tickets' && isStaff(u.role);
-                const cnt = isChats ? unreadChats(u) : isTickets ? noDemo(S.tickets).filter(t => t.status === 'new').length : 0;
-                return `<a class="side__link ${route.name===it.route?'on':''}${cnt?' has-unread':''}" href="#/${it.route}" title="${esc(it.title)}" draggable="false" data-tour="${it.route==='orders'?'orders-link':''}" data-route="${esc(it.route)}" data-sec="${esc(sec.sec)}">
-                ${icon(it.icon)}<span class="lbl">${it.title}</span><span class="win-dot"></span>
-                ${cnt?`<span class="side__link__cnt">${cnt}</span>`:''}
-              </a>`;
-              })()}`).join('')}</div>`).join('')}
+            ${navInnerHTML(u)}
           </nav>
           <div class="side__foot">
             <button class="side__balance" id="side-balance" type="button" title="История баланса">
@@ -8258,9 +8283,9 @@ function initPWA(){
         if (box) { box.appendChild(movedEl); movedEl.dataset.sec = secName; }
         else movedEl.remove();
       }
-      if (navEl && reorderNavDom()) return;
+      if (navEl && reorderNavDom()){ clearHoverMarks(); return; }
       if (movedEl && movedEl.isConnected) movedEl.remove();
-      render();
+      renderNavOnly();
     },
     _navCtx: e => {
       e.preventDefault();
@@ -8282,7 +8307,7 @@ function initPWA(){
         items.push({ label:'Закрыть все окна', icon:'x', onClick:()=>{ try { Windows.closeAll(); } catch(err){} } });
       }
       items.push('-');
-      items.push({ label:'Сбросить меню по умолчанию', icon:'archive', onClick:()=>{ NAV = JSON.parse(JSON.stringify(NAV_DEFAULT)); window.NAV = NAV; delete prefsFor().navCustom; delete prefsFor().navCustomOrder; saveState(); toast('Меню сброшено','ok'); render(); } });
+      items.push({ label:'Сбросить меню по умолчанию', icon:'archive', onClick:()=>{ NAV = JSON.parse(JSON.stringify(NAV_DEFAULT)); window.NAV = NAV; delete prefsFor().navCustom; delete prefsFor().navCustomOrder; saveState(); clearHoverMarks(); toast('Меню сброшено','ok'); renderNavOnly(); } });
       showDropdown(e.target, items, { x:e.clientX, y:e.clientY });
     }
   };

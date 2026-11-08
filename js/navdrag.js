@@ -233,9 +233,23 @@ const NavDrag = (() => {
               moved = true; reordered = true;
             }
           } else {
-            /* бросок на раздел → в конец раздела */
+            /* Бросок на раздел → вставляем по позиции курсора среди пунктов,
+               а не всегда в конец: подсветка раздела должна означать место. */
             const toSec = V.find(x => x.sec === target.dataset.secTitle);
-            if (toSec){ toSec.items.push(item); moved = true; reordered = true; }
+            if (toSec){
+              let idx = toSec.items.length;
+              const box = target.nextElementSibling;
+              if (box && box.classList.contains('side__sec-items')){
+                const links = [...box.querySelectorAll('.side__link')];
+                const at = links.findIndex(l => {
+                  const r = l.getBoundingClientRect();
+                  return cy < r.top + r.height / 2;
+                });
+                idx = at < 0 ? links.length : at;
+              }
+              toSec.items.splice(Math.max(0, Math.min(idx, toSec.items.length)), 0, item);
+              moved = true; reordered = true;
+            }
           }
           if (!moved && fromSec) fromSec.items.push(item);
         }
