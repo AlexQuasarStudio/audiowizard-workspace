@@ -655,6 +655,8 @@ const APP = (() => {
       bnw.title = a.label + hk;
       bnw.setAttribute('aria-label', a.label);
     };
+    /* Настройки меняют хоткей без перерисовки шапки — обновляем подсказку вживую */
+    window.refreshQuickHint = setQuickIcon;
     if (bnw){
       setQuickIcon();
       bnw.onclick = e=>{ e.stopPropagation(); runQuickSel(); };
@@ -2075,6 +2077,19 @@ ex.innerHTML = avatarHTML(user(), '');
 
     const isAdmin = u.role==='admin';
     const isExec = u.role==='executor', isClient = u.role==='client';
+    const canAnalytics = ['admin','top_manager','manager'].includes(u.role);
+    const regAllUsers = canAnalytics ? regUsersAll() : [];
+    const reg14 = canAnalytics ? regDaySeries(regAllUsers, 14) : [];
+    const reg14Total = reg14.reduce((a,d) => a + d.total, 0);
+    const regTotalAll = regAllUsers.length;
+    const regClientsAll = regAllUsers.filter(x => x.role === 'client').length;
+    const regExecutorsAll = regAllUsers.filter(x => x.role === 'executor').length;
+    const reg14Max = Math.max(1, ...reg14.map(d => d.total));
+    const reg14Bars = reg14.map((d,i) => {
+      const bw = 320 / 14, h = (d.total / reg14Max) * 44, hc = (d.clients / reg14Max) * 44, he = (d.executors / reg14Max) * 44;
+      const x = i * bw + 2, y = 53 - h;
+      return `<g class="reg-bar" data-ri="${i}"><rect class="rb-e" x="${x}" y="${y}" width="${bw-4}" height="${he}" rx="2"/><rect class="rb-c" x="${x}" y="${y+he}" width="${bw-4}" height="${hc}" rx="2"/><rect class="reg-hit" x="${i*bw}" y="0" width="${bw}" height="64"/></g>`;
+    }).join('');
 
     root.innerHTML = `
       <div class="dash-hero" data-tour="hero">
@@ -2134,6 +2149,7 @@ ex.innerHTML = avatarHTML(user(), '');
         <div class="metric"><div class="metric__label">${icon('orders','ico-sm')} Активные заказы</div>
           <div class="metric__value">${active}</div>
           <div class="metric__delta">${orders.filter(o=>o.status==='problem').length?`<span class="delta-down">● ${orders.filter(o=>o.status==='problem').length} проблемных</span>`:'без проблем'} </div>
+          ${canAnalytics?'<button type="button" class="metric__more" data-active-detail>Детализация →</button>':''}
           <span class="metric__ico c-blue">${icon('orders')}</span></div>
         <div class="metric"><div class="metric__label">${icon('executors','ico-sm')} Исполнители онлайн</div>
           <div class="metric__value">${onlineExecs}</div>
@@ -2149,13 +2165,34 @@ ex.innerHTML = avatarHTML(user(), '');
       <div class="cols-2 grid" style="margin-top:12px">
         <div class="card"><div class="card-h"><h3>ТОП исполнителей</h3><a href="#/executors" class="small">Все →</a></div>
           <div class="card-b stack" style="gap:2px">
-            ${topExecs.map((e2,i)=>`<div class="list-row"><span class="rank rank--${i+1}">${i+1}</span>${avatarHTML(e2)}<span style="flex:1;min-width:0"><b class="small">${esc(e2.full_name)}</b><div class="cell-sub">${esc(e2.ext.specializations[0]||'')}</div></span><b class="small">${fmtMoney(e2.ext.earned)}</b></div>`).join('')}
+            ${topExecs.map((e2,i)=>`<div class="list-row"><span class="rank rank--${i+1}">${i+1}</span>${avatarHTML(e2)}<span style="flex:1;min-width:0"><b class="small">${esc(e2.full_name)}</b><div class="cell-sub">${esc(e2.ext.specializations[0]||'')}</div></span><b class="small ${Number(e2.ext.earned)<0?'neg':''}">${fmtMoney(e2.ext.earned)}</b></div>`).join('')}
           </div></div>
         <div class="card"><div class="card-h"><h3>ТОП клиентов</h3><a href="#/clients" class="small">Все →</a></div>
           <div class="card-b stack" style="gap:2px">
             ${topClients.map(({c,sum},i)=>`<div class="list-row"><span class="rank rank--${i+1}">${i+1}</span>${avatarHTML(c)}<span style="flex:1;min-width:0"><b class="small">${esc(c.full_name)}</b><div class="cell-sub">${c.ordersCount||noDemo(S.orders.filter(o=>o.client_id===c.id)).length} заказов</div></span><b class="small">${fmtMoney(sum)}</b></div>`).join('')}
           </div></div>
-      </div>`}
+      </div>
+      ${canAnalytics?`
+      <div class="card" style="margin-top:12px">
+        <div class="card-h"><h3>${icon('users')} Пользователи</h3><span class="row" style="gap:10px;align-items:center"><span class="badge ${reg14Total?'c-green':'c-gray'}">+${reg14Total} за 14 дней</span><button type="button" class="rev-link" data-reg-detail>Детализация →</button></span></div>
+        <div class="card-b">
+          <div class="reg-row">
+            <div class="reg-summary">
+              <div class="reg-total"><b>${regTotalAll}</b><span class="small muted">всего пользователей</span></div>
+              <div class="reg-split"><span class="dot" style="background:var(--accent)"></span><b>${regClientsAll}</b> клиентов</div>
+              <div class="reg-split"><span class="dot" style="background:var(--green)"></span><b>${regExecutorsAll}</b> исполнителей</div>
+            </div>
+            ${reg14Total ? `<div class="chart-wrap chart-wrap--reg">
+              <svg class="reg-chart" viewBox="0 0 320 64" preserveAspectRatio="none" aria-label="Приток пользователей за 14 дней">
+                <line class="rb-base" x1="0" y1="53" x2="320" y2="53"/>
+                ${reg14Bars}
+              </svg>
+              <div class="chart-tip" id="reg-tip"></div>
+            </div>` : `<div class="reg-empty small faint">За 14 дней новых регистраций нет</div>`}
+          </div>
+          <div class="small faint" style="margin-top:4px">приток за 14 дней по дате регистрации</div>
+        </div>
+      </div>`:''}`}
       ${isAdmin?`
       <div class="card" style="margin-top:12px"><div class="card-h"><h3>${icon('chart')} Использование функций платформы</h3><span class="badge c-gray">согласие на статистику</span></div>
         <div class="card-b stack" style="gap:10px">
@@ -2169,6 +2206,8 @@ ex.innerHTML = avatarHTML(user(), '');
 
     $$('[data-oid]', root).forEach(el=>el.onclick=()=>CRM.openOrderDetail(el.dataset.oid));
     $$('[data-rev-detail]', root).forEach(el=>el.onclick=e=>{ e.preventDefault(); openRevenueDetail(); });
+    $$('[data-active-detail]', root).forEach(el=>el.onclick=e=>{ e.preventDefault(); openActiveOrdersDetail(); });
+    $$('[data-reg-detail]', root).forEach(el=>el.onclick=e=>{ e.preventDefault(); openRegistrationsDetail(); });
     /* Графики реагируют на курсор: направляющая, точка и подсказка по дню */
     const sparkLabels = Array.from({length:14},(_,i)=>{
       const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-13+i);
@@ -2203,6 +2242,8 @@ ex.innerHTML = avatarHTML(user(), '');
       i => i/13*212+4, v => 58-(v/maxV)*44);
     bindSparkHover(root.querySelector('#rev-chart svg'), root.querySelector('#rev-tip'),
       i => (i/13)*(W-8)+4, v => H-8-(v/maxV)*(H-24));
+    const regWrap = root.querySelector('.chart-wrap--reg');
+    if (regWrap) bindRegHover(regWrap, reg14);
     /* Donut: сегмент под курсором показывается в центре и подсвечивает легенду */
     const donutSvg = root.querySelector('#donut');
     if (donutSvg){
@@ -2287,6 +2328,8 @@ ex.innerHTML = avatarHTML(user(), '');
   }
   const revPlural = n => (n%10===1 && n%100!==11) ? 'заказ'
     : ((n%10>=2 && n%10<=4 && !(n%100>=12 && n%100<=14)) ? 'заказа' : 'заказов');
+  const dayPlural = n => (n%10===1 && n%100!==11) ? 'день'
+    : ((n%10>=2 && n%10<=4 && !(n%100>=12 && n%100<=14)) ? 'дня' : 'дней');
   /* ---------- Экспорт детализации: сводка + расшифровка ---------- */
   const REV_COLS = ['Заказ','Клиент','Ниша','Проект','Менеджер','Исполнители','Выполнен','Сумма','Доля, %','Исполнителям','Менеджеру','Админу','Остаток','Оплачено клиентом','Долг','Долг исполнителям','Долг менеджеру','Статус'];
   const revNum = v => (Math.round((Number(v) || 0) * 100) / 100).toFixed(2).replace('.', ',');
@@ -2451,6 +2494,14 @@ ex.innerHTML = avatarHTML(user(), '');
     const top = rows.reduce((a,x) => (!a || (x.o.total||0) > (a.o.total||0)) ? x : a, null);
     const days = Math.max(1, Math.round((revDayStart(to - 1) - revDayStart(from)) / DAY) + 1);
     const data = revData(rows, total, from, to);
+    const series = revChartSeries(rows, from, to);
+    const bucketWord = series.bucketDays === 1 ? 'дням' : series.bucketDays === 7 ? 'неделям' : 'месяцам';
+    const labelEvery = Math.max(1, Math.ceil(series.items.length / 7));
+    const mgrItems = revManagerItems(data.rows);
+    const mgrMax = Math.max(1, ...mgrItems.map(x => x.value));
+    const mgrBars = mgrItems.length
+      ? mgrItems.map(x => `<div class="rev-bar-row" title="${esc(x.label)}: ${fmtMoney(x.value)}"><span class="rev-bar-name">${esc(x.label)}</span><span class="rev-bar-track"><span class="rev-bar-fill" style="width:${Math.max(2, Math.round(x.value / mgrMax * 100))}%"></span></span><b>${fmtMoney(x.value)}</b></div>`).join('')
+      : '<div class="small faint">Нет данных</div>';
 
     const presetHtml = REV_PRESETS.map(p =>
       `<button type="button" class="btn btn--sm ${revRange.preset === p.id ? 'btn--primary' : 'btn--ghost'}" data-rp="${p.id}">${p.label}</button>`).join('');
@@ -2465,7 +2516,7 @@ ex.innerHTML = avatarHTML(user(), '');
           <button type="button" class="btn btn--soft btn--sm" data-rev-export>${icon('export','ico-sm')} Экспорт</button>
         </div>
       </div>
-      <div class="rev-period small muted">${fmtDate(from)} — ${fmtDate(to - DAY)} · ${days} ${days===1?'день':(days<5?'дня':'дней')} · только выполненные заказы</div>
+      <div class="rev-period small muted">${fmtDate(from)} — ${fmtDate(to - DAY)} · ${days} ${dayPlural(days)} · только выполненные заказы</div>
       <div class="rev-cards">
         <div class="rev-card"><span class="small muted">Выручка</span><b>${fmtMoney(total)}</b></div>
         <div class="rev-card"><span class="small muted">Заказов</span><b>${rows.length}</b></div>
@@ -2473,6 +2524,16 @@ ex.innerHTML = avatarHTML(user(), '');
         <div class="rev-card"><span class="small muted">Крупнейший заказ</span><b>${top ? fmtMoney(top.o.total || 0) : '—'}</b></div>
         <div class="rev-card"><span class="small muted">Доля от всей выручки</span><b>${allTotal ? (total/allTotal*100).toFixed(1).replace('.', ',') + '%' : '—'}</b></div>
       </div>
+      ${rows.length ? `<div class="rev-charts">
+        <div class="rev-chart-block">
+          <div class="row row--between rev-chart-head"><b class="small">Выручка по ${bucketWord}</b><span class="small faint">${fmtMoney(total)}</span></div>
+          ${chartBars(series.items, { height:150, labelEvery, aria:'Выручка по дням' })}
+        </div>
+        <div class="rev-chart-block">
+          <div class="row row--between rev-chart-head"><b class="small">По менеджерам</b><span class="small faint">${fmtMoney(total)}</span></div>
+          <div class="rev-bars">${mgrBars}</div>
+        </div>
+      </div>` : ''}
       ${rows.length ? `
       <div class="row row--between rev-actions">
         <b class="small">Заказы периода</b>
@@ -2510,6 +2571,8 @@ ex.innerHTML = avatarHTML(user(), '');
       revRange = { preset:'custom', from:f, to: t2 + DAY };
       drawRevenueDetail(box, u, base, firstAt);
     };
+    const dailyWrap = box.querySelector('.rev-charts .rev-chart-block .chart-wrap');
+    if (dailyWrap) bindChartBars(dailyWrap, series.items, item => `<b>${esc(item.fullLabel)}</b><span>${fmtMoney(item.value)} · ${item.count} ${revPlural(item.count)}</span>`);
     const expBtn = box.querySelector('[data-rev-export]');
     if (expBtn) expBtn.onclick = () => showDropdown(expBtn, [
       { label:'Excel (.xlsx)', icon:'table', onClick:()=>revExportXlsx(data) },
@@ -2530,6 +2593,629 @@ ex.innerHTML = avatarHTML(user(), '');
       onMount:(host) => {
         const box = host.querySelector('#rev-detail');
         if (box) drawRevenueDetail(box, u, base, firstAt);
+      }
+    });
+  }
+
+  let regRange = null;
+
+  function canSeeAnalytics(){
+    const u = user();
+    return !!u && ['admin','top_manager','manager'].includes(u.role);
+  }
+
+  const ACTIVE_COLS = ['Заказ','Клиент','Ниша','Проект','Менеджер','Исполнители','Создан','Дедлайн','Статус','Сумма','Оплачено','Долг'];
+
+  function activeOrderData(u){
+    const rows = ordersFor(u).filter(o => ['waiting','work'].includes(o.status)).sort((a,b) => {
+      const da = a.deadline || 9e15, db = b.deadline || 9e15;
+      return da - db || (b.created_at || 0) - (a.created_at || 0);
+    });
+    const list = rows.map(o => {
+      const total = Number(o.total) || 0;
+      const paid = Number(o.paid_amount) || 0;
+      return {
+        id: o.id,
+        order_id: o.order_id || '',
+        client: revClientName(o),
+        niche: nicheName(o.nish_id),
+        project: (S.projects.find(p => p.id === o.project_id) || {}).name || '',
+        manager: (userById(o.manager_id) || {}).full_name || '',
+        executors: revExecFullNames(o).join(', '),
+        created_ts: o.created_at || 0,
+        created_at: o.created_at ? revISO(o.created_at) : '',
+        deadline_ts: o.deadline || 0,
+        deadline: o.deadline ? revISO(o.deadline) : '',
+        status: (STATUS_META[o.status] || {}).label || o.status || '',
+        total,
+        paid,
+        debt: Math.max(0, total - paid),
+        overdue: !!(o.deadline && o.deadline < Date.now())
+      };
+    });
+    const total = list.reduce((a,r) => a + r.total, 0);
+    const paid = list.reduce((a,r) => a + r.paid, 0);
+    const debt = list.reduce((a,r) => a + r.debt, 0);
+    const byStatus = [...new Set(list.map(r => r.status))].map(status => {
+      const rs = list.filter(r => r.status === status);
+      return { status, count: rs.length, total: rs.reduce((a,r) => a + r.total, 0), debt: rs.reduce((a,r) => a + r.debt, 0) };
+    }).sort((a,b) => b.total - a.total);
+    const byManager = [...new Set(list.map(r => r.manager || 'Без менеджера'))].map(manager => {
+      const rs = list.filter(r => (r.manager || 'Без менеджера') === manager);
+      return { manager, count: rs.length, total: rs.reduce((a,r) => a + r.total, 0), debt: rs.reduce((a,r) => a + r.debt, 0) };
+    }).sort((a,b) => b.total - a.total);
+    return {
+      meta: {
+        generated_at: new Date().toISOString(),
+        generated_by: (u && u.full_name) || '',
+        date: revISO(Date.now()),
+        note: 'Текущие заказы в статусах «В ожидании» и «В работе»'
+      },
+      totals: { count: list.length, total, paid, debt, overdue: list.filter(r => r.overdue).length, avg: list.length ? Math.round(total / list.length) : 0 },
+      rows: list,
+      byStatus,
+      byManager
+    };
+  }
+
+  function activeFileName(data, ext){
+    return 'aktivnye_zakazy_' + data.meta.date + '.' + ext;
+  }
+
+  function activeExportCsv(data){
+    const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const lines = [ACTIVE_COLS.map(q).join(';')];
+    data.rows.forEach(r => {
+      lines.push([r.order_id, r.client, r.niche, r.project, r.manager, r.executors,
+        r.created_at, r.deadline, r.status, revNum(r.total), revNum(r.paid), revNum(r.debt)].map(q).join(';'));
+    });
+    lines.push(['Итого', data.rows.length + ' заказов', '', '', '', '', '', '', '',
+      revNum(data.totals.total), revNum(data.totals.paid), revNum(data.totals.debt)].map(q).join(';'));
+    revDownload(activeFileName(data, 'csv'), new Blob(['\ufeff' + lines.join('\r\n')], { type:'text/csv;charset=utf-8' }));
+    toast(`Активные заказы: ${data.rows.length} в CSV`, 'ok');
+  }
+
+  function activeExportXlsx(data){
+    const rows = data.rows.map(r => [r.order_id, r.client, r.niche, r.project, r.manager, r.executors,
+      r.created_at, r.deadline, r.status, r.total, r.paid, r.debt]);
+    rows.push(['Итого', data.rows.length + ' заказов', '', '', '', '', '', '', '',
+      data.totals.total, data.totals.paid, data.totals.debt]);
+    const summary = [
+      ['Детализация активных заказов', ''],
+      ['Дата', data.meta.date],
+      ['Активных заказов', data.totals.count],
+      ['Сумма', data.totals.total],
+      ['Оплачено клиентом', data.totals.paid],
+      ['Долг клиентов', data.totals.debt],
+      ['Просрочено', data.totals.overdue],
+      ['Средний чек', data.totals.avg],
+      ['Сформировано', new Date().toLocaleString('ru-RU')],
+      ['Пользователь', data.meta.generated_by],
+      ['Примечание', data.meta.note]
+    ];
+    const statusRows = [['Статус','Заказов','Сумма','Долг']];
+    data.byStatus.forEach(r => statusRows.push([r.status, r.count, r.total, r.debt]));
+    statusRows.push(['Итого', data.totals.count, data.totals.total, data.totals.debt]);
+    const managerRows = [['Менеджер','Заказов','Сумма','Долг']];
+    data.byManager.forEach(r => managerRows.push([r.manager, r.count, r.total, r.debt]));
+    managerRows.push(['Итого', data.totals.count, data.totals.total, data.totals.debt]);
+    const book = { 'Сводка': summary, 'Заказы': [ACTIVE_COLS, ...rows], 'По статусам': statusRows, 'По менеджерам': managerRows };
+    revDownload(activeFileName(data, 'xlsx'), new Blob([AWX.writeSheets(book)], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    toast(`Активные заказы: ${data.rows.length} в Excel`, 'ok');
+  }
+
+  function activeExportJson(data){
+    revDownload(activeFileName(data, 'json'), new Blob([JSON.stringify(data, null, 2)], { type:'application/json;charset=utf-8' }));
+    toast('Активные заказы выгружены в JSON', 'ok');
+  }
+
+  function activeCopyTsv(data){
+    const lines = [ACTIVE_COLS.join('\t')];
+    data.rows.forEach(r => {
+      lines.push([r.order_id, r.client, r.niche, r.project, r.manager, r.executors,
+        r.created_at, r.deadline, r.status, r.total, r.paid, r.debt].join('\t'));
+    });
+    const text = lines.join('\n');
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(() => toast('Таблица скопирована','ok')).catch(() => toast('Не удалось скопировать','err'));
+    } else toast('Копирование недоступно','warn');
+  }
+
+  function drawActiveDetail(box, u, close){
+    const data = activeOrderData(u);
+    const deadline = activeDeadlineItems(data.rows);
+    box.innerHTML = `
+      <div class="rev-toolbar">
+        <div class="rev-presets"><span class="badge c-blue">Текущие</span></div>
+        <div class="rev-range">
+          <span class="small faint">${fmtDate(Date.now())}</span>
+          <button type="button" class="btn btn--soft btn--sm" data-active-export>${icon('export','ico-sm')} Экспорт</button>
+        </div>
+      </div>
+      <div class="rev-period small muted">${data.totals.count} активных · только «В ожидании» и «В работе»</div>
+      <div class="rev-cards">
+        <div class="rev-card"><span class="small muted">Активных заказов</span><b>${data.totals.count}</b></div>
+        <div class="rev-card"><span class="small muted">Сумма</span><b>${fmtMoney(data.totals.total)}</b></div>
+        <div class="rev-card"><span class="small muted">Оплачено клиентом</span><b>${fmtMoney(data.totals.paid)}</b></div>
+        <div class="rev-card"><span class="small muted">Долг клиентов</span><b>${fmtMoney(data.totals.debt)}</b></div>
+        <div class="rev-card"><span class="small muted">Просрочено</span><b>${data.totals.overdue}</b></div>
+      </div>
+      ${data.rows.length ? `<div class="rev-chart-block">
+        <div class="row row--between rev-chart-head"><b class="small">По дедлайнам</b><span class="small faint">${data.totals.count} активных</span></div>
+        ${chartBars(deadline, { height:150, showValue:true, aria:'Активные заказы по дедлайнам' })}
+      </div>` : ''}
+      ${data.rows.length ? `
+      <div class="row row--between rev-actions"><b class="small">Активные заказы</b></div>
+      <div class="tbl-wrap rev-tbl"><table class="tbl">
+        <thead><tr><th>Заказ</th><th>Клиент</th><th>Ниша</th><th>Менеджер</th><th>Исполнители</th><th>Дедлайн</th><th>Статус</th><th class="pay-cell">Сумма</th><th class="pay-cell">Долг</th></tr></thead>
+        <tbody>${data.rows.map(r => `<tr data-aid="${r.id}" style="cursor:pointer">
+          <td><span class="order-id">${esc(r.order_id)}</span></td>
+          <td>${esc(r.client || '—')}</td>
+          <td class="small">${esc(r.niche || '—')}</td>
+          <td class="small">${esc(r.manager || '—')}</td>
+          <td class="small">${esc(r.executors || '—')}</td>
+          <td class="small ${r.overdue ? 'overdue' : 'faint'}">${r.deadline_ts ? fmtDate(r.deadline_ts) : '—'}</td>
+          <td>${esc(r.status)}</td>
+          <td class="pay-cell">${fmtMoney(r.total)}</td>
+          <td class="pay-cell">${fmtMoney(r.debt)}</td>
+        </tr>`).join('')}</tbody>
+        <tfoot><tr><td colspan="7"><b>Итого: ${data.rows.length}</b></td>
+          <td class="pay-cell"><b>${fmtMoney(data.totals.total)}</b></td>
+          <td class="pay-cell"><b>${fmtMoney(data.totals.debt)}</b></td></tr></tfoot>
+      </table></div>` : `<div class="empty" style="padding:26px 0">${icon('orders')}<span>Активных заказов сейчас нет</span></div>`}
+    `;
+    const dlWrap = box.querySelector('.rev-chart-block .chart-wrap');
+    if (dlWrap) bindChartBars(dlWrap, deadline, item => `<b>${esc(item.label)}</b><span>${item.value} · ${fmtMoney(item.sum)}</span>`);
+    const exp = box.querySelector('[data-active-export]');
+    if (exp) exp.onclick = () => showDropdown(exp, [
+      { label:'Excel (.xlsx)', icon:'table', onClick:() => activeExportXlsx(data) },
+      { label:'CSV для Excel', icon:'export', onClick:() => activeExportCsv(data) },
+      { label:'JSON (данные)', icon:'file', onClick:() => activeExportJson(data) },
+      '-',
+      { label:'Копировать таблицу', icon:'copy', onClick:() => activeCopyTsv(data) }
+    ], { alignRight:true });
+    box.querySelectorAll('[data-aid]').forEach(tr => tr.onclick = () => {
+      const id = tr.dataset.aid;
+      close();
+      setTimeout(() => { try { CRM.openOrderDetail(id); } catch(e){} }, 420);
+    });
+  }
+
+  function chartBucketDays(days){
+    return days > 120 ? 30 : days > 45 ? 7 : 1;
+  }
+
+  function revChartSeries(base, from, to){
+    const days = Math.max(1, Math.round((revDayStart(to - 1) - revDayStart(from)) / DAY) + 1);
+    const bucketDays = chartBucketDays(days);
+    const sum = new Map(), cnt = new Map();
+    base.forEach(x => {
+      const k = revISO(x.at);
+      sum.set(k, (sum.get(k) || 0) + (Number(x.o.total) || 0));
+      cnt.set(k, (cnt.get(k) || 0) + 1);
+    });
+    const items = [];
+    for (let i = 0; i < days; i += bucketDays){
+      const t0 = revDayStart(from) + i * DAY;
+      const t1 = Math.min(revDayStart(from) + (i + bucketDays) * DAY, to);
+      let value = 0, count = 0;
+      for (let t = t0; t < t1; t += DAY){
+        const k = revISO(t);
+        value += sum.get(k) || 0;
+        count += cnt.get(k) || 0;
+      }
+      const end = t1 - DAY;
+      const d0 = new Date(t0), d1 = new Date(end);
+      const label = bucketDays === 30
+        ? d0.toLocaleDateString('ru-RU', { month:'short' })
+        : d0.toLocaleDateString('ru-RU', { day:'numeric', month:'short' });
+      const fullLabel = bucketDays === 1
+        ? label
+        : d0.toLocaleDateString('ru-RU', { day:'numeric', month:'short' }) + ' — ' + d1.toLocaleDateString('ru-RU', { day:'numeric', month:'short' });
+      items.push({ label, fullLabel, value, count, t0, t1 });
+    }
+    return { items, bucketDays, days };
+  }
+
+  function regChartSeries(rows, from, to){
+    const days = Math.max(1, Math.round((revDayStart(to - 1) - revDayStart(from)) / DAY) + 1);
+    const bucketDays = chartBucketDays(days);
+    const cMap = new Map(), eMap = new Map();
+    rows.forEach(r => {
+      if (!r.created_at) return;
+      const k = r.created_at;
+      if (r.roleRaw === 'client') cMap.set(k, (cMap.get(k) || 0) + 1);
+      else eMap.set(k, (eMap.get(k) || 0) + 1);
+    });
+    const items = [];
+    for (let i = 0; i < days; i += bucketDays){
+      const t0 = revDayStart(from) + i * DAY;
+      const t1 = Math.min(revDayStart(from) + (i + bucketDays) * DAY, to);
+      let clients = 0, executors = 0;
+      for (let t = t0; t < t1; t += DAY){
+        const k = revISO(t);
+        clients += cMap.get(k) || 0;
+        executors += eMap.get(k) || 0;
+      }
+      const end = t1 - DAY;
+      const d0 = new Date(t0), d1 = new Date(end);
+      const label = bucketDays === 30
+        ? d0.toLocaleDateString('ru-RU', { month:'short' })
+        : d0.toLocaleDateString('ru-RU', { day:'numeric', month:'short' });
+      const fullLabel = bucketDays === 1
+        ? label
+        : d0.toLocaleDateString('ru-RU', { day:'numeric', month:'short' }) + ' — ' + d1.toLocaleDateString('ru-RU', { day:'numeric', month:'short' });
+      items.push({ label, fullLabel, clients, executors, total:clients + executors, t0, t1 });
+    }
+    return { items, bucketDays, days };
+  }
+
+  function revManagerItems(rows){
+    const map = new Map();
+    rows.forEach(r => {
+      const k = r.manager || 'Без менеджера';
+      map.set(k, (map.get(k) || 0) + (Number(r.total) || 0));
+    });
+    return [...map].map(([label, value]) => ({ label, value })).sort((a,b) => b.value - a.value);
+  }
+
+  function activeDeadlineItems(rows){
+    const today = revDayStart(Date.now());
+    const defs = [
+      { key:'overdue', label:'Просрочено', color:'var(--red)' },
+      { key:'today', label:'Сегодня', color:'var(--orange)' },
+      { key:'soon', label:'3 дня', color:'var(--yellow)' },
+      { key:'week', label:'Неделя', color:'var(--accent)' },
+      { key:'later', label:'Позже', color:'var(--green)' },
+      { key:'none', label:'Без срока', color:'var(--gray)' }
+    ];
+    const bucket = r => {
+      const t = r.deadline_ts;
+      if (!t) return 'none';
+      if (t < today) return 'overdue';
+      if (t < today + DAY) return 'today';
+      if (t < today + 4 * DAY) return 'soon';
+      if (t < today + 8 * DAY) return 'week';
+      return 'later';
+    };
+    return defs.map(d => {
+      const rs = rows.filter(r => bucket(r) === d.key);
+      return { label:d.label, value:rs.length, valueLabel:rs.length, sum:rs.reduce((a,r) => a + r.total, 0), color:d.color };
+    });
+  }
+
+  function chartBars(items, opts = {}){
+    const W = 560, H = opts.height || 150, top = 18, base = H - 22;
+    const n = Math.max(1, items.length), slot = W / n;
+    const bw = Math.max(6, Math.min(38, slot - 8));
+    const max = Math.max(1, ...items.map(x => Number(x.value) || 0));
+    const labelEvery = Math.max(1, Math.floor(opts.labelEvery || 1));
+    const bars = items.map((x, i) => {
+      const v = Number(x.value) || 0;
+      const h = v ? Math.max(2, Math.round(v / max * (base - top))) : 0;
+      const cx = slot * i + slot / 2, x0 = cx - bw / 2, y0 = base - h;
+      const showLabel = i % labelEvery === 0 || i === items.length - 1;
+      return `<g class="chart-bar" data-i="${i}">
+        <rect class="chart-fill" x="${x0}" y="${y0}" width="${bw}" height="${h}" rx="4" fill="${x.color || 'var(--accent)'}"></rect>
+        ${opts.showValue ? `<text class="chart-val" x="${cx}" y="${Math.max(12, y0 - 4)}" text-anchor="middle">${esc(x.valueLabel != null ? x.valueLabel : v)}</text>` : ''}
+        ${showLabel ? `<text class="chart-lbl" x="${cx}" y="${base + 14}" text-anchor="middle">${esc(x.label)}</text>` : ''}
+        <rect class="chart-hit" x="${slot * i}" y="0" width="${slot}" height="${base}"></rect>
+      </g>`;
+    }).join('');
+    return `<div class="chart-wrap chart-wrap--bars"><svg class="bar-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(opts.aria || 'График')}">${bars}</svg><div class="chart-tip"></div></div>`;
+  }
+
+  function chartStackedBars(items, opts = {}){
+    const W = 560, H = opts.height || 150, top = 18, base = H - 22;
+    const n = Math.max(1, items.length), slot = W / n;
+    const bw = Math.max(6, Math.min(38, slot - 8));
+    const max = Math.max(1, ...items.map(x => Number(x.total) || 0));
+    const labelEvery = Math.max(1, Math.floor(opts.labelEvery || 1));
+    const bars = items.map((x, i) => {
+      const he = Math.round((Number(x.executors) || 0) / max * (base - top));
+      const hc = Math.round((Number(x.clients) || 0) / max * (base - top));
+      const cx = slot * i + slot / 2, x0 = cx - bw / 2, y0 = base - he - hc;
+      const showLabel = i % labelEvery === 0 || i === items.length - 1;
+      return `<g class="chart-bar" data-i="${i}">
+        <rect class="chart-fill" x="${x0}" y="${y0}" width="${bw}" height="${he}" rx="3" fill="var(--green)"></rect>
+        <rect class="chart-fill" x="${x0}" y="${y0 + he}" width="${bw}" height="${hc}" rx="3" fill="var(--accent)"></rect>
+        ${showLabel ? `<text class="chart-lbl" x="${cx}" y="${base + 14}" text-anchor="middle">${esc(x.label)}</text>` : ''}
+        <rect class="chart-hit" x="${slot * i}" y="0" width="${slot}" height="${base}"></rect>
+      </g>`;
+    }).join('');
+    return `<div class="chart-wrap chart-wrap--bars"><svg class="bar-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(opts.aria || 'График')}">${bars}</svg><div class="chart-tip"></div></div>`;
+  }
+
+  function bindChartBars(wrap, items, tipFn){
+    if (!wrap) return;
+    const tip = wrap.querySelector('.chart-tip');
+    if (!tip) return;
+    const groups = [...wrap.querySelectorAll('.chart-bar')];
+    const show = (g, i) => {
+      groups.forEach(x => x.classList.remove('on'));
+      g.classList.add('on');
+      tip.innerHTML = tipFn(items[i], i);
+      tip.classList.add('on');
+      const r = g.querySelector('.chart-hit').getBoundingClientRect();
+      const wr = wrap.getBoundingClientRect();
+      tip.style.left = Math.min(Math.max(r.left + r.width / 2 - wr.left, 64), Math.max(64, wr.width - 64)) + 'px';
+    };
+    groups.forEach((g, i) => {
+      const hit = g.querySelector('.chart-hit');
+      if (!hit) return;
+      hit.addEventListener('mouseenter', () => show(g, i));
+      hit.addEventListener('mousemove', () => show(g, i));
+      hit.addEventListener('mouseleave', () => { g.classList.remove('on'); tip.classList.remove('on'); });
+    });
+    wrap.addEventListener('mouseleave', () => tip.classList.remove('on'));
+  }
+
+  function bindRegHover(wrap, items){
+    if (!wrap) return;
+    const tip = wrap.querySelector('.chart-tip');
+    if (!tip) return;
+    const groups = [...wrap.querySelectorAll('[data-ri]')];
+    const show = (g, i) => {
+      groups.forEach(x => x.classList.remove('on'));
+      g.classList.add('on');
+      const x = items[i];
+      tip.innerHTML = `<b>${esc(x.label)}</b><span>+${x.total} · ${x.clients} клиентов, ${x.executors} исполнителей</span>`;
+      tip.classList.add('on');
+      const r = g.getBoundingClientRect();
+      const wr = wrap.getBoundingClientRect();
+      tip.style.left = Math.min(Math.max(r.left + r.width / 2 - wr.left, 64), Math.max(64, wr.width - 64)) + 'px';
+    };
+    groups.forEach((g, i) => {
+      g.addEventListener('mouseenter', () => show(g, i));
+      g.addEventListener('mousemove', () => show(g, i));
+      g.addEventListener('mouseleave', () => { g.classList.remove('on'); tip.classList.remove('on'); });
+    });
+    wrap.addEventListener('mouseleave', () => tip.classList.remove('on'));
+  }
+
+  function openActiveOrdersDetail(){
+    if (!canSeeAnalytics()){ toast('Детализация доступна администраторам и менеджерам','warn'); return; }
+    const u = user();
+    openWinModal({
+      title:'Активные заказы', icon:'orders', wide:true,
+      body:'<div id="active-detail" style="min-height:620px"></div>',
+      onMount:(host, close) => {
+        const box = host.querySelector('#active-detail');
+        if (box) drawActiveDetail(box, u, close);
+      }
+    });
+  }
+
+  const REG_COLS = ['Пользователь','Роль','Логин','Email','Телефон','Зарегистрирован','Статус','Заказов'];
+
+  function regUsersAll(){
+    return noDemo(S.users).filter(x => x.role === 'client' || x.role === 'executor');
+  }
+
+  function regOrderCounts(){
+    const clients = new Map(), executors = new Map();
+    noDemo(S.orders).forEach(o => {
+      const ids = o.client_ids && o.client_ids.length ? o.client_ids : (o.client_id ? [o.client_id] : []);
+      ids.forEach(id => clients.set(id, (clients.get(id) || 0) + 1));
+      (o.executors || []).forEach(e => executors.set(e.uid, (executors.get(e.uid) || 0) + 1));
+    });
+    return { clients, executors };
+  }
+
+  function regDaySeries(users, days){
+    const today = revDayStart(Date.now());
+    return Array.from({ length:days }, (_, i) => {
+      const t0 = today - (days - 1 - i) * DAY, t1 = t0 + DAY;
+      const clients = users.filter(x => x.role === 'client' && x.created_at >= t0 && x.created_at < t1).length;
+      const executors = users.filter(x => x.role === 'executor' && x.created_at >= t0 && x.created_at < t1).length;
+      return { t:t0, clients, executors, total:clients + executors, label:new Date(t0).toLocaleDateString('ru-RU',{day:'numeric',month:'short'}) };
+    });
+  }
+
+  function regData(rows, from, to){
+    const counts = regOrderCounts();
+    const list = rows.map(p => {
+      const isClient = p.role === 'client';
+      const status = (p.ext && p.ext.status) || 'active';
+      return {
+        uid:p.id,
+        name:p.full_name || '',
+        roleRaw:p.role,
+        role:isClient ? 'Клиент' : 'Исполнитель',
+        username:p.username || '',
+        email:p.email || '',
+        phone:p.phone || '',
+        created_ts:p.created_at || 0,
+        created_at:p.created_at ? revISO(p.created_at) : '',
+        created_label:p.created_at ? fmtDate(p.created_at) : '—',
+        statusRaw:status,
+        status:status === 'blacklisted' ? 'В чёрном списке' : 'Активный',
+        orders:(isClient ? counts.clients.get(p.id) : counts.executors.get(p.id)) || 0
+      };
+    });
+    const dayMap = new Map();
+    list.forEach(r => {
+      if (!r.created_at) return;
+      const cur = dayMap.get(r.created_at) || { date:r.created_at, clients:0, executors:0, total:0 };
+      if (r.roleRaw === 'client') cur.clients += 1; else cur.executors += 1;
+      cur.total += 1;
+      dayMap.set(r.created_at, cur);
+    });
+    const byDay = [...dayMap.values()].sort((a,b) => a.date.localeCompare(b.date));
+    const byRole = ['client','executor'].map(role => {
+      const rs = list.filter(r => r.roleRaw === role);
+      return { role, label:role === 'client' ? 'Клиенты' : 'Исполнители', total:rs.length, active:rs.filter(r => r.statusRaw !== 'blacklisted').length, blacklisted:rs.filter(r => r.statusRaw === 'blacklisted').length };
+    });
+    const days = Math.max(1, Math.round((revDayStart(to - 1) - revDayStart(from)) / DAY) + 1);
+    return {
+      meta: {
+        generated_at:new Date().toISOString(),
+        generated_by:(user() && user().full_name) || '',
+        period:{ from:revISO(from), to:revISO(to - DAY), days, label:fmtDate(from) + ' — ' + fmtDate(to - DAY) },
+        preset:regRange ? regRange.preset : 'custom',
+        note:'Клиенты и исполнители по дате регистрации'
+      },
+      totals:{
+        total:list.length,
+        clients:list.filter(r => r.roleRaw === 'client').length,
+        executors:list.filter(r => r.roleRaw === 'executor').length,
+        active:list.filter(r => r.statusRaw !== 'blacklisted').length,
+        blacklisted:list.filter(r => r.statusRaw === 'blacklisted').length,
+        avg:list.length ? Math.round(list.length / days * 10) / 10 : 0
+      },
+      rows:list, byDay, byRole
+    };
+  }
+
+  function regFileName(data, ext){
+    return 'prirost_polzovateley_' + data.meta.period.from + '_' + data.meta.period.to + '.' + ext;
+  }
+
+  function regExportCsv(data){
+    const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const lines = [REG_COLS.map(q).join(';')];
+    data.rows.forEach(r => {
+      lines.push([r.name, r.role, r.username, r.email, r.phone, r.created_at, r.status, r.orders].map(q).join(';'));
+    });
+    lines.push(['Итого: ' + data.rows.length + ' пользователей', '', '', '', '', '', '', data.rows.reduce((a,r) => a + r.orders, 0)].map(q).join(';'));
+    revDownload(regFileName(data, 'csv'), new Blob(['\ufeff' + lines.join('\r\n')], { type:'text/csv;charset=utf-8' }));
+    toast(`Приток пользователей: ${data.rows.length} в CSV`, 'ok');
+  }
+
+  function regExportXlsx(data){
+    const rows = data.rows.map(r => [r.name, r.role, r.username, r.email, r.phone, r.created_at, r.status, r.orders]);
+    rows.push(['Итого: ' + data.rows.length + ' пользователей', '', '', '', '', '', '', data.rows.reduce((a,r) => a + r.orders, 0)]);
+    const summary = [
+      ['Приток зарегистрированных пользователей', ''],
+      ['Период', data.meta.period.label],
+      ['Дней', data.meta.period.days],
+      ['Всего новых', data.totals.total],
+      ['Клиенты', data.totals.clients],
+      ['Исполнители', data.totals.executors],
+      ['Активные', data.totals.active],
+      ['В чёрном списке', data.totals.blacklisted],
+      ['В среднем в день', data.totals.avg],
+      ['Сформировано', new Date().toLocaleString('ru-RU')],
+      ['Пользователь', data.meta.generated_by],
+      ['Примечание', data.meta.note]
+    ];
+    const dayRows = [['Дата','Клиенты','Исполнители','Всего']];
+    data.byDay.forEach(r => dayRows.push([r.date, r.clients, r.executors, r.total]));
+    dayRows.push(['Итого', data.totals.clients, data.totals.executors, data.totals.total]);
+    const roleRows = [['Роль','Всего','Активные','В чёрном списке']];
+    data.byRole.forEach(r => roleRows.push([r.label, r.total, r.active, r.blacklisted]));
+    roleRows.push(['Итого', data.totals.total, data.totals.active, data.totals.blacklisted]);
+    const book = { 'Сводка':summary, 'Пользователи':[REG_COLS, ...rows], 'По дням':dayRows, 'По ролям':roleRows };
+    revDownload(regFileName(data, 'xlsx'), new Blob([AWX.writeSheets(book)], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    toast(`Приток пользователей: ${data.rows.length} в Excel`, 'ok');
+  }
+
+  function regExportJson(data){
+    revDownload(regFileName(data, 'json'), new Blob([JSON.stringify(data, null, 2)], { type:'application/json;charset=utf-8' }));
+    toast('Приток пользователей выгружен в JSON', 'ok');
+  }
+
+  function regCopyTsv(data){
+    const lines = [REG_COLS.join('\t')];
+    data.rows.forEach(r => {
+      lines.push([r.name, r.role, r.username, r.email, r.phone, r.created_at, r.status, r.orders].join('\t'));
+    });
+    const text = lines.join('\n');
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(() => toast('Таблица скопирована','ok')).catch(() => toast('Не удалось скопировать','err'));
+    } else toast('Копирование недоступно','warn');
+  }
+
+  function drawRegDetail(box, u, base, firstAt, close){
+    const from = regRange.from, to = regRange.to;
+    const rows = base.filter(x => (x.created_at || 0) >= from && (x.created_at || 0) < to).sort((a,b) => (b.created_at || 0) - (a.created_at || 0));
+    const data = regData(rows, from, to);
+    const days = Math.max(1, Math.round((revDayStart(to - 1) - revDayStart(from)) / DAY) + 1);
+    const series = regChartSeries(data.rows, from, to);
+    const bucketWord = series.bucketDays === 1 ? 'дням' : series.bucketDays === 7 ? 'неделям' : 'месяцам';
+    const labelEvery = Math.max(1, Math.ceil(series.items.length / 7));
+    const presetHtml = REV_PRESETS.map(p =>
+      `<button type="button" class="btn btn--sm ${regRange.preset === p.id ? 'btn--primary' : 'btn--ghost'}" data-rgp="${p.id}">${p.label}</button>`).join('');
+    box.innerHTML = `
+      <div class="rev-toolbar">
+        <div class="rev-presets">${presetHtml}</div>
+        <div class="rev-range">
+          <label>с <input type="date" id="reg-from" value="${revISO(from)}" aria-label="Начало периода"></label>
+          <label>по <input type="date" id="reg-to" value="${revISO(to - DAY)}" aria-label="Конец периода"></label>
+          <button type="button" class="btn btn--ghost btn--sm" data-reg-apply>Применить</button>
+          <button type="button" class="btn btn--soft btn--sm" data-reg-export>${icon('export','ico-sm')} Экспорт</button>
+        </div>
+      </div>
+      <div class="rev-period small muted">${fmtDate(from)} — ${fmtDate(to - DAY)} · ${days} ${dayPlural(days)} · регистрации клиентов и исполнителей</div>
+      <div class="rev-cards">
+        <div class="rev-card"><span class="small muted">Всего новых</span><b>${data.totals.total}</b></div>
+        <div class="rev-card"><span class="small muted">Клиенты</span><b>${data.totals.clients}</b></div>
+        <div class="rev-card"><span class="small muted">Исполнители</span><b>${data.totals.executors}</b></div>
+        <div class="rev-card"><span class="small muted">Активные</span><b>${data.totals.active}</b></div>
+        <div class="rev-card"><span class="small muted">В чёрном списке</span><b>${data.totals.blacklisted}</b></div>
+      </div>
+      ${data.rows.length ? `<div class="rev-chart-block">
+        <div class="row row--between rev-chart-head"><b class="small">Регистрации по ${bucketWord}</b><span class="small faint">${data.totals.total}</span></div>
+        ${chartStackedBars(series.items, { height:150, labelEvery, aria:'Приток пользователей' })}
+      </div>` : ''}
+      ${data.rows.length ? `
+      <div class="row row--between rev-actions"><b class="small">Зарегистрировались</b></div>
+      <div class="tbl-wrap rev-tbl"><table class="tbl">
+        <thead><tr><th>Пользователь</th><th>Роль</th><th>Логин</th><th>Контакты</th><th>Зарегистрирован</th><th>Заказов</th><th>Статус</th></tr></thead>
+        <tbody>${data.rows.map(r => `<tr data-rgu="${r.uid}" data-rgr="${r.roleRaw}" style="cursor:pointer">
+          <td><b class="small">${esc(r.name)}</b></td>
+          <td><span class="badge c-gray">${esc(r.role)}</span></td>
+          <td class="small">${esc(r.username || '—')}</td>
+          <td class="small">${esc([r.email, r.phone].filter(Boolean).join(' · ') || '—')}</td>
+          <td class="small faint">${r.created_label}</td>
+          <td class="small">${r.orders}</td>
+          <td>${r.statusRaw === 'blacklisted' ? '<span class="badge c-red">В чёрном списке</span>' : '<span class="badge c-green">Активный</span>'}</td>
+        </tr>`).join('')}</tbody>
+        <tfoot><tr><td colspan="7"><b>Итого: ${data.rows.length}</b></td></tr></tfoot>
+      </table></div>` : `<div class="empty" style="padding:26px 0">${icon('users')}<span>За этот период новых пользователей нет</span></div>`}
+    `;
+    box.querySelectorAll('[data-rgp]').forEach(b => b.onclick = () => {
+      regRange = revRangeFor(b.dataset.rgp, firstAt);
+      drawRegDetail(box, u, base, firstAt, close);
+    });
+    const apply = box.querySelector('[data-reg-apply]');
+    if (apply) apply.onclick = () => {
+      const f = revFromISO(box.querySelector('#reg-from').value);
+      const t2 = revFromISO(box.querySelector('#reg-to').value);
+      if (f == null || t2 == null){ toast('Укажите обе даты периода','warn'); return; }
+      if (f > t2){ toast('Дата начала позже даты окончания','warn'); return; }
+      regRange = { preset:'custom', from:f, to:t2 + DAY };
+      drawRegDetail(box, u, base, firstAt, close);
+    };
+    const regWrap = box.querySelector('.rev-chart-block .chart-wrap');
+    if (regWrap) bindChartBars(regWrap, series.items, item => `<b>${esc(item.fullLabel)}</b><span>+${item.total} · ${item.clients} клиентов, ${item.executors} исполнителей</span>`);
+    const exp = box.querySelector('[data-reg-export]');
+    if (exp) exp.onclick = () => showDropdown(exp, [
+      { label:'Excel (.xlsx)', icon:'table', onClick:() => regExportXlsx(data) },
+      { label:'CSV для Excel', icon:'export', onClick:() => regExportCsv(data) },
+      { label:'JSON (данные)', icon:'file', onClick:() => regExportJson(data) },
+      '-',
+      { label:'Копировать таблицу', icon:'copy', onClick:() => regCopyTsv(data) }
+    ], { alignRight:true });
+    box.querySelectorAll('[data-rgu]').forEach(tr => tr.onclick = () => {
+      const uid2 = tr.dataset.rgu, role = tr.dataset.rgr;
+      if (close) close();
+      setTimeout(() => { try { CRM.openPersonCard(uid2, role); } catch(e){} }, 420);
+    });
+  }
+
+  function openRegistrationsDetail(){
+    if (!canSeeAnalytics()){ toast('Детализация доступна администраторам и менеджерам','warn'); return; }
+    const base = regUsersAll();
+    const firstAt = base.length ? Math.min(...base.map(x => x.created_at || Date.now())) : Date.now();
+    if (!regRange) regRange = revRangeFor('all', firstAt);
+    const u = user();
+    openWinModal({
+      title:'Приток пользователей', icon:'users', wide:true,
+      body:'<div id="reg-detail" style="min-height:620px"></div>',
+      onMount:(host, close) => {
+        const box = host.querySelector('#reg-detail');
+        if (box) drawRegDetail(box, u, base, firstAt, close);
       }
     });
   }
@@ -7293,6 +7979,7 @@ const cm = root.querySelector('.chat-main');
               /* Живая подсказка у поля поиска */
               const hint = document.getElementById('head-search-hint');
               if (hint && id === 'search') hint.textContent = fmtKeys(combo);
+              if (window.refreshQuickHint) window.refreshQuickHint();
               toast('Горячая клавиша обновлена','ok');
             };
             document.addEventListener('keydown', capture, true);
@@ -7308,6 +7995,7 @@ const cm = root.querySelector('.chat-main');
             renderSec();
             const hint = document.getElementById('head-search-hint');
             if (hint && id === 'search') hint.textContent = fmtKeys(DEFAULT_KEYS[id]);
+            if (window.refreshQuickHint) window.refreshQuickHint();
             toast('Сброшено к значению по умолчанию','ok');
           };
         });
@@ -7317,6 +8005,7 @@ const cm = root.querySelector('.chat-main');
           saveState(); renderSec();
           const hint = document.getElementById('head-search-hint');
           if (hint) hint.textContent = fmtKeys(DEFAULT_KEYS.search);
+          if (window.refreshQuickHint) window.refreshQuickHint();
           toast('Все горячие клавиши сброшены','ok');
         };
         return;

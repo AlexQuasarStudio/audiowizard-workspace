@@ -44,12 +44,52 @@ const Finance = (function(){
     const u = (S.users || []).find(x => x.id === uid);
     if (!u) return;
     u.ext = u.ext || {};
-    u.ext.earned = Math.max(0, Math.round((u.ext.earned || 0) + delta));
+    u.ext.earned = Math.round((u.ext.earned || 0) + delta);
   }
-  /* Баланс — это начислено минус выведено. Выплата (полная или частичная)
-     уменьшает баланс получателя, включая админа и менеджера. */
+  /* Баланс — это начислено минус выведено и штрафы; может уходить в минус.
+     Выплата (полная или частичная) уменьшает баланс получателя, включая админа и менеджера. */
   function credit(uid, amount){ addEarned(uid, Math.max(0, Number(amount) || 0)); }
   function withdraw(uid, amount){ addEarned(uid, -(Math.max(0, Number(amount) || 0))); }
+  function finesFor(uid){
+    return (S.fines || []).filter(f => f.uid === uid && !f.revoked_at).sort((a,b) => (b.created_at||0) - (a.created_at||0));
+  }
+  function finesAll(uid){
+    return (S.fines || []).filter(f => f.uid === uid).sort((a,b) => (b.created_at||0) - (a.created_at||0));
+  }
+  function fineSum(uid){
+    return finesFor(uid).reduce((a,f) => a + (Number(f.amount) || 0), 0);
+  }
+  function fine(uid, amount, reason, opts = {}){
+    const u = (S.users || []).find(x => x.id === uid);
+    const amt = Math.round(Math.max(0, Number(amount) || 0));
+    const why = String(reason || '').trim();
+    if (!u || u.role === 'client' || !amt || !why) return null;
+    const m = (typeof me === 'function' && me()) || {};
+    const rec = {
+      id: 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      uid, amount: amt, reason: why, order_id: opts.order_id || null,
+      created_at: Date.now(), created_by: m.id || 'system', created_by_name: m.full_name || 'Система',
+      revoked_at: null, revoked_by: null, revoked_reason: ''
+    };
+    S.fines = S.fines || [];
+    S.fines.unshift(rec);
+    withdraw(uid, amt);
+    try { logAudit(`Штраф ${fmtMoney(amt)}: ${u.full_name} — ${why}`, 'Финансы'); } catch(e){}
+    saveState();
+    return rec;
+  }
+  function revokeFine(id, reason){
+    const f = (S.fines || []).find(x => x.id === id);
+    if (!f || f.revoked_at) return false;
+    const u = (S.users || []).find(x => x.id === f.uid);
+    f.revoked_at = Date.now();
+    f.revoked_by = (typeof me === 'function' && me() ? me().id : 'system');
+    f.revoked_reason = String(reason || '').trim();
+    credit(f.uid, f.amount);
+    try { logAudit(`Штраф отменён: ${u ? u.full_name : f.uid} — ${fmtMoney(f.amount)}`, 'Финансы'); } catch(e){}
+    saveState();
+    return true;
+  }
 
   function adminUser(){ return (S.users || []).find(u => u.role === 'admin') || null; }
   function managerIdOf(o){
@@ -403,7 +443,7 @@ const Finance = (function(){
     };
   }
 
-  return { cfg, split, accrue, addEarned, credit, withdraw, debts, hasDebt, payoutCfg, period, fmtPeriod, pending, runPayout,
+  return { cfg, split, accrue, addEarned, credit, withdraw, finesFor, finesAll, fineSum, fine, revokeFine, debts, hasDebt, payoutCfg, period, fmtPeriod, pending, runPayout,
     nextCut, lastCut, skipNextPayout, skipInfo, autoTick,
     payoutOrders, excludedIds, isExcluded, setExcluded,
     scOf, scStatusLabel, requestSmartcat, approveSmartcat, rejectSmartcat, smartcatPayload, docsForOrder };

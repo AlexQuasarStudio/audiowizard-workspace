@@ -338,6 +338,44 @@ html[data-theme^='dark'] .auth__card{box-shadow:var(--sh-2)}
 .metric__more:hover{background:var(--accent-soft)}
 .rev-link{background:none;border:0;cursor:pointer;color:var(--accent);font-weight:650;padding:2px 4px;border-radius:6px}
 .rev-link:hover{background:var(--accent-soft)}
+.neg{color:var(--red)!important}
+.reg-row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:24px;align-items:center}
+.reg-summary{display:flex;align-items:flex-end;gap:22px;flex-wrap:wrap}
+.reg-total{display:flex;flex-direction:column;gap:2px}
+.reg-total b{font-size:24px;letter-spacing:-.02em;line-height:1}
+.reg-split{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
+.reg-split b{font-size:16px;color:var(--text)}
+.reg-split .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.reg-chart{display:block;width:100%;height:56px}
+.reg-empty{display:flex;align-items:center;justify-content:center;height:56px;border:1px dashed var(--border);border-radius:10px;color:var(--faint);font-size:12px}
+.rev-tbl .order-id{white-space:nowrap}
+@media (max-width:720px){.reg-row{grid-template-columns:1fr;gap:10px}}
+.reg-chart .rb-c{fill:var(--accent)}
+.reg-chart .rb-e{fill:var(--green)}
+.reg-chart .rb-base{stroke:var(--border)}
+.chart-wrap--reg{position:relative;min-width:0}
+.reg-bar .rb-c,.reg-bar .rb-e{pointer-events:none;opacity:.85;transition:opacity .12s var(--ease),filter .12s var(--ease)}
+.reg-bar.on .rb-c,.reg-bar.on .rb-e{opacity:1;filter:brightness(1.1)}
+.reg-hit{fill:transparent;cursor:crosshair}
+.rev-charts{display:grid;grid-template-columns:1.45fr 1fr;gap:12px;margin-bottom:12px}
+.rev-chart-block{border:1px solid var(--border);border-radius:12px;padding:10px 12px 4px;background:var(--bg-2);min-width:0}
+.rev-chart-head{margin-bottom:2px}
+.rev-bars{display:flex;flex-direction:column;gap:7px;padding:8px 0 4px}
+.rev-bar-row{display:grid;grid-template-columns:minmax(80px,1fr) 2fr auto;gap:8px;align-items:center;font-size:11.5px;border-radius:8px;padding:4px 5px;margin:0 -5px;transition:background-color .12s var(--ease)}
+.rev-bar-row:hover{background:var(--panel)}
+.rev-bar-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.rev-bar-track{height:7px;border-radius:99px;background:var(--border);overflow:hidden}
+.rev-bar-fill{display:block;height:100%;border-radius:99px;background:var(--accent)}
+.rev-bar-row b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.chart-wrap--bars{position:relative;margin-top:2px}
+.bar-chart{display:block;width:100%;height:160px}
+.chart-hit{fill:transparent;cursor:crosshair}
+.chart-fill{opacity:.85;transition:opacity .12s var(--ease),filter .12s var(--ease)}
+.chart-bar.on .chart-fill{opacity:1;filter:brightness(1.08)}
+.chart-val{font-size:10px;fill:var(--text);font-weight:700}
+.chart-lbl{font-size:9.5px;fill:var(--muted)}
+.bar-chart .chart-fill,.bar-chart .chart-val,.bar-chart .chart-lbl{pointer-events:none}
+@media (max-width:760px){.rev-charts{grid-template-columns:1fr}}
 .bar-row{display:grid;grid-template-columns:110px 1fr 54px;gap:10px;align-items:center;font-size:13px}
 .bar-row .progress{height:8px}
 .bar-row b{text-align:right;font-size:12px;color:var(--text-2)}

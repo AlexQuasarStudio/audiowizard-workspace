@@ -351,7 +351,8 @@ const audit = getDemoAudit();
     ],
     usageConsent:{}, cookiesAccepted:false,
     draftPrefs:{}, currentUserId:null, rememberedLogin:null,
-    invites:[] /* приглашения: { id, token, role, limit, used, expiresAt, createdBy, email?, note? } */,
+    invites:[], /* приглашения: { id, token, role, limit, used, expiresAt, createdBy, email?, note? } */
+    fines:[],
     keys:{ ...DEFAULT_KEYS },
     uiText:{} /* переопределения текстов интерфейса: {ключ: текст} (правит админ) */
   };
@@ -380,6 +381,7 @@ function migrateFinance(){
   }
   S.settings.integrations = Object.assign({ payout:{ key:'smartcat', name:'Smartcat', commission:5, enabled:true, perUser:true } }, S.settings.integrations || {});
   S.settings.payout = Object.assign({ enabled:true, auto:true, days:[1,15], time:'15:00', tz:'Europe/Moscow', lastRunAt:null, history:[] }, S.settings.payout || {});
+  if (!Array.isArray(S.fines)) S.fines = [];
   if (!Array.isArray(S.settings.payout.days) || !S.settings.payout.days.length) S.settings.payout.days = [1,15];
   (S.users || []).forEach(u => {
     if (!u.ext) return;
