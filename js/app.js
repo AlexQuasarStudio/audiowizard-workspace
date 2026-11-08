@@ -5989,7 +5989,6 @@ const cm = root.querySelector('.chat-main');
       ${staff?rows:''}
       ${staff?`<h4 class="small" style="margin:12px 0 4px">Заказы к выплате${pend.excluded?' · убрано вручную: '+pend.excluded:''}</h4>${list}`:''}
       ${!staff?`<p class="small">Ваш долг по выполненным заказам: <b>${fmtMoney(myDebt)}</b></p><p class="small faint">Выплата приходит на привязанный аккаунт ${provName} или вне системы — по договорённости с менеджером. ${provName} не берёт комиссию с заработка: удерживаются только транзакционные сборы банка/платёжной системы — их размер зависит от страны и способа выплаты, проверяйте на <a href="https://help.smartcat.com/understanding-freelancer-fees-in-smartcat" target="_blank" rel="noopener">официальной странице</a>.</p>`:''}
-      <p class="small faint" style="margin-top:8px">Сборы провайдера зависят от страны и способа выплаты — уточняйте на официальном сайте. Сумма к зачислению = долг − сборы.</p>
     </div>
 
     <div class="card card-pad">
