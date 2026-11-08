@@ -1370,7 +1370,7 @@ const QUICK_BY_ROLE = {
               ${demoChipsFor(tab).map(u=>`<button type="button" class="demo-chip" data-demo="${u.id}" title="${esc(u.full_name)} · ${esc(u.email)}">${avatarHTML(u,'avatar--sm')} ${esc(u.full_name.split(' ')[0])} · ${ROLE_LABEL[u.role]}</button>`).join('')}
             </div>
           </div>
-          <p class="small faint" style="text-align:center;margin-top:16px">Входя, вы принимаете <a href="#/docs">Условия сервиса</a> и <a href="#/docs">Политику конфиденциальности</a></p>
+          <p class="small faint" style="text-align:center;margin-top:16px">Входя, вы принимаете <a href="#" data-legal="Пользовательское соглашение">Условия сервиса</a> и <a href="#" data-legal="Политика конфиденциальности">Политику конфиденциальности</a></p>
         </div>
       </div>`;
 
@@ -1394,6 +1394,10 @@ const QUICK_BY_ROLE = {
       }, 190);
     });
     $$('.demo-chip', $('#app')).forEach(c=>c.onclick=()=>doLogin(c.dataset.demo, true));
+    /* Документы доступны и до входа: открываем текстом, без перехода на #/docs */
+    $$('[data-legal]', $('#app')).forEach(a=>{
+      a.onclick = (e)=>{ e.preventDefault(); openLegalDoc(a.dataset.legal); };
+    });
     {
       const block = document.querySelector('#demo-chips');
       const demo = document.querySelector('.auth__demo');
@@ -7507,6 +7511,35 @@ const cm = root.querySelector('.chat-main');
   /* Калькулятор в CRM живёт отдельным файлом — отдаём ему те же функции */
   window.CalcServices = { exportServices:exportCalcServices, importServices:importCalcServices };
 
+  /* ---------- Юридические документы ---------- */
+  /* Тексты по умолчанию — их же правит админ в «Справке и документах».
+     С экрана входа документы открываются модалкой: маршрут #/docs там
+     недоступен, пока пользователь не вошёл (раньше ссылки вели в никуда). */
+  const DEFAULT_DOCUMENTS = [
+    { title:'Пользовательское соглашение', body:'Договор между пользователем и сервисом Audiowizard: предмет, права и обязанности сторон, порядок оказания услуг обработки контента, ответственность и порядок разрешения споров. Актуальная редакция от 01.08.2026.' },
+    { title:'Политика конфиденциальности', body:'Мы обрабатываем персональные данные (ФИО, контакты, реквизиты) в целях исполнения заказов. Данные хранятся с шифрованием AES-256, не передаются третьим лицам, кроме случаев, предусмотренных законодательством РФ. Вы можете запросить удаление данных в любой момент.' },
+    { title:'Правила сервиса', body:'Квоты и ограничения: чаевые не более 100% стоимости заказа и 10 000 ₽ разово; файлы удаляются автоматически через 90 дней; рейтинги исполнителей изменяются через голосование менеджеров; материалы заказов принадлежат заказчику (ст. 146, 183 УК РФ).' },
+    { title:'Справка и FAQ', body:'Как создать заказ: раздел «Заказы» → «Новый заказ» → заполните карточку. Как загрузить файл: перетащите его в форму заказа. Как сменить тему: аватар → «Тема».' }
+  ];
+  function legalDocs(){
+    const list = (S.settings && S.settings.documents) || [];
+    return list.length ? list : DEFAULT_DOCUMENTS;
+  }
+  function openLegalDoc(title){
+    const doc = legalDocs().find(x => String(x.title || '').trim() === String(title || '').trim())
+      || { title: title || 'Документ', body: 'Текст документа пока не заполнен.' };
+    openModal({
+      title: esc(doc.title),
+      narrow: true,
+      body: `<div class="small" style="white-space:pre-line;line-height:1.6;color:var(--text-2)">${esc(doc.body || '')}</div>`,
+      footer: '<button class="btn btn--primary" data-legal-ok>Понятно</button>',
+      onMount: (m, close) => {
+        const b = m.querySelector('[data-legal-ok]');
+        if (b) b.onclick = close;
+      }
+    });
+  }
+
   function settingsView(root, section){
     const u = user();
     /* Раздел пришёл из маршрута (#/settings/profile) или это вход в настройки */
@@ -8034,12 +8067,7 @@ const cm = root.querySelector('.chat-main');
 
     /* Роли для доступа к документам — все роли системы (клиенты и исполнители тоже) */
     function docsHTML(){
-      let docs = S.settings.documents || [
-        { title:'Пользовательское соглашение', body:'Договор между пользователем и сервисом Audiowizard: предмет, права и обязанности сторон, порядок оказания услуг обработки контента, ответственность и порядок разрешения споров. Актуальная редакция от 01.08.2026.' },
-        { title:'Политика конфиденциальности', body:'Мы обрабатываем персональные данные (ФИО, контакты, реквизиты) в целях исполнения заказов. Данные хранятся с шифрованием AES-256, не передаются третьим лицам, кроме случаев, предусмотренных законодательством РФ. Вы можете запросить удаление данных в любой момент.' },
-        { title:'Правила сервиса', body:'Квоты и ограничения: чаевые не более 100% стоимости заказа и 10 000 ₽ разово; файлы удаляются автоматически через 90 дней; рейтинги исполнителей изменяются через голосование менеджеров; материалы заказов принадлежат заказчику (ст. 146, 183 УК РФ).' },
-        { title:'Справка и FAQ', body:'Как создать заказ: раздел «Заказы» → «Новый заказ» → заполните карточку. Как загрузить файл: перетащите его в форму заказа. Как сменить тему: аватар → «Тема».' }
-      ];
+      let docs = S.settings.documents || DEFAULT_DOCUMENTS.map(d => ({ ...d }));
       if (!S.settings.documents) S.settings.documents = docs;
       docs = S.settings.documents;
       /* Доступ к документам: d.roles — кто видит. Нет поля — видят все.
