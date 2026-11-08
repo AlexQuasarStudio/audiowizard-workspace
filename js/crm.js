@@ -350,12 +350,18 @@ const CRM = (() => {
     APP.render();
   }
 
-  function payOrder(o, executorEntry){
+  function payOrder(o, executorEntry, amount){
     if (o.status!=='done'){ toast('Оплачивать можно только выполненные заказы','warn'); return; }
-    const targets = executorEntry ? [executorEntry] : o.executors.filter(e=>!e.is_paid);
+    const remaining = e => Math.max(0, (Number(e.amount)||0) - Math.max(0, Math.min(Number(e.amount)||0, Number(e.paid)||0)));
+    const targets = executorEntry ? [executorEntry] : o.executors.filter(e => remaining(e) > 0);
     if (!targets.length){ toast('Все исполнители уже оплачены','info'); return; }
     const LIMIT = 30000;
-    const over = targets.filter(e => (e.amount||0) > LIMIT && !e.approved_by_admin);
+    /* Лимит согласования — на фактическую сумму платежа, а не на всю долю:
+       частичная оплата меньше лимита не требует одобрения. */
+    const over = targets.filter(e => {
+      const pay = (amount != null && executorEntry) ? Math.min(remaining(e), Math.max(0, Number(amount)||0)) : remaining(e);
+      return pay > LIMIT && !e.approved_by_admin;
+    });
     if (over.length){
       over.forEach(e => {
         S.notifs.unshift({ id:uid(), icon:'i-card', title:`Согласование оплаты: ${(userById(e.uid)||{}).full_name}`, text:`Заказ ${o.order_id}: ${fmtMoney(e.amount)} — превышение лимита ${fmtMoney(LIMIT)}. Менеджер просит согласовать.`, t:Date.now(), read:{} });
@@ -365,10 +371,52 @@ const CRM = (() => {
       logAudit(`Согласование оплаты: ${o.order_id} (${over.length} исп.)`, 'Оплата');
       return;
     }
-    targets.forEach(e=>e.is_paid = true);
-    logAudit(`Оплата исполнителям по ${o.order_id}: ${targets.map(e=>(userById(e.uid)||{}).full_name).join(', ')}`, 'Заказ');
-    toast(`Оплата проведена: ${targets.length} ${targets.length===1?'исполнитель':'исполнителя'}`, 'ok');
+    let paidSum = 0;
+    targets.forEach(e=>{
+      const amt = Number(e.amount) || 0;
+      const already = Math.max(0, Math.min(amt, Number(e.paid) || 0));
+      const due = Math.max(0, amt - already);
+      const pay = (amount != null && executorEntry) ? Math.max(0, Math.min(due, Number(amount)||0)) : due;
+      e.paid = Math.min(amt, already + pay);
+      e.is_paid = amt > 0 && e.paid >= amt;
+      paidSum += pay;
+    });
+    if (!paidSum){ toast('Сумма к оплате нулевая','info'); return; }
+    logAudit(`Оплата исполнителям по ${o.order_id}: ${fmtMoney(paidSum)}${(amount != null && executorEntry) ? ' (частично)' : ''} — ${targets.map(e=>(userById(e.uid)||{}).full_name).join(', ')}`, 'Заказ');
+    toast(`Оплачено ${fmtMoney(paidSum)}${(amount != null && executorEntry) ? ' (частично)' : ''}`, 'ok');
     saveState(); APP.render();
+  }
+
+  /* Частичная оплата одного исполнителя: можно закрыть часть доли
+     (например, за один файл), остаток остаётся в долгах заказа. */
+  function openPayDialog(o, e, closeCard){
+    if (!o || !e) return;
+    const ex = userById(e.uid) || {};
+    const amt = Number(e.amount) || 0;
+    const paid = Math.max(0, Math.min(amt, Number(e.paid) || 0));
+    const due = Math.max(0, amt - paid);
+    if (!due){ toast('Исполнитель уже оплачен','info'); return; }
+    openWinModal({ narrow:true, title:'Оплата исполнителю', icon:'card',
+      body:`<div class="stack" style="gap:8px">
+        <p class="small"><b>${esc(ex.full_name || 'Исполнитель')}</b></p>
+        <p class="small faint">Доля: ${fmtMoney(amt)} · оплачено: ${fmtMoney(paid)} · осталось: <b>${fmtMoney(due)}</b></p>
+        <div class="field"><label>Сумма к оплате, ₽</label><input class="input" id="pay-amt" type="number" min="0" max="${due}" step="1" value="${due}"></div>
+        <p class="tiny faint">Можно оплатить часть — например, за один файл. Остаток сохранится в долгах заказа.</p>
+      </div>`,
+      footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-pay-go>Оплатить</button>`,
+      onMount:(mm, cl)=>{
+        const inp = mm.querySelector('#pay-amt');
+        const go = ()=>{
+          const v = Math.max(0, Math.min(due, Number(inp.value) || 0));
+          if (!v){ toast('Укажите сумму больше нуля','warn'); inp.focus(); return; }
+          cl(); closeCard && closeCard();
+          payOrder(o, e, v);
+        };
+        mm.querySelector('[data-x]').onclick = cl;
+        mm.querySelector('[data-pay-go]').onclick = go;
+        inp.addEventListener('keydown', ev=>{ if (ev.key === 'Enter'){ ev.preventDefault(); go(); } });
+      }
+    });
   }
 
   /* Нештатный возврат: снимаем отметки оплаты по заказу, долги снова
@@ -376,7 +424,7 @@ const CRM = (() => {
   function returnToUnpaid(o){
     if (!o) return;
     let n = 0;
-    (o.executors || []).forEach(e => { if (e.is_paid){ e.is_paid = false; n++; } });
+    (o.executors || []).forEach(e => { if (e.is_paid || (Number(e.paid)||0) > 0){ e.is_paid = false; e.paid = 0; n++; } });
     if (o.splitAccrual && o.splitAccrual.manager && o.splitAccrual.manager.paid){ o.splitAccrual.manager.paid = false; n++; }
     if (!n){ toast('У заказа нет оплаченных долей','info'); return; }
     o.history = o.history || [];
@@ -1719,7 +1767,14 @@ const CRM = (() => {
             start_date: c.start ? new Date(c.start).getTime() : (o.order_date || Date.now()),
             audio: form.files.reduce((a,f)=>a+(f.duration||0),0)
           });
-          o.executors = c.executors.map(e=>({ ...e, is_paid: o.status==='done' ? o.executors.find(x=>x.uid===e.uid)?.is_paid || false : false }));
+          /* Частичные оплаты переживают редактирование: paid переносим,
+             подрезаем по новой сумме, is_paid — производный признак. */
+          o.executors = c.executors.map(e => {
+            const amt = Number(e.amount) || 0;
+            const old = (o.executors || []).find(x => x.uid === e.uid) || {};
+            const paid = Math.max(0, Math.min(amt, Number(old.paid != null ? old.paid : (old.is_paid ? amt : 0)) || 0));
+            return { ...e, paid, is_paid: amt > 0 && paid >= amt };
+          });
           if (!isEdit){
             o.history.push({ t:Date.now(), txt:'Заказ создан' });
             if (c.prepay < S.settings.minPrepay) o.nda = false;
@@ -1844,7 +1899,7 @@ const CRM = (() => {
             ${paymentBlock}
             <div class="card card-pad"><b class="small">Исполнители</b>
               <div class="stack" style="gap:9px;margin-top:9px">
-                ${o.executors.map(e=>{const ex=userById(e.uid); return ex?`<div class="row">${avatarHTML(ex,'avatar--sm')}<span style="flex:1;min-width:0"><b class="small">${esc(ex.full_name)}</b><br><span class="faint" style="font-size:11px">${esc(ex.ext.specializations.join(', '))}</span></span><b class="small" style="flex:none;white-space:nowrap">${fmtMoney(e.amount)}</b>${staff&&o.status==='done'?`<button class="btn btn--sm ${e.is_paid?'btn--ghost':'btn--soft'}" data-pay="${e.uid}" style="flex:none;white-space:nowrap">${e.is_paid?'Оплачен':'Оплатить'}</button>`:''}
+                ${o.executors.map(e=>{const ex=userById(e.uid); return ex?`<div class="row">${avatarHTML(ex,'avatar--sm')}<span style="flex:1;min-width:0"><b class="small">${esc(ex.full_name)}</b><br><span class="faint" style="font-size:11px">${esc(ex.ext.specializations.join(', '))}</span></span><b class="small" style="flex:none;white-space:nowrap">${fmtMoney(e.amount)}</b>${(Number(e.paid)||0)>0?`<span class="tiny faint" style="flex:none">оплачено ${fmtMoney(e.paid)}</span>`:''}${staff&&o.status==='done'?`<button class="btn btn--sm ${e.is_paid?'btn--ghost':'btn--soft'}" data-pay="${e.uid}" style="flex:none;white-space:nowrap">${e.is_paid?'Оплачен':((Number(e.paid)||0)>0?'Доплатить':'Оплатить')}</button>`:''}
                 ${staff&&u.role==='admin'&&(e.amount||0)>30000&&!e.approved_by_admin&&!e.is_paid?`<button class="btn btn--sm btn--ghost" data-approve="${e.uid}" title="Согласовать превышение">${icon('check-c')} Согласовать</button>`:''}</div>`:''}).join('') || '<span class="faint small">Не назначены</span>'}
               </div>
             </div>
@@ -1900,7 +1955,7 @@ const CRM = (() => {
             saveState(); toast('Превышение согласовано — менеджер может провести оплату', 'ok');
             close(); APP.render();
           }
-          if ('pay' in t.dataset){ payOrder(o, o.executors.find(x=>x.uid===t.dataset.pay)); close(); APP.render(); }
+          if ('pay' in t.dataset){ openPayDialog(o, o.executors.find(x=>x.uid===t.dataset.pay), close); return; }
           if ('payClient' in t.dataset){
             openWinModal({ narrow:true, title:'Отметить платёж',
               body:`<div class="field"><label>Сумма платежа, ₽ (остаток ${fmtMoney(rest)})</label><input type="number" class="input" id="pay-v" value="${rest}" min="0" max="${o.total}"></div>`,

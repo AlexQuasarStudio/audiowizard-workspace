@@ -83,17 +83,21 @@ const Finance = (function(){
     }
   }
 
-  /* Долг по заказу. Исполнительские доли — по is_paid, доля менеджера —
-     по splitAccrual.manager.paid. Возвращает и разбивку по пользователям. */
+  /* Долг по заказу. Исполнительская доля — остаток от amount с учётом
+     частичной оплаты (e.paid); is_paid — производный признак «оплачено
+     полностью». Доля менеджера — по splitAccrual.manager.paid. */
   function debts(o){
     const out = { exec: 0, manager: 0, total: 0, count: 0, byUser: {} };
     if (!o || !['done', 'archived'].includes(o.status)) return out;
     (o.executors || []).forEach(e => {
-      if (e.is_paid) return;
       const amount = Number(e.amount) || 0;
       if (!amount) return;
-      out.exec += amount;
-      out.byUser[e.uid] = (out.byUser[e.uid] || 0) + amount;
+      const paid = e.paid != null ? Math.max(0, Math.min(amount, Number(e.paid) || 0))
+                                  : (e.is_paid ? amount : 0);
+      const left = amount - paid;
+      if (left <= 0) return;
+      out.exec += left;
+      out.byUser[e.uid] = (out.byUser[e.uid] || 0) + left;
       out.count += 1;
     });
     const a = o.splitAccrual;
@@ -264,7 +268,7 @@ const Finance = (function(){
     if (!pend.orders.length) return { ok:false, why:'Нет выполненных заказов с неоплаченными долями' };
     const by = (me() || {}).id || 'system';
     pend.orders.forEach(o => {
-      (o.executors || []).forEach(e => { e.is_paid = true; });
+      (o.executors || []).forEach(e => { e.is_paid = true; e.paid = Number(e.amount) || 0; });
       if (o.splitAccrual && o.splitAccrual.manager) o.splitAccrual.manager.paid = true;
       o.history = o.history || [];
       o.history.push({ t: Date.now(), txt: `Выплата${opts.manual ? ' (вручную)' : ' по расписанию'}: ${fmtMoney(pend.total)}` });

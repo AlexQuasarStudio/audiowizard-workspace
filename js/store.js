@@ -385,6 +385,14 @@ function migrateFinance(){
     if (!u.ext) return;
     if (!u.ext.smartcat) u.ext.smartcat = { login:'', status:'none' };
   });
+  /* Частичные оплаты: у старых записей paid не было — выводим из is_paid.
+     is_paid остаётся производным «оплачено полностью». */
+  (S.orders || []).forEach(o => (o.executors || []).forEach(e => {
+    const amount = Number(e.amount) || 0;
+    if (e.paid == null) e.paid = e.is_paid ? amount : 0;
+    e.paid = Math.max(0, Math.min(amount, Number(e.paid) || 0));
+    e.is_paid = amount > 0 && e.paid >= amount;
+  }));
 }
 function migrateDemoMarks(){
   /* Гарантия: баланс платформы есть для всех пользователей (и старых сохранений) */
