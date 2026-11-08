@@ -4660,7 +4660,15 @@ updatePeopleBulk();
           ${onResult?'<button class="btn btn--primary btn--sm" data-apply>Подставить в заказ</button>':''}</div>
         <div class="calc-history" id="cx-hist" style="margin-top:12px">${S.calcHistory.slice(-6).reverse().map(h=>`<div data-h="${h.result}">${esc(h.expression)} = ${h.result}</div>`).join('')}</div>
         <div class="small faint" style="margin-top:12px">Отметьте услуги — их стоимость прибавится к результату.</div>
-        <div id="cx-svcs" style="margin-top:8px"></div>`,
+        <div id="cx-svcs" style="margin-top:8px"></div>
+        <div class="card card-pad" style="margin-top:12px;background:var(--panel-2)">
+          <b class="small">Скидки</b>
+          <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
+            <div class="field" style="flex:1;min-width:110px"><label>Часов стенограмм</label><input class="input" id="cx-hours" type="number" min="0" step="0.5" value="0"></div>
+            <div class="field" style="flex:1;min-width:110px"><label>Промокод</label><input class="input" id="cx-promo" placeholder="PROMO10" autocomplete="off" spellcheck="false"></div>
+          </div>
+          <div class="small" id="cx-disc" style="margin-top:8px"></div>
+        </div>`,
       footer:`<button class="btn btn--ghost" data-x>Закрыть</button>${onResult?'<button class="btn btn--primary" data-apply2>Подставить</button>':''}<button class="btn btn--primary" data-create>${icon('plus')} Создать заказ</button>`,
       onMount:(mask, close)=>{
         const g2 = s=>mask.querySelector(s);
@@ -4694,20 +4702,60 @@ updatePeopleBulk();
           }
         });
         const svcSum = () => { let s = 0; mask.querySelectorAll('[data-sv]:checked').forEach(i=>s += +i.dataset.sv.split('|')[2]); return s; };
+        /* Скидки считаются из настроек: список промокодов не захардкожен.
+           «За объём» срабатывает сам по часам, разовый — по коду. Берём
+           максимальную подходящую скидку, а не сумму скидок. */
+        const promoList = () => (S.settings.promos || []).filter(p => p.active !== false);
+        const calcDiscount = () => {
+          const hours = +g2('#cx-hours').value || 0;
+          const code = String(g2('#cx-promo').value || '').trim().toUpperCase();
+          const base = (isNaN(val) ? 0 : val) + svcSum();
+          let best = null;
+          promoList().filter(p => p.kind === 'volume' && hours >= (+p.minHours || 0)).forEach(p => {
+            if (!best || +p.percent > +best.percent) best = { ...p, by: 'volume' };
+          });
+          if (code){
+            const p = promoList().find(x => String(x.code).toUpperCase() === code && (x.kind !== 'volume' || hours >= (+x.minHours || 0)));
+            if (p && (!best || +p.percent > +best.percent)) best = { ...p, by: 'code' };
+          }
+          const pct = best ? Math.min(90, Math.max(0, +best.percent || 0)) : 0;
+          const known = !code || !!promoList().find(x => String(x.code).toUpperCase() === code);
+          return { base, pct, sum: Math.round(base * (1 - pct / 100)), best, code, hours, known };
+        };
+        const paintDiscount = () => {
+          const d = calcDiscount();
+          const box = g2('#cx-disc');
+          if (!box) return;
+          const money = fmtMoney(d.base);
+          if (d.code && !d.known){
+            box.innerHTML = `<span style="color:var(--red)">Код ${esc(d.code)} не найден или не действует</span>`;
+            return;
+          }
+          if (!d.pct){ box.innerHTML = `<span class="faint">Скидок нет · к оплате ${money}</span>`; return; }
+          box.innerHTML = `Скидка ${d.pct}%${d.best && d.best.kind === 'volume' ? ' за объём' : ''} · <s class="faint">${money}</s> <b>${fmtMoney(d.sum)}</b>`;
+        };
+        g2('#cx-hours').addEventListener('input', paintDiscount);
+        g2('#cx-promo').addEventListener('input', paintDiscount);
         g2('#cx-svcs').innerHTML = S.niches.map(n=>`
           <div class="small"><b style="margin-bottom:4px;display:block">${esc(n.name)}</b>
           ${(S.calcServices[n.id]||[]).map(s=>`<label class="svc-row check"><input type="checkbox" data-sv="${n.id}|${esc(s.name)}|${s.price}"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(s.name)} <span class="faint">${esc(s.unit||'')}</span></span><b>${fmtMoney(s.price)}</b></label>`).join('')}</div>`).join('');
-        g2('#cx-svcs').addEventListener('change', ()=>{ if (!isNaN(val)) g2('#cx-val').textContent = fmtMoney(val + svcSum()); });
+        g2('#cx-svcs').addEventListener('change', ()=>{ if (!isNaN(val)) g2('#cx-val').textContent = fmtMoney(val + svcSum()); paintDiscount(); });
         g2('#cx-hist').querySelectorAll('[data-h]').forEach(h=>h.onclick = ()=>{ g2('#cx-in').value = h.dataset.h; upd(); });
         mask.querySelector('[data-x]').onclick = close;
-        const ap = mask.querySelector('[data-apply2]');
-        if (ap) ap.onclick = ()=>{
-          let sum = val + svcSum();
-          if (!sum){ toast('Сначала введите выражение или выберите услуги','warn'); return; }
-          onResult && onResult(sum);
-          toast(`Подставлено: ${fmtMoney(sum)}`, 'ok');
+        const applyResult = ()=>{
+          const d = calcDiscount();
+          if (!d.sum){ toast('Сначала введите выражение или выберите услуги','warn'); return; }
+          /* Разовый промокод гасим только в момент применения. */
+          if (d.best && d.best.by === 'code' && d.best.kind === 'once'){
+            const p = (S.settings.promos || []).find(x => x.id === d.best.id);
+            if (p){ p.used_at = Date.now(); p.active = false; saveState(); logAudit(`Промокод ${p.code} применён (${p.percent}%)`, 'Калькулятор'); }
+          }
+          onResult && onResult(d.sum);
+          toast(`Подставлено: ${fmtMoney(d.sum)}${d.pct ? ` (скидка ${d.pct}%)` : ''}`, 'ok');
           close();
         };
+        /* Кнопка «Подставить» есть и в теле, и в футере — обе должны работать. */
+        [mask.querySelector('[data-apply2]'), mask.querySelector('[data-apply]')].forEach(b => { if (b) b.onclick = applyResult; });
         /* Создать заказ из калькулятора: результат → сумма нового заказа */
         const cr = mask.querySelector('[data-create]');
         if (cr) cr.onclick = ()=>{

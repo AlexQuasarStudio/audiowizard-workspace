@@ -201,6 +201,20 @@ const APP = (() => {
     return true;
   }
 
+  /* Баланс платформы — деньги, которые сейчас лежат на балансах людей.
+     Раньше это была константа 100 000 из демо-данных: у всех одинаковая и
+     не менялась ни от штрафов, ни от начислений. Считаем из состояния. */
+  function platformBalance(){
+    return noDemo(S.users || []).reduce((sum, u) => sum + (Number(u.ext && u.ext.earned) || 0), 0);
+  }
+  /* Обновляем плашки без полного рендера оболочки: штраф или выплата
+     должны менять цифру сразу. */
+  function refreshSideBalance(){
+    const txt = fmtMoney(platformBalance());
+    document.querySelectorAll('#side-balance .side__balance-meta b, #net-pill b').forEach(b => { b.textContent = txt; });
+  }
+  window.refreshSideBalance = refreshSideBalance;
+
   function renderShell(content){
     const u = user();
     const isMobile = window.matchMedia('(max-width:960px)').matches;
@@ -230,7 +244,7 @@ const APP = (() => {
           <div class="side__foot">
             <button class="side__balance" id="side-balance" type="button" title="История баланса">
               <span class="side__balance-ico">${icon('card','ico-sm')}</span>
-              <span class="side__balance-meta"><span>Баланс платформы</span><b>${fmtMoney(S.settings.demoEnabled === false ? 0 : (S.settings.balance || 0))}</b></span>
+              <span class="side__balance-meta"><span>Баланс платформы</span><b>${fmtMoney(platformBalance())}</b></span>
               <span class="side__balance-chev">${icon('chev-r','ico-sm')}</span>
             </button>
             <div class="side__user" id="side-user" data-tour="user">
@@ -254,7 +268,7 @@ const APP = (() => {
               <button class="iconbtn head-actions__arrow" id="btn-actions-arrow" title="Выбрать действие" aria-label="Выбрать действие" aria-haspopup="true">${icon('chev-d','ico-sm')}</button>
             </div>
             <div class="head__pill head__pill--balance">
-              <span class="head-balance" id="net-pill" title="Баланс платформы">${icon('card','ico-sm')}<b>${fmtMoney(S.settings.demoEnabled === false ? 0 : (S.settings.balance || 0))}</b></span>
+              <span class="head-balance" id="net-pill" title="Баланс платформы">${icon('card','ico-sm')}<b>${fmtMoney(platformBalance())}</b></span>
 
               <span class="sep" aria-hidden="true"></span>
               <button class="iconbtn" id="btn-bell" data-tour="bell" aria-label="Уведомления"><span class="bell-ico">${icon('bell')}${unread?`<span class="bell-cnt">${unread>99?'99+':unread}</span>`:''}</span></button>
@@ -1113,7 +1127,7 @@ const QUICK_BY_ROLE = {
     });
     ops.sort((a,b)=>b.t-a.t);
     const top = ops.slice(0, 20);
-    const total = S.settings.balance || 0;
+    const total = platformBalance();
     /* Плашка-панель (как уведомления): открывается под балансом,
        закрывается по клику мимо или по Esc. */
     const oldPanel = document.querySelector('.bal-panel');
@@ -7169,6 +7183,16 @@ const cm = root.querySelector('.chat-main');
         } });
     });
   }
+  /* Тип записи: у админа ToDo — это ещё и идеи продукта с багами, а не
+     только рабочие поручения. Тип хранится в самой записи (t.type). */
+  const TODO_TYPES = {
+    task: { label:'Задача', cls:'c-gray' },
+    idea: { label:'Идея', cls:'c-violet' },
+    bug:  { label:'Баг', cls:'c-red' }
+  };
+  let todoFilter = 'all';
+  function todoType(t){ return TODO_TYPES[t && t.type] ? t.type : 'task'; }
+
   function settingsView(root, section){
     const u = user();
     /* Раздел пришёл из маршрута (#/settings/profile) или это вход в настройки */
@@ -7361,7 +7385,33 @@ const cm = root.querySelector('.chat-main');
           </table></div>
         </div>`).join('')}
         <button class="btn btn--primary" id="calc-save" style="margin-top:14px">${icon('check-c')} Сохранить услуги</button>
+      </div>
+      <div class="card card-pad" style="margin-top:14px">
+        <h3 style="margin-bottom:6px">Промокоды и скидки</h3>
+        <p class="small muted" style="margin-bottom:12px">Код, процент и условие. «Разовый» гасится после применения, «за объём» включается сам, когда часов стенограмм не меньше указанного.</p>
+        <div class="tbl-wrap" style="border:0"><table class="tbl" style="min-width:0">
+          <thead><tr><th>Код</th><th>Скидка, %</th><th>Условие</th><th>От, ч</th><th>Активен</th><th></th></tr></thead>
+          <tbody id="promo-rows">${promoRows()}</tbody>
+        </table></div>
+        <div class="row" style="gap:8px;margin-top:10px">
+          <button class="btn btn--ghost btn--sm" id="promo-add" type="button">${icon('plus')} Промокод</button>
+          <button class="btn btn--primary btn--sm" id="promo-save" type="button">${icon('check-c')} Сохранить промокоды</button>
+        </div>
       </div>`;
+    }
+    /* Строки промокодов: одна разметка для рендера и добавления новой. */
+    function promoRows(){
+      return (S.settings.promos || []).map(p => `<tr data-promo="${p.id}">
+        <td><input class="input" data-pf="code" value="${esc(p.code)}" style="padding:6px 10px;width:120px"></td>
+        <td><input class="input" data-pf="percent" type="number" min="0" max="90" value="${+p.percent || 0}" style="padding:6px 10px;width:80px"></td>
+        <td><select class="input" data-pf="kind" style="padding:6px 10px">
+          <option value="once" ${p.kind !== 'volume' ? 'selected' : ''}>Разовый</option>
+          <option value="volume" ${p.kind === 'volume' ? 'selected' : ''}>За объём</option>
+        </select></td>
+        <td><input class="input" data-pf="minHours" type="number" min="0" value="${+p.minHours || 0}" style="padding:6px 10px;width:80px"></td>
+        <td><label class="check"><input type="checkbox" data-pf="active" ${p.active !== false ? 'checked' : ''}><span class="box"><svg><use href="#i-check-c"/></svg></span></label></td>
+        <td><button class="iconbtn" type="button" data-promo-del="${p.id}" title="Удалить">${icon('trash','ico-sm')}</button></td>
+      </tr>`).join('');
     }
     const REP_LABEL = { none:'Разовое', daily:'Ежедневно', weekly:'Еженедельно', monthly:'Ежемесячно' };
     function todosHTML(u2){
@@ -7372,17 +7422,26 @@ const cm = root.querySelector('.chat-main');
       const byPrio = (a,b)=> (a.done?1:0)-(b.done?1:0) || (a.prio||5)-(b.prio||5) || ((b.created_at||0)-(a.created_at||0));
       const sorted = [...mine].sort(byPrio);
       const openCount = sorted.filter(t=>!t.done).length;
-      const PRESETS = [
-        'Позвонить клиенту', 'Проверить статус заказов', 'Согласовать счёт',
-        'Поставить задачу исполнителю', 'Ответить на тикеты', 'Проверить дедлайны',
-        'Обновить документы', 'Подготовить отчёт', 'Разобрать почту'
-      ];
+      const isAdminTodo = u2.role === 'admin';
+      const OPEN_BUGS = sorted.filter(t=>!t.done && todoType(t)==='bug').length;
+      const CNT = { all: sorted.length, task:0, idea:0, bug:0 };
+      sorted.forEach(t => { CNT[todoType(t)]++; });
+      const PRESETS = isAdminTodo
+        ? ['Исправить баг: ', 'Идея: ', 'Проверить релиз', 'Разобрать отчёты об ошибках', 'Обновить бриф Клоду']
+        : ['Позвонить клиенту', 'Проверить статус заказов', 'Согласовать счёт',
+           'Поставить задачу исполнителю', 'Ответить на тикеты', 'Проверить дедлайны',
+           'Обновить документы', 'Подготовить отчёт', 'Разобрать почту'];
       const PRIO_LABEL = { 1:'Критично', 2:'Важно', 3:'Обычно', 4:'Не срочно', 5:'Когда-нибудь' };
       return `<div class="card card-pad">
         <h3 style="margin-bottom:10px">Умный планировщик (ToDo)</h3>
-        <p class="small muted" style="margin:0 0 12px">Задачи сортируются от важного к наименее важному. Варианты для быстрого старта — ниже.</p>
-        <div class="row" style="gap:8px;margin-bottom:8px">
-          <div class="field" style="flex:1;min-width:0"><input class="input" id="td-text" placeholder="Что нужно сделать?"></div>
+        <p class="small muted" style="margin:0 0 12px">Задачи сортируются от важного к наименее важному.${OPEN_BUGS ? ` <span class="badge c-red" style="margin-left:4px">открытых багов: ${OPEN_BUGS}</span>` : ''} Варианты для быстрого старта — ниже.</p>
+        <div class="row" style="gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          <div class="field" style="flex:1;min-width:180px"><input class="input" id="td-text" placeholder="Что нужно сделать?"></div>
+          <div class="field" style="flex:none;max-width:130px">
+            <select class="input" id="td-type">
+              ${Object.entries(TODO_TYPES).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}
+            </select>
+          </div>
           <div class="field" style="flex:none;max-width:180px">
             <select class="input" id="td-prio">
               ${[1,2,3,4,5].map(p=>`<option value="${p}">${p} — ${PRIO_LABEL[p]}</option>`).join('')}
@@ -7393,6 +7452,9 @@ const cm = root.querySelector('.chat-main');
         <div class="chips" style="gap:6px;margin-bottom:12px">
           ${PRESETS.map(p=>`<span class="chip" data-td-preset="${esc(p)}" style="cursor:pointer">${esc(p)}</span>`).join('')}
         </div>
+        ${sorted.length ? `<div class="chips" id="td-filters" style="gap:6px;margin:0 0 12px">
+          ${[['all','Все'],['task','Задачи'],['bug','Баги'],['idea','Идеи']].map(([k,l])=>`<span class="chip ${todoFilter===k?'on':''}" data-td-filter="${k}" style="cursor:pointer">${l}${CNT[k]?` · ${CNT[k]}`:''}</span>`).join('')}
+        </div>` : ''}
         ${sorted.length ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px">
           <label class="check" style="gap:6px;flex:none"><input type="checkbox" id="td-sel-all" ${openCount?'':'disabled'} aria-label="Выбрать все задачи"><span class="box"><svg><use href="#i-check-c"/></svg></span><span class="small">Выбрать все</span></label>
           <span class="spacer"></span>
@@ -7402,13 +7464,15 @@ const cm = root.querySelector('.chat-main');
         </div>
         <div class="stack" style="gap:8px">${sorted.map(t=>{
           const lbl = PRIO_LABEL[t.prio] || ('Приоритет '+t.prio);
-          return `<div class="row row--between" style="padding:10px 12px;border:1px solid var(--border);border-radius:12px;${t.done?'opacity:.55':''}">
+          const ty = todoType(t);
+          return `<div class="row row--between" data-td-type="${ty}" style="padding:10px 12px;border:1px solid var(--border);border-radius:12px;${t.done?'opacity:.55':''}${todoFilter!=='all'&&todoFilter!==ty?'display:none':''}">
             <span class="small" style="display:flex;gap:8px;align-items:center;min-width:0">
               <label class="check" style="gap:0;flex:none;margin:0" title="Выбрать задачу">
                 <input type="checkbox" data-td-check value="${esc(t.id)}" ${t.done?'disabled':''} aria-label="Выбрать задачу">
                 <span class="box"><svg><use href="#i-check-c"/></svg></span>
               </label>
               ${t.done?'<span class="badge c-green">готово</span>':`<span class="badge ${t.prio===1?'c-red':(t.prio===2?'c-orange':'c-gray')}" title="Приоритет ${t.prio} из 5">${esc(lbl)}</span>`}
+              <span class="badge ${TODO_TYPES[ty].cls}" title="Тип записи">${TODO_TYPES[ty].label}</span>
               <b>${esc(t.text)}</b>
             </span>
             <span style="display:flex;gap:6px;align-items:center">
@@ -7443,6 +7507,7 @@ const cm = root.querySelector('.chat-main');
         `_Выгружено ${when} · Audiowizard Workspace · роль: ${role}_`,
         '',
         `Открыто: ${open.length} · выполнено: ${done.length} · всего: ${mine.length}`,
+        `Баги: ${open.filter(t=>todoType(t)==='bug').length} · идеи: ${open.filter(t=>todoType(t)==='idea').length} · задачи: ${open.filter(t=>todoType(t)==='task').length}`,
         '',
         '## Задание для ИИ-помощника',
         'Ты — помощник по планированию рабочего дня. Ниже мой список задач с приоритетами.',
@@ -7462,11 +7527,11 @@ const cm = root.querySelector('.chat-main');
         const list = rest.filter(t => (t.prio||3) === p);
         if (!list.length) continue;
         lines.push('', `### ${p} — ${TODO_PRIO[p]}`);
-        list.forEach(t => lines.push(`- [ ] (P${p}) ${String(t.text||'').trim()}`));
+        list.forEach(t => lines.push(`- [ ] (P${p}) ${todoType(t)!=='task' ? '['+TODO_TYPES[todoType(t)].label.toLowerCase()+'] ' : ''}${String(t.text||'').trim()}`));
       }
       if (done.length){
         lines.push('', '### Выполнено');
-        [...done].sort((a,b)=>((b.created_at||0)-(a.created_at||0))).forEach(t => lines.push(`- [x] (P${t.prio||3}) ${String(t.text||'').trim()}`));
+        [...done].sort((a,b)=>((b.created_at||0)-(a.created_at||0))).forEach(t => lines.push(`- [x] (P${t.prio||3}) ${todoType(t)!=='task' ? '['+TODO_TYPES[todoType(t)].label.toLowerCase()+'] ' : ''}${String(t.text||'').trim()}`));
       }
       lines.push('', '## Правила',
         '- (P1) — критично, (P5) — когда-нибудь.',
@@ -7480,18 +7545,26 @@ const cm = root.querySelector('.chat-main');
     function todoParseImport(text){
       const raw = String(text||'');
       const items = [], seen = new Set();
-      const add = (value, prio, isDone) => {
-        const t = String(value||'')
+      const add = (value, prio, isDone, type) => {
+        let t = String(value||'')
           .replace(/^[-–—•*]\s*/, '')
           .replace(/\s+/g,' ')
           .replace(/[\s.;,]+$/,'')
           .trim();
+        /* Тип может прийти пометкой в тексте: [баг], [идея], [задача]. */
+        let ty = todoType({ type });
+        const mark = t.match(/^\[(баг|идея|задача|bug|idea|task)\]\s*/i);
+        if (mark){
+          const m = mark[1].toLowerCase();
+          ty = (m === 'баг' || m === 'bug') ? 'bug' : (m === 'идея' || m === 'idea') ? 'idea' : 'task';
+          t = t.slice(mark[0].length).trim();
+        }
         if (t.length < 2 || t.length > 200) return;
         if (!/[0-9a-zа-яё]/i.test(t)) return;
         const key = todoNorm(t);
         if (seen.has(key)) return;
         seen.add(key);
-        items.push({ text:t, prio:Math.min(5, Math.max(1, parseInt(prio,10)||3)), done:!!isDone });
+        items.push({ text:t, prio:Math.min(5, Math.max(1, parseInt(prio,10)||3)), type:ty, done:!!isDone });
       };
       let j = null;
       try { j = JSON.parse(raw.trim()); } catch(e){ j = null; }
@@ -7500,7 +7573,7 @@ const cm = root.querySelector('.chat-main');
         if (arr){
           arr.forEach(x => {
             if (typeof x === 'string') add(x, 3, false);
-            else if (x && typeof x === 'object') add(x.text || x.title || x.task, x.prio || x.priority || 3, x.done || x.completed);
+            else if (x && typeof x === 'object') add(x.text || x.title || x.task, x.prio || x.priority || 3, x.done || x.completed, x.type);
           });
           if (items.length) return items;
         }
@@ -7869,6 +7942,44 @@ const cm = root.querySelector('.chat-main');
         if (del){ del.closest('tr').remove(); toast('Строка удалена — не забудьте сохранить','info'); return; }
         const add = e.target.closest('[data-add]');
         if (add) addRow(add.dataset.add);
+        const promoSave = e.target.closest('#promo-save');
+        if (promoSave){
+          const list = [];
+          el.querySelectorAll('tbody#promo-rows tr[data-promo]').forEach(tr=>{
+            const g = f => tr.querySelector(`[data-pf="${f}"]`);
+            const code = String(g('code').value || '').trim().toUpperCase();
+            if (!code) return;
+            list.push({
+              id: tr.dataset.promo,
+              code,
+              percent: Math.min(90, Math.max(0, +g('percent').value || 0)),
+              kind: g('kind').value === 'volume' ? 'volume' : 'once',
+              minHours: Math.max(0, +g('minHours').value || 0),
+              active: !!g('active').checked
+            });
+          });
+          S.settings.promos = list;
+          saveState();
+          logAudit('Промокоды обновлены', 'Настройки');
+          toast('Промокоды сохранены', 'ok');
+          return;
+        }
+        if (e.target.closest('#promo-add')){
+          S.settings.promos = S.settings.promos || [];
+          S.settings.promos.push({ id:'pm' + uid(), code:'NEW10', percent:10, kind:'once', minHours:0, active:true });
+          const tb = el.querySelector('#promo-rows');
+          if (tb){ tb.innerHTML = promoRows(); }
+          toast('Промокод добавлен — задайте код и сохраните', 'info');
+          return;
+        }
+        const promoDel = e.target.closest('[data-promo-del]');
+        if (promoDel){
+          S.settings.promos = (S.settings.promos || []).filter(x => x.id !== promoDel.dataset.promoDel);
+          const tb = el.querySelector('#promo-rows');
+          if (tb) tb.innerHTML = promoRows();
+          saveState();
+          return;
+        }
         if (e.target.closest('#calc-save')) save();
       });
     }
@@ -8174,8 +8285,9 @@ const cm = root.querySelector('.chat-main');
           const t = el.querySelector('#td-text').value.trim();
           if (!t){ toast('Введите задачу','warn'); return; }
           const prio = +el.querySelector('#td-prio').value || 3;
+          const type = todoType({ type: el.querySelector('#td-type') && el.querySelector('#td-type').value });
           S.todos = S.todos || [];
-          S.todos.push({ id:uid(), owner_id:u.id, text:t, prio, done:false, created_at:Date.now() });
+          S.todos.push({ id:uid(), owner_id:u.id, text:t, prio, type, done:false, created_at:Date.now() });
           saveState(); toast('Задача добавлена','ok'); renderSec();
         };
         const tdText = el.querySelector('#td-text');
@@ -8184,6 +8296,14 @@ const cm = root.querySelector('.chat-main');
           const inp = el.querySelector('#td-text');
           if (inp) inp.value = ch.dataset.tdPreset;
           if (tdAdd) tdAdd.click();
+        });
+        /* Фильтр по типу — без перерисовки: прячем строки на месте. */
+        el.querySelectorAll('[data-td-filter]').forEach(ch=>ch.onclick=()=>{
+          todoFilter = ch.dataset.tdFilter;
+          el.querySelectorAll('[data-td-filter]').forEach(x=>x.classList.toggle('on', x===ch));
+          el.querySelectorAll('[data-td-type]').forEach(row=>{
+            row.style.display = todoFilter === 'all' || row.dataset.tdType === todoFilter ? '' : 'none';
+          });
         });
         el.querySelectorAll('[data-td-done]').forEach(b=>b.onclick=()=>{
           const t = (S.todos||[]).find(x=>x.id===b.dataset.tdDone);

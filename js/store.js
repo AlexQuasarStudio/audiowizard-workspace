@@ -81,6 +81,17 @@ const norm = s => String(s||'').toLowerCase().trim();
 const debounce = (fn, ms=160) => { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; };
 const rndIp = () => `192.168.${1+Math.floor(Math.random()*40)}.${1+Math.floor(Math.random()*240)}`;
 
+/* ---------- Промокоды калькулятора ----------
+   Не хардкод в расчёте: список живёт в настройках и редактируется админом.
+   once — одноразовый (гасится при применении), volume — скидка за объём
+   стенограмм от minHours часов. */
+const DEFAULT_PROMOS = [
+  { id:'pm-promo10', code:'PROMO10', percent:10, kind:'once',   minHours:0,  active:true },
+  { id:'pm-pack10',  code:'PACK10',  percent:10, kind:'volume', minHours:10, active:true },
+  { id:'pm-pack15',  code:'PACK15',  percent:15, kind:'volume', minHours:30, active:true }
+];
+function promosDefault(){ return JSON.parse(JSON.stringify(DEFAULT_PROMOS)); }
+
 /* ---------- Сид-данные ---------- */
 function seedState(){
   const now = Date.now(), T = today();
@@ -331,7 +342,7 @@ const audit = getDemoAudit();
     users, niches, specializations, projects, folders, orders, chats, messages, polls,
     tickets, ideas, kanbanBoards:kanban, kbCards, changelog, importRules, calcServices,
     calcHistory:[], notifs, audit, backups:[], importLogs, importLogLines,
-    settings:{ demoEnabled:true, minPrepay:50, selfDeleteDays:90, hiddenRoutes:[], balance: 100000, appBgDoodles:true,
+    settings:{ demoEnabled:true, minPrepay:50, selfDeleteDays:90, hiddenRoutes:[], balance: 100000, appBgDoodles:true, promos: promosDefault(),
       referral:{ enabled:true, percent:2, fixedBonus:0, karmaPerRef:2, role:'client' },
       /* Доли от суммы заказа: админ — 25% (маржа услуг), менеджер — 5%.
          Разница (итого − исполнители − админ − менеджер) показывается как
@@ -382,6 +393,7 @@ function migrateFinance(){
   S.settings.integrations = Object.assign({ payout:{ key:'smartcat', name:'Smartcat', commission:5, enabled:true, perUser:true } }, S.settings.integrations || {});
   S.settings.payout = Object.assign({ enabled:true, auto:true, days:[1,15], time:'15:00', tz:'Europe/Moscow', lastRunAt:null, history:[] }, S.settings.payout || {});
   if (!Array.isArray(S.fines)) S.fines = [];
+  if (!Array.isArray(S.settings.promos)) S.settings.promos = promosDefault();
   if (!Array.isArray(S.settings.payout.days) || !S.settings.payout.days.length) S.settings.payout.days = [1,15];
   (S.users || []).forEach(u => {
     if (!u.ext) return;
@@ -509,7 +521,12 @@ function migrateRules(){
 let saveTimer = null;
 function saveState(){
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(()=>{ try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){} }, 120);
+  saveTimer = setTimeout(()=>{
+    try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){}
+    /* Плашки баланса живут вне рендера раздела: любое изменение состояния
+       (штраф, начисление, выплата) обновляет цифру без перерисовки оболочки. */
+    try{ window.refreshSideBalance && window.refreshSideBalance(); }catch(e){}
+  }, 120);
 }
 
 /* ---------- Хелперы над состоянием ---------- */
