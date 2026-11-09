@@ -1148,8 +1148,7 @@ body:not(.zen) .side{position:fixed;top:7px;left:12px;bottom:7px;height:auto;tra
      сжимается до одной кнопки. */
   .head__mtools{overflow:hidden}
   .head__mtools .head__msearch{overflow:hidden;transition:width .26s var(--ease),opacity .18s var(--ease),transform .26s var(--ease)}
-  body.m-head-fit .head__mtools .head__msearch{width:0;opacity:0;transform:translateX(-6px) scale(.82);pointer-events:none}
-  /* Правые плашки — той же высоты и радиуса, что группа меню и поиска */
+    /* Правые плашки — той же высоты и радиуса, что группа меню и поиска */
   .head__ops{height:40px;padding:4px;border-radius:14px;box-sizing:border-box}
   .head__ops .head-actions__main{width:32px;height:30px}
   .head__ops .head-actions__arrow{height:30px}

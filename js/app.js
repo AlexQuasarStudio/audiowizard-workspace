@@ -615,7 +615,7 @@ const APP = (() => {
            «плашки растворились при скролле» и замораживаем его до закрытия. */
         if (window.__pillsReset) window.__pillsReset();
         window.__pillsFrozen = true;
-        document.body.classList.remove('pills-hide', 'm-head-fit');
+        document.body.classList.remove('pills-hide');
         if (sw){ sw.style.opacity = ''; sw.style.filter = ''; sw.style.pointerEvents = ''; delete sw.dataset.pillHidden; }
         document.body.classList.add('m-search-open');
         if (mback) mback.hidden = false;
@@ -626,35 +626,6 @@ const APP = (() => {
         requestAnimationFrame(()=>{ if (document.body.classList.contains('m-search-open') && document.activeElement !== si) si.focus({ preventScroll:true }); });
       };
       if (mback) mback.onmousedown = e=>{ e.preventDefault(); closeM(); };
-      /* При прокрутке вниз иконка поиска «заезжает» в кнопку меню: группа
-         сжимается до одной кнопки. Возвращается, как только тянут вверх или
-         страница вернулась к началу. Пока открыт поиск — не трогаем: поле
-         должно быть на месте. */
-      if (!window.__mHeadScroll){
-        window.__mHeadScroll = true;
-        let lastY = window.scrollY || 0, queued = false;
-        const syncHead = ()=>{
-          const y = window.scrollY || 0;
-          const mobile = !window.matchMedia || window.matchMedia('(max-width:960px)').matches;
-          const open = document.body.classList.contains('m-search-open');
-          const fit = mobile && !open && (y > 32 ? y > lastY + 1 : false);
-          const back = mobile && !open && (y <= 32 || y < lastY - 1);
-          if (fit) document.body.classList.add('m-head-fit');
-          else if (back) document.body.classList.remove('m-head-fit');
-          if (!mobile || open) document.body.classList.remove('m-head-fit');
-          lastY = y;
-        };
-        window.addEventListener('scroll', ()=>{
-          if (queued) return;
-          queued = true;
-          requestAnimationFrame(()=>{ queued = false; syncHead(); });
-        }, { passive:true });
-        window.addEventListener('resize', syncHead);
-        /* Открыли поиск — сразу возвращаем иконке место */
-        const origClose = window.__closeMobileSearch;
-        window.__closeMobileSearch = ()=>{ origClose && origClose(); syncHead(); };
-        document.addEventListener('click', e=>{ if (e.target.closest('#m-search')) document.body.classList.remove('m-head-fit'); }, true);
-      }
       if (!window.__mSearchBound){
         window.__mSearchBound = true;
         /* capture: обработчик поля в ui.js останавливает всплытие Escape */
@@ -832,6 +803,7 @@ const QUICK_BY_ROLE = {
 
   function userMenu(anchor){
     const u = user();
+    const isMobile = window.matchMedia && window.matchMedia('(max-width:960px)').matches;
     const isZen = document.body.classList.contains('zen');
     /* В zen — те же быстрые действия, что в обычном режиме, и всегда сверху */
     const quickNow = (QUICK_BY_ROLE[u.role] || ['chats'])
@@ -843,7 +815,7 @@ const QUICK_BY_ROLE = {
       { label:'Тема: '+(MODE_LABEL[effMode(u)]), icon:'palette', hint:'Ctrl+Shift+Y', keepOpen:true, onClick:(it)=>{ cycleTheme(true); it.label = 'Тема: '+(MODE_LABEL[effMode(user())]); } },
       { label:'Акцент: '+(ACCENT_LABEL[u.accent||'violet']), icon:'sparkle', keepOpen:true, onClick:(it)=>{ const list = ACCENT_LIST; u.accent = list[(list.indexOf(u.accent||'violet')+1)%list.length]; saveState(); applyTheme(u.mode,u.accent); it.label = 'Акцент: '+ACCENT_LABEL[u.accent]; toast('Акцент: '+ACCENT_LABEL[u.accent],'info'); } },
       ...(document.body.classList.contains('zen') ? [{ label:'Показать меню', icon:'shrink', onClick:()=>toggleZen() }]:[]),
-      ...(!document.body.classList.contains('zen') ? [{ label:'Полноэкранный режим', icon:'expand', hint:'скрыть меню и топбар', onClick:()=>toggleZen() }]:[]),
+      ...(!document.body.classList.contains('zen') && !isMobile ? [{ label:'Полноэкранный режим', icon:'expand', hint:'скрыть меню и топбар', onClick:()=>toggleZen() }]:[]),
       '-',
       /* «Быстрые действия» — раскрывающийся пункт (как раньше): при наведении
          показывает подменю, клик закрепляет. В подменю — быстрые действия +
@@ -1643,6 +1615,7 @@ let zenAvatar = null;
     try{ if (navigator.keyboard && navigator.keyboard.unlock) navigator.keyboard.unlock(); }catch(e){}
   }
   function requestFs(){
+    if (window.matchMedia && window.matchMedia('(max-width:960px)').matches) return;
     try{
       const el = document.documentElement;
       const fn = el.requestFullscreen || el.webkitRequestFullscreen;
@@ -1674,6 +1647,12 @@ let zenAvatar = null;
   }
 
   function applyZen(on, opts = {}){
+    /* На мобильном полноэкранный режим не используется: даже сохранённый
+       zen снимаем, чтобы меню и топбар не пропадали. */
+    if (on && window.matchMedia && window.matchMedia('(max-width:960px)').matches){
+      try { prefsFor().zen = false; saveState(); } catch(e){}
+      on = false;
+    }
     /* На время смены режима гасим переходы шапки и чатовых плашек:
        иначе они «телепортируются» к поиску, пока .head меняет left. */
     document.body.classList.add('zen-toggling');
@@ -1880,6 +1859,7 @@ ex.innerHTML = avatarHTML(user(), '');
     });
   }
   function toggleZen(){
+    if (window.matchMedia && window.matchMedia('(max-width:960px)').matches) return;
     const on = !document.body.classList.contains('zen');
     prefsFor().zen = on; saveState();
     applyZen(on);
@@ -8227,12 +8207,13 @@ const cm = root.querySelector('.chat-main');
         <div class="log-box">${suspicious.map(a=>`<div class="err">${esc(a.user||'Система')} — ${esc(String(a.action).slice(0,80))} (${fmtDate(a.t)})</div>`).join('')}</div></div>`:''}`;
     }
     function keysHTML(){
+      const mobile = window.matchMedia && window.matchMedia('(max-width:960px)').matches;
       const defs = [
         ['Поиск / палетка команд','search'],
         ['Новый заказ','newOrder'],
         ['Настройки','settings'],
         ['Переключить тему','theme'],
-        ['Полноэкранный режим','zen']
+        ...(!mobile ? [['Полноэкранный режим','zen']] : [])
       ];
       const fmt = c => String(c||'').split('+').map((p,i)=> i===0 ? p.toUpperCase() : (p===''?'':p.toUpperCase())).map(x=>x===' '?'SPACE':x).join(' + ');
       return `<div class="card card-pad"><h3 style="margin-bottom:12px">Горячие клавиши</h3>
