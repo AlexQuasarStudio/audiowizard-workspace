@@ -328,20 +328,16 @@ const APP = (() => {
       document.addEventListener('scroll', window.__toTopHandler, { passive: true });
       window.__toTopHandler();
     }
-    /* Плашки и поиск прилипают к странице: едут вверх вместе со скроллом
-       (после запаса 60px), плавно догоняя цель; при скролле вверх возвращаются. */
+    /* Плашки и поиск гаснут и теряют размытие вслед за скроллом,
+       плавно догоняя цель; при скролле вверх так же плавно возвращаются. */
     { document.removeEventListener('scroll', window.__pillsHandler);
       window.__pTarget = 0;  /* целевое растворение 0..1 (0 = полностью видно) */
       window.__pOff = 0;     /* текущее плавное значение */
       window.__pRaf = 0;
-      window.__pillsReleaseRaf = 0;
       window.__pillsFrozen = false;
-      window.__pMaxScroll = 0; /* самая глубокая позиция, с которой начался подъём */
-      window.__pTurnAcc = 0;  /* накопленный прогресс проявления при подъёме (0..1) */
       if (window.__pillPrevY === undefined) window.__pillPrevY = window.scrollY;
       const ACC = 40;        /* первые 40px скролла плашки не трогают */
       const FADE = 80;       /* дистанция полного растворения при скролле ВНИЗ */
-      const REVEAL = 120;    /* резерв: дистанция подъёма (не используется в позиционной модели) */
       const FADE_MS = 160;   /* плавность следования (экспоненциальное сглаживание) */
       /* В zen меню выезжает за 0.3s — плашки растворяются тем же темпом, чтобы
          движение было согласованным. В обычном режиме реакция быстрее. */
@@ -370,38 +366,33 @@ const APP = (() => {
         /* Пока открыт мобильный поиск, плашки не растворяются: поле поиска
            должно оставаться видимым на любом скролле. */
         const p = document.body.classList.contains('m-search-open') ? 0 : Math.min(1, Math.max(0, window.__pOff));
+        /* Стекло гаснет вместе с blur: силу размытия считаем здесь же и
+           отдаём плашкам переменными. На обёртки opacity/filter не ставим —
+           они создают backdrop root и отключают backdrop-filter у стекла. */
+        if (p <= 0.001) {
+          document.documentElement.style.removeProperty('--pill-fade');
+          document.documentElement.style.removeProperty('--pill-blur');
+        } else {
+          document.documentElement.style.setProperty('--pill-fade', p.toFixed(3));
+          document.documentElement.style.setProperty('--pill-blur', (16 * (1 - p)).toFixed(2) + 'px');
+        }
+        const fullyOut = p > 0.9;
         list.forEach(el => {
           /* Растворение, а не уезд: плашки гаснут (opacity) с мягким
              размытием по мере скролла и так же проявляются обратно. */
-          const fullyOut = p > 0.9;
           el.style.transform = '';
-          el.style.opacity = p <= 0.001 ? '' : String(Math.max(0, 1 - p));
-          el.style.filter = p <= 0.001 ? '' : `blur(${(p * 2).toFixed(2)}px)`;
           /* Клики недоступны только когда плашка почти растворилась;
              до этого наведение проявляет её полностью. */
           el.style.pointerEvents = p > 0.6 ? 'none' : '';
           el.dataset.pillHidden = fullyOut ? '1' : '';
-          document.body.classList.toggle('pills-hide', fullyOut);
-          document.body.classList.toggle('pills-move', false);
         });
+        document.body.classList.toggle('pills-hide', fullyOut);
+
         if (Math.abs(window.__pTarget - window.__pOff) > 0.005) window.__pRaf = requestAnimationFrame(pillTick);
-        else {
-          pillLastT = 0;
-          /* Даём кадру отрисоваться с opacity:1 и blur:0, и только следующим
-             кадром отпускаем transition. Иначе браузер успевает показать
-             полный blur одним кадром — фон плашки «щёлкает». */
-          window.__pillsReleaseRaf = requestAnimationFrame(()=>{
-            window.__pillsReleaseRaf = 0;
-            if (Math.abs(window.__pTarget - window.__pOff) <= 0.005) document.body.classList.remove('pills-anim');
-          });
-        }
+        else pillLastT = 0;
       };
       const paint = t => {
         window.__pTarget = Math.min(1, Math.max(0, t));
-        /* Промоушен слоя нужен только на время движения: статичный
-           will-change на контейнере гасил фирменное размытие плашек. */
-        if (window.__pillsReleaseRaf){ cancelAnimationFrame(window.__pillsReleaseRaf); window.__pillsReleaseRaf = 0; }
-        if (window.__pTarget !== window.__pOff) document.body.classList.add('pills-anim');
         if (!window.__pRaf) window.__pRaf = requestAnimationFrame(pillTick);
       };
       const reveal = () => paint(0);
@@ -411,13 +402,6 @@ const APP = (() => {
         if (!a || a === document.body) return false;
         return !!(a.closest && (a.closest('.head__search') || a.closest('.head__right') || a.closest('.head')));
       };
-      /* Скролл: ПОЗИЦИОННОЕ растворение — симметрично в обе стороны.
-         Вниз — плашки гаснут по мере удаления от верха; вверх — постепенно
-         проявляются (чем ближе к верху, тем полнее). Никаких «прыжков». */
-      /* Гибрид: вниз — позиционное растворение от верха (ACC..ACC+FADE);
-         вверх — плавное проявление от самой глубокой точки (дистанция REVEAL).
-         Плашки не «залипают» погашенными до самого верха и не прыгают
-         при подъёме; у верха (y <= ACC) всегда полностью видимы. */
       /* Растворение плашек по ТЗ пользователя:
    - скролл ВНИЗ в любой позиции — плавный раствор;
    - скролл ВВЕРХ в любом месте — плавное проявление (никакой «защёлки»);
