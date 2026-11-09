@@ -4,6 +4,10 @@
 'use strict';
 
 const LS_KEY = 'aw_state_v1';
+/* Версия схемы данных. Поднимается при добавлении сущностей, чтобы
+   импорт из старой версии приложения можно было обновить на лету. */
+const SCHEMA_VERSION = 2;
+const BACKUP_PREFIX = 'aw_backup_';
 
 const STATUS_META = {
   draft:    { label:'Черновик',    cls:'c-gray',   row:'tr-draft' },
@@ -150,6 +154,39 @@ const DEFAULT_PROMOS = [
 ];
 function promosDefault(){ return JSON.parse(JSON.stringify(DEFAULT_PROMOS)); }
 
+/* Надбавки за срочность и доп. опции по нишам (специализациям).
+   Раньше калькулятор умел только услуги; срочность и опции — отдельные
+   настройки, чтобы их можно было менять без правки кода. */
+const DEFAULT_CALC_SETTINGS = {
+  rushPct: { n1:10, n2:10, n3:10 },
+  extras: {
+    n1: [
+      { id:'ce-n1-1', name:'Разметка спикеров', price:400, unit:'за час аудио', active:true },
+      { id:'ce-n1-2', name:'Тайм-коды', price:600, unit:'за час аудио', active:true },
+      { id:'ce-n1-3', name:'Субтитры (SRT)', price:1200, unit:'за час видео', active:true }
+    ],
+    n2: [
+      { id:'ce-n2-1', name:'SEO-метатеги', price:800, unit:'за статью', active:true },
+      { id:'ce-n2-2', name:'Иллюстрации', price:1500, unit:'за штуку', active:true },
+      { id:'ce-n2-3', name:'Вычитка редактором', price:600, unit:'за 1000 знаков', active:true }
+    ],
+    n3: [
+      { id:'ce-n3-1', name:'Апостиль', price:4500, unit:'за документ', active:true },
+      { id:'ce-n3-2', name:'Вёрстка PDF', price:700, unit:'за документ', active:true },
+      { id:'ce-n3-3', name:'Курьерская доставка', price:1200, unit:'за документ', active:true }
+    ]
+  }
+};
+function defaultCalcSettings(){ return JSON.parse(JSON.stringify(DEFAULT_CALC_SETTINGS)); }
+function calcSettingsSeed(){
+  const base = defaultCalcSettings();
+  const rushPct = {}, extras = {};
+  /* Ключи привязаны к сид-нишам; для новых ниш значения создаёт миграция. */
+  (Object.keys(base.rushPct) || []).forEach(k => { rushPct[k] = base.rushPct[k]; });
+  Object.keys(base.extras).forEach(k => { extras[k] = base.extras[k]; });
+  return { rushPct, extras };
+}
+
 /* ---------- Сид-данные ---------- */
 function seedState(){
   const now = Date.now(), T = today();
@@ -157,9 +194,12 @@ function seedState(){
   const daysFwd = n => new Date(T.getTime() + n*DAY).getTime();
 
   const users = [
-    { id:'u-admin', username:'admin', email:'admin@audiowizard.ru', pw:'admin123', role:'admin', full_name:'Алексей Дьяченко', phone:'+7 912 345-67-01', about:'Слежу за тем, чтобы всё работало как часы.', mode:'system', accent:'violet', is_online:true, avatar:'', consent_marketing:true, tour_completed:false, created_at:days(300) },
-    { id:'u-top', username:'top', email:'handzhyan@audiowizard.ru', pw:'top123', role:'top_manager', full_name:'Анжелика Ханджян', phone:'+7 912 345-67-02', about:'Топ-менеджер. Приоритетное распределение заказов.', mode:'dark', accent:'violet', is_online:true, avatar:'', consent_marketing:true, tour_completed:false, created_at:days(290) },
-    { id:'u-manager', username:'manager', email:'denisyuk@audiowizard.ru', pw:'manager123', role:'manager', full_name:'Андрей Денисюк', phone:'+7 912 345-67-03', about:'Веду проекты по аудио и переводам.', mode:'dark', accent:'violet', is_online:true, avatar:'', consent_marketing:true, tour_completed:false, created_at:days(240) },
+    { id:'u-admin', username:'admin', email:'admin@audiowizard.ru', pw:'admin123', role:'admin', full_name:'Алексей Дьяченко', phone:'+7 912 345-67-01', about:'Слежу за тем, чтобы всё работало как часы.', mode:'system', accent:'violet', is_online:true, avatar:'', consent_marketing:true, tour_completed:false, created_at:days(300),
+      ext:{ earned:0, status:'active', comment:'', commentPersonal:'' } },
+    { id:'u-top', username:'top', email:'handzhyan@audiowizard.ru', pw:'top123', role:'top_manager', full_name:'Анжелика Ханджян', phone:'+7 912 345-67-02', about:'Топ-менеджер. Приоритетное распределение заказов.', mode:'dark', accent:'violet', is_online:true, avatar:'', consent_marketing:true, tour_completed:false, created_at:days(290),
+      ext:{ earned:2375, status:'active', comment:'', commentPersonal:'' } },
+    { id:'u-manager', username:'manager', email:'denisyuk@audiowizard.ru', pw:'manager123', role:'manager', full_name:'Андрей Денисюк', phone:'+7 912 345-67-03', about:'Веду проекты по аудио и переводам.', mode:'dark', accent:'violet', is_online:true, avatar:'', consent_marketing:true, tour_completed:false, created_at:days(240),
+      ext:{ earned:2150, status:'active', comment:'', commentPersonal:'' } },
     { id:'u-ex1', username:'maria', email:'maria@audiowizard.ru', pw:'executor123', role:'executor', full_name:'Мария Кузнецова', phone:'+7 903 111-22-33', about:'Стенографист, 4 года опыта. Конференции, интервью, подкасты.', mode:'system', accent:'violet', is_online:true, avatar:'', consent_marketing:false, tour_completed:false, created_at:days(200),
       ext:{ specializations:['Стенографирование','Расшифровка интервью'], qualification:{'Стенографирование':3,'Расшифровка интервью':2}, qualOverall:3, earned:268400, status:'active', workStatus:'working', comment:'', commentPersonal:'', managerId:'u-manager' } },
     { id:'u-ex2', username:'pavel', email:'pavel@audiowizard.ru', pw:'executor123', role:'executor', full_name:'Павел Смирнов', phone:'+7 903 111-22-34', about:'Копирайтинг и рерайт. Люблю сложные тексты.', mode:'dark', accent:'green', is_online:true, avatar:'', consent_marketing:true, tour_completed:false, created_at:days(190),
@@ -396,9 +436,13 @@ const audit = getDemoAudit();
   ];
 
   return {
-    _v:1,
+    _v:2,
     users, niches, specializations, projects, folders, orders, chats, messages, polls,
     tickets, ideas, kanbanBoards:kanban, kbCards, changelog, importRules, calcServices,
+    calcSettings: calcSettingsSeed(),
+    /* Командные аккаунты: задел под группы клиентов/исполнителей с общим
+       доступом, балансом и заказами от имени команды. */
+    teams: [],
     calcHistory:[], notifs, audit, backups:[], importLogs, importLogLines,
     settings:{ demoEnabled:true, minPrepay:50, selfDeleteDays:90, hiddenRoutes:[], balance: 100000, appBgDoodles:true, promos: promosDefault(),
       referral:{ enabled:true, percent:2, fixedBonus:0, karmaPerRef:2, role:'client' },
@@ -432,13 +476,32 @@ let S;
 function loadState(){
   try{
     const raw = localStorage.getItem(LS_KEY);
-    if (raw){ S = JSON.parse(raw); if (S && S._v === 1){ migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); migrateKeys(); migrateFinance(); saveState(); return; } }
+    if (raw){ S = JSON.parse(raw); if (S && (S._v >= 1 || Array.isArray(S.users))){ S._v = Number(S._v) || 1; migrateSchema(); migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); migrateKeys(); migrateStaffBalances(); migrateFinance(); saveState(); return; } }
   }catch(e){}
   S = seedState();
   saveState();
 }
 /* ---------- Демо-данные: пометки и полная очистка для продакшена ---------- */
 const SEED_DEMO_RE = /^(u-(manager|top|ex\d+|cl\d+)|(o|ch|m\d|n\d|nf\d|i\d|t\d|p\d|f\d|v\d|kb\d|kc\d)\d*$)/;
+/* Стафф в демо раньше не имел личного earned: заголовок показывал общий
+   баланс платформы, и у админа/топ-менеджера/менеджера была одна цифра.
+   Восстанавливаем личный баланс из ещё не выплаченных долей заказов.
+   Явно заданный earned (в том числе 0) не трогаем. */
+function migrateStaffBalances(){
+  (S.users || []).forEach(u => {
+    if (!['admin','top_manager','manager'].includes(u.role)) return;
+    u.ext = u.ext || {};
+    if (u.ext.earned != null) return;
+    let sum = 0;
+    (S.orders || []).forEach(o => {
+      const a = o.splitAccrual;
+      if (!a) return;
+      if (a.admin && a.admin.uid === u.id && !a.admin.paid) sum += Number(a.admin.amount) || 0;
+      if (a.manager && a.manager.uid === u.id && !a.manager.paid) sum += Number(a.manager.amount) || 0;
+    });
+    u.ext.earned = sum;
+  });
+}
 function migrateFinance(){
   if (!S.settings) S.settings = {};
   S.settings.finance = Object.assign({ adminMargin:25, managerFee:10, executorShare:40, payoutCommission:5, minOrderTotal:500, minExecutorPay:100, reviewFee:10 }, S.settings.finance || {});
@@ -466,6 +529,51 @@ function migrateFinance(){
     e.is_paid = amount > 0 && e.paid >= amount;
   }));
 }
+/* Обновление схемы сохранения до текущей версии. Вызывается при загрузке
+   и при импорте пакета из другой версии приложения. Все шаги идемпотентны:
+   недостающие сущности добавляются, существующие значения не перетираются. */
+function migrateSchema(){
+  if (!S || typeof S !== 'object') return S;
+  if (!Array.isArray(S.teams)) S.teams = [];
+  S.teams.forEach((t, i) => {
+    if (!t.id) t.id = 'team-legacy-' + i;
+    if (!Array.isArray(t.member_ids)) t.member_ids = [];
+    if (!t.kind) t.kind = 'mixed';
+    if (!t.status) t.status = 'active';
+  });
+  const def = defaultCalcSettings();
+  if (!S.calcSettings || typeof S.calcSettings !== 'object') S.calcSettings = {};
+  if (!S.calcSettings.rushPct || typeof S.calcSettings.rushPct !== 'object') S.calcSettings.rushPct = {};
+  if (!S.calcSettings.extras || typeof S.calcSettings.extras !== 'object') S.calcSettings.extras = {};
+  (S.niches || []).forEach(n => {
+    if (S.calcSettings.rushPct[n.id] == null) S.calcSettings.rushPct[n.id] = def.rushPct[n.id] != null ? def.rushPct[n.id] : 10;
+    if (!Array.isArray(S.calcSettings.extras[n.id])) S.calcSettings.extras[n.id] = def.extras[n.id] ? JSON.parse(JSON.stringify(def.extras[n.id])) : [];
+    S.calcSettings.extras[n.id] = S.calcSettings.extras[n.id].filter(x => x && x.name).map((x, i) => ({
+      id: x.id || ('ce-' + n.id + '-' + i),
+      name: String(x.name),
+      price: Math.max(0, Number(x.price) || 0),
+      unit: x.unit || '',
+      active: x.active !== false
+    }));
+  });
+  if (!Array.isArray(S.backups)) S.backups = [];
+  S.backups.forEach((b, i) => {
+    if (!b.id) b.id = 'legacy-' + i;
+    if (b.schema == null) b.schema = 1;
+  });
+  if (!(S._v >= SCHEMA_VERSION)) S._v = SCHEMA_VERSION;
+  return S;
+}
+/* Настройки срочности и опций для ниши — с безопасными значениями по умолчанию. */
+function rushPctFor(nid){
+  const v = (((S || {}).calcSettings || {}).rushPct || {})[nid];
+  return Math.max(0, Math.min(200, v == null ? 10 : Number(v) || 0));
+}
+function calcExtrasFor(nid){
+  const list = (((S || {}).calcSettings || {}).extras || {})[nid];
+  return Array.isArray(list) ? list.filter(x => x && x.active !== false) : [];
+}
+
 function migrateDemoMarks(){
   /* Гарантия: баланс платформы есть для всех пользователей (и старых сохранений) */
   if (S.settings && S.settings.balance == null) S.settings.balance = 100000;
@@ -585,6 +693,156 @@ function saveState(){
        (штраф, начисление, выплата) обновляет цифру без перерисовки оболочки. */
     try{ window.refreshSideBalance && window.refreshSideBalance(); }catch(e){}
   }, 120);
+}
+
+/* ---------- Миграция, перенос и бекапы ---------- */
+function stateSummary(st){
+  st = st || S || {};
+  const users = Array.isArray(st.users) ? st.users : [];
+  const orders = Array.isArray(st.orders) ? st.orders : [];
+  const services = Object.values(st.calcServices || {}).reduce((a, l) => a + (Array.isArray(l) ? l.length : 0), 0);
+  return {
+    users: users.length,
+    clients: users.filter(u => u.role === 'client').length,
+    executors: users.filter(u => u.role === 'executor').length,
+    staff: users.filter(u => isStaff(u.role)).length,
+    orders: orders.length,
+    teams: (st.teams || []).length,
+    niches: (st.niches || []).length,
+    services
+  };
+}
+
+/* Пакет переноса: всё состояние или только профили и настройки.
+   Версия схемы указана явно, чтобы принять пакет из другой версии. */
+function portableSnapshot(scope = 'full'){
+  const full = JSON.parse(JSON.stringify(S));
+  delete full.backups;
+  const profileKeys = ['users','teams','niches','specializations','calcServices','calcSettings','settings','importRules','product'];
+  const payload = scope === 'profiles'
+    ? profileKeys.reduce((a, k) => { if (full[k] !== undefined) a[k] = full[k]; return a; }, {})
+    : full;
+  return {
+    format: 'audiowizard-migration',
+    formatVersion: 1,
+    schema: SCHEMA_VERSION,
+    scope: scope === 'profiles' ? 'profiles' : 'full',
+    exported_at: new Date().toISOString(),
+    app: { name: 'Audiowizard Workspace', product: 'MultiTool' },
+    version: (S.product || {}).version || '',
+    build: (S.product || {}).build || 0,
+    summary: stateSummary(payload),
+    payload
+  };
+}
+
+function validatePortable(obj){
+  const errors = [], warnings = [];
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+    return { ok: false, errors: ['Файл не содержит JSON-объект состояния'], warnings, payload: null };
+  }
+  const wrapped = obj.format === 'audiowizard-migration';
+  const payload = wrapped ? obj.payload : obj;
+  if (!payload || typeof payload !== 'object') errors.push('В пакете нет блока payload');
+  if (payload && !Array.isArray(payload.users)) errors.push('В пакете нет массива профилей users');
+  if (payload && payload.settings != null && typeof payload.settings !== 'object') errors.push('Блок settings повреждён');
+  const schema = Number(wrapped ? obj.schema : payload && payload._v) || 1;
+  if (schema > SCHEMA_VERSION) warnings.push('Пакет собран в более новой версии (схема ' + schema + ' > ' + SCHEMA_VERSION + '): неизвестные поля сохраним, но новые возможности могут не отобразиться.');
+  if (!wrapped && !errors.length) warnings.push('Это «сырой» файл состояния без упаковки. Импорт продолжится, но лучше использовать пакет миграции.');
+  return { ok: !errors.length, errors, warnings, payload, schema, wrapped, scope: wrapped ? (obj.scope || 'full') : 'full', meta: wrapped ? obj : null };
+}
+
+/* Прогон схемных миграций на импортируемых данных без изменения текущего S. */
+function preparePortable(payload){
+  const saved = S;
+  try {
+    S = JSON.parse(JSON.stringify(payload || {}));
+    if (!Array.isArray(S.users)) S.users = [];
+    migrateSchema();
+    return S;
+  } finally { S = saved; }
+}
+
+function diffProfiles(payload){
+  const imported = Array.isArray(payload && payload.users) ? payload.users : [];
+  const add = [], update = [];
+  imported.forEach(u => {
+    if (!u) return;
+    const cur = S.users.find(x => x.id === u.id) || S.users.find(x => u.login && x.login === u.login) || S.users.find(x => u.email && x.email && x.email === u.email);
+    if (cur) update.push({ from: cur.full_name, to: u.full_name || cur.full_name, id: cur.id });
+    else add.push({ name: u.full_name || u.login || u.id, role: u.role || '' });
+  });
+  return { add, update, imported: imported.length, teams: ((payload || {}).teams || []).length };
+}
+
+function deepMergeState(base, patch){
+  if (Array.isArray(patch)) return JSON.parse(JSON.stringify(patch));
+  if (!patch || typeof patch !== 'object') return patch === undefined ? base : patch;
+  const out = (base && typeof base === 'object' && !Array.isArray(base)) ? base : {};
+  Object.keys(patch).forEach(k => { out[k] = deepMergeState(out[k], patch[k]); });
+  return out;
+}
+
+function mergeProfiles(payload){
+  const p = payload || {};
+  (Array.isArray(p.users) ? p.users : []).forEach(u => {
+    if (!u || !u.id) return;
+    const cur = S.users.find(x => x.id === u.id) || S.users.find(x => u.login && x.login === u.login) || S.users.find(x => u.email && x.email && x.email === u.email);
+    if (cur) Object.assign(cur, u, { id: cur.id });
+    else S.users.push(JSON.parse(JSON.stringify(u)));
+  });
+  if (Array.isArray(p.teams)) {
+    S.teams = S.teams || [];
+    p.teams.forEach(t => {
+      if (!t || !t.id) return;
+      const cur = S.teams.find(x => x.id === t.id);
+      if (cur) Object.assign(cur, t);
+      else S.teams.push(JSON.parse(JSON.stringify(t)));
+    });
+  }
+  ['niches','specializations','calcServices','calcSettings','importRules'].forEach(k => {
+    if (p[k] !== undefined) S[k] = deepMergeState(S[k], p[k]);
+  });
+  if (p.settings) S.settings = deepMergeState(S.settings || {}, p.settings);
+  if (p.product) S.product = deepMergeState(S.product || {}, p.product);
+  migrateSchema();
+  return stateSummary(S);
+}
+
+function backupPayloadKey(id){ return BACKUP_PREFIX + id; }
+function createBackup(type = 'manual', name = ''){
+  const id = 'bk' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const copy = JSON.parse(JSON.stringify(S));
+  delete copy.backups;
+  const raw = JSON.stringify({ format: 'audiowizard-backup', formatVersion: 1, schema: SCHEMA_VERSION, created_at: Date.now(), payload: copy });
+  try { localStorage.setItem(backupPayloadKey(id), raw); }
+  catch(e){ return { error: 'Недостаточно места в браузере для нового бекапа' }; }
+  const meta = {
+    id,
+    name: name || ('aw-backup-' + new Date().toISOString().slice(0,16).replace(/[T:]/g,'-') + '.json'),
+    type, t: Date.now(), schema: SCHEMA_VERSION, size: raw.length,
+    summary: stateSummary(copy)
+  };
+  S.backups = S.backups || [];
+  S.backups.unshift(meta);
+  return meta;
+}
+function readBackup(id){
+  try {
+    const raw = localStorage.getItem(backupPayloadKey(id));
+    return raw ? JSON.parse(raw) : null;
+  } catch(e){ return null; }
+}
+function restoreBackup(id){
+  const pack = readBackup(id);
+  if (!pack || !pack.payload) return { error: 'Файл бекапа не найден или повреждён' };
+  const prepared = preparePortable(pack.payload);
+  const metas = S.backups;
+  prepared.backups = metas;
+  S = prepared;
+  migrateSchema();
+  saveState();
+  return { ok: true, summary: stateSummary(S) };
 }
 
 /* ---------- Хелперы над состоянием ---------- */
@@ -937,3 +1195,28 @@ const DraftsDB = (()=>{
 
 /* XSS-безопасный текст → HTML с \n */
 const nl2br = s => esc(s).replace(/\n/g,'<br>');
+
+/* Портативная миграция: используется админ-разделом «Данные и бекапы»
+   и доступна из консоли/других версий приложения. */
+window.Migrate = {
+  schemaVersion: SCHEMA_VERSION,
+  summary: stateSummary,
+  snapshot: portableSnapshot,
+  validate: validatePortable,
+  prepare: preparePortable,
+  diff: diffProfiles,
+  merge: mergeProfiles,
+  replace(payload){
+    const prepared = preparePortable(payload);
+    const metas = S.backups;
+    prepared.backups = metas;
+    S = prepared;
+    migrateSchema();
+    saveState();
+    return stateSummary(S);
+  },
+  createBackup,
+  readBackup,
+  restoreBackup,
+  backupKey: backupPayloadKey
+};

@@ -10,6 +10,13 @@ const CRM = (() => {
   /* Групповое выделение персон (клиенты/исполнители): живущее на уровне модуля,
      т.к. personRow/personCard определяются вне peopleView. */
   const psel = new Set();
+  /* Бейдж срочности нужен и списку, и карточке заказа — держим на уровне модуля. */
+  function rushMark(o){
+    if (!o || !o.rush) return '';
+    const pct = Number(o.rush_pct) || 0;
+    const tip = 'Срочный заказ' + (pct ? ` · надбавка ${pct}%` : '');
+    return `<span class="badge c-orange o-rush" title="${esc(tip)}">Срочно</span>`;
+  }
   /* Точечное обновление текущего списка после закрытия окна: без полной
      перерисовки раздела и без мигания меню. */
   let ordersRefresh = null;
@@ -685,12 +692,14 @@ const CRM = (() => {
         <td data-l="✓">${staff||u.role==='client'?`<input type="checkbox" class="row-sel" value="${o.id}" ${sel.has(o.id)?'checked':''} aria-label="Выбрать ${o.order_id}">`:''}</td>
         <td class="o-head" data-l="">
           <span class="order-id" data-copy="${o.order_id}" title="Скопировать ID">${o.order_id}</span>
+          ${rushMark(o)}
           <span class="cell-main o-ell" title="${esc(clList.map(x=>x.full_name).join(', '))}">${esc(clList.map(x=>x.full_name).join(', ')||'—')}</span>
           <span class="o-head-total">${fmtMoney(o.total)}</span>
           <svg class="ico ico-sm o-head-arrow"><use href="#i-chev-r"/></svg>
         </td>
         <td data-l="Заказ" class="o-main">
           <span class="order-id" data-copy="${o.order_id}" title="Скопировать ID">${o.order_id}</span>
+          ${rushMark(o)}
           <div class="cell-sub o-ell"><span data-inline="niche">${nicheChip(o.nish_id)}</span>${o.project_id ? ' · <span data-inline="project">' + esc((S.projects.find(p=>p.id===o.project_id)||{}).name || '') + '</span>' : ' · <span data-inline="project" class="faint">+ проект</span>'}</div>
         </td>
         <td data-l="Клиент" data-inline="client"><span class="cell-main o-ell" title="${esc(clList.map(x=>x.full_name).join(', '))}">${clList.length ? esc(clList.map(x=>x.full_name).join(', ')) : '—'}</span></td>
@@ -845,6 +854,7 @@ const CRM = (() => {
         <div class="o-card__top">
           ${staff||u.role==='client'?`<input type="checkbox" class="row-sel" value="${o.id}" ${sel.has(o.id)?'checked':''} aria-label="Выбрать ${o.order_id}">`:''}
           <span class="order-id" data-copy="${o.order_id}" title="Скопировать ID">${o.order_id}</span>
+          ${rushMark(o)}
           <span class="spacer"></span>
           <span data-inline="status">${statusChip(o.status)}</span>
         </div>
@@ -1555,7 +1565,7 @@ const CRM = (() => {
       .slice(0, limit);
   }
 
-  async function openOrderForm(editId, prefill=0){
+  async function openOrderForm(editId, prefill=0, prefillMeta=null){
     const u = me();
     const isEdit = !!editId;
     const o = isEdit ? S.orders.find(x=>x.id===editId) : {
@@ -1563,6 +1573,7 @@ const CRM = (() => {
       total:0, certification_amount:0, need_cert:false, comment:'', manager_id:u.id, project_id:'',
       folder_id:'', nish_id:'', executors:[], audio:0, files:[], proposed_price:0, paid_amount:0,
       forbid_download:false, portfolio_ban:true, nda:false, history:[], created_at:Date.now(),
+      rush:false, rush_pct:0, rush_fee:0,
       /* Дата начала работ по умолчанию — сегодня (для нового заказа) */
       start_date: Date.now()
     };
@@ -1570,7 +1581,7 @@ const CRM = (() => {
     const executors = S.users.filter(x=>x.role==='executor' && x.ext.status!=='blacklisted' && x.ext.workStatus==='working');
     /* Копии, а не ссылки: иначе правка суммы в форме сразу меняет заказ,
        и при сохранении не с чем сравнить прежнюю оплаченную часть. */
-    const form = { executors: (o.executors||[]).map(e=>({...e})), files: [...(o.files||[])], calcSum: 0 };
+    const form = { executors: (o.executors||[]).map(e=>({...e})), files: [...(o.files||[])], calcSum: 0, calcRushFee: Number(o.rush_fee)||0 };
 
     const m = openWinModal({
       wide:true, title: isEdit ? `Заказ ${o.order_id}` : 'Новый заказ', route:'orders',
@@ -1661,9 +1672,15 @@ const CRM = (() => {
 
         /* Живой мультивыбор клиентов: поиск → чипы */
         let selClients = Array.isArray(o.client_ids) && o.client_ids.length ? [...o.client_ids] : (o.client_id ? [o.client_id] : []);
+        /* Номер, который сгенерировали мы: при смене клиента меняем в нём
+           только инициалы, не трогая дату и суффикс. Ручную правку не
+           перетираем — она перестаёт совпадать с autoOrderId. */
+        let autoOrderId = '';
+        let syncOrderIdForClient = () => {};
         const clName = id => { const c = clients.find(x=>x.id===id); return c ? c.full_name : '—'; };
         const renderChips = () => {
           g('#of-client').value = selClients[0] || '';
+          syncOrderIdForClient();
           g('#of-client-chips').innerHTML = selClients.map(id => `<span class="chip on" data-rc="${id}">${esc(clName(id))}${icon('x','ico-sm')}</span>`).join('') || '<span class="tiny faint">Клиент не выбран</span>';
           g('#of-client-chips').querySelectorAll('[data-rc]').forEach(ch => ch.onclick = () => { selClients = selClients.filter(x => x !== ch.dataset.rc); renderChips(); syncPf(); paintDeadlineHint(); paintRecs(); applyDeadline(false); });
         };
@@ -1690,10 +1707,39 @@ const CRM = (() => {
         };
         renderChips(); syncPf();
 
-        g('#of-gen').onclick = ()=>{ g('#of-id').value = generateOrderId(); };
+        g('#of-gen').onclick = ()=>{ const id = generateOrderId(); g('#of-id').value = id; autoOrderId = id; };
         /* ID заказа: только латиница, цифры и дефис; всегда капсом.
            Неуникальный номер подсвечиваем сразу при вводе. */
         const checkFormId = markOrderIdField(g('#of-id'), g('#of-id-hint'), isEdit ? o.id : null);
+        /* Автообновление номера по инициалам клиента: только для нового
+           заказа и правила «инициалы клиента». Если номер ещё пуст —
+           создаём его один раз; если это наш сгенерированный номер —
+           меняем префикс, сохраняя дату и суффикс (-1, -2…). */
+        syncOrderIdForClient = () => {
+          if (isEdit) return;
+          const rule = idRuleFor((me() || {}).id);
+          if (!rule || rule.mode !== 'initials' || rule.who === 'manager') return;
+          const idEl = g('#of-id');
+          if (!idEl) return;
+          const cl = clients.find(x => x.id === selClients[0]);
+          if (!cl) return;
+          if (!idEl.value.trim()){
+            const id = generateOrderId();
+            idEl.value = id;
+            autoOrderId = id;
+            if (checkFormId) checkFormId();
+            return;
+          }
+          if (!autoOrderId || idEl.value !== autoOrderId) return;
+          const m = /^([A-Z]+)-(\d{4})(-\d+)?$/.exec(autoOrderId);
+          if (!m) return;
+          const next = idInitials(cl.full_name) + '-' + m[2] + (m[3] || '');
+          if (next === idEl.value) return;
+          idEl.value = next;
+          autoOrderId = next;
+          if (checkFormId) checkFormId();
+        };
+        syncOrderIdForClient();
         g('#of-id').addEventListener('input', e=>{
           const el = e.target;
           const clean = sanitizeOrderId(el.value, true);
@@ -1832,6 +1878,17 @@ const CRM = (() => {
 
         /* Срок: рекомендуем по фактам и подставляем, пока дедлайн не тронули руками */
         let deadlineTouched = !!o.deadline;
+        /* Срочность считается автоматически: срок короче обычного срока
+           ниши (с учётом даты начала) — заказ помечается «Срочно». */
+        function isRushOrder(){
+          const dlRaw = g('#of-deadline').value;
+          const nid = g('#of-niche').value;
+          if (!dlRaw || !nid) return { urgent:false, pct:0, rec:null };
+          const rec = recommendDeadline({ nishId:nid, clientId: selClients[0] || '' });
+          const st = g('#of-start').value ? new Date(g('#of-start').value + 'T18:00:00') : new Date();
+          const due = st.getTime() + rec.days * DAY;
+          return { urgent: new Date(dlRaw).getTime() < due, pct: rushPctFor(nid), rec };
+        }
         function paintDeadlineHint(){
           const box = g('#of-deadline-hint');
           if (!box) return;
@@ -1846,7 +1903,9 @@ const CRM = (() => {
             const v = g('#of-deadline').value;
             if (v) tail = ` · до ${fmtDate(new Date(v).getTime())}`;
           }
-          box.innerHTML = `Рекомендуем <b>${rec.days} ${daysWord(rec.days)}</b> — медиана ${rec.base} ${daysWord(rec.base)} по ${rec.source}${sample} + запас ${rec.buffer} ${daysWord(rec.buffer)}${tail}`;
+          const rush = isRushOrder();
+          const rushTail = rush.urgent ? ` <span class="badge c-orange" title="Срок короче обычного — заказ будет помечен срочным">Срочно +${rush.pct}%</span>` : '';
+          box.innerHTML = `Рекомендуем <b>${rec.days} ${daysWord(rec.days)}</b> — медиана ${rec.base} ${daysWord(rec.base)} по ${rec.source}${sample} + запас ${rec.buffer} ${daysWord(rec.buffer)}${tail}${rushTail}`;
         }
         function applyDeadline(force){
           const nid = g('#of-niche').value;
@@ -1938,7 +1997,42 @@ const CRM = (() => {
           if (sum > 0){ g('#of-total').value = sum + form.calcSum; }
         };
         g('#of-niche').addEventListener('change', ()=>{ renderSvcs(); applyDeadline(false); paintRecs(); }); renderSvcs();
-        g('#of-open-calc').onclick = ()=>openCalculator({ onResult: v=>{ form.calcSum = v; g('#of-total').value = (+g('#of-total').value||0) + v; } });
+        g('#of-open-calc').onclick = ()=>openCalculator({
+          nishId: g('#of-niche').value,
+          deadline: g('#of-deadline').value ? new Date(g('#of-deadline').value).getTime() : null,
+          onResult: (v, meta={})=>{
+            form.calcSum = v;
+            g('#of-total').value = (+g('#of-total').value||0) + v;
+            form.calcRushFee = Number(meta.rushFee) || 0;
+            if (meta.nishId && g('#of-niche').value !== meta.nishId){
+              g('#of-niche').value = meta.nishId;
+              renderSvcs();
+              paintRecs();
+            }
+            if (meta.deadline){
+              const dl = g('#of-deadline');
+              dl.value = new Date(meta.deadline - new Date(meta.deadline).getTimezoneOffset()*60000).toISOString().slice(0,16);
+              deadlineTouched = true;
+            }
+            paintDeadlineHint();
+          }
+        });
+
+        /* Данные из калькулятора: ниша, свой срок и надбавка за срочность. */
+        if (prefillMeta){
+          if (prefillMeta.nishId && g('#of-niche').value !== prefillMeta.nishId){
+            g('#of-niche').value = prefillMeta.nishId;
+            renderSvcs();
+            paintRecs();
+          }
+          if (prefillMeta.deadline){
+            const dl = g('#of-deadline');
+            dl.value = new Date(prefillMeta.deadline - new Date(prefillMeta.deadline).getTimezoneOffset()*60000).toISOString().slice(0,16);
+            deadlineTouched = true;
+          }
+          form.calcRushFee = Number(prefillMeta.rushFee) || 0;
+          paintDeadlineHint();
+        }
 
         /* автосохранение черновика */
         let dirty = false;
@@ -1952,9 +2046,11 @@ const CRM = (() => {
         }, 5000);
 
         function collect(){
+          const rush = isRushOrder();
           return cleanRecord({
             order_id:sanitizeOrderId(g('#of-id').value), client_id:g('#of-client').value, client_ids:[...selClients], nish_id:g('#of-niche').value, tariff:g('#of-tariff').value,
             status:g('#of-status').value, deadline:g('#of-deadline').value||null, start:g('#of-start').value||null, total:+g('#of-total').value||0, is_test:!!(g('#of-test')||{}).checked,
+            rush: rush.urgent, rush_pct: rush.urgent ? rush.pct : 0, rush_fee: rush.urgent ? (Number(form.calcRushFee)||0) : 0,
             managerFee: Math.max(0, Math.min(100, +g('#of-mgrfee').value || 10)),
             prepay:+g('#of-prepay').value, cert:g('#of-cert').value, need_cert:g('#of-need-cert').checked,
             comment:g('#of-comment').value, project_id:g('#of-project').value, folder_id:g('#of-folder').value,
@@ -2259,6 +2355,7 @@ const CRM = (() => {
       body: `
         <div class="row wrap" style="gap:7px;margin-bottom:14px">
           ${statusChip(o.status)} ${nicheChip(o.nish_id)} ${o.tariff ? tariffChip(o.tariff) : ''}
+          ${rushMark(o)}
           ${o.nda?'<span class="badge c-violet">NDA</span>':''}
           ${o.forbid_download?'<span class="badge c-red">Запрет скачивания</span>':''}
           ${o.certification_amount?'<span class="badge c-blue">Заверение '+fmtMoney(o.certification_amount)+'</span>':''}
@@ -4948,10 +5045,12 @@ updatePeopleBulk();
   }
 
   /* ==================== КАЛЬКУЛЯТОР ==================== */
-  function openCalculator({ onResult=null } = {}){
-    const staffView = isStaff(me().role);
+  function openCalculator({ onResult=null, nishId='', deadline=null } = {}){
+    const firstNiche = (S.niches[0] || {}).id || '';
+    const initNiche = (S.niches || []).some(n => n.id === nishId) ? nishId : firstNiche;
+    const dlValue = deadline ? new Date(new Date(deadline).getTime() - new Date(deadline).getTimezoneOffset()*60000).toISOString().slice(0,16) : '';
     const m = openWinModal({
-      narrow:true, title:'Калькулятор услуг', route:'orders',
+      narrow:true, tall:true, title:'Калькулятор услуг', route:'orders',
       body:`<div class="calc-display"><div class="expr" id="cx-expr">введите выражение с клавиатуры</div><div class="val" id="cx-val">0</div></div>
         <div class="field" style="margin-top:12px"><label>Выражение</label>
           <input class="input mono" id="cx-in" placeholder="например: 2.5 × 1800 + 5600" autocomplete="off" spellcheck="false">
@@ -4960,6 +5059,16 @@ updatePeopleBulk();
         <div class="row" style="margin-top:10px"><span class="small muted" id="cx-live"></span><span class="spacer"></span>
           ${onResult?'<button class="btn btn--primary btn--sm" data-apply>Подставить в заказ</button>':''}</div>
         <div class="calc-history" id="cx-hist" style="margin-top:12px">${S.calcHistory.slice(-6).reverse().map(h=>`<div data-h="${h.result}">${esc(h.expression)} = ${h.result}</div>`).join('')}</div>
+        <div class="card card-pad" style="margin-top:12px;background:var(--panel-2)">
+          <b class="small">Срок и срочность</b>
+          <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
+            <div class="field" style="flex:1;min-width:150px"><label>Специализация</label>
+              <select class="input" id="cx-niche">${(S.niches||[]).map(n=>`<option value="${n.id}" ${n.id===initNiche?'selected':''}>${esc(n.name)}</option>`).join('')}</select></div>
+            <div class="field" style="flex:1;min-width:170px"><label>Свой срок</label>
+              <input class="input" id="cx-deadline" type="datetime-local" value="${dlValue}"></div>
+          </div>
+          <div class="small" id="cx-rush" style="margin-top:8px"></div>
+        </div>
         <div class="small faint" style="margin-top:12px">Отметьте услуги — их стоимость прибавится к результату.</div>
         <div id="cx-svcs" style="margin-top:8px"></div>
         <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
@@ -4974,7 +5083,7 @@ updatePeopleBulk();
           </div>
           <div class="small" id="cx-disc" style="margin-top:8px"></div>
         </div>`,
-      footer:`<button class="btn btn--ghost" data-x>Закрыть</button>${onResult?'<button class="btn btn--primary" data-apply2>Подставить</button>':''}<button class="btn btn--primary" data-create>${icon('plus')} Создать заказ</button>`,
+      footer:`<button class="btn btn--ghost" data-x>Закрыть</button>${onResult?'<button class="btn btn--primary" data-apply2>Подставить</button>':`<button class="btn btn--primary" data-create>${icon('plus')} Создать заказ</button>`}`,
       onMount:(mask, close)=>{
         const g2 = s=>mask.querySelector(s);
         let val = 0;
@@ -4991,9 +5100,9 @@ updatePeopleBulk();
           const raw = g2('#cx-in').value;
           const v = compute(raw);
           val = v;
-          g2('#cx-val').textContent = isNaN(v) ? '—' : fmtMoney(v);
           g2('#cx-live').textContent = isNaN(v) ? (raw ? 'проверьте выражение' : '') : `= ${v}`;
           g2('#cx-expr').textContent = raw;
+          paintTotals();
         };
         g2('#cx-in').addEventListener('input', upd);
         g2('#cx-in').addEventListener('keydown', e=>{
@@ -5002,11 +5111,34 @@ updatePeopleBulk();
             S.calcHistory = S.calcHistory.slice(-20);
             g2('#cx-hist').insertAdjacentHTML('afterbegin', `<div data-h="${val}">${esc(g2('#cx-in').value)} = ${val}</div>`);
             saveState();
-            if (onResult) { onResult(svcSum() + val); toast(`Подставлено: ${fmtMoney(svcSum() + val)}`, 'ok'); }
+            if (onResult){
+              const d = calcDiscount();
+              onResult(d.sum, metaOf(d));
+              toast(`Подставлено: ${fmtMoney(d.sum)}${d.rush ? ` · срочно +${d.rushPct}%` : ''}`, 'ok');
+            }
             g2('#cx-in').value = ''; upd();
           }
         });
-        const svcSum = () => { let s = 0; mask.querySelectorAll('[data-sv]:checked').forEach(i=>s += +i.dataset.sv.split('|')[2]); return s; };
+        /* Услуги и доп. опции: и те и другие прибавляются к базе. */
+        const svcSum = () => {
+          let s = 0;
+          mask.querySelectorAll('[data-sv]:checked,[data-ex]:checked').forEach(i=>{
+            const raw = i.dataset.sv || i.dataset.ex || '';
+            s += +(raw.split('|')[2] || 0);
+          });
+          return s;
+        };
+        /* Свой срок: если он короче обычного срока ниши, заказ считается
+           срочным и к сумме применяется надбавка из настроек. */
+        const deadlineState = () => {
+          const nid = g2('#cx-niche') ? g2('#cx-niche').value : '';
+          const raw = g2('#cx-deadline') ? g2('#cx-deadline').value : '';
+          const dl = raw ? new Date(raw).getTime() : null;
+          const rec = nid ? recommendDeadline({ nishId:nid }) : null;
+          const urgent = !!(dl && rec && dl < Date.now() + rec.days*DAY);
+          const pct = urgent ? rushPctFor(nid) : 0;
+          return { nid, dl, rec, urgent, pct };
+        };
         /* Скидки считаются из настроек: список промокодов не захардкожен.
            «За объём» срабатывает сам по часам, разовый — по коду. Берём
            максимальную подходящую скидку, а не сумму скидок. */
@@ -5025,7 +5157,18 @@ updatePeopleBulk();
           }
           const pct = best ? Math.min(90, Math.max(0, +best.percent || 0)) : 0;
           const known = !code || !!promoList().find(x => String(x.code).toUpperCase() === code);
-          return { base, pct, sum: Math.round(base * (1 - pct / 100)), best, code, hours, known };
+          const dl = deadlineState();
+          const discounted = Math.round(base * (1 - pct / 100));
+          const rushFee = dl.urgent ? Math.round(discounted * dl.pct / 100) : 0;
+          return { base, pct, discounted, rushFee, sum: discounted + rushFee, rush: dl.urgent,
+            rushPct: dl.pct, deadline: dl.dl, nid: dl.nid, best, code, hours, known };
+        };
+        const metaOf = d => ({ deadline:d.deadline, rush:d.rush, rushPct:d.rushPct, rushFee:d.rushFee, nishId:d.nid });
+        const paintTotals = () => {
+          const d = calcDiscount();
+          const empty = (val == null || isNaN(val)) && !svcSum() && !d.deadline;
+          g2('#cx-val').textContent = empty ? (g2('#cx-in').value ? '—' : '0') : fmtMoney(d.sum);
+          return d;
         };
         const paintDiscount = () => {
           const d = calcDiscount();
@@ -5036,18 +5179,58 @@ updatePeopleBulk();
             box.innerHTML = `<span style="color:var(--red)">Код ${esc(d.code)} не найден или не действует</span>`;
             return;
           }
-          if (!d.pct){ box.innerHTML = `<span class="faint">Скидок нет · к оплате ${money}</span>`; return; }
-          box.innerHTML = `Скидка ${d.pct}%${d.best && d.best.kind === 'volume' ? ' за объём' : ''} · <s class="faint">${money}</s> <b>${fmtMoney(d.sum)}</b>`;
+          const parts = [];
+          if (d.pct) parts.push(`Скидка ${d.pct}%${d.best && d.best.kind === 'volume' ? ' за объём' : ''} · <s class="faint">${money}</s> <b>${fmtMoney(d.discounted)}</b>`);
+          if (d.rush) parts.push(`<span class="badge c-orange">Срочно</span> +${d.rushPct}% · <b>${fmtMoney(d.rushFee)}</b>`);
+          box.innerHTML = parts.length
+            ? parts.join('<br>') + `<br>К оплате <b>${fmtMoney(d.sum)}</b>`
+            : `<span class="faint">Скидок и надбавок нет · к оплате ${money}</span>`;
         };
-        g2('#cx-hours').addEventListener('input', paintDiscount);
-        g2('#cx-promo').addEventListener('input', paintDiscount);
+        const paintRush = () => {
+          const box = g2('#cx-rush');
+          if (!box) return;
+          const d = deadlineState();
+          if (!d.dl){
+            box.innerHTML = `<span class="faint">Срок не указан — пометка «Срочно» не ставится.${d.rec ? ` Обычный срок по нише: ${d.rec.days} ${daysWord(d.rec.days)}.` : ''}</span>`;
+            return;
+          }
+          if (!d.rec){ box.innerHTML = '<span class="faint">Выберите специализацию</span>'; return; }
+          const left = Math.max(0, Math.ceil((d.dl - Date.now())/DAY));
+          if (d.urgent){
+            const early = Math.max(0, d.rec.days - left);
+            box.innerHTML = `<span class="badge c-orange">Срочно</span> <span class="small">срок на ${early} ${daysWord(early)} короче обычного · надбавка ${d.pct}%</span>`;
+          } else {
+            box.innerHTML = `<span class="badge c-green">Обычный срок</span> <span class="small">${left} ${daysWord(left)} — не короче стандарта (${d.rec.days} ${daysWord(d.rec.days)})</span>`;
+          }
+        };
+        g2('#cx-hours').addEventListener('input', ()=>{ paintDiscount(); upd(); });
+        g2('#cx-promo').addEventListener('input', ()=>{ paintDiscount(); upd(); });
         const paintSvcs = ()=>{
-          g2('#cx-svcs').innerHTML = S.niches.map(n=>`
-            <div class="small"><b style="margin-bottom:4px;display:block">${esc(n.name)}</b>
-            ${(S.calcServices[n.id]||[]).map(s=>`<label class="svc-row check"><input type="checkbox" data-sv="${n.id}|${esc(s.name)}|${s.price}"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(s.name)} <span class="faint">${esc(s.unit||'')}</span></span><b>${fmtMoney(s.price)}</b></label>`).join('')}</div>`).join('');
+          g2('#cx-svcs').innerHTML = S.niches.map(n=>{
+            const svcs = S.calcServices[n.id] || [];
+            const extras = calcExtrasFor(n.id);
+            return `<div class="small"><b style="margin-bottom:4px;display:block">${esc(n.name)}</b>
+              ${svcs.map(s=>`<label class="svc-row check"><input type="checkbox" data-sv="${n.id}|${esc(s.name)}|${s.price}"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(s.name)} <span class="faint">${esc(s.unit||'')}</span></span><b>${fmtMoney(s.price)}</b></label>`).join('')}
+              ${extras.length ? `<div class="tiny faint" style="margin:6px 0 2px">Доп. опции</div>${extras.map(e=>`<label class="svc-row check"><input type="checkbox" data-ex="${n.id}|${esc(e.id)}|${e.price}"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(e.name)} <span class="faint">${esc(e.unit||'')}</span></span><b>${fmtMoney(e.price)}</b></label>`).join('')}` : ''}
+            </div>`;
+          }).join('');
         };
         paintSvcs();
-        g2('#cx-svcs').addEventListener('change', ()=>{ if (!isNaN(val)) g2('#cx-val').textContent = fmtMoney(val + svcSum()); paintDiscount(); });
+        paintRush();
+        paintDiscount();
+        upd();
+        g2('#cx-niche').addEventListener('change', ()=>{ paintRush(); paintDiscount(); upd(); });
+        g2('#cx-deadline').addEventListener('input', ()=>{ paintRush(); paintDiscount(); upd(); });
+        g2('#cx-svcs').addEventListener('change', e=>{
+          const inp = e.target.closest('[data-sv],[data-ex]');
+          if (inp && inp.checked){
+            const nid = (inp.dataset.sv || inp.dataset.ex || '').split('|')[0];
+            const sel = g2('#cx-niche');
+            if (sel && nid && sel.value !== nid){ sel.value = nid; paintRush(); }
+          }
+          paintDiscount();
+          upd();
+        });
         /* Услуги правятся в настройках, но выгрузить и догрузить их можно прямо здесь */
         const svcExportBtn = mask.querySelector('[data-cx-export]');
         if (svcExportBtn) svcExportBtn.onclick = ()=>{ if (window.CalcServices) window.CalcServices.exportServices('xlsx'); };
@@ -5057,8 +5240,9 @@ updatePeopleBulk();
           const r = await window.CalcServices.importServices();
           if (r && r.changed){
             paintSvcs();
-            g2('#cx-val').textContent = fmtMoney((isNaN(val) ? 0 : val) + svcSum());
+            paintRush();
             paintDiscount();
+            upd();
           }
         };
         g2('#cx-hist').querySelectorAll('[data-h]').forEach(h=>h.onclick = ()=>{ g2('#cx-in').value = h.dataset.h; upd(); });
@@ -5071,8 +5255,8 @@ updatePeopleBulk();
             const p = (S.settings.promos || []).find(x => x.id === d.best.id);
             if (p){ p.used_at = Date.now(); p.active = false; saveState(); logAudit(`Промокод ${p.code} применён (${p.percent}%)`, 'Калькулятор'); }
           }
-          onResult && onResult(d.sum);
-          toast(`Подставлено: ${fmtMoney(d.sum)}${d.pct ? ` (скидка ${d.pct}%)` : ''}`, 'ok');
+          onResult && onResult(d.sum, metaOf(d));
+          toast(`Подставлено: ${fmtMoney(d.sum)}${d.pct ? ` (скидка ${d.pct}%)` : ''}${d.rush ? ` · срочно +${d.rushPct}%` : ''}`, 'ok');
           close();
         };
         /* Кнопка «Подставить» есть и в теле, и в футере — обе должны работать. */
@@ -5080,9 +5264,9 @@ updatePeopleBulk();
         /* Создать заказ из калькулятора: результат → сумма нового заказа */
         const cr = mask.querySelector('[data-create]');
         if (cr) cr.onclick = ()=>{
-          let sum = val + svcSum();
+          const d = calcDiscount();
           close();
-          openOrderForm(null, sum || 0);
+          openOrderForm(null, d.sum || 0, metaOf(d));
         };
       }
     });

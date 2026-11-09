@@ -214,15 +214,16 @@ const APP = (() => {
     const u = user();
     return !!u && u.role !== 'client';
   }
+  /* У каждого профиля — только его личный баланс. Платформенный итог
+     (сумма всех балансов) показываем отдельно в панели баланса, иначе
+     в демо админ, топ-менеджер и менеджер видели одну и ту же цифру. */
   function myBalance(){
     const u = user();
     if (!u) return 0;
-    if (isStaff(u.role)) return platformBalance();
     return window.Finance ? Finance.balanceOf(u.id) : Math.round(Number(u.ext && u.ext.earned) || 0);
   }
   function balanceCaption(){
-    const u = user();
-    return u && isStaff(u.role) ? 'Баланс платформы' : 'Мой баланс';
+    return 'Мой баланс';
   }
   /* Обновляем плашки без полного рендера оболочки: штраф или выплата
      должны менять цифру сразу. */
@@ -333,6 +334,7 @@ const APP = (() => {
       window.__pTarget = 0;  /* целевое растворение 0..1 (0 = полностью видно) */
       window.__pOff = 0;     /* текущее плавное значение */
       window.__pRaf = 0;
+      window.__pillsReleaseRaf = 0;
       window.__pillsFrozen = false;
       window.__pMaxScroll = 0; /* самая глубокая позиция, с которой начался подъём */
       window.__pTurnAcc = 0;  /* накопленный прогресс проявления при подъёме (0..1) */
@@ -385,13 +387,20 @@ const APP = (() => {
         if (Math.abs(window.__pTarget - window.__pOff) > 0.005) window.__pRaf = requestAnimationFrame(pillTick);
         else {
           pillLastT = 0;
-          document.body.classList.remove('pills-anim');
+          /* Даём кадру отрисоваться с opacity:1 и blur:0, и только следующим
+             кадром отпускаем transition. Иначе браузер успевает показать
+             полный blur одним кадром — фон плашки «щёлкает». */
+          window.__pillsReleaseRaf = requestAnimationFrame(()=>{
+            window.__pillsReleaseRaf = 0;
+            if (Math.abs(window.__pTarget - window.__pOff) <= 0.005) document.body.classList.remove('pills-anim');
+          });
         }
       };
       const paint = t => {
         window.__pTarget = Math.min(1, Math.max(0, t));
         /* Промоушен слоя нужен только на время движения: статичный
            will-change на контейнере гасил фирменное размытие плашек. */
+        if (window.__pillsReleaseRaf){ cancelAnimationFrame(window.__pillsReleaseRaf); window.__pillsReleaseRaf = 0; }
         if (window.__pTarget !== window.__pOff) document.body.classList.add('pills-anim');
         if (!window.__pRaf) window.__pRaf = requestAnimationFrame(pillTick);
       };
@@ -1185,8 +1194,8 @@ const QUICK_BY_ROLE = {
     }
     ops.sort((a,b)=>b.t-a.t);
     const top = ops.slice(0, 20);
-    const total = staff ? platformBalance() : (window.Finance ? Finance.balanceOf(u.id) : Math.round(Number(u.ext && u.ext.earned) || 0));
-    const totalLabel = staff ? 'Баланс платформы' : 'Мой баланс';
+    const total = window.Finance ? Finance.balanceOf(u.id) : Math.round(Number(u.ext && u.ext.earned) || 0);
+    const totalLabel = 'Мой баланс';
     /* Плашка-панель (как уведомления): открывается под балансом,
        закрывается по клику мимо или по Esc. */
     const oldPanel = document.querySelector('.bal-panel');
@@ -1194,13 +1203,14 @@ const QUICK_BY_ROLE = {
     const panel = document.createElement('div');
     panel.className = 'bal-panel';
     panel.innerHTML = `
-      <div class="bal-head">${icon('card')} ${staff ? 'История баланса' : 'Моя история баланса'} <span class="spacer"></span>
+      <div class="bal-head">${icon('card')} ${staff ? 'Мой баланс и операции платформы' : 'Моя история баланса'} <span class="spacer"></span>
         <button class="iconbtn bal-close" aria-label="Закрыть">${icon('x','ico-sm')}</button></div>
       <div class="bal-list">${top.length
         ? top.map(op => `<div class="bal-item ${op.kind}"><span class="bal-ico">${icon(op.kind==='out'?'minus':'plus','ico-sm')}</span>
             <span class="bal-main"><span class="t">${esc(op.text)}</span><span class="d">${esc(op.user||'')}${op.user?' · ':''}${fmtDT(op.t)}</span></span></div>`).join('')
         : `<div class="empty">${icon('card')}<span>Операций пока нет</span></div>`}</div>
-      <div class="bal-foot"><span>${totalLabel}</span><b>${fmtMoney(total)}</b></div>`;
+      <div class="bal-foot"><span>${totalLabel}</span><b>${fmtMoney(total)}</b></div>
+      ${staff ? `<div class="bal-foot bal-foot--sub"><span>Баланс платформы</span><b>${fmtMoney(platformBalance())}</b></div>` : ''}`;
     document.body.appendChild(panel);
     /* Позиция задаётся в CSS — та же, что у панели уведомлений
        (top от --head-h, right 14px), чтобы плашки стояли ровно друг под другом. */
@@ -2426,7 +2436,9 @@ ex.innerHTML = avatarHTML(user(), '');
   function revData(rows, total, from, to){
     const u = user();
     const days = Math.max(1, Math.round((revDayStart(to - 1) - revDayStart(from)) / DAY) + 1);
-    const allDone = ordersFor(u).filter(o => o.status === 'done');
+    /* Оборот системы — все завершённые заказы, включая архив: архивный
+       заказ уже был выполнен и оплачен, исключать его из общего итога нельзя. */
+    const allDone = ordersFor(u).filter(o => ['done','archived'].includes(o.status));
     const allTotal = allDone.reduce((a,o) => a + (Number(o.total) || 0), 0);
     const top = rows.reduce((a,x) => (!a || (Number(x.o.total)||0) > (Number(a.o.total)||0)) ? x : a, null);
     const list = rows.map(x => {
@@ -2475,6 +2487,7 @@ ex.innerHTML = avatarHTML(user(), '');
       dayMap.set(d, cur);
     });
     const byDay = [...dayMap.values()].sort((a,b) => a.date.localeCompare(b.date));
+    const sumBy = key => list.reduce((a,r) => a + (Number(r[key]) || 0), 0);
     return {
       meta: {
         generated_at: new Date().toISOString(),
@@ -2488,7 +2501,11 @@ ex.innerHTML = avatarHTML(user(), '');
         orders: rows.length,
         avg: rows.length ? Math.round(total / rows.length) : 0,
         top: top ? (Number(top.o.total) || 0) : 0,
-        share_of_all: allTotal ? total / allTotal * 100 : 0
+        share_of_all: allTotal ? total / allTotal * 100 : 0,
+        admin: sumBy('admin'),
+        manager: sumBy('manager_fee'),
+        left: sumBy('left'),
+        system: allTotal
       },
       rows: list,
       byExecutor,
@@ -2539,6 +2556,10 @@ ex.innerHTML = avatarHTML(user(), '');
       ['Период', data.meta.period.label],
       ['Дней', data.meta.period.days],
       ['Выручка', data.totals.revenue],
+      ['Админам', data.totals.admin],
+      ['Менеджерам', data.totals.manager],
+      ['Свободный остаток', data.totals.left],
+      ['Общий оборот системы', data.totals.system],
       ['Заказов', data.totals.orders],
       ['Средний чек', data.totals.avg],
       ['Крупнейший заказ', data.totals.top],
@@ -2579,7 +2600,6 @@ ex.innerHTML = avatarHTML(user(), '');
     const from = revRange.from, to = revRange.to;
     const rows = base.filter(x => x.at >= from && x.at < to).sort((a,b) => b.at - a.at);
     const total = rows.reduce((a,x) => a + (x.o.total || 0), 0);
-    const allTotal = base.reduce((a,x) => a + (x.o.total || 0), 0);
     const avg = rows.length ? total / rows.length : 0;
     const top = rows.reduce((a,x) => (!a || (x.o.total||0) > (a.o.total||0)) ? x : a, null);
     const days = Math.max(1, Math.round((revDayStart(to - 1) - revDayStart(from)) / DAY) + 1);
@@ -2608,11 +2628,15 @@ ex.innerHTML = avatarHTML(user(), '');
       </div>
       <div class="rev-period small muted">${fmtDate(from)} — ${fmtDate(to - DAY)} · ${days} ${dayPlural(days)} · только выполненные заказы</div>
       <div class="rev-cards">
-        <div class="rev-card"><span class="small muted">Выручка</span><b>${fmtMoney(total)}</b></div>
+        <div class="rev-card"><span class="small muted">Выручка за период</span><b>${fmtMoney(total)}</b></div>
+        <div class="rev-card"><span class="small muted">Админам</span><b>${fmtMoney(data.totals.admin)}</b></div>
+        <div class="rev-card"><span class="small muted">Менеджерам</span><b>${fmtMoney(data.totals.manager)}</b></div>
+        <div class="rev-card" title="Все выполненные и архивные заказы за всё время"><span class="small muted">Общий оборот системы</span><b>${fmtMoney(data.totals.system)}</b></div>
+        <div class="rev-card" title="Сумма заказов минус доли исполнителей, админа и менеджера. Остаётся в резерве и никому не начисляется."><span class="small muted">Свободный остаток</span><b class="${data.totals.left<0?'neg':''}">${fmtMoney(data.totals.left)}</b></div>
         <div class="rev-card"><span class="small muted">Заказов</span><b>${rows.length}</b></div>
         <div class="rev-card"><span class="small muted">Средний чек</span><b>${rows.length ? fmtMoney(Math.round(avg)) : '—'}</b></div>
         <div class="rev-card"><span class="small muted">Крупнейший заказ</span><b>${top ? fmtMoney(top.o.total || 0) : '—'}</b></div>
-        <div class="rev-card"><span class="small muted">Доля от всей выручки</span><b>${allTotal ? (total/allTotal*100).toFixed(1).replace('.', ',') + '%' : '—'}</b></div>
+        <div class="rev-card"><span class="small muted">Доля периода в обороте</span><b>${data.totals.system ? (total/data.totals.system*100).toFixed(1).replace('.', ',') + '%' : '—'}</b></div>
       </div>
       ${rows.length ? `<div class="rev-charts">
         <div class="rev-chart-block">
@@ -2620,7 +2644,7 @@ ex.innerHTML = avatarHTML(user(), '');
           ${chartBars(series.items, { height:150, labelEvery, aria:'Выручка по дням' })}
         </div>
         <div class="rev-chart-block">
-          <div class="row row--between rev-chart-head"><b class="small">По менеджерам</b><span class="small faint">${fmtMoney(total)}</span></div>
+          <div class="row row--between rev-chart-head"><b class="small">Выручка по менеджерам</b><span class="small faint">${fmtMoney(total)}</span></div>
           <div class="rev-bars">${mgrBars}</div>
         </div>
       </div>` : ''}
@@ -7491,6 +7515,10 @@ const cm = root.querySelector('.chat-main');
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(url), 4000);
   }
+  /* Скачивание JSON-пакетов миграции и бекапов. */
+  function migDownload(name, obj){
+    calcSvcDownload(name, JSON.stringify(obj, null, 2), 'application/json');
+  }
   function exportCalcServices(kind){
     const k = kind === 'csv' || kind === 'json' ? kind : 'xlsx';
     const stamp = new Date().toISOString().slice(0,10);
@@ -7656,6 +7684,16 @@ const cm = root.querySelector('.chat-main');
       <td><input class="input" data-f="unit" value="${esc(s.unit||'')}" style="padding:6px 10px"></td>
       <td><input class="input" data-f="margin" type="number" min="0" max="90" value="${s.margin||0}" style="padding:6px 10px;width:76px"></td>
       <td style="width:40px"><button class="iconbtn" data-del="${s.id}" title="Удалить услугу">${icon('trash')}</button></td>
+    </tr>`).join('');
+  }
+  function calcExtraRowsHTML(nid){
+    const list = (((S.calcSettings || {}).extras || {})[nid]) || [];
+    return list.map(e => `<tr data-eid="${e.id}">
+      <td><input class="input" data-ef="name" value="${esc(e.name||'')}" style="padding:6px 10px"></td>
+      <td><input class="input" data-ef="price" type="number" min="0" value="${Number(e.price)||0}" style="padding:6px 10px;width:100px"></td>
+      <td><input class="input" data-ef="unit" value="${esc(e.unit||'')}" placeholder="за час / за документ" style="padding:6px 10px"></td>
+      <td><label class="check"><input type="checkbox" data-ef="active" ${e.active!==false?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span></label></td>
+      <td style="width:40px"><button class="iconbtn" data-extra-del="${e.id}" title="Удалить опцию">${icon('trash','ico-sm')}</button></td>
     </tr>`).join('');
   }
   /* Калькулятор в CRM живёт отдельным файлом — отдаём ему те же функции */
@@ -7881,6 +7919,17 @@ const cm = root.querySelector('.chat-main');
             <thead><tr><th>Услуга</th><th>Цена, ₽</th><th>Единица</th><th>Маржа, %<input class="input" data-margin-all="${n.id}" type="number" min="0" max="90" placeholder="все" style="width:58px;padding:3px 6px;font-size:11px;margin-left:6px" title="Выставить маржу всем услугам группы"></th><th></th></tr></thead>
             <tbody data-niche="${n.id}">${rows(n.id)}</tbody>
           </table></div>
+          <div class="row" style="gap:10px;margin-top:10px;flex-wrap:wrap;align-items:flex-end">
+            <div class="field" style="max-width:210px"><label>Надбавка за срочность, %</label>
+              <input class="input" data-rush-pct="${n.id}" type="number" min="0" max="200" step="1" value="${rushPctFor(n.id)}"></div>
+            <span class="small faint" style="margin-bottom:8px">По умолчанию 10%. Применяется, если срок короче обычного.</span>
+          </div>
+          <div class="row row--between" style="margin-top:12px"><span class="small muted">Доп. опции</span>
+            <button class="btn btn--ghost btn--sm" data-add-extra="${n.id}" type="button">${icon('plus')} Опция</button></div>
+          <div class="tbl-wrap" style="margin-top:6px;border:0"><table class="tbl" style="min-width:0">
+            <thead><tr><th>Опция</th><th>Цена, ₽</th><th>Единица</th><th>Вкл.</th><th></th></tr></thead>
+            <tbody data-extra="${n.id}">${calcExtraRowsHTML(n.id)}</tbody>
+          </table></div>
         </div>`).join('')}
         <button class="btn btn--primary" id="calc-save" style="margin-top:14px">${icon('check-c')} Сохранить услуги</button>
       </div>
@@ -7974,6 +8023,7 @@ const cm = root.querySelector('.chat-main');
               <b>${esc(t.text)}</b>
             </span>
             <span style="display:flex;gap:6px;align-items:center">
+              <button class="iconbtn" data-td-edit="${t.id}" title="Редактировать">${icon('edit','ico-sm')}</button>
               ${t.done?'':`<button class="btn btn--ghost btn--sm" data-td-done="${t.id}">Готово</button>`}
               <button class="iconbtn" data-td-del="${t.id}" title="Удалить">${icon('trash','ico-sm')}</button>
             </span>
@@ -8361,14 +8411,153 @@ const cm = root.querySelector('.chat-main');
       el.querySelector('#tc-on').onchange = saveM;
       el.querySelector('#tc-save').onclick = saveM;
     }
+    const TEAM_KIND = { client:'Клиенты', executor:'Исполнители', mixed:'Смешанная', partner:'Партнёры' };
+    const membersWord = n => n===1 ? 'участник' : (n>=2 && n<=4 ? 'участника' : 'участников');
+    function teamRowsHTML(){
+      const teams = S.teams || [];
+      if (!teams.length) return '<p class="small faint">Команд пока нет. Создайте первую — это задел под общие аккаунты.</p>';
+      return teams.map(t=>{
+        const n = (t.member_ids || []).length;
+        const owner = t.owner_id ? ((userById(t.owner_id) || {}).full_name || '') : '';
+        return `<div class="session-row" style="gap:8px;flex-wrap:wrap">
+          <span class="badge c-blue">${esc(TEAM_KIND[t.kind] || t.kind || 'Команда')}</span>
+          <span style="flex:1;min-width:150px"><b class="small">${esc(t.name)}</b>
+            <div class="cell-sub">${n} ${membersWord(n)}${owner ? ` · владелец: ${esc(owner)}` : ''}</div></span>
+          <button class="btn btn--ghost btn--sm" type="button" data-team-edit="${t.id}">Изменить</button>
+          <button class="iconbtn" type="button" data-team-del="${t.id}" title="Удалить команду">${icon('trash','ico-sm')}</button>
+        </div>`;
+      }).join('');
+    }
+    function backupRowsHTML(){
+      if (!S.backups.length) return '<p class="small faint">Бекапов пока нет</p>';
+      return S.backups.map(b=>{
+        const has = !!(window.Migrate && Migrate.readBackup(b.id));
+        const summary = b.summary ? ` · ${b.summary.users} проф. / ${b.summary.orders} зак.` : '';
+        const size = b.size ? ` · ${Math.round(b.size/1024)} КБ` : '';
+        return `<div class="session-row" style="gap:8px;flex-wrap:wrap">${icon('db')}
+          <span style="flex:1;min-width:170px"><b class="small">${esc(b.name)}</b>
+            <div class="cell-sub">${b.type==='auto'?'автоматический':'ручной'} · ${fmtDT(b.t)} · схема ${b.schema||1}${size}${summary}</div></span>
+          <span class="badge ${has?'c-green':'c-gray'}">${has?'целостность ок':'только метаданные'}</span>
+          ${has?`<button class="btn btn--ghost btn--sm" type="button" data-bk-dl="${b.id}">Скачать</button><button class="btn btn--soft btn--sm" type="button" data-bk-restore="${b.id}">Восстановить</button>`:''}
+        </div>`;
+      }).join('');
+    }
+    function openTeamForm(team){
+      const isNew = !team;
+      const t = team || { id:'team' + uid(), name:'', kind:'client', owner_id:'', member_ids:[], status:'active', created_at:Date.now() };
+      const kind = t.kind || 'client';
+      const pool = S.users.filter(u => {
+        if (kind === 'client') return u.role === 'client';
+        if (kind === 'executor') return u.role === 'executor';
+        if (kind === 'partner') return u.role !== 'admin';
+        return true;
+      });
+      openWinModal({ narrow:true, title: isNew ? 'Новая команда (Team)' : 'Команда: ' + t.name, route:'settings',
+        body:`<div class="stack" style="gap:12px">
+          <div class="field"><label>Название *</label><input class="input" id="tm-name" value="${esc(t.name)}" placeholder="Например: VoiceLab — команда"></div>
+          <div class="field"><label>Тип команды</label><select class="input" id="tm-kind">
+            ${Object.entries(TEAM_KIND).map(([k,l])=>`<option value="${k}" ${kind===k?'selected':''}>${l}</option>`).join('')}
+          </select></div>
+          <div class="field"><label>Владелец</label><select class="input" id="tm-owner">
+            <option value="">— не назначен —</option>
+            ${pool.map(u=>`<option value="${u.id}" ${t.owner_id===u.id?'selected':''}>${esc(u.full_name)}</option>`).join('')}
+          </select></div>
+          <div class="field"><label>Участники</label>
+            <div class="small faint" style="margin-bottom:6px">Отметьте аккаунты, чтобы привязать к команде; снимите галочку — отвязать.</div>
+            <div class="stack" style="gap:6px;max-height:240px;overflow:auto" id="tm-members">
+              ${pool.map(u=>`<label class="check small" style="gap:8px"><input type="checkbox" value="${u.id}" ${(t.member_ids||[]).includes(u.id)?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span><span>${esc(u.full_name)} <span class="faint">${esc(ROLE_LABEL[u.role]||u.role)}</span></span></label>`).join('') || '<span class="small faint">Нет подходящих профилей</span>'}
+            </div></div>
+          <p class="small faint">В финальной версии команда сможет выступать заказчиком или исполнителем, иметь общий баланс и роли участников.</p>
+        </div>`,
+        footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-tm-save>${isNew?'Создать':'Сохранить'}</button>`,
+        onMount:(m2, close)=>{
+          m2.querySelector('[data-x]').onclick = close;
+          m2.querySelector('[data-tm-save]').onclick = ()=>{
+            const name = m2.querySelector('#tm-name').value.trim();
+            if (!name){ toast('Введите название команды','warn'); return; }
+            const next = {
+              ...t,
+              name,
+              kind: m2.querySelector('#tm-kind').value,
+              owner_id: m2.querySelector('#tm-owner').value || null,
+              member_ids: [...m2.querySelectorAll('#tm-members input:checked')].map(i=>i.value),
+              status: t.status || 'active',
+              created_at: t.created_at || Date.now()
+            };
+            S.teams = S.teams || [];
+            const i = S.teams.findIndex(x=>x.id===t.id);
+            if (i >= 0) S.teams[i] = next; else S.teams.push(next);
+            logAudit((isNew?'Создана команда: ':'Команда обновлена: ') + name, 'Команды');
+            saveState(); close(); renderSec(); toast(isNew?'Команда создана':'Команда сохранена','ok');
+          };
+        }
+      });
+    }
+    function applyMigPayload(payload, mode, doBackup){
+      if (doBackup){
+        const bk = Migrate.createBackup('auto', 'before-import-' + new Date().toISOString().slice(0,16).replace(/[T:]/g,'-') + '.json');
+        if (bk && bk.error){ toast(bk.error, 'err'); return false; }
+      }
+      if (mode === 'merge') Migrate.merge(payload); else Migrate.replace(payload);
+      saveState();
+      logAudit('Импорт пакета миграции: ' + (mode === 'merge' ? 'дополнение профилей' : 'замена данных'), 'Миграция');
+      toast('Импорт завершён — перезагружаем приложение', 'ok');
+      setTimeout(()=>location.reload(), 650);
+      return true;
+    }
+    function openMigPreview(pack, fileName){
+      const v = Migrate.validate(pack);
+      if (!v.ok){ toast(v.errors[0] || 'Пакет повреждён', 'err'); return; }
+      const diff = Migrate.diff(v.payload);
+      const meta = v.meta || {};
+      openWinModal({ narrow:true, title:'Импорт пакета миграции', route:'settings',
+        body:`<div class="stack" style="gap:10px">
+          <div class="small">Файл: <b>${esc(fileName)}</b><br>Схема: <b>${v.schema}</b>${meta.build ? ` · сборка ${meta.build}` : ''} · ${v.scope === 'profiles' ? 'профили и настройки' : 'полный пакет'}</div>
+          <div class="small">В пакете: профилей <b>${(v.payload.users||[]).length}</b>, заказов <b>${(v.payload.orders||[]).length || 0}</b>, команд <b>${(v.payload.teams||[]).length}</b>.</div>
+          <div class="small">Профили: новых <b>${diff.add.length}</b>, обновлений <b>${diff.update.length}</b>.</div>
+          ${v.warnings.length ? `<div class="small" style="color:var(--yellow)">${v.warnings.map(w=>esc(w)).join('<br>')}</div>` : ''}
+          <div class="field"><label>Режим</label><select class="input" id="mig-mode">
+            <option value="replace">Заменить всё (полный перенос)</option>
+            <option value="merge" ${v.scope === 'profiles' ? 'selected' : ''}>Дополнить профили и настройки</option>
+          </select></div>
+          <label class="check small"><input type="checkbox" id="mig-backup" checked><span class="box"><svg><use href="#i-check-c"/></svg></span><span>Создать бекап перед импортом</span></label>
+        </div>`,
+        footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-mig-go>Импортировать</button>`,
+        onMount:(m2, close)=>{
+          m2.querySelector('[data-x]').onclick = close;
+          m2.querySelector('[data-mig-go]').onclick = ()=>{
+            const mode = m2.querySelector('#mig-mode').value;
+            const doBackup = m2.querySelector('#mig-backup').checked;
+            close();
+            applyMigPayload(v.payload, mode, doBackup);
+          };
+        }
+      });
+    }
     function dataHTML(){
       return `<div class="card card-pad"><h3 style="margin-bottom:6px">Бекапы</h3>
-        <p class="small muted" style="margin-bottom:10px">Автоматические ежедневные и ручные копии. Бекапы невозможно удалить никому.</p>
+        <p class="small muted" style="margin-bottom:10px">Снимки состояния с версией схемы. Бекапы невозможно удалить никому; перед импортом и сбросом создаётся автоматический.</p>
         <button class="btn btn--primary btn--sm" id="dt-backup">${icon('db')} Создать бекап</button>
-        <div class="stack" style="margin-top:12px">
-          ${S.backups.map(b=>`<div class="session-row">${icon('db')}<span style="flex:1"><b class="small">${esc(b.name)}</b><div class="cell-sub">${b.type==='auto'?'автоматический':'ручной'} · ${fmtDT(b.t)}</div></span><span class="badge c-green">целостность ок</span></div>`).join('')||'<p class="small faint">Бекапов пока нет</p>'}
-        </div></div>
-      <div class="card card-pad" style="border-color:var(--red)"><h3 style="margin-bottom:6px;color:var(--red)">Сброс демо-данных</h3>
+        <div class="stack" style="margin-top:12px">${backupRowsHTML()}</div></div>
+      <div class="card card-pad" style="margin-top:14px"><h3 style="margin-bottom:6px">Миграция данных</h3>
+        <p class="small muted" style="margin-bottom:10px">Перенос всех настроек и профилей в другую версию приложения. Пакет содержит версию схемы, проверяется при импорте и автоматически обновляется до текущей.</p>
+        <div class="small faint" style="margin-bottom:10px">Схема v${window.Migrate ? Migrate.schemaVersion : 2} · сборка ${(S.product||{}).build || '—'} · профилей ${(S.users||[]).length} · заказов ${(S.orders||[]).length}</div>
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          <button class="btn btn--primary btn--sm" id="mig-export-full" type="button">${icon('export')} Полный пакет</button>
+          <button class="btn btn--soft btn--sm" id="mig-export-profiles" type="button">${icon('export')} Профили и настройки</button>
+          <button class="btn btn--ghost btn--sm" id="mig-import" type="button">${icon('import')} Импорт пакета</button>
+        </div>
+        <input type="file" id="mig-file" accept=".json,application/json" hidden>
+        <div class="small" id="mig-status" style="margin-top:8px"></div>
+      </div>
+      <div class="card card-pad" style="margin-top:14px">
+        <h3 style="margin-bottom:6px">Командные аккаунты (Team)</h3>
+        <p class="small muted" style="margin-bottom:10px">Группы клиентов, исполнителей и партнёров. Задел: общий доступ, баланс и заказы от имени команды.</p>
+        <button class="btn btn--primary btn--sm" id="team-add" type="button">${icon('plus')} Создать команду</button>
+        <div class="stack" style="margin-top:10px">${teamRowsHTML()}</div>
+      </div>
+      <div class="card card-pad" style="border-color:var(--red)">
+        <h3 style="margin-bottom:6px;color:var(--red)">Сброс демо-данных</h3>
         <p class="small muted">Перед сбросом автоматически создаётся полный бекап. Все данные вернутся к исходному состоянию.</p>
         <button class="btn btn--danger btn--sm" id="dt-reset" style="margin-top:12px">${icon('trash')} Сбросить данные</button></div>
       <div class="card card-pad" style="margin-top:14px"><h3 style="margin-bottom:6px">Меню</h3>
@@ -8421,10 +8610,22 @@ const cm = root.querySelector('.chat-main');
             list.push({ id: tr.dataset.sid, name, price: +g('price')||0, unit: g('unit'), margin: Math.min(90, Math.max(0, +g('margin')||0)) });
           });
           S.calcServices[nid] = list;
+          const extras = [];
+          const etb = el.querySelector(`tbody[data-extra="${nid}"]`);
+          if (etb) etb.querySelectorAll('tr[data-eid]').forEach(tr=>{
+            const gf = f => tr.querySelector(`[data-ef="${f}"]`);
+            const name = gf('name').value.trim();
+            if (!name) return;
+            extras.push({ id: tr.dataset.eid, name, price: Math.max(0, +gf('price').value || 0), unit: gf('unit').value.trim(), active: !!gf('active').checked });
+          });
+          S.calcSettings = S.calcSettings || { rushPct:{}, extras:{} };
+          S.calcSettings.extras[nid] = extras;
+          const rp = el.querySelector(`[data-rush-pct="${nid}"]`);
+          S.calcSettings.rushPct[nid] = Math.max(0, Math.min(200, +((rp || {}).value) || 0));
         });
         logAudit('Услуги калькулятора обновлены', 'Настройки');
         saveState();
-        toast('Услуги калькулятора сохранены', 'ok');
+        toast('Услуги и настройки срочности сохранены', 'ok');
       };
       const addRow = nid => {
         const tb = el.querySelector(`tbody[data-niche="${nid}"]`);
@@ -8440,7 +8641,26 @@ const cm = root.querySelector('.chat-main');
           <td style="width:40px"><button class="iconbtn" data-del="${id}" title="Удалить">${icon('trash')}</button></td>`;
         tb.appendChild(tr);
       };
+      const addExtraRow = nid => {
+        const tb = el.querySelector(`tbody[data-extra="${nid}"]`);
+        if (!tb) return;
+        const id = 'ce' + uid();
+        const tr = document.createElement('tr');
+        tr.dataset.eid = id;
+        tr.className = 'calc-new-row';
+        tr.innerHTML = `
+          <td><input class="input" data-ef="name" placeholder="Название опции" style="padding:6px 10px"></td>
+          <td><input class="input" data-ef="price" type="number" min="0" value="0" style="padding:6px 10px;width:100px"></td>
+          <td><input class="input" data-ef="unit" placeholder="за час / за документ" style="padding:6px 10px"></td>
+          <td><label class="check"><input type="checkbox" data-ef="active" checked><span class="box"><svg><use href="#i-check-c"/></svg></span></label></td>
+          <td style="width:40px"><button class="iconbtn" data-extra-del="${id}" title="Удалить опцию">${icon('trash','ico-sm')}</button></td>`;
+        tb.appendChild(tr);
+      };
       el.addEventListener('click', e=>{
+        const exDel = e.target.closest('[data-extra-del]');
+        if (exDel){ exDel.closest('tr').remove(); toast('Опция удалена — не забудьте сохранить','info'); return; }
+        const addEx = e.target.closest('[data-add-extra]');
+        if (addEx){ addExtraRow(addEx.dataset.addExtra); return; }
         const del = e.target.closest('[data-del]');
         if (del){ del.closest('tr').remove(); toast('Строка удалена — не забудьте сохранить','info'); return; }
         const add = e.target.closest('[data-add]');
@@ -8796,9 +9016,54 @@ const cm = root.querySelector('.chat-main');
         const tdText = el.querySelector('#td-text');
         if (tdText) tdText.addEventListener('keydown', e=>{ if (e.key==='Enter') tdAdd && tdAdd.click(); });
         el.querySelectorAll('[data-td-preset]').forEach(ch=>ch.onclick=()=>{
+          /* Подсказка только заполняет поле — задачу пользователь утверждает
+             кнопкой «Добавить» (или Enter), а не кликом по варианту. */
           const inp = el.querySelector('#td-text');
-          if (inp) inp.value = ch.dataset.tdPreset;
-          if (tdAdd) tdAdd.click();
+          if (!inp) return;
+          inp.value = ch.dataset.tdPreset;
+          inp.focus();
+          try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch(e){}
+        });
+        /* Редактирование уже добавленной задачи (в том числе выполненной).
+           Модалка с текстом, типом и приоритетом — «утверждённую» запись
+           можно поправить, не удаляя и не создавая заново. */
+        const todoEditModal = t => new Promise(resolve => {
+          const m = openModal({
+            title:'Редактировать задачу', narrow:true,
+            body:`<div class="stack" style="gap:10px">
+              <div class="field"><label>Текст задачи</label><input class="input" id="td-edit-text" value="${esc(t.text)}"></div>
+              <div class="cols-2 grid" style="gap:10px">
+                <div class="field"><label>Тип</label><select class="input" id="td-edit-type">
+                  ${Object.entries(TODO_TYPES).map(([k,v])=>`<option value="${k}" ${todoType(t)===k?'selected':''}>${v.label}</option>`).join('')}
+                </select></div>
+                <div class="field"><label>Приоритет</label><select class="input" id="td-edit-prio">
+                  ${[1,2,3,4,5].map(p=>`<option value="${p}" ${(+t.prio||3)===p?'selected':''}>${p} — ${TODO_PRIO[p]}</option>`).join('')}
+                </select></div>
+              </div>
+            </div>`,
+            footer:`<button class="btn btn--ghost" data-c>Отмена</button><button class="btn btn--primary" data-ok>Сохранить</button>`,
+            onClose:()=>resolve(null)
+          });
+          const inp = m.el.querySelector('#td-edit-text');
+          const ok = m.el.querySelector('[data-ok]');
+          const save = ()=>{
+            const text = inp.value.trim();
+            if (!text){ toast('Введите текст задачи','warn'); inp.focus(); return; }
+            resolve({ text, type: todoType({ type: m.el.querySelector('#td-edit-type').value }), prio: +m.el.querySelector('#td-edit-prio').value || 3 });
+            m.close();
+          };
+          ok.onclick = save;
+          m.el.querySelector('[data-c]').onclick = ()=>{ resolve(null); m.close(); };
+          inp.addEventListener('keydown', e=>{ if (e.key==='Enter'){ e.preventDefault(); save(); } });
+          setTimeout(()=>{ inp.focus(); inp.select(); }, 30);
+        });
+        el.querySelectorAll('[data-td-edit]').forEach(b=>b.onclick=async()=>{
+          const t = (S.todos||[]).find(x=>x.id===b.dataset.tdEdit);
+          if (!t) return;
+          const v = await todoEditModal(t);
+          if (!v) return;
+          t.text = v.text; t.type = v.type; t.prio = v.prio;
+          saveState(); renderSec(); toast('Задача обновлена','ok');
         });
         /* Фильтр по типу — без перерисовки: прячем строки на месте. */
         el.querySelectorAll('[data-td-filter]').forEach(ch=>ch.onclick=()=>{
@@ -9237,20 +9502,99 @@ const cm = root.querySelector('.chat-main');
           delete prefsFor().navCustom; delete prefsFor().navCustomOrder;
           saveState(); toast('Меню сброшено к заводским настройкам','ok'); APP.render();
         };
-        $('#dt-backup', el).onclick = ()=>{
-          S.backups.unshift({ name:`aw-backup-${new Date().toISOString().slice(0,16).replace(/[T:]/g,'-')}.sql.gz`, type:'manual', t:Date.now() });
-          logAudit('Создан ручной бекап','Бекап'); saveState(); toast('Бекап создан','ok'); renderSec();
+
+        const bkBtn = el.querySelector('#dt-backup');
+        if (bkBtn) bkBtn.onclick = ()=>{
+          const meta = Migrate.createBackup('manual');
+          if (!meta || meta.error){ toast((meta && meta.error) || 'Не удалось создать бекап','err'); return; }
+          saveState();
+          logAudit('Создан ручной бекап: ' + meta.name, 'Бекап');
+          toast('Бекап создан','ok');
+          renderSec();
         };
-        $('#dt-reset', el).onclick = async ()=>{
+
+        el.querySelectorAll('[data-team-edit]').forEach(b=>b.onclick=()=>{
+          const t = (S.teams || []).find(x=>x.id === b.dataset.teamEdit);
+          if (t) openTeamForm(t);
+        });
+        el.querySelectorAll('[data-team-del]').forEach(b=>b.onclick=async()=>{
+          const t = (S.teams || []).find(x=>x.id === b.dataset.teamDel);
+          if (!t) return;
+          const ok = await confirmModal({ title:`Удалить команду «${t.name}»?`, text:'Профили останутся, но выйдут из команды.', okText:'Удалить', danger:true });
+          if (!ok) return;
+          S.teams = (S.teams || []).filter(x=>x.id !== t.id);
+          logAudit('Удалена команда: ' + t.name, 'Команды');
+          saveState(); renderSec(); toast('Команда удалена','ok');
+        });
+        const teamAdd = el.querySelector('#team-add');
+        if (teamAdd) teamAdd.onclick = ()=>openTeamForm(null);
+
+        const expFull = el.querySelector('#mig-export-full');
+        if (expFull) expFull.onclick = ()=>{
+          const stamp = new Date().toISOString().slice(0,10);
+          migDownload(`aw-migration-full-${stamp}.json`, Migrate.snapshot('full'));
+          logAudit('Экспорт полного пакета миграции','Миграция');
+          toast('Полный пакет скачан','ok');
+        };
+        const expProf = el.querySelector('#mig-export-profiles');
+        if (expProf) expProf.onclick = ()=>{
+          const stamp = new Date().toISOString().slice(0,10);
+          migDownload(`aw-migration-profiles-${stamp}.json`, Migrate.snapshot('profiles'));
+          logAudit('Экспорт профилей и настроек','Миграция');
+          toast('Пакет профилей скачан','ok');
+        };
+        const impBtn = el.querySelector('#mig-import');
+        const impFile = el.querySelector('#mig-file');
+        if (impBtn && impFile){
+          impBtn.onclick = ()=>impFile.click();
+          impFile.onchange = async ()=>{
+            const f = impFile.files && impFile.files[0];
+            if (!f) return;
+            try {
+              const pack = JSON.parse(await f.text());
+              openMigPreview(pack, f.name);
+            } catch(err){
+              toast('Не удалось прочитать JSON-пакет','err');
+            }
+            impFile.value = '';
+          };
+        }
+        el.querySelectorAll('[data-bk-dl]').forEach(b=>b.onclick=()=>{
+          const pack = Migrate.readBackup(b.dataset.bkDl);
+          if (!pack){ toast('Файл бекапа не найден','err'); return; }
+          const meta = (S.backups || []).find(x=>x.id === b.dataset.bkDl);
+          const name = (meta ? meta.name : 'backup').replace(/\.json$/i,'');
+          migDownload(name + '-payload.json', {
+            format:'audiowizard-migration', formatVersion:1, schema:pack.schema || SCHEMA_VERSION,
+            scope:'full', exported_at:new Date().toISOString(), payload:pack.payload
+          });
+          toast('Бекап скачан','ok');
+        });
+        el.querySelectorAll('[data-bk-restore]').forEach(b=>b.onclick=async()=>{
+          const id = b.dataset.bkRestore;
+          const meta = (S.backups || []).find(x=>x.id === id);
+          const ok = await confirmModal({ title:'Восстановить бекап?', text:`${meta ? esc(meta.name) + ' от ' + fmtDT(meta.t) : 'Выбранный снимок'}. Текущие данные будут заменены, перед восстановлением создаётся новый снимок.`, okText:'Восстановить', danger:true });
+          if (!ok) return;
+          Migrate.createBackup('auto','before-restore-' + new Date().toISOString().slice(0,16).replace(/[T:]/g,'-') + '.json');
+          const r = Migrate.restoreBackup(id);
+          if (r.error){ toast(r.error,'err'); return; }
+          toast('Бекап восстановлен — перезагружаем','ok');
+          setTimeout(()=>location.reload(), 650);
+        });
+
+        const resetBtn = el.querySelector('#dt-reset');
+        if (resetBtn) resetBtn.onclick = async ()=>{
           const ok = await confirmModal({ title:'Сбросить демо-данные?', okText:'Сбросить', danger:true, text:'Будет создан полный бекап, затем данные вернутся к исходным.' });
-          if (ok){
-            S.backups.unshift({ name:`pre-reset-${Date.now()}.sql.gz`, type:'auto', t:Date.now() });
-            saveState();
-            localStorage.removeItem(LS_KEY);
-            S = seedState(); saveState();
-            toast('Данные сброшены, бекап сохранён','ok');
-            setTimeout(()=>location.reload(), 600);
-          }
+          if (!ok) return;
+          const pre = Migrate.createBackup('auto','pre-reset-' + Date.now() + '.json');
+          if (pre && pre.error){ toast(pre.error,'err'); return; }
+          const backups = S.backups;
+          localStorage.removeItem(LS_KEY);
+          S = seedState();
+          S.backups = backups;
+          saveState();
+          toast('Данные сброшены, бекап сохранён','ok');
+          setTimeout(()=>location.reload(), 600);
         };
       }
     }

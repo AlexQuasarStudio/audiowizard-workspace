@@ -230,7 +230,7 @@ function openAvatarCropper(file, onDone){
 /* Окно в стиле окон меню (aw-win): перетаскивание, ресайз, кнопки окна.
    Используется для виджетов (заказ, калькулятор и т.п.), которым нужен
    такой же хром, как у окон элементов меню. */
-function openWinModal({ title='', icon='app', body='', footer='', wide=false, narrow=false, route='', onMount=null, onClose=null }){
+function openWinModal({ title='', icon='app', body='', footer='', wide=false, narrow=false, tall=false, route='', onMount=null, onClose=null }){
   closeDropdown && closeDropdown();
   if (window.Windows && Windows.spawnCustom){
     /* Модалка должна принадлежать ТЕКУЩЕМУ разделу: без route окно
@@ -241,7 +241,7 @@ function openWinModal({ title='', icon='app', body='', footer='', wide=false, na
     const win = Windows.spawnCustom({
       title, icon, html: body, route,
       width: wide ? 'min(940px, calc(100vw - 120px))' : narrow ? 'min(430px, calc(100vw - 60px))' : 'min(600px, calc(100vw - 80px))',
-      height: wide ? 'min(720px, calc(100vh - 90px))' : narrow ? 'min(430px, calc(100vh - 160px))' : 'min(660px, calc(100vh - 110px))',
+      height: wide ? 'min(720px, calc(100vh - 90px))' : tall ? 'min(720px, calc(100vh - 90px))' : narrow ? 'min(430px, calc(100vh - 160px))' : 'min(660px, calc(100vh - 110px))',
       onMount: (winEl, close) => { onMount && onMount(winEl, close); },
       onClose
     });

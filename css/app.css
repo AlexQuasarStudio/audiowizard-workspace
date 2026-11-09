@@ -141,7 +141,7 @@
 /* Поиск: в правом блоке шапки, свёрнут в иконку и раскрывается в поле */
 .head__search{flex:none;width:min(300px,34vw);max-width:min(300px,34vw);min-width:150px;position:relative;cursor:text;transition:width .28s var(--ease),max-width .28s var(--ease)}
 .head__search.is-open,.head__search:focus-within{cursor:text}
-.head__search .fake-input{display:flex;align-items:center;justify-content:flex-start;gap:11px;overflow:hidden;width:100%;height:44px;box-sizing:border-box;background:color-mix(in srgb,var(--panel) 74%,transparent);-webkit-backdrop-filter:blur(16px) saturate(1.15);backdrop-filter:blur(16px) saturate(1.15);border:1px solid color-mix(in srgb,var(--border-2) 78%,transparent);border-radius:14px;padding:0 14px;color:var(--faint);font-size:13px;box-shadow:var(--sh-1);transition:border-color var(--dur),box-shadow var(--dur),background var(--dur)}
+.head__search .fake-input{display:flex;align-items:center;justify-content:flex-start;gap:11px;overflow:hidden;width:100%;height:44px;box-sizing:border-box;background:color-mix(in srgb,var(--panel) 74%,transparent);-webkit-backdrop-filter:blur(16px) saturate(1.15);backdrop-filter:blur(16px) saturate(1.15);border:1px solid color-mix(in srgb,var(--border-2) 78%,transparent);border-radius:14px;padding:0 14px;color:var(--faint);font-size:13px;box-shadow:var(--sh-1);transition:border-color var(--dur),box-shadow var(--dur),background var(--dur),-webkit-backdrop-filter .22s var(--ease),backdrop-filter .22s var(--ease)}
 .head__search .fake-input:hover{border-color:var(--border-2)}
 
 .head__search:hover .fake-input{border-color:var(--border-2);background:color-mix(in srgb,var(--panel) 86%,transparent)}
@@ -176,13 +176,20 @@ body.pills-hide .head__mtools{pointer-events:none}
 body.pills-move .head__search .fake-input,
 body.pills-move .head__pill--balance,
 body.pills-move .head__ops{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+/* Пока плашки растворены/двигаются, контейнер получает opacity и filter —
+   это создаёт backdrop root, и стекло внутри всё равно не рисуется. Держим
+   blur нулевым на время движения: когда pills-anim снимется, transition
+   вернёт его плавно, а не одним кадром. */
+body.pills-anim .head__search .fake-input,
+body.pills-anim .head__pill--balance,
+body.pills-anim .head__ops{
+  -webkit-backdrop-filter:blur(0px) saturate(1);
+  backdrop-filter:blur(0px) saturate(1)
+}
 /* will-change на контейнере создаёт backdrop root и гасит backdrop-filter
-   у плашек: blur(16px) перестаёт размывать фон. Держим промоушен только
-   пока плашки действительно едут, а в покое отдаём слой обратно. */
+   у плашек, а его снятие в момент возврата blur даёт лишнюю пересборку
+   слоя. Промоушен не держим: opacity/filter анимируются и без него. */
 .head__right,.head__search,.head__mtools{will-change:auto}
-body.pills-anim .head__right,
-body.pills-anim .head__search,
-body.pills-anim .head__mtools{will-change:transform,opacity,filter}
 /* Скрытая плашка: гасим клики у ВСЕХ потомков (кнопок), иначе клик по
    невидимому контейнеру уходит на внутренние элементы и «будит» плашку. */
 .head__right[data-pill-hidden="1"],
@@ -193,11 +200,11 @@ body.pills-anim .head__mtools{will-change:transform,opacity,filter}
 .head__mtools[data-pill-hidden="1"] *{pointer-events:none!important}
 /* Горячая кнопка быстрых действий: иконка действия + стрелка-селектор */
 .head__pill{display:inline-flex;align-items:center;gap:10px;padding:5px 8px;border-radius:16px;background:var(--panel);border:1px solid var(--border-2);box-shadow:var(--sh-1)}
-.head__pill--balance{display:inline-flex;align-items:center;gap:3px;height:44px;padding:0 6px 0 10px;border-radius:14px;background:color-mix(in srgb,var(--panel) 74%,transparent);-webkit-backdrop-filter:blur(16px) saturate(1.15);backdrop-filter:blur(16px) saturate(1.15);border:1px solid color-mix(in srgb,var(--border-2) 78%,transparent);box-shadow:var(--sh-1);box-sizing:border-box;transition:background-color var(--dur),border-color var(--dur)}
+.head__pill--balance{display:inline-flex;align-items:center;gap:3px;height:44px;padding:0 6px 0 10px;border-radius:14px;background:color-mix(in srgb,var(--panel) 74%,transparent);-webkit-backdrop-filter:blur(16px) saturate(1.15);backdrop-filter:blur(16px) saturate(1.15);border:1px solid color-mix(in srgb,var(--border-2) 78%,transparent);box-shadow:var(--sh-1);box-sizing:border-box;transition:background-color var(--dur),border-color var(--dur),-webkit-backdrop-filter .22s var(--ease),backdrop-filter .22s var(--ease)}
 .head__pill--balance .head-balance{background:none;border:none;font-size:12px;gap:6px;padding:0;cursor:pointer;user-select:none}
 .head__pill--balance #btn-bell{background:none;border:none;position:relative;padding:0;margin:0}
 .head__pill .head-actions{display:inline-flex;align-items:center;gap:1px;padding:0;background:none;border:none;border-radius:0}
-.head__ops{display:inline-flex;align-items:center;gap:4px;padding:4px;border-radius:16px;background:color-mix(in srgb,var(--panel) 74%,transparent);-webkit-backdrop-filter:blur(16px) saturate(1.15);backdrop-filter:blur(16px) saturate(1.15);border:1px solid color-mix(in srgb,var(--border-2) 78%,transparent);box-shadow:var(--sh-1);transition:background-color var(--dur),border-color var(--dur)}
+.head__ops{display:inline-flex;align-items:center;gap:4px;padding:4px;border-radius:16px;background:color-mix(in srgb,var(--panel) 74%,transparent);-webkit-backdrop-filter:blur(16px) saturate(1.15);backdrop-filter:blur(16px) saturate(1.15);border:1px solid color-mix(in srgb,var(--border-2) 78%,transparent);box-shadow:var(--sh-1);transition:background-color var(--dur),border-color var(--dur),-webkit-backdrop-filter .22s var(--ease),backdrop-filter .22s var(--ease)}
 .head-actions__main{color:var(--accent)!important}
 .head-actions__main:hover{background:var(--accent-soft)!important;color:var(--accent)!important}
 .head-actions__arrow{width:18px;height:30px;color:var(--muted)}
@@ -2232,6 +2239,8 @@ body.pills-hide .head{pointer-events:none}
 .bal-main .d{color:var(--faint);font-size:11px}
 .bal-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 14px;border-top:1px solid var(--border);background:var(--bg-2);font-size:12px;color:var(--muted)}
 .bal-foot b{font-size:13.5px;color:var(--text)}
+.bal-foot--sub{background:transparent;border-top:0;padding-top:2px;padding-bottom:10px;color:var(--faint)}
+.bal-foot--sub b{font-size:12.5px;color:var(--text-2)}
 
 /* ---- Сортировка уведомлений: чипы не сжимаются ---- */
 .notif-tabs .chip{flex:none;white-space:nowrap;word-break:normal;hyphens:none}
