@@ -5041,18 +5041,46 @@ updatePeopleBulk();
 
   /* ==================== КАЛЬКУЛЯТОР ==================== */
   function openCalculator({ onResult=null, nishId='', deadline=null } = {}){
+    if (!onResult){
+      window.__modalRestorers = window.__modalRestorers || {};
+      window.__modalRestorers.calculator = () => openCalculator();
+    }
     const firstNiche = (S.niches[0] || {}).id || '';
     const initNiche = (S.niches || []).some(n => n.id === nishId) ? nishId : firstNiche;
     const dlTs = deadline ? new Date(deadline).getTime() : 0;
     const dlValue = dlTs ? new Date(dlTs - new Date(dlTs).getTimezoneOffset()*60000).toISOString().slice(0,16) : '';
     const daysValue = dlTs ? String(Math.max(0, Math.ceil((dlTs - Date.now())/DAY))) : '';
+    /* Для объёма: ставка услуги и подходящая единица по умолчанию. */
+    const volList = [];
+    (S.niches || []).forEach(n => (S.calcServices[n.id] || []).forEach((s,i)=>{ if (+s.price > 0) volList.push({ nid:n.id, idx:i, niche:n.name, s }); }));
+    const firstVol = volList.find(v => v.nid === initNiche) || volList[0];
+    const volOptions = volList.map(v => `<option value="${v.nid}|${v.idx}" ${v===firstVol?'selected':''}>${esc(v.niche)} · ${esc(v.s.name)} — ${fmtMoney(v.s.price)} ${esc(v.s.unit||'')}</option>`).join('');
+    const volUnit = firstVol && /страниц|лист/i.test(firstVol.s.unit) ? 'page' : firstVol && /1000.*знак|символ/i.test(firstVol.s.unit) ? 'char' : 'min';
     const m = openWinModal({
-      narrow:true, tall:true, title:'Калькулятор услуг', route:'orders',
+      narrow:true, tall:true, title:'Калькулятор услуг', route:'orders', persistKey: onResult ? '' : 'calculator',
       body:`<div class="calc-display">
           <input class="expr" id="cx-in" placeholder="например: 2.5 × 1800 + 5600" autocomplete="off" spellcheck="false" aria-label="Выражение">
           <div class="val" id="cx-val">0</div>
         </div>
         <div class="small faint" style="margin-top:6px">Поддерживаются + − × ÷ ( ) % и запятая как десятичный разделитель · Enter — в результат</div>
+        <div class="card card-pad" style="margin-top:10px;background:var(--panel-2)">
+          <b class="small">Объём</b>
+          <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
+            <div class="field" style="flex:0 0 120px"><label>Количество</label>
+              <input class="input" id="cx-volume" type="number" min="0" step="0.1" placeholder="0"></div>
+            <div class="field" style="flex:0 0 140px"><label>Считать в</label>
+              <select class="input" id="cx-unit">
+                <option value="min" ${volUnit==='min'?'selected':''}>минутах</option>
+                <option value="hour" ${volUnit==='hour'?'selected':''}>часах</option>
+                <option value="char" ${volUnit==='char'?'selected':''}>символах</option>
+                <option value="page" ${volUnit==='page'?'selected':''}>страницах</option>
+              </select></div>
+            <div class="field" style="flex:1;min-width:220px"><label>Услуга</label>
+              <select class="input" id="cx-vsvc">${volOptions}</select></div>
+          </div>
+          <div class="small" id="cx-volume-note" style="margin-top:6px"></div>
+          <div class="tiny faint" style="margin-top:4px">Символы для стенограмм — 600 знаков в минуту.</div>
+        </div>
         <div class="row" style="margin-top:10px"><span class="small muted" id="cx-live"></span><span class="spacer"></span>
           ${onResult?'<button class="btn btn--primary btn--sm" data-apply>Подставить в заказ</button>':''}</div>
         <div class="calc-history" id="cx-hist" style="margin-top:12px">${S.calcHistory.slice(-6).reverse().map(h=>`<div data-h="${h.result}">${esc(h.expression)} = ${h.result}</div>`).join('')}</div>
@@ -5068,7 +5096,7 @@ updatePeopleBulk();
           </div>
           <div class="small" id="cx-rush" style="margin-top:8px"></div>
         </div>
-        <div class="small faint" style="margin-top:12px">Отметьте услуги — их стоимость прибавится к результату.</div>
+        <div class="small faint" style="margin-top:12px">Дополнительные услуги и опции. Если объём уже указан выше, основную услугу здесь не дублируйте.</div>
         <div id="cx-svcs" style="margin-top:8px"></div>
         <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
           <button class="btn btn--ghost btn--sm" type="button" data-cx-export>${icon('export')} Экспорт услуг</button>
@@ -5117,6 +5145,63 @@ updatePeopleBulk();
             g2('#cx-in').value = ''; upd();
           }
         });
+        /* Объём: точные минуты, часы, символы или страницы. Считаем ставку
+           из выбранной услуги и подставляем выражение в верхнее поле. */
+        const volState = () => {
+          const qty = +g2('#cx-volume').value || 0;
+          const unit = g2('#cx-unit').value;
+          const [nid, idx] = String(g2('#cx-vsvc').value || '').split('|');
+          const s = (S.calcServices[nid] || [])[+idx];
+          if (!s) return { qty, unit, nid, s:null, rate:0 };
+          const u = String(s.unit || '').toLowerCase();
+          let rate = 0;
+          if (unit === 'min'){
+            if (/час/.test(u)) rate = s.price / 60;
+            else if (/мин/.test(u)) rate = s.price;
+          } else if (unit === 'hour'){
+            if (/час/.test(u)) rate = s.price;
+            else if (/мин/.test(u)) rate = s.price * 60;
+          } else if (unit === 'char'){
+            if (/1000/.test(u) && /знак/.test(u)) rate = s.price / 1000;
+            else if (/символ/.test(u)) rate = s.price;
+            else if (/час/.test(u)) rate = s.price / (60 * 600);
+            else if (/мин/.test(u)) rate = s.price / 600;
+          } else if (unit === 'page'){
+            if (/страниц|лист/.test(u)) rate = s.price;
+          }
+          return { qty, unit, nid, s, rate };
+        };
+        const paintVolume = (auto=true) => {
+          const v = volState();
+          const note = g2('#cx-volume-note');
+          if (!note) return;
+          if (!v.s){ note.textContent = 'Выберите услугу'; return; }
+          if (!v.qty){ note.textContent = 'Укажите объём — подставим точный расчёт'; return; }
+          if (!v.rate){
+            const want = /страниц|лист/i.test(v.s.unit) ? 'page' : /1000.*знак|символ/i.test(v.s.unit) ? 'char' : /час|мин/i.test(v.s.unit) ? 'min' : '';
+            if (want && g2('#cx-unit').value !== want){ g2('#cx-unit').value = want; return paintVolume(auto); }
+            note.innerHTML = '<span style="color:var(--red)">Для этой услуги выберите другую единицу объёма</span>';
+            return;
+          }
+          const label = v.unit === 'min' ? 'мин' : v.unit === 'hour' ? 'ч' : v.unit === 'char' ? 'симв.' : 'стр.';
+          const rateStr = +v.rate.toFixed(6);
+          note.innerHTML = `${v.qty} ${label} × ${(+v.rate.toFixed(2)).toLocaleString('ru-RU')} ₽ = <b>${fmtMoney(Math.round(v.qty * v.rate))}</b>`;
+          if (auto){
+            g2('#cx-in').value = `${v.qty} × ${rateStr}`;
+            upd();
+          }
+        };
+        ['#cx-volume','#cx-unit','#cx-vsvc'].forEach(sel => {
+          const el = g2(sel);
+          if (!el) return;
+          el.addEventListener('input', ()=>paintVolume(true));
+          el.addEventListener('change', ()=>paintVolume(true));
+        });
+        g2('#cx-vsvc').addEventListener('change', ()=>{
+          const v = volState();
+          if (v.nid && g2('#cx-niche')){ g2('#cx-niche').value = v.nid; paintRush(); paintDiscount(); }
+        });
+
         /* Услуги и доп. опции: фиксированные прибавляются напрямую,
            процентные надбавки считаются от суммы «выражение + фикс. услуги». */
         const picked = () => [...mask.querySelectorAll('[data-sv]:checked,[data-ex]:checked')].map(i => {
@@ -5229,6 +5314,7 @@ updatePeopleBulk();
         paintRush();
         paintDiscount();
         upd();
+        paintVolume(false);
         g2('#cx-niche').addEventListener('change', ()=>{ paintRush(); paintDiscount(); upd(); });
         /* Срок можно задать в днях — точная дата подставляется сама;
            ручная дата так же пересчитывает дни. */

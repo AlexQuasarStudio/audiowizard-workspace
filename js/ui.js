@@ -230,7 +230,7 @@ function openAvatarCropper(file, onDone){
 /* Окно в стиле окон меню (aw-win): перетаскивание, ресайз, кнопки окна.
    Используется для виджетов (заказ, калькулятор и т.п.), которым нужен
    такой же хром, как у окон элементов меню. */
-function openWinModal({ title='', icon='app', body='', footer='', wide=false, narrow=false, tall=false, route='', onMount=null, onClose=null }){
+function openWinModal({ title='', icon='app', body='', footer='', wide=false, narrow=false, tall=false, route='', onMount=null, onClose=null, persistKey='' }){
   closeDropdown && closeDropdown();
   if (window.Windows && Windows.spawnCustom){
     /* Модалка должна принадлежать ТЕКУЩЕМУ разделу: без route окно
@@ -294,6 +294,20 @@ function openWinModal({ title='', icon='app', body='', footer='', wide=false, na
     /* Поздняя проверка: шрифты/картинки могли изменить высоту. Тоже без
        анимации — окно не «плывёт», а просто встаёт на место. */
     setTimeout(fitWin, 320);
+    /* Модалка переживает жёсткую перезагрузку: сохраняем снимок тела и
+       футера вместе с введёнными значениями. Для окон с живым restorer
+       (калькулятор) при восстановлении вызывается их функция заново. */
+    win._modal = true;
+    win._persistKey = persistKey || '';
+    try { window.__persistWins && window.__persistWins(); } catch(e){}
+    let saveT = 0;
+    const saveStateLater = () => {
+      clearTimeout(saveT);
+      saveT = setTimeout(() => { try { window.__persistWins && window.__persistWins(); } catch(e){} }, 160);
+    };
+    win.addEventListener('input', saveStateLater);
+    win.addEventListener('change', saveStateLater);
+    setTimeout(saveStateLater, 350);
     return { el: win, close: () => { win._close && win._close(); } };
   }
   return openModal({ title, body, footer, wide, onMount, onClose });

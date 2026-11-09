@@ -7817,7 +7817,14 @@ const cm = root.querySelector('.chat-main');
       if (route.name === 'settings' && location.hash !== '#/settings/' + section){
         try { history.replaceState(null, '', '#/settings/' + section); } catch(e){}
       }
-      if (isMobileSettings()){ navScroll = window.scrollY; mobileState(true, true); }
+      if (isMobileSettings()){
+        navScroll = window.scrollY;
+        mobileState(true, true);
+        /* После входа в раздел показываем его начало, а не середину списка,
+           с которой пришли. Двойной вызов гасит scroll anchoring браузера. */
+        window.scrollTo(0, 0);
+        requestAnimationFrame(()=>{ try { window.scrollTo({ top:0, behavior:'smooth' }); } catch(e){ window.scrollTo(0,0); } });
+      }
     });
     renderSec();
 

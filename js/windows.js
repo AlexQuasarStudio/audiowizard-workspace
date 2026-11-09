@@ -26,6 +26,29 @@ const Windows = (() => {
 
   /* ---------- Окна переживают перезагрузку: сохранение в localStorage ---------- */
   const WS_KEY = 'aw_wins_state';
+  /* Снимок тела окна: innerHTML не хранит введённые значения, поэтому
+     переносим их в атрибуты/текст — после перезагрузки форма выглядит так же. */
+  function serializeBody(win){
+    const body = win.querySelector('.aw-win__body');
+    if (!body) return '';
+    const clone = body.cloneNode(true);
+    clone.querySelectorAll('input,textarea,select').forEach(el => {
+      if (el.tagName === 'SELECT'){
+        [...el.options].forEach(o => {
+          if (o.value === el.value) o.setAttribute('selected', '');
+          else o.removeAttribute('selected');
+        });
+      } else if (el.type === 'checkbox' || el.type === 'radio'){
+        if (el.checked) el.setAttribute('checked', '');
+        else el.removeAttribute('checked');
+      } else if (el.tagName === 'TEXTAREA'){
+        el.textContent = el.value;
+      } else {
+        el.setAttribute('value', el.value);
+      }
+    });
+    return clone.innerHTML;
+  }
   function persistWins(){
     const arr = allWins().map(r => {
       const s = r.win.style;
@@ -43,7 +66,9 @@ const Windows = (() => {
         corner: r.win.__cornerPos || null,
         cornerPrev: r.win.__cornerPrev || null,
         cornerMin: r.win.classList.contains('aw-win--corner-min'),
-        max: r.win._prevRect ? { left: r.win._prevRect.left, top: r.win._prevRect.top, width: r.win._prevRect.width, height: r.win._prevRect.height } : null };
+        max: r.win._prevRect ? { left: r.win._prevRect.left, top: r.win._prevRect.top, width: r.win._prevRect.width, height: r.win._prevRect.height } : null,
+        custom: r.win._modal ? { title: r.win._title || '', icon: r.win._iconName || 'app', html: serializeBody(r.win),
+          footer: (r.win.querySelector('.aw-win__foot') || {}).innerHTML || '', key: r.win._persistKey || '' } : null };
     }).filter(Boolean);
     try { localStorage.setItem(WS_KEY, JSON.stringify(arr.slice(-12))); } catch(e){}
   }
@@ -53,7 +78,41 @@ const Windows = (() => {
     try { arr = JSON.parse(localStorage.getItem(WS_KEY) || '[]'); } catch(e){}
     if (!Array.isArray(arr)) return;
     arr.forEach(s => {
-      if (!s || !s.route || !window.NAV_VIEWS || !window.NAV_VIEWS[s.route]) return;
+      if (!s || !s.route) return;
+      /* Модальные окна восстанавливаем из снимка: заголовок, тело, футер и
+         введённые значения. Для известных окон (калькулятор) вызываем
+         живой restorer, чтобы обработчики снова работали. */
+      if (s.custom && s.custom.html){
+        const restorer = s.custom.key && window.__modalRestorers && window.__modalRestorers[s.custom.key];
+        if (restorer){
+          try { restorer(); } catch(e){}
+          return;
+        }
+        try {
+          const win = spawnCustom({ title:s.custom.title, icon:s.custom.icon, html:s.custom.html, route:s.route, _restore:true });
+          if (!win) return;
+          if (s.custom.footer){
+            const f = document.createElement('div');
+            f.className = 'aw-win__foot';
+            f.innerHTML = s.custom.footer;
+            f.querySelectorAll('[data-x]').forEach(x => x.addEventListener('click', () => win._close && win._close()));
+            win.appendChild(f);
+          }
+          if (s.left) win.style.left = s.left;
+          if (s.top) win.style.top = s.top;
+          if (s.width) win.style.width = s.width;
+          if (s.height) win.style.height = s.height;
+          win._modal = true;
+          win._persistKey = s.custom.key || '';
+          if (s.minimized){
+            win.style.display = 'none';
+            const rec = winsFor(s.route).find(x => x.win === win);
+            if (rec) rec.minimized = true;
+          }
+          return;
+        } catch(e){}
+      }
+      if (!window.NAV_VIEWS || !window.NAV_VIEWS[s.route]) return;
       try {
         const win = spawn(s.route, null, { _restore:true });
         if (win){
