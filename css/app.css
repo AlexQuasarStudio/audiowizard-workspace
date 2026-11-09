@@ -1109,6 +1109,9 @@ body:not(.zen) .side, body:not(.zen) .head, body:not(.zen) .foot{
   transform:none;
   transition:opacity .3s var(--ease),transform .3s var(--ease),visibility 0s linear 0s;
 }
+/* Сама шапка — прозрачная полоса на всю ширину; клики должны проходить
+   сквозь неё к контенту. Интерактивны только плашки (.head>*). */
+body:not(.zen) .head{pointer-events:none}
 body:not(.zen) .side{position:fixed;top:7px;left:12px;bottom:7px;height:auto;transition:width .34s var(--ease),opacity .3s var(--ease),transform .3s var(--ease),visibility 0s linear 0s}
 @media (max-width:960px){
   /* Мобильный режим: панель уходит за край полностью — без «полоски» слева,

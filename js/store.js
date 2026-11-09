@@ -154,29 +154,63 @@ const DEFAULT_PROMOS = [
 ];
 function promosDefault(){ return JSON.parse(JSON.stringify(DEFAULT_PROMOS)); }
 
-/* Надбавки за срочность и доп. опции по нишам (специализациям).
-   Раньше калькулятор умел только услуги; срочность и опции — отдельные
-   настройки, чтобы их можно было менять без правки кода. */
+/* Каталог услуг — цены, единицы и формулировки с audiowizard.ru/price.
+   Сид и разовая миграция заполняют им «Настройки → Калькулятор и услуги».
+   Маржа платформы — 25%, как в финансовой модели по умолчанию. */
+const SITE_CALC_VERSION = 1;
+const SITE_CALC_SERVICES = {
+  n1: [
+    { id:'cs-a1',  name:'Стенограмма аудиозаписи', price:1200, unit:'за час аудио', margin:25 },
+    { id:'cs-a2',  name:'Стенограмма с несколькими участниками', price:1380, unit:'за час аудио', margin:25 },
+    { id:'cs-a3',  name:'Стенограмма судебного заседания', price:1800, unit:'за час аудио', margin:25 },
+    { id:'cs-a4',  name:'Стенограмма в прямом эфире', price:4800, unit:'за час аудио', margin:25 },
+    { id:'cs-a5',  name:'ИИ-стенограмма', price:540, unit:'за час аудио', margin:25 },
+    { id:'cs-a6',  name:'ИИ + человек', price:1080, unit:'за час аудио', margin:25 },
+    { id:'cs-a7',  name:'Подготовка диалоговых/субтитровых листов', price:1320, unit:'за час аудио', margin:25 },
+    { id:'cs-a8',  name:'Изготовление субтитров для видео', price:3000, unit:'за час видео', margin:25 },
+    { id:'cs-a9',  name:'Подготовка монтажных листов', price:3600, unit:'за час видео', margin:25 },
+    { id:'cs-a10', name:'Заверение стенограммы', price:1299, unit:'за шт', margin:25 },
+    { id:'cs-a11', name:'Тестовая расшифровка', price:0, unit:'2 минуты', margin:25 },
+    { id:'cs-a12', name:'Улучшение звука и очистка от шумов', price:2000, unit:'за запись', margin:25 },
+    { id:'cs-a13', name:'Озвучка диктором', price:12000, unit:'за час', margin:25 }
+  ],
+  n2: [
+    { id:'cs-t1', name:'Копирайтинг', price:0, unit:'договорная', margin:25 },
+    { id:'cs-t2', name:'SEO-копирайтинг', price:0, unit:'договорная', margin:25 },
+    { id:'cs-t3', name:'Рерайтинг', price:0, unit:'договорная', margin:25 },
+    { id:'cs-t4', name:'Набор текста', price:100, unit:'за лист', margin:25 },
+    { id:'cs-t5', name:'Индивидуально', price:0, unit:'договорная', margin:25 }
+  ],
+  n3: [
+    { id:'cs-r1', name:'Перевод с иностранного', price:300, unit:'за страницу', margin:25 },
+    { id:'cs-r2', name:'Перевод на иностранный', price:400, unit:'за страницу', margin:25 },
+    { id:'cs-r3', name:'Стенограмма на иностранном', price:300, unit:'за страницу', margin:25 },
+    { id:'cs-r4', name:'Перевод с украинского', price:200, unit:'за страницу', margin:25 },
+    { id:'cs-r5', name:'Перевод на украинский', price:300, unit:'за страницу', margin:25 },
+    { id:'cs-r6', name:'Стенограмма на украинском', price:200, unit:'за страницу', margin:25 },
+    { id:'cs-r7', name:'Перевод презентаций', price:200, unit:'за страницу', margin:25 }
+  ]
+};
+/* Надбавки за срочность и доп. опции. Проценты взяты с сайта
+   («Факторы надбавки к стоимости»), фиксированные цены — из прайса. */
 const DEFAULT_CALC_SETTINGS = {
   rushPct: { n1:10, n2:10, n3:10 },
   extras: {
     n1: [
-      { id:'ce-n1-1', name:'Разметка спикеров', price:400, unit:'за час аудио', active:true },
-      { id:'ce-n1-2', name:'Тайм-коды', price:600, unit:'за час аудио', active:true },
-      { id:'ce-n1-3', name:'Субтитры (SRT)', price:1200, unit:'за час видео', active:true }
+      { id:'ce-a1', name:'Плохое качество записи', price:0, pct:30, unit:'% от стоимости', active:true },
+      { id:'ce-a2', name:'Корректура', price:0, pct:20, unit:'% от стоимости', active:true },
+      { id:'ce-a3', name:'Повышенная сложность', price:0, pct:20, unit:'% от стоимости', active:true },
+      { id:'ce-a4', name:'Особые требования к оформлению', price:0, pct:10, unit:'% от стоимости', active:true },
+      { id:'ce-a5', name:'Распечатка копии', price:99, pct:0, unit:'за копию', active:true },
+      { id:'ce-a6', name:'Дополнительная копия', price:49, pct:0, unit:'за копию', active:true }
     ],
-    n2: [
-      { id:'ce-n2-1', name:'SEO-метатеги', price:800, unit:'за статью', active:true },
-      { id:'ce-n2-2', name:'Иллюстрации', price:1500, unit:'за штуку', active:true },
-      { id:'ce-n2-3', name:'Вычитка редактором', price:600, unit:'за 1000 знаков', active:true }
-    ],
+    n2: [],
     n3: [
-      { id:'ce-n3-1', name:'Апостиль', price:4500, unit:'за документ', active:true },
-      { id:'ce-n3-2', name:'Вёрстка PDF', price:700, unit:'за документ', active:true },
-      { id:'ce-n3-3', name:'Курьерская доставка', price:1200, unit:'за документ', active:true }
+      { id:'ce-r1', name:'Перевод слайда', price:100, pct:0, unit:'за слайд', active:true }
     ]
   }
 };
+function siteCalcServices(){ return JSON.parse(JSON.stringify(SITE_CALC_SERVICES)); }
 function defaultCalcSettings(){ return JSON.parse(JSON.stringify(DEFAULT_CALC_SETTINGS)); }
 function calcSettingsSeed(){
   const base = defaultCalcSettings();
@@ -398,11 +432,7 @@ function seedState(){
     { id:'r-p1', entity:'client', conditions:[{ field:'comment', op:'regex', value:'промокод|скидка|PROMO10' }], action_type:'discount', action_value:'' }
   ];
 
-  const calcServices = {
-    n1:[ {id:'cs1', name:'Расшифровка записи', price:900, unit:'за час аудио', margin:25}, {id:'cs2', name:'Монтаж/чистка аудио', price:2500, unit:'за трек', margin:25}, {id:'cs3', name:'Заверение стенограммы', price:5600, unit:'за документ', margin:25} ],
-    n2:[ {id:'cs4', name:'Копирайтинг', price:1200, unit:'за 1000 знаков', margin:25}, {id:'cs5', name:'Рерайт', price:700, unit:'за 1000 знаков', margin:25}, {id:'cs6', name:'SEO-оптимизация', price:1500, unit:'за статью', margin:25} ],
-    n3:[ {id:'cs7', name:'Письменный перевод', price:950, unit:'за страницу', margin:25}, {id:'cs8', name:'Редактура перевода', price:500, unit:'за страницу', margin:25}, {id:'cs9', name:'Нотариальное заверение', price:2800, unit:'за документ', margin:25} ]
-  };
+  const calcServices = siteCalcServices();
 
   const notifs = [
     { id:'nf1', icon:'i-orders', title:'Заказ AW-1042 в работе', text:'Игорь Волков изменил статус заказа', t:days(4), read:{'u-manager':true} },
@@ -449,7 +479,7 @@ const audit = getDemoAudit();
        доступом, балансом и заказами от имени команды. */
     teams: [],
     calcHistory:[], notifs, audit, backups:[], importLogs, importLogLines,
-    settings:{ demoEnabled:true, minPrepay:50, selfDeleteDays:90, hiddenRoutes:[], balance: DEMO_BALANCE, appBgDoodles:true, promos: promosDefault(),
+    settings:{ demoEnabled:true, minPrepay:50, selfDeleteDays:90, hiddenRoutes:[], balance: DEMO_BALANCE, appBgDoodles:true, calcCatalogVersion: SITE_CALC_VERSION, promos: promosDefault(),
       referral:{ enabled:true, percent:2, fixedBonus:0, karmaPerRef:2, role:'client' },
       /* Доли от суммы заказа: админ — 25% (маржа услуг), менеджер — 5%.
          Разница (итого − исполнители − админ − менеджер) показывается как
@@ -481,7 +511,7 @@ let S;
 function loadState(){
   try{
     const raw = localStorage.getItem(LS_KEY);
-    if (raw){ S = JSON.parse(raw); if (S && (S._v >= 1 || Array.isArray(S.users))){ S._v = Number(S._v) || 1; migrateSchema(); migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); migrateKeys(); migrateStaffBalances(); migrateFinance(); saveState(); return; } }
+    if (raw){ S = JSON.parse(raw); if (S && (S._v >= 1 || Array.isArray(S.users))){ S._v = Number(S._v) || 1; migrateSchema(); migrateSiteCatalog(); migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); migrateKeys(); migrateStaffBalances(); migrateFinance(); saveState(); return; } }
   }catch(e){}
   S = seedState();
   saveState();
@@ -534,6 +564,27 @@ function migrateFinance(){
     e.is_paid = amount > 0 && e.paid >= amount;
   }));
 }
+/* Разовая замена демо-каталога услуг на прайс audiowizard.ru.
+   Меняет только три сид-ниши и запоминает версию каталога, чтобы правки
+   администратора после этого не перетирались при каждой загрузке. */
+function migrateSiteCatalog(){
+  if (!S) return;
+  S.settings = S.settings || {};
+  if (S.settings.calcCatalogVersion === SITE_CALC_VERSION) return;
+  if (!S.calcServices) S.calcServices = {};
+  if (!S.calcSettings) S.calcSettings = { rushPct:{}, extras:{} };
+  if (!S.calcSettings.rushPct) S.calcSettings.rushPct = {};
+  if (!S.calcSettings.extras) S.calcSettings.extras = {};
+  const services = siteCalcServices();
+  const def = defaultCalcSettings();
+  (S.niches || []).forEach(n => {
+    if (services[n.id]) S.calcServices[n.id] = services[n.id];
+    if (def.rushPct[n.id] != null) S.calcSettings.rushPct[n.id] = def.rushPct[n.id];
+    if (def.extras[n.id]) S.calcSettings.extras[n.id] = JSON.parse(JSON.stringify(def.extras[n.id]));
+  });
+  S.settings.calcCatalogVersion = SITE_CALC_VERSION;
+}
+
 /* Обновление схемы сохранения до текущей версии. Вызывается при загрузке
    и при импорте пакета из другой версии приложения. Все шаги идемпотентны:
    недостающие сущности добавляются, существующие значения не перетираются. */
@@ -557,6 +608,7 @@ function migrateSchema(){
       id: x.id || ('ce-' + n.id + '-' + i),
       name: String(x.name),
       price: Math.max(0, Number(x.price) || 0),
+      pct: Math.max(0, Math.min(200, Number(x.pct) || 0)),
       unit: x.unit || '',
       active: x.active !== false
     }));

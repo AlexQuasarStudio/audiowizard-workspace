@@ -7675,7 +7675,8 @@ const cm = root.querySelector('.chat-main');
     return list.map(e => `<tr data-eid="${e.id}">
       <td><input class="input" data-ef="name" value="${esc(e.name||'')}" style="padding:6px 10px"></td>
       <td><input class="input" data-ef="price" type="number" min="0" value="${Number(e.price)||0}" style="padding:6px 10px;width:100px"></td>
-      <td><input class="input" data-ef="unit" value="${esc(e.unit||'')}" placeholder="за час / за документ" style="padding:6px 10px"></td>
+      <td><input class="input" data-ef="pct" type="number" min="0" max="200" value="${Number(e.pct)||0}" style="padding:6px 10px;width:86px"></td>
+      <td><input class="input" data-ef="unit" value="${esc(e.unit||'')}" placeholder="за час / % от стоимости" style="padding:6px 10px"></td>
       <td><label class="check"><input type="checkbox" data-ef="active" ${e.active!==false?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span></label></td>
       <td style="width:40px"><button class="iconbtn" data-extra-del="${e.id}" title="Удалить опцию">${icon('trash','ico-sm')}</button></td>
     </tr>`).join('');
@@ -7911,7 +7912,7 @@ const cm = root.querySelector('.chat-main');
           <div class="row row--between" style="margin-top:12px"><span class="small muted">Доп. опции</span>
             <button class="btn btn--ghost btn--sm" data-add-extra="${n.id}" type="button">${icon('plus')} Опция</button></div>
           <div class="tbl-wrap" style="margin-top:6px;border:0"><table class="tbl" style="min-width:0">
-            <thead><tr><th>Опция</th><th>Цена, ₽</th><th>Единица</th><th>Вкл.</th><th></th></tr></thead>
+            <thead><tr><th>Опция</th><th>Цена, ₽</th><th>Надбавка, %</th><th>Единица</th><th>Вкл.</th><th></th></tr></thead>
             <tbody data-extra="${n.id}">${calcExtraRowsHTML(n.id)}</tbody>
           </table></div>
         </div>`).join('')}
@@ -8600,7 +8601,7 @@ const cm = root.querySelector('.chat-main');
             const gf = f => tr.querySelector(`[data-ef="${f}"]`);
             const name = gf('name').value.trim();
             if (!name) return;
-            extras.push({ id: tr.dataset.eid, name, price: Math.max(0, +gf('price').value || 0), unit: gf('unit').value.trim(), active: !!gf('active').checked });
+            extras.push({ id: tr.dataset.eid, name, price: Math.max(0, +gf('price').value || 0), pct: Math.max(0, Math.min(200, +((gf('pct')||{}).value) || 0)), unit: gf('unit').value.trim(), active: !!gf('active').checked });
           });
           S.calcSettings = S.calcSettings || { rushPct:{}, extras:{} };
           S.calcSettings.extras[nid] = extras;
@@ -8635,7 +8636,8 @@ const cm = root.querySelector('.chat-main');
         tr.innerHTML = `
           <td><input class="input" data-ef="name" placeholder="Название опции" style="padding:6px 10px"></td>
           <td><input class="input" data-ef="price" type="number" min="0" value="0" style="padding:6px 10px;width:100px"></td>
-          <td><input class="input" data-ef="unit" placeholder="за час / за документ" style="padding:6px 10px"></td>
+          <td><input class="input" data-ef="pct" type="number" min="0" max="200" value="0" style="padding:6px 10px;width:86px"></td>
+          <td><input class="input" data-ef="unit" placeholder="за час / % от стоимости" style="padding:6px 10px"></td>
           <td><label class="check"><input type="checkbox" data-ef="active" checked><span class="box"><svg><use href="#i-check-c"/></svg></span></label></td>
           <td style="width:40px"><button class="iconbtn" data-extra-del="${id}" title="Удалить опцию">${icon('trash','ico-sm')}</button></td>`;
         tb.appendChild(tr);

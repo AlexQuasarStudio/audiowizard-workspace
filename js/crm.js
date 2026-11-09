@@ -5048,7 +5048,9 @@ updatePeopleBulk();
   function openCalculator({ onResult=null, nishId='', deadline=null } = {}){
     const firstNiche = (S.niches[0] || {}).id || '';
     const initNiche = (S.niches || []).some(n => n.id === nishId) ? nishId : firstNiche;
-    const dlValue = deadline ? new Date(new Date(deadline).getTime() - new Date(deadline).getTimezoneOffset()*60000).toISOString().slice(0,16) : '';
+    const dlTs = deadline ? new Date(deadline).getTime() : 0;
+    const dlValue = dlTs ? new Date(dlTs - new Date(dlTs).getTimezoneOffset()*60000).toISOString().slice(0,16) : '';
+    const daysValue = dlTs ? String(Math.max(0, Math.ceil((dlTs - Date.now())/DAY))) : '';
     const m = openWinModal({
       narrow:true, tall:true, title:'Калькулятор услуг', route:'orders',
       body:`<div class="calc-display"><div class="expr" id="cx-expr">введите выражение с клавиатуры</div><div class="val" id="cx-val">0</div></div>
@@ -5064,7 +5066,9 @@ updatePeopleBulk();
           <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
             <div class="field" style="flex:1;min-width:150px"><label>Специализация</label>
               <select class="input" id="cx-niche">${(S.niches||[]).map(n=>`<option value="${n.id}" ${n.id===initNiche?'selected':''}>${esc(n.name)}</option>`).join('')}</select></div>
-            <div class="field" style="flex:1;min-width:170px"><label>Свой срок</label>
+            <div class="field" style="flex:0 0 108px"><label>Срок, дней</label>
+              <input class="input" id="cx-days" type="number" min="0" step="1" value="${daysValue}" placeholder="—"></div>
+            <div class="field" style="flex:1;min-width:170px"><label>Или дата</label>
               <input class="input" id="cx-deadline" type="datetime-local" value="${dlValue}"></div>
           </div>
           <div class="small" id="cx-rush" style="margin-top:8px"></div>
@@ -5119,15 +5123,18 @@ updatePeopleBulk();
             g2('#cx-in').value = ''; upd();
           }
         });
-        /* Услуги и доп. опции: и те и другие прибавляются к базе. */
-        const svcSum = () => {
-          let s = 0;
-          mask.querySelectorAll('[data-sv]:checked,[data-ex]:checked').forEach(i=>{
-            const raw = i.dataset.sv || i.dataset.ex || '';
-            s += +(raw.split('|')[2] || 0);
-          });
-          return s;
-        };
+        /* Услуги и доп. опции: фиксированные прибавляются напрямую,
+           процентные надбавки считаются от суммы «выражение + фикс. услуги». */
+        const picked = () => [...mask.querySelectorAll('[data-sv]:checked,[data-ex]:checked')].map(i => {
+          const p = (i.dataset.sv || i.dataset.ex || '').split('|');
+          return { kind: i.dataset.sv ? 'sv' : 'ex', nid:p[0], name:p[1], price:+p[2] || 0, pct:+p[3] || 0 };
+        });
+        const svcOnlySum = () => picked().filter(x => x.kind === 'sv').reduce((s,x)=>s+x.price, 0);
+        const fixedExtraSum = () => picked().filter(x => x.kind === 'ex' && !x.pct).reduce((s,x)=>s+x.price, 0);
+        const pctSum = () => picked().filter(x => x.kind === 'ex' && x.pct > 0).reduce((s,x)=>s+x.pct, 0);
+        const preExtra = () => (isNaN(val) ? 0 : val) + svcOnlySum();
+        const pctFee = () => Math.round(preExtra() * pctSum() / 100);
+        const svcSum = () => preExtra() + fixedExtraSum() + pctFee();
         /* Свой срок: если он короче обычного срока ниши, заказ считается
            срочным и к сумме применяется надбавка из настроек. */
         const deadlineState = () => {
@@ -5146,7 +5153,11 @@ updatePeopleBulk();
         const calcDiscount = () => {
           const hours = +g2('#cx-hours').value || 0;
           const code = String(g2('#cx-promo').value || '').trim().toUpperCase();
-          const base = (isNaN(val) ? 0 : val) + svcSum();
+          const fixed = fixedExtraSum();
+          const extraPct = pctSum();
+          const priced = (isNaN(val) ? 0 : val) + svcOnlySum();
+          const extraFee = Math.round(priced * extraPct / 100);
+          const base = priced + fixed + extraFee;
           let best = null;
           promoList().filter(p => p.kind === 'volume' && hours >= (+p.minHours || 0)).forEach(p => {
             if (!best || +p.percent > +best.percent) best = { ...p, by: 'volume' };
@@ -5155,13 +5166,13 @@ updatePeopleBulk();
             const p = promoList().find(x => String(x.code).toUpperCase() === code && (x.kind !== 'volume' || hours >= (+x.minHours || 0)));
             if (p && (!best || +p.percent > +best.percent)) best = { ...p, by: 'code' };
           }
-          const pct = best ? Math.min(90, Math.max(0, +best.percent || 0)) : 0;
+          const discountPct = best ? Math.min(90, Math.max(0, +best.percent || 0)) : 0;
           const known = !code || !!promoList().find(x => String(x.code).toUpperCase() === code);
           const dl = deadlineState();
-          const discounted = Math.round(base * (1 - pct / 100));
+          const discounted = Math.round(base * (1 - discountPct / 100));
           const rushFee = dl.urgent ? Math.round(discounted * dl.pct / 100) : 0;
-          return { base, pct, discounted, rushFee, sum: discounted + rushFee, rush: dl.urgent,
-            rushPct: dl.pct, deadline: dl.dl, nid: dl.nid, best, code, hours, known };
+          return { base, pct: discountPct, discounted, rushFee, sum: discounted + rushFee, rush: dl.urgent,
+            rushPct: dl.pct, deadline: dl.dl, nid: dl.nid, best, code, hours, known, extraPct, extraFee };
         };
         const metaOf = d => ({ deadline:d.deadline, rush:d.rush, rushPct:d.rushPct, rushFee:d.rushFee, nishId:d.nid });
         const paintTotals = () => {
@@ -5180,6 +5191,7 @@ updatePeopleBulk();
             return;
           }
           const parts = [];
+          if (d.extraFee) parts.push(`Надбавки ${d.extraPct}% · <b>${fmtMoney(d.extraFee)}</b>`);
           if (d.pct) parts.push(`Скидка ${d.pct}%${d.best && d.best.kind === 'volume' ? ' за объём' : ''} · <s class="faint">${money}</s> <b>${fmtMoney(d.discounted)}</b>`);
           if (d.rush) parts.push(`<span class="badge c-orange">Срочно</span> +${d.rushPct}% · <b>${fmtMoney(d.rushFee)}</b>`);
           box.innerHTML = parts.length
@@ -5210,8 +5222,8 @@ updatePeopleBulk();
             const svcs = S.calcServices[n.id] || [];
             const extras = calcExtrasFor(n.id);
             return `<div class="small"><b style="margin-bottom:4px;display:block">${esc(n.name)}</b>
-              ${svcs.map(s=>`<label class="svc-row check"><input type="checkbox" data-sv="${n.id}|${esc(s.name)}|${s.price}"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(s.name)} <span class="faint">${esc(s.unit||'')}</span></span><b>${fmtMoney(s.price)}</b></label>`).join('')}
-              ${extras.length ? `<div class="tiny faint" style="margin:6px 0 2px">Доп. опции</div>${extras.map(e=>`<label class="svc-row check"><input type="checkbox" data-ex="${n.id}|${esc(e.id)}|${e.price}"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(e.name)} <span class="faint">${esc(e.unit||'')}</span></span><b>${fmtMoney(e.price)}</b></label>`).join('')}` : ''}
+              ${svcs.map(s=>`<label class="svc-row check"><input type="checkbox" data-sv="${n.id}|${esc(s.name)}|${s.price}"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(s.name)} <span class="faint">${esc(s.unit||'')}</span></span><b>${s.price ? fmtMoney(s.price) : (s.unit === 'договорная' ? 'договорная' : fmtMoney(0))}</b></label>`).join('')}
+              ${extras.length ? `<div class="tiny faint" style="margin:6px 0 2px">Доп. опции</div>${extras.map(e=>`<label class="svc-row check"><input type="checkbox" data-ex="${n.id}|${esc(e.id)}|${Number(e.price)||0}|${Number(e.pct)||0}"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(e.name)} <span class="faint">${esc(e.unit || (e.pct ? '% от стоимости' : ''))}</span></span><b>${e.pct ? '+' + e.pct + '%' : fmtMoney(e.price)}</b></label>`).join('')}` : ''}
             </div>`;
           }).join('');
         };
@@ -5220,7 +5232,22 @@ updatePeopleBulk();
         paintDiscount();
         upd();
         g2('#cx-niche').addEventListener('change', ()=>{ paintRush(); paintDiscount(); upd(); });
-        g2('#cx-deadline').addEventListener('input', ()=>{ paintRush(); paintDiscount(); upd(); });
+        /* Срок можно задать в днях — точная дата подставляется сама;
+           ручная дата так же пересчитывает дни. */
+        const localDT = ts => new Date(ts - new Date(ts).getTimezoneOffset()*60000).toISOString().slice(0,16);
+        const syncDaysToDate = ()=>{
+          const raw = (g2('#cx-days').value || '').trim();
+          const n = Number(raw);
+          if (raw === '' || !isFinite(n) || n < 0){ g2('#cx-deadline').value = ''; return; }
+          g2('#cx-deadline').value = localDT(Date.now() + n*DAY);
+        };
+        const syncDateToDays = ()=>{
+          const v = g2('#cx-deadline').value;
+          const ts = v ? new Date(v).getTime() : 0;
+          g2('#cx-days').value = ts ? String(Math.max(0, Math.ceil((ts - Date.now())/DAY))) : '';
+        };
+        g2('#cx-days').addEventListener('input', ()=>{ syncDaysToDate(); paintRush(); paintDiscount(); upd(); });
+        g2('#cx-deadline').addEventListener('input', ()=>{ syncDateToDays(); paintRush(); paintDiscount(); upd(); });
         g2('#cx-svcs').addEventListener('change', e=>{
           const inp = e.target.closest('[data-sv],[data-ex]');
           if (inp && inp.checked){
