@@ -192,6 +192,8 @@ function seedState(){
   const now = Date.now(), T = today();
   const days = n => new Date(T.getTime() - n*DAY).getTime();
   const daysFwd = n => new Date(T.getTime() + n*DAY).getTime();
+  /* Демо: у каждого профиля одинаковый стартовый личный баланс. */
+  const DEMO_BALANCE = 100000;
 
   const users = [
     { id:'u-admin', username:'admin', email:'admin@audiowizard.ru', pw:'admin123', role:'admin', full_name:'Алексей Дьяченко', phone:'+7 912 345-67-01', about:'Слежу за тем, чтобы всё работало как часы.', mode:'system', accent:'violet', is_online:true, avatar:'', consent_marketing:true, tour_completed:false, created_at:days(300),
@@ -223,6 +225,9 @@ function seedState(){
     { id:'u-cl5', username:'fincom', email:'zakaz@finkom.ru', pw:'client123', role:'client', full_name:'АО «ФинКом»', phone:'+7 495 123-45-67', about:'Финансовая организация. Тендеры и конференции.', mode:'light', accent:'violet', is_online:true, avatar:'', consent_marketing:true, tour_completed:false, created_at:days(60),
       ext:{ company:'АО «ФинКом»', roleIn:'Сотрудник', comment:'Крупный клиент, предоплата 50%.', discountApplied:false, managerId:'u-manager', status:'active', requisites:{ inn:'9705123456', kpp:'970501001', bank:'АО «Тинькофф Банк»', account:'40701810100000001234', corr:'30101810145250000974', bik:'044525974', address:'г. Москва, ул. Финансовая, д. 5' }, consentNews:true } }
   ];
+
+  /* В демо у каждого профиля на старте 100 000 ₽ на балансе. */
+  users.forEach(u => { u.ext = u.ext || {}; u.ext.earned = DEMO_BALANCE; });
 
   /* Smartcat-аккаунты для выплат. Менеджеры тоже получают оплату через
      Smartcat — закладываем это сразу, чтобы модель не пришлось менять. */
@@ -444,7 +449,7 @@ const audit = getDemoAudit();
        доступом, балансом и заказами от имени команды. */
     teams: [],
     calcHistory:[], notifs, audit, backups:[], importLogs, importLogLines,
-    settings:{ demoEnabled:true, minPrepay:50, selfDeleteDays:90, hiddenRoutes:[], balance: 100000, appBgDoodles:true, promos: promosDefault(),
+    settings:{ demoEnabled:true, minPrepay:50, selfDeleteDays:90, hiddenRoutes:[], balance: DEMO_BALANCE, appBgDoodles:true, promos: promosDefault(),
       referral:{ enabled:true, percent:2, fixedBonus:0, karmaPerRef:2, role:'client' },
       /* Доли от суммы заказа: админ — 25% (маржа услуг), менеджер — 5%.
          Разница (итого − исполнители − админ − менеджер) показывается как
