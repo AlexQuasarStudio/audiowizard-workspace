@@ -62,6 +62,18 @@ const Finance = (function(){
   function fineSum(uid){
     return finesFor(uid).reduce((a,f) => a + (Number(f.amount) || 0), 0);
   }
+  /* После штрафа/отмены баланс меняется сразу во всех местах: плашка,
+     открытые профили и история. Раньше обновлялся только профиль, и
+     плашка могла показывать старую сумму. */
+  function refreshMoneyUi(uid){
+    try {
+      /* CRM объявлен как const, поэтому window.CRM === undefined —
+         проверяем лексический глобал через typeof. */
+      if (typeof CRM !== 'undefined' && typeof CRM.refreshMoneyUsers === 'function') CRM.refreshMoneyUsers([uid]);
+      else if (window.refreshSideBalance) window.refreshSideBalance();
+    } catch(e){}
+    try { const bp = document.querySelector('.bal-panel'); if (bp) bp.remove(); } catch(e){}
+  }
   function fine(uid, amount, reason, opts = {}){
     const u = (S.users || []).find(x => x.id === uid);
     const amt = Math.round(Math.max(0, Number(amount) || 0));
@@ -79,6 +91,7 @@ const Finance = (function(){
     withdraw(uid, amt);
     try { logAudit(`Штраф ${fmtMoney(amt)}: ${u.full_name} — ${why}`, 'Финансы'); } catch(e){}
     saveState();
+    refreshMoneyUi(uid);
     return rec;
   }
   function revokeFine(id, reason){
@@ -91,6 +104,7 @@ const Finance = (function(){
     credit(f.uid, f.amount);
     try { logAudit(`Штраф отменён: ${u ? u.full_name : f.uid} — ${fmtMoney(f.amount)}`, 'Финансы'); } catch(e){}
     saveState();
+    refreshMoneyUi(f.uid);
     return true;
   }
 

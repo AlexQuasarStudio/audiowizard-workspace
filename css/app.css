@@ -470,7 +470,7 @@ tr.inl-tr{animation:inlRowIn .2s var(--ease)}
 .calc-key--op{color:var(--accent)}
 .calc-key--eq{background:var(--grad-brand);color:#fff;border-color:transparent}
 .calc-display{background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:10px 14px;text-align:right}
-.calc-display .expr{font-size:12px;color:var(--muted);min-height:16px;font-family:var(--mono)}
+.calc-display .expr{display:block;width:100%;box-sizing:border-box;border:0;background:transparent;outline:none;padding:0;text-align:right;font-size:12px;color:var(--muted);min-height:16px;font-family:var(--mono)}
 .calc-display .val{font-size:23px;font-weight:700;letter-spacing:-.01em;word-break:break-all}
 .calc-history{max-height:110px;overflow:auto;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
 .calc-history div{padding:3px 2px;border-bottom:1px dashed var(--border);cursor:pointer}
@@ -1895,6 +1895,18 @@ html.splash-hold #splash{visibility:hidden}
    каждом из них резко грузит GPU. Неактивные — плотный полупрозрачный фон. */
 .aw-win--active{background:color-mix(in srgb,var(--panel) 82%,transparent);-webkit-backdrop-filter:blur(22px) saturate(1.25);backdrop-filter:blur(22px) saturate(1.25)}
 .aw-win:not(.aw-win--active){background:color-mix(in srgb,var(--panel) 94%,transparent);-webkit-backdrop-filter:none;backdrop-filter:none}
+/* Внутри неактивных окон стекло не размывает фон: сохраняем вид, но убираем
+   десятки backdrop-проходов, из-за которых 8–12 окон давали ~14 fps. */
+#windows-layer .aw-win:not(.aw-win--active) .card,
+#windows-layer .aw-win:not(.aw-win--active) .panel,
+#windows-layer .aw-win:not(.aw-win--active) .chat-head,
+#windows-layer .aw-win:not(.aw-win--active) .chat-input,
+#windows-layer .aw-win:not(.aw-win--active) .chat-composer,
+#windows-layer .aw-win:not(.aw-win--active) .day-sep>span{
+  -webkit-backdrop-filter:none;
+  backdrop-filter:none;
+  background:var(--panel);
+}
 .toast{background:color-mix(in srgb,var(--panel) 84%,transparent);-webkit-backdrop-filter:blur(22px) saturate(1.25);backdrop-filter:blur(22px) saturate(1.25)}
 .head-search-dd,.palette,.dropdown,.client-live,.executor-pick{background:color-mix(in srgb,var(--panel) 82%,transparent);-webkit-backdrop-filter:blur(20px) saturate(1.22);backdrop-filter:blur(20px) saturate(1.22)}
 .chat-composer{background:color-mix(in srgb,var(--bg-2) 68%,transparent);-webkit-backdrop-filter:blur(18px) saturate(1.2);backdrop-filter:blur(18px) saturate(1.2)}

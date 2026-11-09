@@ -456,7 +456,7 @@ const Windows = (() => {
   }
 
   /* ---------- Создание окна (всегда НОВОЕ, даже если есть окна того же маршрута) ---------- */
-  const MAX_WINS = 8; /* лимит открытых окон: при большем числе приложение нестабильно и мигает */
+  const MAX_WINS = 12; /* лимит окон: неактивные не держат blur, 12 тянет */
   function spawn(route, param, custom){
     const V = window.NAV_VIEWS;
     const NAV_SRC = window.NAV || [];
@@ -840,8 +840,9 @@ const Windows = (() => {
       /* Геометрия ДО драга: если окно уронят в уголок, вернём его сюда. */
       win.__dragStartRect = { left: win.style.left || (r.left + 'px'), top: win.style.top || (r.top + 'px'),
         width: win.style.width || (r.width + 'px'), height: win.style.height || (r.height + 'px') };
-      active = { kind:'drag', win:win, sx:e.clientX, sy:e.clientY, ox:r.left, oy:r.top, moved:false,
-        noToggle: !!(e.target.closest && e.target.closest('.aw-win__title--sw')) };
+      active = { kind:'drag', win:win, sx:e.clientX, sy:e.clientY, ox:r.left, oy:r.top, ow:r.width, oh:r.height, moved:false,
+        noToggle: !!(e.target.closest && e.target.closest('.aw-win__title--sw')),
+        neighbors: snapshotNeighbors(win) };
       win.classList.add('aw-win--dragging');
       document.body.classList.add('win-dragging');
       focusWin(win);
@@ -1143,6 +1144,7 @@ const Windows = (() => {
         win.__cornerPrev = null;
         win.__cornerPos = null;
         const rr0 = win.getBoundingClientRect();
+        active.ow = win.offsetWidth; active.oh = win.offsetHeight;
         active.sx = e.clientX; active.sy = e.clientY;
         active.ox = win.__expandTarget ? win.__expandTarget.left : rr0.left;
         active.oy = win.__expandTarget ? win.__expandTarget.top : rr0.top;
@@ -1160,7 +1162,9 @@ const Windows = (() => {
         return;
       }
       let x = active.ox + dx, y = active.oy + dy;
-      const w = win.offsetWidth, h = win.offsetHeight;
+      /* Размер окна зафиксирован на старте драга: offsetWidth/Height
+         на каждом mousemove заставляли браузер пересчитывать layout. */
+      const w = active.ow || win.offsetWidth, h = active.oh || win.offsetHeight;
       x = Math.max(-w + 100, Math.min(x, window.innerWidth - 100));
       y = Math.max(0, Math.min(y, window.innerHeight - 40));
       win.style.left = x + 'px';
@@ -1190,11 +1194,11 @@ const Windows = (() => {
       /* Живой вертикальный магнит: окно прилипает к соседу сверху/снизу ещё
          во время драга, без ожидания отпускания. */
       if (!cornerDrop){
-        const magY = liveVerticalMagnet(win, x, y, w, h);
+        const magY = liveVerticalMagnet(win, x, y, w, h, active.neighbors);
         if (magY !== null){ y = magY; win.style.top = y + 'px'; }
       }
       /* Предпросмотр стыка: тень гаснет сразу, как только окна прижались. */
-      previewSplitDuringDrag(win);
+      previewSplitDuringDrag(win, active.neighbors, { left:x, top:y, right:x + w, bottom:y + h });
       if (!cornerDrop){
         if (x < 26) snap = (y < 26 ? 'tl' : 'left');        /* левая половина */
         else if (x + w > window.innerWidth - 26) snap = (y < 26 ? 'tr' : 'right'); /* правая */
@@ -1288,22 +1292,17 @@ const Windows = (() => {
       el.classList.toggle('aw-win--split', adj);
     });
   }
-  /* Живой вертикальный магнит: если dragged-окно почти прижалось верхом к
-     нижнему краю соседа (или низом к его верху), притягиваем его встык ещё
-     во время движения — в полноширинном вертикальном сплите это сразу
-     показывает, что окна встанут друг над другом. */
-  function liveVerticalMagnet(win, x, y, w, h){
-    let bestY = null, bestD = 27;
+  /* Соседи фиксируются на старте драга: прямоугольники и видимость
+     (кто реально сверху) не меняются, пока тащат одно окно. Раньше
+     liveVerticalMagnet на каждый mousemove делал elementFromPoint и
+     getBoundingClientRect по всем окнам — это и давало просадки. */
+  function snapshotNeighbors(win){
+    const out = [];
     allWins().forEach(rec => {
       const el = rec.win;
       if (el === win) return;
       const o = winGeom(el);
       if (!o.width || !o.height) return;
-      /* Пересечение по горизонтали не меньше 40px: окна не липнут издалека */
-      if (!((x <= o.right - 40) && (o.left <= x + w - 40))) return;
-      /* Магнит не должен цепляться за окно, которое перекрыто другим
-         (наблюдали «магнит слетел на заднее окно»): точка в центре соседа
-         обязана принадлежать ему, а не верхнему окну. */
       try {
         const cx = Math.max(1, Math.min(window.innerWidth - 1, Math.round(o.left + o.width / 2)));
         const cy = Math.max(1, Math.min(window.innerHeight - 1, Math.round(o.top + o.height / 2)));
@@ -1311,6 +1310,20 @@ const Windows = (() => {
         const hitWin = hit && hit.closest ? hit.closest('.aw-win') : null;
         if (hitWin && hitWin !== el) return;
       } catch(e){}
+      out.push({ el, left:o.left, top:o.top, right:o.right, bottom:o.bottom, width:o.width, height:o.height });
+    });
+    return out;
+  }
+  /* Живой вертикальный магнит: если dragged-окно почти прижалось верхом к
+     нижнему краю соседа (или низом к его верху), притягиваем его встык ещё
+     во время движения — в полноширинном вертикальном сплите это сразу
+     показывает, что окна встанут друг над другом. */
+  function liveVerticalMagnet(win, x, y, w, h, neighbors){
+    let bestY = null, bestD = 27;
+    (neighbors || snapshotNeighbors(win)).forEach(o => {
+      if (!o || !o.el || o.el === win) return;
+      /* Пересечение по горизонтали не меньше 40px: окна не липнут издалека */
+      if (!((x <= o.right - 40) && (o.left <= x + w - 40))) return;
       const dTop = Math.abs(o.bottom - y);            /* верхом к низу соседа */
       const dBot = Math.abs(o.top - (y + h));         /* низом к верху соседа */
       if (dTop < bestD){ bestD = dTop; bestY = Math.round(o.bottom); }
@@ -1322,20 +1335,17 @@ const Windows = (() => {
   /* Стык во время драга: как только окно прижалось к соседу, оба получают
      класс сплита — тень плавно гаснет сразу, ещё до отпускания кнопки.
      На дропе состояние пересчитывает syncSplitClasses. */
-  function previewSplitDuringDrag(win){
+  function previewSplitDuringDrag(win, neighbors, rect){
     if (!win) return;
-    const r = winGeom(win);
+    const r = rect || winGeom(win);
     const near = [];
-    allWins().forEach(rec => {
-      const el = rec.win;
-      if (el === win) return;
-      const o = winGeom(el);
-      if (!o.width || !o.height) return;
+    (neighbors || snapshotNeighbors(win)).forEach(o => {
+      if (!o || !o.el || o.el === win) return;
       const vertOv = (r.top <= o.bottom - 10) && (o.top <= r.bottom - 10);
       const horOv  = (r.left <= o.right - 10) && (o.left <= r.right - 10);
       const horAdj = vertOv && (Math.abs(o.left - r.right) <= 12 || Math.abs(o.right - r.left) <= 12);
       const verAdj = horOv  && (Math.abs(o.top - r.bottom) <= 12 || Math.abs(o.bottom - r.top) <= 12);
-      if (horAdj || verAdj) near.push(el);
+      if (horAdj || verAdj) near.push(o.el);
     });
     (win.__splitPeek || []).forEach(el => {
       if (el !== win && near.indexOf(el) < 0 && !el.__inSplit) el.classList.remove('aw-win--split');
@@ -1611,7 +1621,7 @@ const Windows = (() => {
         const store = JSON.parse(sessionStorage.getItem('aw_wins') || '{"wins":[]}');
         const arr = store.wins.filter(x => x.route !== win._route);
         arr.push({ route: win._route, left: win.style.left || '36px', top: win.style.top || '36px', width: win.style.width, height: win.style.height, z: win.style.zIndex || 3010 });
-        sessionStorage.setItem('aw_wins', JSON.stringify({ wins: arr.slice(-8) }));
+        sessionStorage.setItem('aw_wins', JSON.stringify({ wins: arr.slice(-12) }));
       } catch(e2){}
     }
     if (active){

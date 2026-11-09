@@ -195,6 +195,11 @@ const SITE_CALC_SERVICES = {
    («Факторы надбавки к стоимости»), фиксированные цены — из прайса. */
 const DEFAULT_CALC_SETTINGS = {
   rushPct: { n1:10, n2:10, n3:10 },
+  /* Минимумы и стандартный срок по категории: 0 = взять общий минимум
+     из «Выплат» / считать срок по истории. */
+  minPrice: { n1:1000, n2:1000, n3:1000 },
+  minExecPrice: { n1:100, n2:100, n3:100 },
+  deadlineDays: { n1:0, n2:0, n3:0 },
   extras: {
     n1: [
       { id:'ce-a1', name:'Плохое качество записи', price:0, pct:30, unit:'% от стоимости', active:true },
@@ -214,11 +219,27 @@ function siteCalcServices(){ return JSON.parse(JSON.stringify(SITE_CALC_SERVICES
 function defaultCalcSettings(){ return JSON.parse(JSON.stringify(DEFAULT_CALC_SETTINGS)); }
 function calcSettingsSeed(){
   const base = defaultCalcSettings();
-  const rushPct = {}, extras = {};
+  const rushPct = {}, extras = {}, minPrice = {}, minExecPrice = {}, deadlineDays = {};
   /* Ключи привязаны к сид-нишам; для новых ниш значения создаёт миграция. */
   (Object.keys(base.rushPct) || []).forEach(k => { rushPct[k] = base.rushPct[k]; });
   Object.keys(base.extras).forEach(k => { extras[k] = base.extras[k]; });
-  return { rushPct, extras };
+  Object.keys(base.minPrice).forEach(k => { minPrice[k] = base.minPrice[k]; });
+  Object.keys(base.minExecPrice).forEach(k => { minExecPrice[k] = base.minExecPrice[k]; });
+  Object.keys(base.deadlineDays).forEach(k => { deadlineDays[k] = base.deadlineDays[k]; });
+  return { rushPct, extras, minPrice, minExecPrice, deadlineDays };
+}
+/* Безопасные значения для расчётов и формы заказа. */
+function minPriceFor(nid){
+  const v = (((S || {}).calcSettings || {}).minPrice || {})[nid];
+  return Math.max(0, Math.round(Number(v) || 0));
+}
+function minExecPriceFor(nid){
+  const v = (((S || {}).calcSettings || {}).minExecPrice || {})[nid];
+  return Math.max(0, Math.round(Number(v) || 0));
+}
+function deadlineDaysFor(nid){
+  const v = (((S || {}).calcSettings || {}).deadlineDays || {})[nid];
+  return Math.max(0, Math.round(Number(v) || 0));
 }
 
 /* ---------- Сид-данные ---------- */
@@ -575,12 +596,18 @@ function migrateSiteCatalog(){
   if (!S.calcSettings) S.calcSettings = { rushPct:{}, extras:{} };
   if (!S.calcSettings.rushPct) S.calcSettings.rushPct = {};
   if (!S.calcSettings.extras) S.calcSettings.extras = {};
+  if (!S.calcSettings.minPrice) S.calcSettings.minPrice = {};
+  if (!S.calcSettings.minExecPrice) S.calcSettings.minExecPrice = {};
+  if (!S.calcSettings.deadlineDays) S.calcSettings.deadlineDays = {};
   const services = siteCalcServices();
   const def = defaultCalcSettings();
   (S.niches || []).forEach(n => {
     if (services[n.id]) S.calcServices[n.id] = services[n.id];
     if (def.rushPct[n.id] != null) S.calcSettings.rushPct[n.id] = def.rushPct[n.id];
     if (def.extras[n.id]) S.calcSettings.extras[n.id] = JSON.parse(JSON.stringify(def.extras[n.id]));
+    if (def.minPrice[n.id] != null) S.calcSettings.minPrice[n.id] = def.minPrice[n.id];
+    if (def.minExecPrice[n.id] != null) S.calcSettings.minExecPrice[n.id] = def.minExecPrice[n.id];
+    if (def.deadlineDays[n.id] != null) S.calcSettings.deadlineDays[n.id] = def.deadlineDays[n.id];
   });
   S.settings.calcCatalogVersion = SITE_CALC_VERSION;
 }
@@ -601,8 +628,14 @@ function migrateSchema(){
   if (!S.calcSettings || typeof S.calcSettings !== 'object') S.calcSettings = {};
   if (!S.calcSettings.rushPct || typeof S.calcSettings.rushPct !== 'object') S.calcSettings.rushPct = {};
   if (!S.calcSettings.extras || typeof S.calcSettings.extras !== 'object') S.calcSettings.extras = {};
+  ['minPrice','minExecPrice','deadlineDays'].forEach(k => {
+    if (!S.calcSettings[k] || typeof S.calcSettings[k] !== 'object') S.calcSettings[k] = {};
+  });
   (S.niches || []).forEach(n => {
     if (S.calcSettings.rushPct[n.id] == null) S.calcSettings.rushPct[n.id] = def.rushPct[n.id] != null ? def.rushPct[n.id] : 10;
+    if (S.calcSettings.minPrice[n.id] == null) S.calcSettings.minPrice[n.id] = def.minPrice[n.id] != null ? def.minPrice[n.id] : 0;
+    if (S.calcSettings.minExecPrice[n.id] == null) S.calcSettings.minExecPrice[n.id] = def.minExecPrice[n.id] != null ? def.minExecPrice[n.id] : 0;
+    if (S.calcSettings.deadlineDays[n.id] == null) S.calcSettings.deadlineDays[n.id] = def.deadlineDays[n.id] != null ? def.deadlineDays[n.id] : 0;
     if (!Array.isArray(S.calcSettings.extras[n.id])) S.calcSettings.extras[n.id] = def.extras[n.id] ? JSON.parse(JSON.stringify(def.extras[n.id])) : [];
     S.calcSettings.extras[n.id] = S.calcSettings.extras[n.id].filter(x => x && x.name).map((x, i) => ({
       id: x.id || ('ce-' + n.id + '-' + i),

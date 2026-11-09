@@ -1518,9 +1518,10 @@ const CRM = (() => {
       source = 'всем выполненным заказам';
     }
     const med = median(vals);
-    const base = med ? Math.max(1, Math.ceil(med)) : (DEADLINE_FALLBACK[nishId] || 4);
+    const fixedDays = deadlineDaysFor(nishId);
+    const base = fixedDays > 0 ? fixedDays : (med ? Math.max(1, Math.ceil(med)) : (DEADLINE_FALLBACK[nishId] || 4));
     const buffer = Math.max(1, Math.ceil(base * 0.1));
-    return { days: base + buffer, base, buffer, sample: vals.length, source: vals.length ? source : 'типовому сроку ниши' };
+    return { days: base + buffer, base, buffer, sample: vals.length, source: fixedDays > 0 ? 'настройке категории' : (vals.length ? source : 'типовому сроку ниши') };
   }
   /* Кого предложить: опыт с этим клиентом, профильная специализация, работа
      в нише, свободная загрузка и высокий рейтинг. Причины показываем рядом. */
@@ -2087,8 +2088,8 @@ const CRM = (() => {
         mask.querySelector('[data-save]').onclick = async ()=>{
           const c = collect();
           if (!c.client_id || !c.nish_id || !c.total){ toast('Заполните клиента, нишу и сумму','err'); return; }
-          const minTotal = window.Finance ? Finance.cfg().minOrderTotal : 500;
-          const minExec = window.Finance ? Finance.cfg().minExecutorPay : 100;
+          const minTotal = minPriceFor(c.nish_id) || (window.Finance ? Finance.cfg().minOrderTotal : 500);
+          const minExec = minExecPriceFor(c.nish_id) || (window.Finance ? Finance.cfg().minExecutorPay : 100);
           if (!c.is_test && c.total < minTotal){ toast(`Минимальная стоимость заказа — ${fmtMoney(minTotal)} (кроме тестового)`,'err'); const tf=g('#of-total'); if(tf){ tf.classList.add('is-bad'); tf.focus(); } return; }
           if (!c.is_test && c.executors.some(e=>(e.amount||0) < minExec)){ toast(`Оплата исполнителя — не ниже ${fmtMoney(minExec)} (кроме тестового)`,'err'); return; }
           if (!c.order_id){ c.order_id = generateOrderId(); }
@@ -3479,23 +3480,21 @@ updatePeopleBulk();
      окно штрафа, карточка человека остаётся на месте. */
   function updateProfileMoney(p){
     if (!p) return;
-    const host = document.querySelector(`[data-person-id="${p.id}"]`);
-    if (!host) return;
-    const bal = host.querySelector('[data-bal]');
-    if (bal){
-      bal.textContent = fmtMoney(balOf(p));
-      bal.classList.toggle('neg', balOf(p) < 0);
-    }
-    const debt = host.querySelector('[data-debt]');
-    if (debt){
-      debt.textContent = fmtMoney(window.Finance ? Finance.debtsOf(p.id) : 0);
-    }
-    const card = host.querySelector('[data-fines-card]');
-    if (card){
-      card.innerHTML = finesCardHTML(p);
-      const fh = card.querySelector('[data-fines]');
-      fh && (fh.onclick = ()=>openFinesHistory(p));
-    }
+    const hosts = document.querySelectorAll(`[data-person-id="${p.id}"]`);
+    hosts.forEach(host => {
+      host.querySelectorAll('[data-bal]').forEach(bal => {
+        bal.textContent = fmtMoney(balOf(p));
+        bal.classList.toggle('neg', balOf(p) < 0);
+      });
+      host.querySelectorAll('[data-debt]').forEach(debt => {
+        debt.textContent = fmtMoney(window.Finance ? Finance.debtsOf(p.id) : 0);
+      });
+      host.querySelectorAll('[data-fines-card]').forEach(card => {
+        card.innerHTML = finesCardHTML(p);
+        const fh = card.querySelector('[data-fines]');
+        fh && (fh.onclick = ()=>openFinesHistory(p));
+      });
+    });
   }
 
   /* Стабильные номера людей (вариант 2): монотонный счётчик, каждой новой
@@ -3930,8 +3929,6 @@ updatePeopleBulk();
           const rec = Finance.fine(p.id, amount, reason);
           if (!rec){ toast('Не удалось назначить штраф','err'); return; }
           close();
-          refreshPerson(p);
-          updateProfileMoney(p);
           toast(`Штраф ${fmtMoney(amount)} назначен`, 'ok');
         };
       }
@@ -3973,8 +3970,6 @@ updatePeopleBulk();
           if (!ok) return;
           Finance.revokeFine(f.id, 'Отменён вручную');
           close();
-          refreshPerson(p);
-          updateProfileMoney(p);
           toast('Штраф отменён, сумма возвращена на баланс','ok');
         });
       }
@@ -5053,11 +5048,11 @@ updatePeopleBulk();
     const daysValue = dlTs ? String(Math.max(0, Math.ceil((dlTs - Date.now())/DAY))) : '';
     const m = openWinModal({
       narrow:true, tall:true, title:'Калькулятор услуг', route:'orders',
-      body:`<div class="calc-display"><div class="expr" id="cx-expr">введите выражение с клавиатуры</div><div class="val" id="cx-val">0</div></div>
-        <div class="field" style="margin-top:12px"><label>Выражение</label>
-          <input class="input mono" id="cx-in" placeholder="например: 2.5 × 1800 + 5600" autocomplete="off" spellcheck="false">
-          <div class="small faint">Поддерживаются + − × ÷ ( ) % и запятая как десятичный разделитель · Enter — в результат</div>
+      body:`<div class="calc-display">
+          <input class="expr" id="cx-in" placeholder="например: 2.5 × 1800 + 5600" autocomplete="off" spellcheck="false" aria-label="Выражение">
+          <div class="val" id="cx-val">0</div>
         </div>
+        <div class="small faint" style="margin-top:6px">Поддерживаются + − × ÷ ( ) % и запятая как десятичный разделитель · Enter — в результат</div>
         <div class="row" style="margin-top:10px"><span class="small muted" id="cx-live"></span><span class="spacer"></span>
           ${onResult?'<button class="btn btn--primary btn--sm" data-apply>Подставить в заказ</button>':''}</div>
         <div class="calc-history" id="cx-hist" style="margin-top:12px">${S.calcHistory.slice(-6).reverse().map(h=>`<div data-h="${h.result}">${esc(h.expression)} = ${h.result}</div>`).join('')}</div>
@@ -5105,7 +5100,6 @@ updatePeopleBulk();
           const v = compute(raw);
           val = v;
           g2('#cx-live').textContent = isNaN(v) ? (raw ? 'проверьте выражение' : '') : `= ${v}`;
-          g2('#cx-expr').textContent = raw;
           paintTotals();
         };
         g2('#cx-in').addEventListener('input', upd);
@@ -5171,7 +5165,10 @@ updatePeopleBulk();
           const dl = deadlineState();
           const discounted = Math.round(base * (1 - discountPct / 100));
           const rushFee = dl.urgent ? Math.round(discounted * dl.pct / 100) : 0;
-          return { base, pct: discountPct, discounted, rushFee, sum: discounted + rushFee, rush: dl.urgent,
+          const rawSum = discounted + rushFee;
+          const minTotal = minPriceFor(dl.nid);
+          const sum = (base > 0 && minTotal > 0) ? Math.max(minTotal, rawSum) : rawSum;
+          return { base, pct: discountPct, discounted, rushFee, sum, minTotal, minApplied: sum > rawSum, rush: dl.urgent,
             rushPct: dl.pct, deadline: dl.dl, nid: dl.nid, best, code, hours, known, extraPct, extraFee };
         };
         const metaOf = d => ({ deadline:d.deadline, rush:d.rush, rushPct:d.rushPct, rushFee:d.rushFee, nishId:d.nid });
@@ -5194,6 +5191,7 @@ updatePeopleBulk();
           if (d.extraFee) parts.push(`Надбавки ${d.extraPct}% · <b>${fmtMoney(d.extraFee)}</b>`);
           if (d.pct) parts.push(`Скидка ${d.pct}%${d.best && d.best.kind === 'volume' ? ' за объём' : ''} · <s class="faint">${money}</s> <b>${fmtMoney(d.discounted)}</b>`);
           if (d.rush) parts.push(`<span class="badge c-orange">Срочно</span> +${d.rushPct}% · <b>${fmtMoney(d.rushFee)}</b>`);
+          if (d.minApplied) parts.push(`Минимальная стоимость категории · <b>${fmtMoney(d.minTotal)}</b>`);
           box.innerHTML = parts.length
             ? parts.join('<br>') + `<br>К оплате <b>${fmtMoney(d.sum)}</b>`
             : `<span class="faint">Скидок и надбавок нет · к оплате ${money}</span>`;

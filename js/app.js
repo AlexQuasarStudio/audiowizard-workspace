@@ -7905,9 +7905,15 @@ const cm = root.querySelector('.chat-main');
             <tbody data-niche="${n.id}">${rows(n.id)}</tbody>
           </table></div>
           <div class="row" style="gap:10px;margin-top:10px;flex-wrap:wrap;align-items:flex-end">
+            <div class="field" style="max-width:170px"><label>Мин. цена, ₽</label>
+              <input class="input" data-min-price="${n.id}" type="number" min="0" step="50" value="${minPriceFor(n.id)}"></div>
+            <div class="field" style="max-width:200px"><label>Мин. оплата исполнителю, ₽</label>
+              <input class="input" data-min-exec="${n.id}" type="number" min="0" step="10" value="${minExecPriceFor(n.id)}"></div>
+            <div class="field" style="max-width:150px"><label>Срок, дней</label>
+              <input class="input" data-deadline-days="${n.id}" type="number" min="0" step="1" value="${deadlineDaysFor(n.id) || ''}" placeholder="авто"></div>
             <div class="field" style="max-width:210px"><label>Надбавка за срочность, %</label>
               <input class="input" data-rush-pct="${n.id}" type="number" min="0" max="200" step="1" value="${rushPctFor(n.id)}"></div>
-            <span class="small faint" style="margin-bottom:8px">По умолчанию 10%. Применяется, если срок короче обычного.</span>
+            <span class="small faint" style="margin-bottom:8px">0 — общий минимум из «Выплат» и авто-срок. Срочность применяется, если срок короче обычного.</span>
           </div>
           <div class="row row--between" style="margin-top:12px"><span class="small muted">Доп. опции</span>
             <button class="btn btn--ghost btn--sm" data-add-extra="${n.id}" type="button">${icon('plus')} Опция</button></div>
@@ -8603,8 +8609,15 @@ const cm = root.querySelector('.chat-main');
             if (!name) return;
             extras.push({ id: tr.dataset.eid, name, price: Math.max(0, +gf('price').value || 0), pct: Math.max(0, Math.min(200, +((gf('pct')||{}).value) || 0)), unit: gf('unit').value.trim(), active: !!gf('active').checked });
           });
-          S.calcSettings = S.calcSettings || { rushPct:{}, extras:{} };
+          S.calcSettings = S.calcSettings || { rushPct:{}, extras:{}, minPrice:{}, minExecPrice:{}, deadlineDays:{} };
           S.calcSettings.extras[nid] = extras;
+          S.calcSettings.minPrice = S.calcSettings.minPrice || {};
+          S.calcSettings.minExecPrice = S.calcSettings.minExecPrice || {};
+          S.calcSettings.deadlineDays = S.calcSettings.deadlineDays || {};
+          const num = sel => Math.max(0, Math.round(+((el.querySelector(sel) || {}).value) || 0));
+          S.calcSettings.minPrice[nid] = num(`[data-min-price="${nid}"]`);
+          S.calcSettings.minExecPrice[nid] = num(`[data-min-exec="${nid}"]`);
+          S.calcSettings.deadlineDays[nid] = num(`[data-deadline-days="${nid}"]`);
           const rp = el.querySelector(`[data-rush-pct="${nid}"]`);
           S.calcSettings.rushPct[nid] = Math.max(0, Math.min(200, +((rp || {}).value) || 0));
         });
@@ -8739,7 +8752,22 @@ const cm = root.querySelector('.chat-main');
       el.querySelector('#pr-demo').addEventListener('change', e=>{
         S.settings = S.settings || {};
         S.settings.demoEnabled = e.target.checked;
-        saveState(); toast('Демо-вход: ' + (e.target.checked ? 'включён' : 'отключён полностью'), 'ok');
+        if (e.target.checked){
+          /* Перезапуск демо: чистые балансы и никаких действующих штрафов,
+             иначе карточка штрафов снова разойдётся с балансом. */
+          (S.users || []).forEach(u => { u.ext = u.ext || {}; u.ext.earned = 100000; });
+          (S.fines || []).forEach(f => {
+            if (f.revoked_at) return;
+            f.revoked_at = Date.now();
+            f.revoked_by = 'system';
+            f.revoked_reason = 'Сброс демо-режима';
+          });
+          saveState();
+          toast('Демо включён: балансы сброшены до 100 000 ₽', 'ok');
+        } else {
+          saveState();
+          toast('Демо-вход отключён полностью', 'ok');
+        }
         APP.render();
       });
       el.querySelector('#pr-save').onclick = ()=>{
