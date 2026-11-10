@@ -132,8 +132,7 @@ const Windows = (() => {
           if (s.cornerPrev) win.__cornerPrev = s.cornerPrev;
           if (s.max){
             win._prevRect = { left: s.max.left, top: s.max.top, width: s.max.width, height: s.max.height };
-            const mb = win.querySelector('.aw-win__max');
-            if (mb){ mb.innerHTML = icon('shrink','ico-sm'); mb.title = 'Восстановить'; }
+            setMaxState(win, true);
           }
         }
         /* Свёрнутое окно остаётся свёрнутым после обновления: прячем его
@@ -442,6 +441,14 @@ const Windows = (() => {
     return winsFor(route).length > 0;
   }
 
+  /* Иконка разворота меняется классом: expand и shrink лежат стопкой,
+     поэтому переход идёт плавно, без мгновенной подмены разметки. */
+  function setMaxState(win, maxed){
+    win.classList.toggle('aw-win--maxed', !!maxed);
+    const mb = win.querySelector('.aw-win__max');
+    if (mb) mb.title = maxed ? 'Восстановить' : 'На весь экран';
+  }
+
   /* ---------- Плавный разворот на весь экран ---------- */
   function toggleMax(win, btn){
     const prev = win._prevRect;
@@ -453,16 +460,14 @@ const Windows = (() => {
       win.style.right = ''; win.style.bottom = '';
       win.style.minWidth = ''; win.style.minHeight = '';
       win._prevRect = null;
-      btn.innerHTML = icon('expand','ico-sm');
-      btn.title = 'На весь экран';
+      setMaxState(win, false);
     } else {
       win._prevRect = { left: win.style.left, top: win.style.top, width: win.style.width, height: win.style.height };
       win.style.left = '0'; win.style.top = '0';
       win.style.width = '100vw'; win.style.height = '100vh';
       win.style.right = ''; win.style.bottom = '';
       win.style.minWidth = '0'; win.style.minHeight = '0';
-      btn.innerHTML = icon('shrink','ico-sm');
-      btn.title = 'Восстановить';
+      setMaxState(win, true);
     }
     anim();
     focusWin(win);
@@ -557,7 +562,7 @@ const Windows = (() => {
     head.className = 'aw-win__head';
     head.innerHTML = '<span class="aw-win__title aw-win__title--sw" role="button" title="Сменить раздел">' + icon(iconName,'ico-sm') + ' <b>' + esc(title) + '</b>' + icon('chev-d','ico-sm') + '</span><span class="spacer"></span>' +
       '<button class="iconbtn aw-win__min" title="Свернуть окно раздела"><span class="win-min-ico win-min-ico--dash">&minus;</span><span class="win-min-ico win-min-ico--down">' + icon('chev-d','ico-sm') + '</span><span class="win-min-ico win-min-ico--up">' + icon('chev-u','ico-sm') + '</span></button>' +
-      '<button class="iconbtn aw-win__max" title="Развернуть окно раздела">' + icon('expand','ico-sm') + '</button>' +
+      '<button class="iconbtn aw-win__max" title="Развернуть окно раздела"><span class="win-max-ico win-max-ico--expand">' + icon('expand','ico-sm') + '</span><span class="win-max-ico win-max-ico--shrink">' + icon('shrink','ico-sm') + '</span></button>' +
       '<button class="iconbtn aw-win__close" title="Закрыть окно раздела — приложение останется">' + icon('x','ico-sm') + '</button>';
     const body = document.createElement('div');
     body.className = 'aw-win__body';
@@ -619,7 +624,12 @@ const Windows = (() => {
     const total = allWins().length;
     const W_DEF = 'min(560px, calc(100vw - 80px))', H_DEF = 'min(440px, calc(100vh - 90px))';
     const sideW = (document.querySelector('.side') || { getBoundingClientRect: () => ({ right: 0 }) }).getBoundingClientRect().right;
-    if (param && typeof param.x === 'number' && typeof param.y === 'number'){
+    const snapRect = (param && param.snap) ? snapRectFor(param.snap) : null;
+    if (snapRect){
+      /* Дроп пункта меню в подсказку сплита: окно сразу занимает половину */
+      win.style.left = snapRect.left + 'px'; win.style.top = snapRect.top + 'px';
+      win.style.width = snapRect.width + 'px'; win.style.height = snapRect.height + 'px';
+    } else if (param && typeof param.x === 'number' && typeof param.y === 'number'){
       win.style.width = W_DEF; win.style.height = H_DEF;
       const wDef = 560;
       const minLeft = (param.forceRight ? sideW + 16 : 8);
@@ -1321,6 +1331,12 @@ const Windows = (() => {
       } else if (g){ g.style.display = 'none'; g.classList.remove('aw-snap-guide--corner'); }
       win.__lastSnap = cornerDrop ? null : snap; /* магнит к краю: применим на mouseup */
     } else if (active.kind === 'resize'){
+      /* Ресайз развёрнутого окна — это уже не полный экран: иконка плавно
+         возвращается к «На весь экран», а не остаётся «Восстановить». */
+      if (win._prevRect){
+        win._prevRect = null;
+        setMaxState(win, false);
+      }
       const d = active.dir;
       let L = active.ox, T = active.oy, W = active.ow, H = active.oh;
       if (d.includes('e')) W = Math.max(300, active.ow + dx);

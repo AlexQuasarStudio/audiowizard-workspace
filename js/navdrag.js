@@ -49,6 +49,7 @@ const NavDrag = (() => {
   // Отмена: вернуть элемент на его прежнее место (по снимку)
   function cancel(){
     if (!drag) return;
+    hideSplitHints();
     const el = drag.el, ph = drag.placeholder;
     if (el){
       el.classList.remove('menu-drag-live');
@@ -101,6 +102,7 @@ const NavDrag = (() => {
     guide.hidden = true;
     document.body.appendChild(guide);
     drag = { el, placeholder: ph, guide, _parent: parent, _order: orderSnapshot() };
+    if (!el.classList.contains('side__sec')) ensureHints();
     const nav = document.querySelector('.side__nav');
     if (nav) nav.classList.add('menu-drag-active');
     document.body.classList.add('menu-dragging');
@@ -130,6 +132,65 @@ const NavDrag = (() => {
   function hideGuide(){
     if (drag && drag.guide) drag.guide.hidden = true;
     document.querySelectorAll(guideSel).forEach(g => g.hidden = true);
+  }
+
+  /* Куда именно упадёт окно: четыре половины экрана. Подсказки показываем
+     все сразу, а подсвечиваем ту, к которой ближе курсор. */
+  function splitZoneAt(cx, cy){
+    if (cx < navRight()) return null;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const dx = vw * 0.22, dy = vh * 0.22;
+    const edges = [['left', cx, dx], ['right', vw - cx, dx], ['top', cy, dy], ['bottom', vh - cy, dy]];
+    edges.sort((a, b) => a[1] - b[1]);
+    return edges[0][1] <= edges[0][2] ? edges[0][0] : null;
+  }
+
+  function ensureHints(){
+    if (!drag) return null;
+    if (drag.hints) return drag.hints;
+    document.querySelectorAll('.menu-split-hints').forEach(x => x.remove());
+    const h = document.createElement('div');
+    h.className = 'menu-split-hints';
+    h.innerHTML = '<div class="menu-split-preview"></div>' + [
+      ['left','Слева','split-left'], ['right','Справа','split-right'],
+      ['top','Сверху','split-quarter'], ['bottom','Снизу','split-quarter']
+    ].map(([z, label, ic]) => `<div class="menu-split-hint" data-zone="${z}"><span class="menu-split-hint__ic">${icon(ic,'ico-sm')}</span><span>${label}</span></div>`).join('');
+    document.body.appendChild(h);
+    drag.hints = h;
+    return h;
+  }
+
+  function updateHints(zone){
+    if (!drag) return;
+    const h = ensureHints();
+    if (!h) return;
+    h.classList.add('is-on');
+    h.classList.remove('is-out');
+    h.querySelectorAll('.menu-split-hint').forEach(el => el.classList.toggle('is-hot', el.dataset.zone === zone));
+    const pv = h.querySelector('.menu-split-preview');
+    if (!pv) return;
+    if (!zone){ pv.classList.remove('is-on'); return; }
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const halfW = Math.round(vw / 2), halfH = Math.round(vh / 2);
+    const r = zone === 'left' ? { left:8, top:8, width:halfW-12, height:vh-16 }
+      : zone === 'right' ? { left:halfW+4, top:8, width:vw-halfW-12, height:vh-16 }
+      : zone === 'top' ? { left:8, top:8, width:vw-16, height:halfH-12 }
+      : { left:8, top:halfH+4, width:vw-16, height:vh-halfH-12 };
+    pv.style.left = r.left + 'px'; pv.style.top = r.top + 'px';
+    pv.style.width = r.width + 'px'; pv.style.height = r.height + 'px';
+    pv.classList.add('is-on');
+  }
+
+  function hideSplitHints(){
+    const h = drag && drag.hints;
+    if (!h) return;
+    drag.hints = null;
+    h.classList.remove('is-on');
+    h.classList.add('is-out');
+    const pv = h.querySelector('.menu-split-preview');
+    if (pv) pv.classList.remove('is-on');
+    h.querySelectorAll('.menu-split-hint.is-hot').forEach(el => el.classList.remove('is-hot'));
+    setTimeout(() => { if (h.isConnected) h.remove(); }, 190);
   }
 
   function dropTargetAt(cx, cy){
@@ -171,14 +232,19 @@ const NavDrag = (() => {
     }
     /* Ghost окна (зона справа) — только для пунктов: разделы во вьюпорт не переносятся */
     if (!sEl && !target && cx >= navRight()){
-      showGuide(cx, cy);
+      const zone = splitZoneAt(cx, cy);
+      updateHints(zone);
+      if (zone) hideGuide(); else showGuide(cx, cy);
     } else {
+      hideSplitHints();
       hideGuide();
     }
   }
 
   function finish(cx, cy){
     if (!drag) return;
+    const splitZone = splitZoneAt(cx, cy);
+    hideSplitHints();
     const src = drag.el;
     const under = document.elementFromPoint(cx, cy);
     const navNow = document.querySelector('.side__nav');
@@ -252,8 +318,13 @@ const NavDrag = (() => {
         }
       }
     } else if (cx >= navRight() && src.classList.contains('side__link')){
-      // Дроп справа от меню → окно слева от правого края меню
-      try { Windows.spawn(src.dataset.route, { x: cx, y: cy, forceRight: true }); } catch(e){}
+      /* Бросок в подсказку сплита — окно сразу в нужной половине;
+         иначе оставляем свободное окно по месту курсора. */
+      try {
+        Windows.spawn(src.dataset.route, splitZone
+          ? { snap: splitZone }
+          : { x: cx, y: cy, forceRight: true });
+      } catch(e){}
       moved = true;
     }
     /* Перестановка, которая вернула тот же порядок (например, дроп в свою же

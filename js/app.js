@@ -827,10 +827,11 @@ const QA = {
   report:     { id:'report',     label:'Сообщить о проблеме',   icon:'alert',     run:()=>reportProblem() },
   invite:     { id:'invite',     label:'Пригласить в приложение', icon:'user-plus', run:()=>{ if (window.openInvites) window.openInvites(); else toast('Приглашения — в разделе «Люди»','info'); } },
   kanban:     { id:'kanban',     label:'Канбан задач',          icon:'kanban',    run:()=>go('kanban') },
+  planner:    { id:'planner',    label:'Планировщик',           icon:'calendar',  run:()=>go('settings','reminders') },
   team:       { id:'team',       label:'Исполнители',           icon:'executor',  run:()=>go('executors') }
 };
 const QUICK_BY_ROLE = {
-  admin:       ['order','calc','client','executor','-','chats','transcribe','texts','translate','-','invite','report'],
+  admin:       ['order','calc','client','executor','-','chats','transcribe','texts','translate','-','invite','planner'],
   top_manager: ['order','calc','client','executor','-','chats','transcribe','texts','translate','-','invite','report'],
   manager:     ['order','calc','client','-','chats','texts','kanban','-','invite','report'],
   client:      ['order','-','chats','ticket','report'],
@@ -3908,6 +3909,17 @@ ex.innerHTML = avatarHTML(user(), '');
       }, 160);
     };
     window.__chatWidget = { render: renderWidget, close: closeWidget, minimize: minimizeWidget };
+  /* Поле ввода чата растёт под текст до разумного предела, дальше — скролл */
+  const growChatInput = (ta)=>{
+    if (!ta) return;
+    /* Сброс в auto нужен, чтобы scrollHeight не был равен уже раздутой
+       высоте: иначе после удаления текста поле не сжималось обратно. */
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
+  };
+  document.addEventListener('input', e=>{
+    if (e.target && e.target.id === 'chat-t') growChatInput(e.target);
+  }, true);
   /* Дата в чате: глобальное делегирование — перерисовка ленты не рвёт обработчик */
   const dayTargetTop = (nb, mid)=>{
     /* Цель — сама плашка этой даты: встаёт на sticky-позицию, под ней
@@ -4982,7 +4994,7 @@ const cm = root.querySelector('.chat-main');
                   </div>`}</div>`;
           if (tab==='emoji'){
             dd.querySelectorAll('[data-em]').forEach(b=>b.onclick = ()=>{
-              const t = $('#chat-t', root); t.value += b.dataset.em; t.focus(); closeEmoji();
+              const t = $('#chat-t', root); t.value += b.dataset.em; growChatInput(t); t.focus(); closeEmoji();
             });
           } else if (tab==='poll'){
             const optsBox = dd.querySelector('#pq-opts');
@@ -5315,6 +5327,7 @@ const cm = root.querySelector('.chat-main');
         return bar;
       };
       const chatTa = $('#chat-t', root);
+      growChatInput(chatTa);
       /* Восстановление фокуса: если пользователь печатал (фокус был в поле),
          после пересоздания DOM возвращаем курсор в текстовую область —
          отправка (кнопка/Enter) не должна выбрасывать из режима набора. */
@@ -5386,6 +5399,7 @@ const cm = root.querySelector('.chat-main');
           if (sp){
             const cur2 = chatTa.value; const at2 = cur2.lastIndexOf('@');
             chatTa.value = (at2 >= 0 ? cur2.slice(0, at2) : cur2) + '@' + sp.dataset.mentionSpec + ' ';
+            growChatInput(chatTa);
             chatTa.focus(); closeMentionDD(); return;
           }
           const b = ev.target.closest('[data-mention],[data-mention-role]');
@@ -5395,6 +5409,7 @@ const cm = root.querySelector('.chat-main');
           const cur = chatTa.value;
           const at = cur.lastIndexOf('@');
           chatTa.value = (at >= 0 ? cur.slice(0, at) : cur) + tok;
+          growChatInput(chatTa);
           chatTa.focus();
           closeMentionDD();
         });
@@ -5463,6 +5478,7 @@ const cm = root.querySelector('.chat-main');
         try { return sessionStorage.getItem(draftKey) || ''; } catch(e){ return ''; }
       };
       if (!editSrc && !chatTa.value) chatTa.value = draftLoad();
+      growChatInput(chatTa);
       /* Черновик после жёсткой перезагрузки: сразу показываем самолётик, а не микрофон */
       {
         const sb = root.querySelector('#btn-send');
