@@ -3420,6 +3420,8 @@ updatePeopleBulk();
       const inl = e.target.closest('[data-inline]');
       if (inl && staff){
         if (e.target.closest('.inline-input,.inline-pick')) return;
+        /* Клик, которым закрыли плашку, не должен сразу открывать её снова. */
+        if (window.__inlineToggleAt && Date.now() - window.__inlineToggleAt < 400){ window.__inlineToggleAt = 0; e.stopPropagation(); return; }
         e.stopPropagation();
         openPersonInline(inl);
         return;

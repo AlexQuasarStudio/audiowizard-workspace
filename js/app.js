@@ -72,6 +72,18 @@ const APP = (() => {
     window.visualViewport.addEventListener('scroll', syncPageZoom, { passive:true });
   }
 
+  /* Ссылки-переходы внутри окна (например «Все заказы» на дашборде) тоже
+     должны открывать раздел в окне, а не менять hash всей страницы. */
+  document.addEventListener('click', e => {
+    const a = e.target && e.target.closest ? e.target.closest('#windows-layer .aw-win a[href^="#/"]') : null;
+    if (!a) return;
+    const w = a.closest('.aw-win');
+    if (!w || typeof w._switchTo !== 'function') return;
+    e.preventDefault(); e.stopPropagation();
+    const parts = String(a.getAttribute('href') || '').replace(/^#\//, '').split('/');
+    if (parts[0]) w._switchTo(parts[0], parts[1] || null);
+  }, true);
+
   /* Запоминаем, из какого окна начался клик: если кнопка внутри окна
      вызывает go(), раздел должен открыться в этом окне. */
   document.addEventListener('pointerdown', e => {

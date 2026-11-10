@@ -2481,3 +2481,21 @@ body.col-dragging,body.col-dragging *{cursor:col-resize!important;user-select:no
 
 /* На зуме отключаем backdrop-blur окон: с десятком окон он даёт артефакты */
 body.page-zoomed .aw-win--active{background:var(--panel);-webkit-backdrop-filter:none;backdrop-filter:none}
+
+/* Подсветка редактируемых блоков имени/исполнителей и статуса работы */
+.o-wrap tr[data-oid] td[data-inline="client"] .cell-main,
+.o-wrap tr[data-oid] td[data-inline="executors"] .ex-stack,
+.o-card__client[data-inline],
+.person-card [data-inline="workStatus"],
+.person-table [data-inline="workStatus"]{
+  display:inline-flex;align-items:center;gap:4px;max-width:100%;border-radius:7px;
+  transition:background-color .15s var(--ease),box-shadow .15s var(--ease)
+}
+.o-wrap tr[data-oid] td[data-inline="client"]:hover .cell-main,
+.o-wrap tr[data-oid] td[data-inline="executors"]:hover .ex-stack,
+.o-card__client[data-inline]:hover,
+.person-card [data-inline="workStatus"]:hover,
+.person-table [data-inline="workStatus"]:hover{
+  background:var(--accent-soft);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 26%,transparent)
+}
