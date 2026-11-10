@@ -917,6 +917,9 @@ const Windows = (() => {
        Подавляем, если только что был именно драг (второй «клик» после дропа). */
     head.addEventListener('dblclick', e => {
       if (e.target.closest('.aw-win__close') || e.target.closest('.aw-win__max') || e.target.closest('.aw-win__min')) return;
+      /* При активном зуме двойной тап не разворачивает окно: иначе геометрия
+         окна и масштаб страницы конфликтуют и рендер дёргается. */
+      if (window.visualViewport && window.visualViewport.scale > 1.01) return;
       if (Date.now() - (win.__lastDragEnd || 0) < 400) return;
       e.preventDefault();
       if (win.classList.contains('aw-win--corner')){ exitCorner(win); return; }
@@ -1804,6 +1807,15 @@ const Windows = (() => {
     if (list.length) toast(`Свёрнуто окон раздела: ${list.length}`, 'ok');
     return list.length;
   }
+  function hasMinimizedRoute(route){
+    return winsFor(route).some(r => r.minimized);
+  }
+  function restoreRoute(route){
+    const list = winsFor(route).filter(r => r.minimized && !r.win._closing);
+    list.forEach(r => unminimizeWin(route, r.win));
+    if (list.length) toast(`Развёрнуто окон раздела: ${list.length}`, 'ok');
+    return list.length;
+  }
   function closeRoute(route){
     const list = winsFor(route).slice();
     list.forEach(r => { if (!r.win._closing) closeWindow(route, r.win); });
@@ -1830,7 +1842,7 @@ const Windows = (() => {
     return win;
   }
 
-  return { spawn, spawnCustom, refreshAllIndicators, hasWindow, isClosing, hasOpenWins, hasMinimized, hasExpanded, restoreAll, minimizeWin, restoreWindow, closeAll, minimizeAll, minimizeRoute, closeRoute, closeWindow, showPreview, restoreSavedWins };
+  return { spawn, spawnCustom, refreshAllIndicators, hasWindow, isClosing, hasOpenWins, hasMinimized, hasExpanded, restoreAll, minimizeWin, restoreWindow, closeAll, minimizeAll, minimizeRoute, restoreRoute, hasMinimizedRoute, closeRoute, closeWindow, showPreview, restoreSavedWins };
 })();
 
 /* Браузер: const верхнего уровня не создаёт window.Windows — вешаем явно */

@@ -61,6 +61,17 @@ const APP = (() => {
     return NAV.map(s => ({ sec:s.sec, items:s.items.filter(i=>i.roles.includes(user.role) && !hidden.includes(i.route)) })).filter(s=>s.items.length);
   }
 
+  /* При сильном зуме (pinch/double-tap) снимаем дорогое стекло с активного
+     окна: при десятке окон backdrop-filter даёт артефакты и «дёрганый» рендер. */
+  function syncPageZoom(){
+    const z = !!(window.visualViewport && window.visualViewport.scale > 1.01);
+    if (document.body) document.body.classList.toggle('page-zoomed', z);
+  }
+  if (window.visualViewport){
+    window.visualViewport.addEventListener('resize', syncPageZoom, { passive:true });
+    window.visualViewport.addEventListener('scroll', syncPageZoom, { passive:true });
+  }
+
   /* Запоминаем, из какого окна начался клик: если кнопка внутри окна
      вызывает go(), раздел должен открыться в этом окне. */
   document.addEventListener('pointerdown', e => {
@@ -10488,6 +10499,9 @@ function initPWA(){
         /* Действия ниже относятся только к окнам ЭТОГО пункта меню.
            Они идут до разделителя; общие операции — после него. */
         if (window.Windows && Windows.hasWindow && Windows.hasWindow(route)){
+          if (Windows.hasMinimizedRoute && Windows.hasMinimizedRoute(route)){
+            items.push({ label:'Развернуть все окна раздела', icon:'chev-u', onClick:()=>{ try { Windows.restoreRoute(route); } catch(err){} } });
+          }
           items.push({ label:'Свернуть окна раздела', icon:'chev-d', onClick:()=>{ try { Windows.minimizeRoute(route); } catch(err){} } });
           items.push({ label:'Закрыть окна раздела', icon:'x', danger:true, onClick:()=>{ try { Windows.closeRoute(route); } catch(err){} } });
         }
