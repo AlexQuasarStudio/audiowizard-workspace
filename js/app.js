@@ -4007,6 +4007,26 @@ ex.innerHTML = avatarHTML(user(), '');
     curChat = curList.find(c=>c.id===curChat) ? curChat : curList[0]?.id;
     let emojiOpen = false;
 
+    /* Ключевые слова для подсказок смайлов. Срабатывают, только если в поле
+       введено ровно это слово/фраза — без другого текста вокруг. */
+    const EMOJI_HINTS = {
+      'привет':['👋','😀'], 'здравствуйте':['👋'], 'пока':['👋'], 'до свидания':['👋'],
+      'спасибо':['🙏','🤝'], 'благодарю':['🙏'], 'пожалуйста':['🤝'],
+      'любовь':['❤️','😍'], 'люблю':['❤️','😍'], 'сердце':['❤️'],
+      'грусть':['😢'], 'грустно':['😢'], 'печаль':['😢'], 'плачу':['😢'],
+      'смех':['😂'], 'смешно':['😂'], 'хаха':['😂'], 'шутка':['😂'],
+      'радость':['😀','🎉'], 'ура':['🎉','🙌'], 'праздник':['🎉'], 'день рождения':['🎉','🥳'],
+      'круто':['🔥','💯'], 'огонь':['🔥'], 'супер':['🔥','💯'], 'класс':['👍','🔥'],
+      'ок':['👌','👍'], 'окей':['👌'], 'хорошо':['👍','✅'], 'согласен':['👍','✅'],
+      'да':['✅'], 'нет':['❌'], 'вопрос':['❓','🤔'], 'думаю':['🤔'],
+      'идея':['💡'], 'важно':['⚠️','📌'], 'срочно':['⏰','⚡'], 'дедлайн':['⏰','📌'],
+      'работа':['💼','📝'], 'деньги':['💰'], 'оплата':['💰','✅'],
+      'время':['⏰'], 'кофе':['☕'], 'музыка':['🎧','🎶'], 'звук':['🎧'], 'аудио':['🎧'],
+      'текст':['📝'], 'перевод':['📝','🌐'], 'солнце':['☀️'], 'ночь':['🌙'], 'луна':['🌙'],
+      'дождь':['🌧️'], 'поздравляю':['🎉','🥳'], 'молодец':['👏','🏆'], 'победа':['🏆','🎉'],
+      'устал':['😴'], 'спать':['😴'], 'злюсь':['😠'], 'больно':['🤕']
+    };
+
     const renderList = ()=>{
       $$('.chat-item', root).forEach(el=>el.classList.toggle('on', el.dataset.ch===curChat));
     };
@@ -4659,6 +4679,7 @@ const cm = root.querySelector('.chat-main');
           <input type="file" id="chat-file" hidden accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip">
           <button class="iconbtn" id="btn-attach" title="Прикрепить файл">${icon('clip')}</button>
           <textarea id="chat-t" rows="1" placeholder="Сообщение…">${editSrc?esc(editSrc.text||''):''}</textarea>
+          <div class="chat-emoji-hints" id="chat-emoji-hints" aria-hidden="true"></div>
           <button class="iconbtn" id="btn-emoji" title="Стикеры и эмодзи">${icon('sticker')}</button>
           <button class="btn btn--primary btn--icon chat-send-toggle" id="btn-send" aria-label="Отправить" title="Отправить">
             <span class="chat-send-ic" id="send-ic-mic" title="Голосовое сообщение">${icon('mic')}</span>
@@ -4963,6 +4984,7 @@ const cm = root.querySelector('.chat-main');
       $('#btn-emoji', root).onclick = e=>{
         emojiOpen = !emojiOpen;
         if (!emojiOpen) return;
+        hideEmojiHints();
         const dd = showDropdown(e.currentTarget, [], {});
         if (!dd) return;
         dd.className = 'dd emoji-panel';
@@ -5328,6 +5350,36 @@ const cm = root.querySelector('.chat-main');
       };
       const chatTa = $('#chat-t', root);
       growChatInput(chatTa);
+      const emojiHints = $('#chat-emoji-hints', root);
+      const normHint = (s)=>String(s||'').trim().toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ').replace(/[.,!?;:…]+$/,'');
+      const hideEmojiHints = ()=>{
+        if (!emojiHints) return;
+        emojiHints.classList.remove('is-on');
+        emojiHints.setAttribute('aria-hidden','true');
+      };
+      const updateEmojiHints = ()=>{
+        if (!emojiHints) return;
+        if (emojiOpen){ hideEmojiHints(); return; }
+        const key = normHint(chatTa.value);
+        const list = key ? EMOJI_HINTS[key] : null;
+        if (!list || !list.length){ hideEmojiHints(); return; }
+        emojiHints.innerHTML = list.map(em=>`<button type="button" data-hint-em="${em}" title="Вставить ${em}">${em}</button>`).join('');
+        emojiHints.querySelectorAll('[data-hint-em]').forEach(b=>{
+          /* mousedown не даём забрать фокус у textarea — иначе клик теряется */
+          b.onmousedown = ev=>ev.preventDefault();
+          b.onclick = ()=>{
+            chatTa.value = b.dataset.hintEm;
+            growChatInput(chatTa);
+            chatTa.focus();
+            try { chatTa.dispatchEvent(new Event('input', { bubbles:true })); } catch(e){}
+            hideEmojiHints();
+          };
+        });
+        emojiHints.classList.add('is-on');
+        emojiHints.setAttribute('aria-hidden','false');
+      };
+      chatTa.addEventListener('input', updateEmojiHints);
+      chatTa.addEventListener('keydown', ev=>{ if (ev.key === 'Escape') hideEmojiHints(); });
       /* Восстановление фокуса: если пользователь печатал (фокус был в поле),
          после пересоздания DOM возвращаем курсор в текстовую область —
          отправка (кнопка/Enter) не должна выбрасывать из режима набора. */
@@ -5479,6 +5531,7 @@ const cm = root.querySelector('.chat-main');
       };
       if (!editSrc && !chatTa.value) chatTa.value = draftLoad();
       growChatInput(chatTa);
+      updateEmojiHints();
       /* Черновик после жёсткой перезагрузки: сразу показываем самолётик, а не микрофон */
       {
         const sb = root.querySelector('#btn-send');
