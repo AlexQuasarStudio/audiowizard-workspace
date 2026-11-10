@@ -137,6 +137,64 @@ const CRM = (() => {
     if (type === 'select') inp.addEventListener('change', ()=>finish(true));
     __crmInline = { cancel: ()=>finish(false), el };
   }
+  /* Подсказки для полей новой строки заказа: клиент — одно имя,
+     исполнители — несколько через запятую. Плашка фильтруется по вводу
+     и не блокирует остальную строку. */
+  function attachInlineSuggest(input, getItems, multi){
+    if (!input || input.__awSuggest) return;
+    input.__awSuggest = 1;
+    let panel = null, active = -1, list = [];
+    const close = ()=>{
+      if (!panel) return;
+      panel.remove(); panel = null; active = -1; list = [];
+    };
+    const render = ()=>{
+      const value = input.value || '';
+      const cut = multi ? value.lastIndexOf(',') : -1;
+      const start = cut + 1;
+      const query = norm(value.slice(start));
+      const picked = multi ? new Set(value.slice(0, start).split(/[,;]+/).map(x=>norm(x)).filter(Boolean)) : new Set();
+      list = (getItems() || []).filter(x => !picked.has(norm(x.label)) &&
+        (!query || norm(x.label).includes(query) || norm(x.search || '').includes(query))).slice(0, 8);
+      if (!list.length){ close(); return; }
+      if (!panel){
+        panel = document.createElement('div');
+        panel.className = 'inline-suggest';
+        document.body.appendChild(panel);
+      }
+      panel.innerHTML = list.map((x, i) => `<button type="button" class="inline-suggest__item${i===active?' on':''}" data-i="${i}">${esc(x.label)}<span class="faint">${esc(x.hint || '')}</span></button>`).join('');
+      const r = input.getBoundingClientRect();
+      panel.style.left = Math.max(8, Math.min(r.left, innerWidth - 290)) + 'px';
+      panel.style.top = Math.min(r.bottom + 4, innerHeight - 230) + 'px';
+      panel.querySelectorAll('[data-i]').forEach(b => {
+        b.addEventListener('mousedown', e => { e.preventDefault(); choose(+b.dataset.i); });
+      });
+    };
+    const choose = i => {
+      const item = list[i]; if (!item) return;
+      const value = input.value || '';
+      const cut = multi ? value.lastIndexOf(',') : -1;
+      const prefix = cut >= 0 ? value.slice(0, cut + 1).replace(/\s*$/, ' ') : '';
+      input.value = prefix + item.label + (multi ? ', ' : '');
+      input.dispatchEvent(new Event('input', { bubbles:true }));
+      close();
+      input.focus();
+    };
+    input.addEventListener('input', ()=>{ active = -1; render(); });
+    input.addEventListener('focus', render);
+    input.addEventListener('keydown', e => {
+      if (!panel) return;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+        e.preventDefault();
+        active = (active + (e.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length;
+        render();
+      } else if (e.key === 'Enter' && active >= 0){
+        e.preventDefault(); choose(active);
+      } else if (e.key === 'Escape'){ close(); }
+    });
+    input.addEventListener('blur', ()=>setTimeout(close, 120));
+  }
+
   /* Даты в инлайне вводим обычным текстом «дд.мм.гггг»: нативный input[type=date]
      сегментный, и при клике в центр фокус попадает в год — цифры дописываются
      в него, не давая нормально набрать дату. */
@@ -1116,6 +1174,12 @@ const CRM = (() => {
             });
             checkInlineOrderId(box);
           }
+          const clientInp = box.querySelector('[data-f="client"]');
+          attachInlineSuggest(clientInp, () => S.users.filter(x => x.role === 'client' && x.ext.status !== 'blacklisted')
+            .map(x => ({ label:x.full_name, search:(x.email || '') + ' ' + (x.username || ''), hint:x.email || '' })), false);
+          const execInp = box.querySelector('[data-f="execs"]');
+          attachInlineSuggest(execInp, () => S.users.filter(x => x.role === 'executor' && x.ext.status !== 'blacklisted')
+            .map(x => ({ label:x.full_name, search:x.username || '', hint:(x.username || '') + (x.ext.specializations && x.ext.specializations.length ? ' · ' + x.ext.specializations[0] : '') })), true);
           const gen = box.querySelector('[data-gen-id]');
           if (gen) gen.onclick = ()=>{
             const inp = box.querySelector('[data-f="id"]');
