@@ -7555,9 +7555,9 @@ const cm = root.querySelector('.chat-main');
     const exp = el.querySelector('#po-export');
     if (exp) exp.onclick = ()=>{
       const pend = Finance.pending();
-      const uids = Object.keys(pend.byUser);
+      const uids = Object.keys(pend.byUser).filter(uid => Finance.isPayoutRecipient(uid));
       if (!uids.length){ toast('Нет данных для экспорта','info'); return; }
-      const payloads = uids.map(uid => Finance.smartcatPayload(uid, pend.orders.filter(o => Finance.debts(o).byUser[uid])));
+      const payloads = uids.map(uid => Finance.smartcatPayload(uid, pend.orders.filter(o => Finance.debts(o).byUser[uid]))).filter(Boolean);
       const data = { schema:'smartcat.payout.batch.v1', generatedAt:new Date().toISOString(), period:{ from:new Date(pend.period.from).toISOString(), to:new Date(pend.period.to).toISOString() }, payouts: payloads, totals:{ amount:pend.total, commission:pend.commission, net:pend.net } };
       const a=document.createElement('a');
       a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));

@@ -123,6 +123,12 @@ const Finance = (function(){
   function debtsOf(uid){
     return (S.orders || []).reduce((sum, o) => sum + (debts(o).byUser[uid] || 0), 0);
   }
+  /* Админ — плательщик, а не получатель: его доля и остаток не попадают
+     ни в «К выплате», ни в Smartcat. */
+  function isPayoutRecipient(uid){
+    const u = userById(uid);
+    return !!(u && u.role !== 'admin' && u.role !== 'client');
+  }
 
   /* ---------- Страховочный резерв ----------
      Это отдельные деньги платформы «на случай чего», не баланс сотрудника.
@@ -296,6 +302,7 @@ const Finance = (function(){
        образует: долг есть только у заказов, которые начислялись. */
     if (o.status === 'archived' && !o.splitAccrual && !o._accrued) return out;
     (o.executors || []).forEach(e => {
+      if (!isPayoutRecipient(e.uid)) return;
       const amount = Number(e.amount) || 0;
       if (!amount) return;
       const paid = e.paid != null ? Math.max(0, Math.min(amount, Number(e.paid) || 0))
@@ -307,7 +314,7 @@ const Finance = (function(){
       out.count += 1;
     });
     const a = o.splitAccrual;
-    if (a && a.manager && !a.manager.paid && a.manager.amount > 0){
+    if (a && a.manager && !a.manager.paid && a.manager.amount > 0 && isPayoutRecipient(a.manager.uid)){
       out.manager += a.manager.amount;
       out.byUser[a.manager.uid] = (out.byUser[a.manager.uid] || 0) + a.manager.amount;
     }
@@ -460,11 +467,12 @@ const Finance = (function(){
     let total = 0;
     orders.forEach(o => {
       const d = debts(o);
-      total += d.total;
       Object.entries(d.byUser).forEach(([uid, amount]) => {
+        if (!isPayoutRecipient(uid)) return;
         byUser[uid] = (byUser[uid] || 0) + amount;
       });
     });
+    total = Object.values(byUser).reduce((a, n) => a + n, 0);
     const commission = Math.round(total * cfg().commission / 100);
     const excluded = excludedIds().length;
     return { period: p, orders, byUser, total, commission, net: total - commission, excluded };
@@ -477,6 +485,7 @@ const Finance = (function(){
     const by = (me() || {}).id || 'system';
     pend.orders.forEach(o => {
       (o.executors || []).forEach(e => {
+        if (!isPayoutRecipient(e.uid)) return;
         const amt = Number(e.amount) || 0;
         const already = Math.max(0, Math.min(amt, Number(e.paid) || 0));
         const due = Math.max(0, amt - already);
@@ -484,7 +493,7 @@ const Finance = (function(){
         e.paid = amt;
         e.is_paid = amt > 0;
       });
-      if (o.splitAccrual && o.splitAccrual.manager && !o.splitAccrual.manager.paid){
+      if (o.splitAccrual && o.splitAccrual.manager && !o.splitAccrual.manager.paid && isPayoutRecipient(o.splitAccrual.manager.uid)){
         const m = o.splitAccrual.manager;
         if (Number(m.amount) > 0) withdraw(m.uid, m.amount);
         m.paid = true;
@@ -566,6 +575,7 @@ const Finance = (function(){
   }
   function smartcatPayload(uid, entries){
     const u = userById(uid);
+    if (!isPayoutRecipient(uid)) return null;
     const sc = scOf(uid);
     const docs = [];
     (entries || []).forEach(o => {
@@ -603,7 +613,7 @@ const Finance = (function(){
   }
 
   return { cfg, split, accrue, addEarned, credit, withdraw, balanceOf, debtsOf,
-    reserveRules, reserveState, reserveBalance, reserveList, reserveAdjust, reserveUpdate, reserveDelete, reservePost, reserveSyncOrder,
+    reserveRules, reserveState, reserveBalance, reserveList, reserveAdjust, reserveUpdate, reserveDelete, reservePost, reserveSyncOrder, isPayoutRecipient,
     finesFor, finesAll, fineSum, fine, revokeFine, debts, hasDebt, payoutCfg, period, fmtPeriod, pending, runPayout,
     nextCut, lastCut, skipNextPayout, skipInfo, autoTick,
     payoutOrders, excludedIds, isExcluded, setExcluded,
