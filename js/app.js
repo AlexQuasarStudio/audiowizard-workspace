@@ -7258,6 +7258,12 @@ const cm = root.querySelector('.chat-main');
     return `<span class="badge ${cls}">${label}</span>`;
   }
   function payoutProvider(){ return Object.assign({ key:'smartcat', name:'Smartcat', commission:5, enabled:true }, ((S.settings.integrations||{}).payout||{})); }
+  const RESERVE_TYPE_LABELS = {
+    manual_in:'Пополнение', manual_out:'Списание', manual:'Корректировка',
+    orderLeft:'Остаток заказа', refund:'Возврат', tax:'Налоги',
+    payout:'Выплата', correction:'Корректировка'
+  };
+  function reserveTypeText(type){ return RESERVE_TYPE_LABELS[type] || 'Движение'; }
   function openReserveHistory(){
     const rows = Finance.reserveList();
     openWinModal({
@@ -7272,7 +7278,7 @@ const cm = root.querySelector('.chat-main');
             return `<tr>
               <td class="small faint" style="white-space:nowrap">${when}</td>
               <td class="pay-cell"><b class="${Number(e.amount)<0?'neg':''}">${sign}${fmtMoney(e.amount)}</b></td>
-              <td class="small">${esc(e.type || '—')}</td>
+              <td class="small">${esc(reserveTypeText(e.type))}</td>
               <td class="small">${esc(e.reason || '')}${e.comment ? `<br><span class="faint">${esc(e.comment)}</span>` : ''}</td>
               <td class="small faint">${e.source === 'auto' ? 'Автоматически' : esc(e.author_name || 'Админ')}</td>
               <td style="white-space:nowrap"><button class="iconbtn" type="button" data-rv-edit="${esc(e.id)}" title="Исправить">${icon('edit','ico-sm')}</button><button class="iconbtn" type="button" data-rv-del="${esc(e.id)}" title="Удалить">${icon('trash','ico-sm')}</button></td>
@@ -7347,7 +7353,7 @@ const cm = root.querySelector('.chat-main');
     const reserveRows = Finance.reserveList().slice(0, 8);
     const canReserve = u.role === 'admin';
     const reserveRules = Finance.reserveRules();
-    const reserveTypeLabel = { manual_in:'Пополнение', manual_out:'Списание', orderLeft:'Остаток заказа', refund:'Возврат', tax:'Налоги', payout:'Выплата', correction:'Корректировка' };
+    const reserveTypeLabel = RESERVE_TYPE_LABELS;
     const reserveRowsHtml = reserveRows.length ? reserveRows.map(e => {
       const when = new Date(e.at).toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
       const sign = (Number(e.amount) || 0) > 0 ? '+' : '';
