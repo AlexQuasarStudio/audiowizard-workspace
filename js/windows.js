@@ -127,7 +127,7 @@ const Windows = (() => {
           if (s.cornerMin){
             win.classList.add('aw-win--corner-min');
             const mb2 = win.querySelector('.aw-win__min');
-            if (mb2) mb2.title = 'Развернуть';
+            if (mb2) mb2.title = 'Развернуть окно раздела';
           }
           if (s.cornerPrev) win.__cornerPrev = s.cornerPrev;
           if (s.max){
@@ -556,9 +556,9 @@ const Windows = (() => {
     const head = document.createElement('div');
     head.className = 'aw-win__head';
     head.innerHTML = '<span class="aw-win__title aw-win__title--sw" role="button" title="Сменить раздел">' + icon(iconName,'ico-sm') + ' <b>' + esc(title) + '</b>' + icon('chev-d','ico-sm') + '</span><span class="spacer"></span>' +
-      '<button class="iconbtn aw-win__min" title="Свернуть"><span class="win-min-ico win-min-ico--dash">&minus;</span><span class="win-min-ico win-min-ico--down">' + icon('chev-d','ico-sm') + '</span><span class="win-min-ico win-min-ico--up">' + icon('chev-u','ico-sm') + '</span></button>' +
-      '<button class="iconbtn aw-win__max" title="На весь экран">' + icon('expand','ico-sm') + '</button>' +
-      '<button class="iconbtn aw-win__close" title="Закрыть">' + icon('x','ico-sm') + '</button>';
+      '<button class="iconbtn aw-win__min" title="Свернуть окно раздела"><span class="win-min-ico win-min-ico--dash">&minus;</span><span class="win-min-ico win-min-ico--down">' + icon('chev-d','ico-sm') + '</span><span class="win-min-ico win-min-ico--up">' + icon('chev-u','ico-sm') + '</span></button>' +
+      '<button class="iconbtn aw-win__max" title="Развернуть окно раздела">' + icon('expand','ico-sm') + '</button>' +
+      '<button class="iconbtn aw-win__close" title="Закрыть окно раздела — приложение останется">' + icon('x','ico-sm') + '</button>';
     const body = document.createElement('div');
     body.className = 'aw-win__body';
     win.appendChild(head);
@@ -813,17 +813,21 @@ const Windows = (() => {
         if (win.classList.contains('aw-win--corner')) return;
         if (typeof showDropdown !== 'function') return;
         const items = [];
+        /* Разделители — на границах секций, как в боковом меню. */
+        let sectionCount = 0;
         for (const sec of NAV_SRC){
-          for (const it of sec.items){
-            if (!V || !V[it.route]) continue;
-            items.push({ label: it.title, icon: it.icon || 'app', onClick: () => switchTo(it.route) });
-          }
+          const secItems = sec.items
+            .filter(it => V && V[it.route])
+            .map(it => ({ label: it.title, icon: it.icon || 'app', onClick: () => switchTo(it.route) }));
+          if (!secItems.length) continue;
+          if (sectionCount++) items.push('-');
+          items.push(...secItems);
         }
         if (!items.length) return;
         showDropdown(switchBtn, items, { x: ev.clientX, y: ev.clientY });
       };
     }
-    function switchTo(newRoute){
+    function switchTo(newRoute, newParam){
       const cur = win._route || route;
       if (!newRoute || newRoute === cur || !V || !V[newRoute]) return;
       const oldArr = registry.get(cur);
@@ -853,7 +857,7 @@ const Windows = (() => {
       body.classList.add('aw-win__body--swap-out');
       setTimeout(()=>{
         body.innerHTML = '';
-        try { V[newRoute](body); } catch(e){ body.innerHTML = '<div class="empty">' + icon('alert') + '<span>Ошибка: ' + esc(e && e.message || e) + '</span></div>'; }
+        try { V[newRoute](body, newParam); } catch(e){ body.innerHTML = '<div class="empty">' + icon('alert') + '<span>Ошибка: ' + esc(e && e.message || e) + '</span></div>'; }
         body.classList.remove('aw-win__body--swap-out');
         body.classList.add('aw-win__body--swap-in');
         setTimeout(()=>body.classList.remove('aw-win__body--swap-in'), 260);
@@ -862,6 +866,9 @@ const Windows = (() => {
       refreshMenuIndicator(newRoute, true);
       try { persistWins(); } catch(e){}
     }
+    /* Навигация изнутри этого окна (кнопки «перейти в раздел») должна
+       менять содержимое окна, а не страницу под ним. */
+    win._switchTo = switchTo;
  
     function closeWindow(){
       if (win._closing) return;
@@ -1031,7 +1038,7 @@ const Windows = (() => {
       win.style.height = hh + 'px';
       if (p.includes('b')) win.style.top = (rc.top + rc.height - hh) + 'px';
       const minBtn = win.querySelector('.aw-win__min');
-      if (minBtn) minBtn.title = 'Развернуть';
+      if (minBtn) minBtn.title = 'Развернуть окно раздела';
     }
     setTimeout(() => win.classList.remove('aw-win--animating'), 320);
     focusWin(win);
@@ -1056,7 +1063,7 @@ const Windows = (() => {
       if (bottomAnchor) win.style.top = (win.__cornerTop != null ? win.__cornerTop : curTop - (ch - hh)) + 'px';
       win.__cornerTop = null;
       win.__cornerHeight = null;
-      if (minBtn) minBtn.title = 'Свернуть';
+      if (minBtn) minBtn.title = 'Свернуть окно раздела';
     } else {
       win.__cornerHeight = win.offsetHeight;
       win.__cornerTop = curTop;
@@ -1065,7 +1072,7 @@ const Windows = (() => {
       win.style.minHeight = '0';
       /* Сворачиваемся К НИЖНЕМУ КРАЮ: шапка остаётся у нижней границы окна. */
       if (bottomAnchor) win.style.top = (curTop + win.__cornerHeight - hh) + 'px';
-      if (minBtn) minBtn.title = 'Развернуть';
+      if (minBtn) minBtn.title = 'Развернуть окно раздела';
     }
     setTimeout(() => win.classList.remove('aw-win--animating'), 340);
     try { persistWins(); } catch(e){}
@@ -1074,7 +1081,7 @@ const Windows = (() => {
      из него innerHeight меняется, а окно оставалось на прежних пикселях —
      визуально оно «отклеивалось» от нижнего края. Пересчитываем позицию по
      тому же углу, сохраняя размер, который пользователь задал вручную. */
-  function spotCorner(win){
+  function spotCorner(win, instant){
     if (!win || !win.classList.contains('aw-win--corner')) return;
     if (active || win.__expandUntil) return;
     const pos = win.__cornerPos || 'br';
@@ -1092,7 +1099,10 @@ const Windows = (() => {
     const same = Math.abs((curL || 0) - left) < 1 && Math.abs((curT || 0) - top) < 1
       && (collapsed || (Math.abs((curW || 0) - w) < 1 && Math.abs((curH || 0) - fullH) < 1));
     if (same) return;
-    win.classList.add('aw-win--animating');
+    if (!instant){
+      win.classList.add('aw-win--animating');
+      setTimeout(() => win.classList.remove('aw-win--animating'), 320);
+    }
     win.style.left = Math.round(left) + 'px';
     win.style.top = Math.round(top) + 'px';
     if (collapsed){
@@ -1105,18 +1115,42 @@ const Windows = (() => {
       win.style.height = fullH + 'px';
       win.style.minWidth = '0'; win.style.minHeight = '0';
     }
-    setTimeout(() => win.classList.remove('aw-win--animating'), 320);
   }
   let __cornerRAF = null;
-  function reflowCorners(){
+  let __cornerSaveT = null;
+  /* Сохранение геометрии — не чаще одного раза после серии ресайзов.
+     Раньше persistWins() вызывался на каждом кадре изменения окна браузера,
+     сериализовал все окна и введённые формы и давал заметные подвисания. */
+  function saveWinsSoon(){
+    clearTimeout(__cornerSaveT);
+    __cornerSaveT = setTimeout(() => {
+      __cornerSaveT = null;
+      try { persistWins(); } catch(e){}
+    }, 260);
+  }
+  function reflowCorners(instant){
     const els = document.querySelectorAll('#windows-layer .aw-win--corner');
     if (!els.length) return;
-    els.forEach(spotCorner);
-    try { persistWins(); } catch(e){}
+    const lay = document.getElementById('windows-layer');
+    if (instant && lay){
+      /* На время подгонки под новый размер окна браузера отключаем переходы:
+         иначе каждый resize-кадр заново запускал анимацию left/top/width/height
+         у всех уголков — окна «плыли» и мерцали. */
+      lay.classList.add('wins-reflowing');
+    }
+    els.forEach(w => spotCorner(w, instant));
+    if (instant && lay){
+      /* Фиксируем новую геометрию без transition и сразу снимаем блокировку. */
+      void lay.offsetWidth;
+      lay.classList.remove('wins-reflowing');
+      saveWinsSoon();
+    } else {
+      try { persistWins(); } catch(e){}
+    }
   }
   function scheduleCorners(){
     if (__cornerRAF) cancelAnimationFrame(__cornerRAF);
-    __cornerRAF = requestAnimationFrame(() => { __cornerRAF = null; reflowCorners(); });
+    __cornerRAF = requestAnimationFrame(() => { __cornerRAF = null; reflowCorners(true); });
   }
   window.addEventListener('resize', scheduleCorners, { passive:true });
   ['fullscreenchange','webkitfullscreenchange'].forEach(ev => {
@@ -1142,14 +1176,14 @@ const Windows = (() => {
     win.__cornerWasMin = false;
     win.__cornerDetached = false;
     const mb = win.querySelector('.aw-win__min');
-    if (mb) mb.title = 'Свернуть';
+    if (mb) mb.title = 'Свернуть окно раздела';
   }
   function exitCorner(win){
     if (!win || !win.classList.contains('aw-win--corner')) return;
     win.__cornerWasMin = false;
     win.classList.remove('aw-win--corner', 'aw-win--corner-min');
     const mb0 = win.querySelector('.aw-win__min');
-    if (mb0) mb0.title = 'Свернуть';
+    if (mb0) mb0.title = 'Свернуть окно раздела';
     win.__cornerHeight = null;
     win.__cornerTop = null;
     const p = win.__cornerPrev;
@@ -1187,7 +1221,7 @@ const Windows = (() => {
         if (win.classList.contains('aw-win--corner-min')){
           win.classList.remove('aw-win--corner-min');
           const mb1 = win.querySelector('.aw-win__min');
-          if (mb1) mb1.title = 'Свернуть';
+          if (mb1) mb1.title = 'Свернуть окно раздела';
           const ch = win.__cornerHeight || 520;
           const hh2 = win.offsetHeight;
           const curTop = parseFloat(win.style.top) || win.getBoundingClientRect().top;
@@ -1762,6 +1796,21 @@ const Windows = (() => {
     return count;
   }
 
+  /* Операции только для окон одного пункта меню: контекстное меню раздела
+     не должно сворачивать/закрывать окна других разделов. */
+  function minimizeRoute(route){
+    const list = winsFor(route).filter(r => !r.minimized && !r.win._closing);
+    list.forEach(r => minimizeWin(r.win, route));
+    if (list.length) toast(`Свёрнуто окон раздела: ${list.length}`, 'ok');
+    return list.length;
+  }
+  function closeRoute(route){
+    const list = winsFor(route).slice();
+    list.forEach(r => { if (!r.win._closing) closeWindow(route, r.win); });
+    if (list.length) toast(`Закрыто окон раздела: ${list.length}`, 'ok');
+    return list.length;
+  }
+
   let customSeq = 0;
   function spawnCustom(opts){
     const route = (opts && opts.route) || ('__w' + (++customSeq));
@@ -1781,7 +1830,7 @@ const Windows = (() => {
     return win;
   }
 
-  return { spawn, spawnCustom, refreshAllIndicators, hasWindow, isClosing, hasOpenWins, hasMinimized, hasExpanded, restoreAll, minimizeWin, restoreWindow, closeAll, minimizeAll, closeWindow, showPreview, restoreSavedWins };
+  return { spawn, spawnCustom, refreshAllIndicators, hasWindow, isClosing, hasOpenWins, hasMinimized, hasExpanded, restoreAll, minimizeWin, restoreWindow, closeAll, minimizeAll, minimizeRoute, closeRoute, closeWindow, showPreview, restoreSavedWins };
 })();
 
 /* Браузер: const верхнего уровня не создаёт window.Windows — вешаем явно */

@@ -1658,6 +1658,9 @@ body.win-dragging *{user-select:none!important}
 
 /* ---------- Плавная анимация max/min окна ---------- */
 .aw-win--animating{transition:left .3s var(--ease),right .3s var(--ease),top .3s var(--ease),bottom .3s var(--ease),width .3s var(--ease),height .3s var(--ease),transform .3s var(--ease),opacity .3s var(--ease),box-shadow .3s var(--ease)!important}
+/* Подгонка уголков под новый размер окна браузера — без переходов:
+   иначе каждый кадр resize заново запускал анимацию геометрии. */
+#windows-layer.wins-reflowing .aw-win{transition:none!important}
 
 /* Местное время в приветствии дашборда */
 .dash-clock{font-variant-numeric:tabular-nums;color:inherit}
@@ -2460,3 +2463,9 @@ body.col-dragging,body.col-dragging *{cursor:col-resize!important;user-select:no
 
 /* Список аккаунтов провайдера в выплатах: прокрутка + пагинация */
 .sc-list{max-height:300px;overflow-y:auto;border-radius:10px}
+
+/* Плавное удаление строки/карточки заказа */
+.o-row-out{opacity:0!important;transform:translateY(-3px);transition:opacity .18s var(--ease),transform .18s var(--ease)!important}
+.rev-card--reserve{position:relative;padding-right:38px}
+.rev-card--reserve .rev-reserve-adj{position:absolute;right:8px;top:8px;width:26px;height:26px;border-radius:8px;color:var(--muted)}
+.rev-card--reserve .rev-reserve-adj:hover{color:var(--text);background:var(--panel-3)}

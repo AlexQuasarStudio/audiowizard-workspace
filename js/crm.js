@@ -319,6 +319,7 @@ const CRM = (() => {
       applyAccrual(o, -1);
       o._accrued = false;
     }
+    if (to === 'archived' || o.status === 'archived') await fadeOrderRows(o);
     o.history.push({ t:Date.now(), txt:`Статус: ${STATUS_META[o.status].label} → ${STATUS_META[to].label}` });
     o.status = to;
     if (to === 'archived') o.archived_at = Date.now();
@@ -348,6 +349,10 @@ const CRM = (() => {
         }
       } catch(e){ console.error(e); }
     }
+    /* Резерв следует за историческим статусом заказа: выполнен/архив —
+       свободный остаток в резерве; возврат в работу/отмена — снимаем.
+       Правило включается админом; при выключенном правиле движения нет. */
+    try { if (window.Finance && Finance.reserveSyncOrder) Finance.reserveSyncOrder(o); } catch(e){ console.error(e); }
     logAudit(`Статус заказа ${o.order_id}: ${STATUS_META[to].label}`, 'Заказ');
     notifyParticipants(o, `Заказ ${o.order_id}: ${STATUS_META[to].label}`);
     saveState();
@@ -360,12 +365,33 @@ const CRM = (() => {
     saveState();
   }
 
+  /* Плавно убираем строку/карточку перед удалением или архивацией, чтобы
+     список не «дёргался» мгновенной перерисовкой. */
+  function fadeOrderRows(o){
+    return new Promise(resolve => {
+      const els = [...document.querySelectorAll(`[data-oid="${o.id}"]`)].filter(el => el.matches('tr, .o-card'));
+      if (!els.length) return resolve();
+      els.forEach(el => { el.style.height = el.offsetHeight + 'px'; el.classList.add('o-row-out'); });
+      setTimeout(resolve, 190);
+    });
+  }
+
+  function fadePersonRows(p){
+    return new Promise(resolve => {
+      const els = [...document.querySelectorAll(`[data-uid="${p.id}"]`)].filter(el => el.matches('tr, .person-card'));
+      if (!els.length) return resolve();
+      els.forEach(el => { el.style.height = el.offsetHeight + 'px'; el.classList.add('o-row-out'); });
+      setTimeout(resolve, 190);
+    });
+  }
+
   async function deleteOrder(o){
     if (!['draft','waiting'].includes(o.status)){
       toast('Удалять можно только заказы в статусе «Черновик» или «В ожидании»', 'err'); return;
     }
     const ok = await confirmModal({ title:`Удалить заказ ${o.order_id}?`, text:'Заказ будет удалён безвозвратно.', okText:'Удалить', danger:true });
     if (!ok) return;
+    await fadeOrderRows(o);
     S.orders = S.orders.filter(x=>x.id!==o.id);
     logAudit(`Удалён заказ ${o.order_id}`, 'Заказ'); saveState();
     toast(`Заказ ${o.order_id} удалён`, 'ok');
@@ -1441,7 +1467,8 @@ const CRM = (() => {
     ];
     if (staff){
       items.push('-');
-      items.push({ label: bl ? 'Убрать из ЧС' : 'Добавить в ЧС', icon:'x-c', danger:!bl, onClick:()=>{
+      items.push({ label: bl ? 'Убрать из ЧС' : 'Добавить в ЧС', icon:'x-c', danger:!bl, onClick:async ()=>{
+        await fadePersonRows(p);
         p.ext.status = bl ? 'active' : 'blacklisted';
         logAudit(`${bl?'Убран из ЧС':'Добавлен в ЧС'}: ${p.full_name}`,'Безопасность');
         saveState(); toast(bl?'Разблокирован':'Добавлен в ЧС','ok'); refreshPerson(p);
@@ -2092,6 +2119,16 @@ const CRM = (() => {
           const minExec = minExecPriceFor(c.nish_id) || (window.Finance ? Finance.cfg().minExecutorPay : 100);
           if (!c.is_test && c.total < minTotal){ toast(`Минимальная стоимость заказа — ${fmtMoney(minTotal)} (кроме тестового)`,'err'); const tf=g('#of-total'); if(tf){ tf.classList.add('is-bad'); tf.focus(); } return; }
           if (!c.is_test && c.executors.some(e=>(e.amount||0) < minExec)){ toast(`Оплата исполнителя — не ниже ${fmtMoney(minExec)} (кроме тестового)`,'err'); return; }
+          /* Дедлайн не может быть раньше даты начала: иначе срок уже просрочен
+             в момент создания и ломает расчёт срочности. */
+          if (c.deadline && c.start){
+            const dlTs2 = new Date(c.deadline).getTime(), stTs2 = new Date(c.start).getTime();
+            if (isFinite(dlTs2) && isFinite(stTs2) && dlTs2 < stTs2){
+              toast('Дедлайн не может быть раньше даты начала заказа','err');
+              const df = g('#of-deadline'); if (df){ df.classList.add('is-bad'); df.focus(); }
+              return;
+            }
+          }
           if (!c.order_id){ c.order_id = generateOrderId(); }
           if (S.orders.some(x=>x.order_id===c.order_id && x.id!==o.id)){
             toast(`ID ${c.order_id} уже занят — выберите другой`, 'err');
@@ -3288,10 +3325,21 @@ updatePeopleBulk();
       }
       if (f === 'workStatus'){
         if (p.ext.status === 'blacklisted') return;
-        inlineField(el, { type:'select', value:p.ext.workStatus || 'working', options:[{value:'working', label:'Работаю'},{value:'not_working', label:'Не работаю'}], onSave:v => {
-          if (v === (p.ext.workStatus || 'working')) return;
-          p.ext.workStatus = v; done('Статус «' + p.full_name + '» изменён');
-        }});
+        /* Как статус заказа: клик сразу раскрывает плашку выбора, а не
+           превращает ячейку в select. */
+        inlinePicker(el, {
+          items:[{ value:'working', label:'Работаю' }, { value:'not_working', label:'Не работаю' }],
+          selected:[p.ext.workStatus || 'working'],
+          single:true,
+          placeholder:'Статус',
+          onSave:ids => {
+            const v = ids[0];
+            if (!v || v === (p.ext.workStatus || 'working')) return;
+            p.ext.workStatus = v;
+            p.is_online = v === 'working';
+            done('Статус «' + p.full_name + '» изменён');
+          }
+        });
         return;
       }
     }
@@ -3881,9 +3929,10 @@ updatePeopleBulk();
               body:`<div class="field"><label>Причина *</label><textarea class="input" id="bl-reason" rows="3" placeholder="Нарушение правил, срыв сроков…"></textarea></div>`,
               footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--danger" data-bl-save>В чёрный список</button>`,
               onMount:(m2, close2)=>{
-                m2.querySelector('[data-bl-save]').onclick = ()=>{
+                m2.querySelector('[data-bl-save]').onclick = async ()=>{
                   const reason = m2.querySelector('#bl-reason').value.trim();
                   if (!reason){ toast('Укажите причину','warn'); return; }
+                  await fadePersonRows(p);
                   p.ext.status = 'blacklisted';
                   p.ext.comment = (p.ext.comment? p.ext.comment+'\n' : '') + `[ЧС ${fmtDate(Date.now())}] ${reason}`;
                   logAudit(`Добавлен в ЧС: ${p.full_name} — ${reason}`,'Безопасность');
@@ -3892,6 +3941,7 @@ updatePeopleBulk();
               } });
             return;
           }
+          await fadePersonRows(p);
           p.ext.status = toBl?'blacklisted':'active';
           logAudit(`${toBl?'Добавлен в ЧС':'Убран из ЧС'}: ${p.full_name}`,'Безопасность');
           saveState(); toast(toBl?'Добавлен в чёрный список':'Разблокирован','ok'); close(); refreshPerson(p);
@@ -5081,8 +5131,7 @@ updatePeopleBulk();
           <div class="small" id="cx-volume-note" style="margin-top:6px"></div>
           <div class="tiny faint" style="margin-top:4px">Символы для стенограмм — 600 знаков в минуту.</div>
         </div>
-        <div class="row" style="margin-top:10px"><span class="small muted" id="cx-live"></span><span class="spacer"></span>
-          ${onResult?'<button class="btn btn--primary btn--sm" data-apply>Подставить в заказ</button>':''}</div>
+        <div class="row" style="margin-top:10px"><span class="small muted" id="cx-live"></span></div>
         <div class="calc-history" id="cx-hist" style="margin-top:12px">${S.calcHistory.slice(-6).reverse().map(h=>`<div data-h="${h.result}">${esc(h.expression)} = ${h.result}</div>`).join('')}</div>
         <div class="card card-pad" style="margin-top:12px;background:var(--panel-2)">
           <b class="small">Срок и срочность</b>
@@ -5127,7 +5176,9 @@ updatePeopleBulk();
           const raw = g2('#cx-in').value;
           const v = compute(raw);
           val = v;
-          g2('#cx-live').textContent = isNaN(v) ? (raw ? 'проверьте выражение' : '') : `= ${v}`;
+          /* compute('') возвращает null; isNaN(null) === false, из-за этого
+             в подсказке появлялось «= null». Пустое поле — просто пусто. */
+          g2('#cx-live').textContent = v == null ? '' : (Number.isNaN(v) ? 'проверьте выражение' : `= ${v}`);
           paintTotals();
         };
         g2('#cx-in').addEventListener('input', upd);
@@ -5185,7 +5236,8 @@ updatePeopleBulk();
           }
           const label = v.unit === 'min' ? 'мин' : v.unit === 'hour' ? 'ч' : v.unit === 'char' ? 'симв.' : 'стр.';
           const rateStr = +v.rate.toFixed(6);
-          note.innerHTML = `${v.qty} ${label} × ${(+v.rate.toFixed(2)).toLocaleString('ru-RU')} ₽ = <b>${fmtMoney(Math.round(v.qty * v.rate))}</b>`;
+          const qtyTxt = Number(v.qty).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+          note.innerHTML = `${qtyTxt} ${label} × ${(+v.rate.toFixed(2)).toLocaleString('ru-RU')} ₽ = <b>${fmtMoney(Math.round(v.qty * v.rate))}</b>`;
           if (auto){
             g2('#cx-in').value = `${v.qty} × ${rateStr}`;
             upd();
@@ -5370,8 +5422,8 @@ updatePeopleBulk();
           toast(`Подставлено: ${fmtMoney(d.sum)}${d.pct ? ` (скидка ${d.pct}%)` : ''}${d.rush ? ` · срочно +${d.rushPct}%` : ''}`, 'ok');
           close();
         };
-        /* Кнопка «Подставить» есть и в теле, и в футере — обе должны работать. */
-        [mask.querySelector('[data-apply2]'), mask.querySelector('[data-apply]')].forEach(b => { if (b) b.onclick = applyResult; });
+        const applyBtn = mask.querySelector('[data-apply2]');
+        if (applyBtn) applyBtn.onclick = applyResult;
         /* Создать заказ из калькулятора: результат → сумма нового заказа */
         const cr = mask.querySelector('[data-create]');
         if (cr) cr.onclick = ()=>{

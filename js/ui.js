@@ -236,6 +236,12 @@ function openWinModal({ title='', icon='app', body='', footer='', wide=false, na
     /* Модалка должна принадлежать ТЕКУЩЕМУ разделу: без route окно
        регистрировалось под заглушкой __wN, которой нет в меню, и
        сворачивались такие окна «в пустоту» — без точки и миниатюры. */
+    /* Если окно вызвано из окна раздела — наследуем маршрут ИМЕННО этого
+       окна, а не раздела, который открыт на странице под ним. */
+    if (!route){
+      const aw = document.querySelector('#windows-layer .aw-win--active');
+      if (aw && aw._route && !String(aw._route).startsWith('__')) route = aw._route;
+    }
     if (!route && window.__lastRouteName) route = window.__lastRouteName;
     if (!route && window.__prevRoute) route = window.__prevRoute.name;
     const win = Windows.spawnCustom({

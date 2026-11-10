@@ -505,7 +505,7 @@ const audit = getDemoAudit();
       /* Доли от суммы заказа: админ — 25% (маржа услуг), менеджер — 5%.
          Разница (итого − исполнители − админ − менеджер) показывается как
          свободный остаток; отрицательная — предупреждение о превышении. */
-      finance:{ adminMargin:25, managerFee:10, executorShare:40, payoutCommission:5, minOrderTotal:500, minExecutorPay:100, reviewFee:10 },
+      finance:{ adminMargin:25, managerFee:10, executorShare:40, payoutCommission:5, minOrderTotal:500, minExecutorPay:200, reviewFee:10 },
       /* Платёжный провайдер не захардкожен: имя, комиссия и включённость
          берутся отсюда, чтобы смена/отключение провайдера не требовали правок кода. */
       integrations:{ payout:{ key:'smartcat', name:'Smartcat', commission:5, enabled:true, perUser:true } },
@@ -522,6 +522,10 @@ const audit = getDemoAudit();
     draftPrefs:{}, currentUserId:null, rememberedLogin:null,
     invites:[], /* приглашения: { id, token, role, limit, used, expiresAt, createdBy, email?, note? } */
     fines:[],
+    /* Страховочный резерв: только движения, баланс всегда выводится из них.
+       opening — стартовый остаток (перенос из прошлой системы), entries —
+       ручные корректировки админа и будущие автоматические начисления. */
+    reserve:{ opening:0, entries:[] },
     keys:{ ...DEFAULT_KEYS },
     uiText:{} /* переопределения текстов интерфейса: {ключ: текст} (правит админ) */
   };
@@ -560,16 +564,35 @@ function migrateStaffBalances(){
 }
 function migrateFinance(){
   if (!S.settings) S.settings = {};
-  S.settings.finance = Object.assign({ adminMargin:25, managerFee:10, executorShare:40, payoutCommission:5, minOrderTotal:500, minExecutorPay:100, reviewFee:10 }, S.settings.finance || {});
+  S.settings.finance = Object.assign({ adminMargin:25, managerFee:10, executorShare:40, payoutCommission:5, minOrderTotal:500, minExecutorPay:200, reviewFee:10 }, S.settings.finance || {});
   /* Старые сохранения держали прежний дефолт 5% — поднимаем до 10%,
      если пользователь явно не менял значение (метка версии дефолтов). */
   if (S.settings.finance._defaultsVersion !== 2){
     if (S.settings.finance.managerFee == null || Number(S.settings.finance.managerFee) === 5) S.settings.finance.managerFee = 10;
     S.settings.finance._defaultsVersion = 2;
   }
+  if (S.settings.finance._defaultsVersion !== 3){
+    if (S.settings.finance.minExecutorPay == null || Number(S.settings.finance.minExecutorPay) === 100) S.settings.finance.minExecutorPay = 200;
+    S.settings.finance._defaultsVersion = 3;
+  }
   S.settings.integrations = Object.assign({ payout:{ key:'smartcat', name:'Smartcat', commission:5, enabled:true, perUser:true } }, S.settings.integrations || {});
   S.settings.payout = Object.assign({ enabled:true, auto:true, days:[1,15], time:'15:00', tz:'Europe/Moscow', lastRunAt:null, history:[] }, S.settings.payout || {});
   if (!Array.isArray(S.fines)) S.fines = [];
+  /* Резерв: старые сохранения его не знали. Не подставляем демо-сумму —
+     стартовый остаток должен быть подтверждён админом вручную. */
+  if (!S.reserve || typeof S.reserve !== 'object' || Array.isArray(S.reserve)) S.reserve = { opening:0, entries:[] };
+  S.reserve.opening = Math.round(Number(S.reserve.opening) || 0);
+  if (!Array.isArray(S.reserve.entries)) S.reserve.entries = [];
+  S.reserve.entries = S.reserve.entries.filter(e => e && typeof e === 'object').map(e => ({
+    ...e,
+    id: e.id || 'rv' + String(e.at || Date.now()) + Math.random().toString(36).slice(2, 6),
+    at: Number(e.at) || Date.now(),
+    amount: Math.round(Number(e.amount) || 0),
+    reason: String(e.reason || ''),
+    comment: String(e.comment || ''),
+    type: String(e.type || 'manual'),
+    source: e.source === 'auto' ? 'auto' : 'admin'
+  }));
   if (!Array.isArray(S.settings.promos)) S.settings.promos = promosDefault();
   if (!Array.isArray(S.settings.payout.days) || !S.settings.payout.days.length) S.settings.payout.days = [1,15];
   (S.users || []).forEach(u => {

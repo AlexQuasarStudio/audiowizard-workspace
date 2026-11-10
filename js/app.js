@@ -61,7 +61,20 @@ const APP = (() => {
     return NAV.map(s => ({ sec:s.sec, items:s.items.filter(i=>i.roles.includes(user.role) && !hidden.includes(i.route)) })).filter(s=>s.items.length);
   }
 
+  /* Запоминаем, из какого окна начался клик: если кнопка внутри окна
+     вызывает go(), раздел должен открыться в этом окне. */
+  document.addEventListener('pointerdown', e => {
+    const w = e.target && e.target.closest ? e.target.closest('#windows-layer .aw-win') : null;
+    window.__navSourceWin = (w && typeof w._switchTo === 'function') ? w : null;
+  }, true);
+
   function go(name, param=null){
+    const fromWin = window.__navSourceWin;
+    window.__navSourceWin = null;
+    if (fromWin && fromWin.isConnected && typeof fromWin._switchTo === 'function' && !String(name).startsWith('err')){
+      fromWin._switchTo(name, param);
+      return;
+    }
     /* мобильный drawer: закрыть при переходе */
     { const sd = document.querySelector('.side'); if (sd && sd.classList.contains('open')){ sd.classList.remove('open'); document.querySelector('.side-scrim')?.remove(); } }
     /* память скролла: позиция запоминается на раздел и восстанавливается */
@@ -2086,8 +2099,11 @@ ex.innerHTML = avatarHTML(user(), '');
   /* ---------- Дашборд ---------- */
   function dashView(root){
     const u = user();
-    const orders = ordersFor(u).filter(o=>o.status!=='archived');
-    const done = orders.filter(o=>o.status==='done');
+    const allOrders = ordersFor(u);
+    const orders = allOrders.filter(o=>o.status!=='archived');
+    /* Архив — мягкое удаление: заказ остаётся в БД, но уходит из выручки,
+       оборота, среднего чека и доли. Возврат из архива возвращает метрики. */
+    const done = allOrders.filter(o=>o.status==='done');
     const revenue = done.reduce((a,o)=>a+o.total,0);
     const active = orders.filter(o=>['waiting','work'].includes(o.status)).length;
     const onlineExecs = noDemo(S.users).filter(x=>x.role==='executor'&&x.is_online&&x.ext.status==='active').length;
@@ -2102,7 +2118,7 @@ ex.innerHTML = avatarHTML(user(), '');
     const series = Array.from({length:14},(_,i)=>{
       const d0 = new Date(); d0.setHours(0,0,0,0); d0.setDate(d0.getDate()-13+i);
       const t0 = d0.getTime(), t1 = t0 + DAY;
-      return noDemo(S.orders).filter(o=>o.status==='done'&&o.history.some(h=>h.t>=t0&&h.t<t1&&h.txt.includes('Выполнено'))).reduce((a,o)=>a+o.total,0);
+      return allOrders.filter(o=>o.status==='done'&&o.history.some(h=>h.t>=t0&&h.t<t1&&h.txt.includes('Выполнено'))).reduce((a,o)=>a+o.total,0);
     });
     const maxV = Math.max(...series, 1);
     const W=520,H=120;
@@ -2400,9 +2416,9 @@ ex.innerHTML = avatarHTML(user(), '');
   function revData(rows, total, from, to){
     const u = user();
     const days = Math.max(1, Math.round((revDayStart(to - 1) - revDayStart(from)) / DAY) + 1);
-    /* Оборот системы — все завершённые заказы, включая архив: архивный
-       заказ уже был выполнен и оплачен, исключать его из общего итога нельзя. */
-    const allDone = ordersFor(u).filter(o => ['done','archived'].includes(o.status));
+    /* Оборот привязан к выбранному периоду: все неархивные заказы,
+       созданные в нём. Архив — мягкое удаление и в оборот не входит. */
+    const allDone = ordersFor(u).filter(o => o.status !== 'archived' && (Number(o.created_at) || 0) >= from && (Number(o.created_at) || 0) < to);
     const allTotal = allDone.reduce((a,o) => a + (Number(o.total) || 0), 0);
     const top = rows.reduce((a,x) => (!a || (Number(x.o.total)||0) > (Number(a.o.total)||0)) ? x : a, null);
     const list = rows.map(x => {
@@ -2577,6 +2593,18 @@ ex.innerHTML = avatarHTML(user(), '');
       ? mgrItems.map(x => `<div class="rev-bar-row" title="${esc(x.label)}: ${fmtMoney(x.value)}"><span class="rev-bar-name">${esc(x.label)}</span><span class="rev-bar-track"><span class="rev-bar-fill" style="width:${Math.max(2, Math.round(x.value / mgrMax * 100))}%"></span></span><b>${fmtMoney(x.value)}</b></div>`).join('')
       : '<div class="small faint">Нет данных</div>';
 
+    /* В карточке выручки — доля именно этого профиля, без пояснений. */
+    const role = u.role;
+    const myShare = role === 'admin' ? data.totals.admin
+      : (role === 'manager' || role === 'top_manager') ? data.totals.manager
+      : role === 'executor'
+        ? rows.reduce((sum, x) => sum + (x.o.executors || []).filter(e => e.uid === u.id)
+            .reduce((s, e) => s + (Number(e.amount) || 0), 0), 0)
+        : total;
+    const myShareLabel = role === 'admin' ? 'Выручка админа'
+      : (role === 'manager' || role === 'top_manager') ? 'Выручка менеджера'
+      : role === 'executor' ? 'Выручка исполнителя' : 'Выручка';
+
     const presetHtml = REV_PRESETS.map(p =>
       `<button type="button" class="btn btn--sm ${revRange.preset === p.id ? 'btn--primary' : 'btn--ghost'}" data-rp="${p.id}">${p.label}</button>`).join('');
 
@@ -2592,15 +2620,12 @@ ex.innerHTML = avatarHTML(user(), '');
       </div>
       <div class="rev-period small muted">${fmtDate(from)} — ${fmtDate(to - DAY)} · ${days} ${dayPlural(days)} · только выполненные заказы</div>
       <div class="rev-cards">
-        <div class="rev-card"><span class="small muted">Выручка за период</span><b>${fmtMoney(total)}</b></div>
-        <div class="rev-card"><span class="small muted">Админам</span><b>${fmtMoney(data.totals.admin)}</b></div>
-        <div class="rev-card"><span class="small muted">Менеджерам</span><b>${fmtMoney(data.totals.manager)}</b></div>
-        <div class="rev-card" title="Все выполненные и архивные заказы за всё время"><span class="small muted">Общий оборот системы</span><b>${fmtMoney(data.totals.system)}</b></div>
-        <div class="rev-card" title="Сумма заказов минус доли исполнителей, админа и менеджера. Остаётся в резерве и никому не начисляется."><span class="small muted">Свободный остаток</span><b class="${data.totals.left<0?'neg':''}">${fmtMoney(data.totals.left)}</b></div>
+        <div class="rev-card"><span class="small muted">${myShareLabel}</span><b>${fmtMoney(myShare)}</b></div>
+        <div class="rev-card rev-card--reserve" data-rev-reserve-history title="Открыть историю резерва"><span class="small muted">Свободный остаток</span><b class="${Finance.reserveBalance()<0?'neg':''}">${fmtMoney(Finance.reserveBalance())}</b>${role==='admin'?`<button class="iconbtn rev-reserve-adj" type="button" data-rev-reserve-adjust title="Изменить резерв">${icon('edit','ico-sm')}</button>`:''}</div>
+        <div class="rev-card" title="Все неархивные заказы, созданные в выбранном периоде"><span class="small muted">Оборот за период</span><b>${fmtMoney(data.totals.system)}</b></div>
         <div class="rev-card"><span class="small muted">Заказов</span><b>${rows.length}</b></div>
         <div class="rev-card"><span class="small muted">Средний чек</span><b>${rows.length ? fmtMoney(Math.round(avg)) : '—'}</b></div>
         <div class="rev-card"><span class="small muted">Крупнейший заказ</span><b>${top ? fmtMoney(top.o.total || 0) : '—'}</b></div>
-        <div class="rev-card"><span class="small muted">Доля периода в обороте</span><b>${data.totals.system ? (total/data.totals.system*100).toFixed(1).replace('.', ',') + '%' : '—'}</b></div>
       </div>
       ${rows.length ? `<div class="rev-charts">
         <div class="rev-chart-block">
@@ -2655,6 +2680,10 @@ ex.innerHTML = avatarHTML(user(), '');
       bindChartSelect(dailyWrap, { items: series.items, top:true,
         period:c => series.bucketDays === 1 ? `${c} ${dayPlural(c)}` : series.bucketDays === 7 ? `${c} нед.` : `${c} мес.` });
     }
+    const rvCard = box.querySelector('[data-rev-reserve-history]');
+    if (rvCard) rvCard.onclick = (e)=>{ if (e.target.closest('[data-rev-reserve-adjust]')) return; openReserveHistory(); };
+    const rvAdj = box.querySelector('[data-rev-reserve-adjust]');
+    if (rvAdj) rvAdj.onclick = (e)=>{ e.stopPropagation(); openReserveAdjust(1); };
     const expBtn = box.querySelector('[data-rev-export]');
     if (expBtn) expBtn.onclick = () => showDropdown(expBtn, [
       { label:'Excel (.xlsx)', icon:'table', onClick:()=>revExportXlsx(data) },
@@ -7229,6 +7258,79 @@ const cm = root.querySelector('.chat-main');
     return `<span class="badge ${cls}">${label}</span>`;
   }
   function payoutProvider(){ return Object.assign({ key:'smartcat', name:'Smartcat', commission:5, enabled:true }, ((S.settings.integrations||{}).payout||{})); }
+  function openReserveHistory(){
+    const rows = Finance.reserveList();
+    openWinModal({
+      title:'История страховочного резерва', icon:'card', wide:true,
+      body:`<div class="card card-pad" style="margin:0">
+        <div class="row row--between" style="margin-bottom:10px"><span class="small muted">Текущий остаток</span><b>${fmtMoney(Finance.reserveBalance())}</b></div>
+        ${rows.length ? `<div class="tbl-wrap"><table class="tbl">
+          <thead><tr><th>Дата</th><th>Сумма</th><th>Тип</th><th>Причина</th><th>Автор</th><th></th></tr></thead>
+          <tbody>${rows.map(e => {
+            const when = new Date(e.at).toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
+            const sign = (Number(e.amount) || 0) > 0 ? '+' : '';
+            return `<tr>
+              <td class="small faint" style="white-space:nowrap">${when}</td>
+              <td class="pay-cell"><b class="${Number(e.amount)<0?'neg':''}">${sign}${fmtMoney(e.amount)}</b></td>
+              <td class="small">${esc(e.type || '—')}</td>
+              <td class="small">${esc(e.reason || '')}${e.comment ? `<br><span class="faint">${esc(e.comment)}</span>` : ''}</td>
+              <td class="small faint">${e.source === 'auto' ? 'Автоматически' : esc(e.author_name || 'Админ')}</td>
+              <td style="white-space:nowrap"><button class="iconbtn" type="button" data-rv-edit="${esc(e.id)}" title="Исправить">${icon('edit','ico-sm')}</button><button class="iconbtn" type="button" data-rv-del="${esc(e.id)}" title="Удалить">${icon('trash','ico-sm')}</button></td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table></div>` : '<div class="empty" style="padding:26px 0">Нет движений резерва</div>'}
+      </div>`,
+      onMount:(m, close)=>{
+        m.querySelectorAll('[data-rv-edit]').forEach(b => b.onclick = ()=>{
+          const e = rows.find(x => x.id === b.dataset.rvEdit);
+          if (!e) return;
+          const amount = prompt('Сумма движения, ₽ (минус — списание)', String(e.amount));
+          if (amount == null) return;
+          const reason = prompt('Причина', e.reason || '');
+          if (reason == null) return;
+          const comment = prompt('Комментарий', e.comment || '');
+          if (Finance.reserveUpdate(e.id, { amount, reason, comment })){ close(); setTimeout(openReserveHistory, 180); }
+        });
+        m.querySelectorAll('[data-rv-del]').forEach(b => b.onclick = ()=>{
+          const e = rows.find(x => x.id === b.dataset.rvDel);
+          if (!e || !confirm('Удалить движение резерва? Баланс пересчитается.')) return;
+          if (Finance.reserveDelete(e.id)){ close(); setTimeout(openReserveHistory, 180); }
+        });
+      }
+    });
+  }
+  function openReserveAdjust(dir){
+    const bal = Finance.reserveBalance();
+    const isIn = dir > 0;
+    openWinModal({
+      title: isIn ? 'Пополнить страховочный резерв' : 'Списать из страховочного резерва',
+      icon:'card', narrow:true,
+      body:`<div class="stack" style="gap:12px">
+        <div class="row row--between small"><span class="muted">Текущий остаток</span><b class="${bal<0?'neg':''}">${fmtMoney(bal)}</b></div>
+        <div class="field"><label>Сумма, ₽ *</label><input class="input" id="reserve-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="Например, 25000"></div>
+        <div class="field"><label>Причина *</label><textarea class="input" id="reserve-reason" rows="3" placeholder="${isIn?'Из прибыли, возврат неизрасходованного аванса…':'Возврат клиенту, срочная замена исполнителя…'}"></textarea></div>
+        <div class="field"><label>Комментарий</label><input class="input" id="reserve-comment" placeholder="Необязательно: номер заказа, документ, договорённость"></div>
+        <p class="small faint" style="margin:0">${isIn?'Сумма добавится к остатку резерва.':'Сумма спишется из резерва; больше остатка списать нельзя.'}</p>
+      </div>`,
+      footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn ${isIn?'btn--primary':'btn--danger'}" data-reserve-save>${isIn?'Пополнить':'Списать'}</button>`,
+      onMount:(m, close)=>{
+        m.querySelector('[data-x]').onclick = close;
+        m.querySelector('[data-reserve-save]').onclick = ()=>{
+          const amount = Math.round(Number(m.querySelector('#reserve-amount').value) || 0);
+          const reason = m.querySelector('#reserve-reason').value.trim();
+          const comment = m.querySelector('#reserve-comment').value.trim();
+          if (amount <= 0){ toast('Укажите сумму больше нуля','warn'); return; }
+          if (!reason){ toast('Укажите причину движения','warn'); return; }
+          if (!isIn && amount > bal){ toast('Нельзя списать больше остатка резерва','warn'); return; }
+          const rec = Finance.reserveAdjust(isIn ? amount : -amount, reason, { comment });
+          if (!rec){ toast('Не удалось изменить резерв','err'); return; }
+          close();
+          toast(isIn ? `Резерв пополнен на ${fmtMoney(amount)}` : `Из резерва списано ${fmtMoney(amount)}`, 'ok');
+          try { APP.render(); } catch(e){}
+        };
+      }
+    });
+  }
   function payoutsHTML(){
     const u = me();
     const staff = ['admin','top_manager','manager'].includes(u.role);
@@ -7241,6 +7343,49 @@ const cm = root.querySelector('.chat-main');
     const nextCutTs = Finance.nextCut();
     const fmtCut = ts => new Date(ts).toLocaleString('ru-RU', { day:'numeric', month:'long', hour:'2-digit', minute:'2-digit', timeZone:'Europe/Moscow' }) + ' МСК';
     const myId = u.id;
+    const reserve = Finance.reserveBalance();
+    const reserveRows = Finance.reserveList().slice(0, 8);
+    const canReserve = u.role === 'admin';
+    const reserveRules = Finance.reserveRules();
+    const reserveTypeLabel = { manual_in:'Пополнение', manual_out:'Списание', orderLeft:'Остаток заказа', refund:'Возврат', tax:'Налоги', payout:'Выплата', correction:'Корректировка' };
+    const reserveRowsHtml = reserveRows.length ? reserveRows.map(e => {
+      const when = new Date(e.at).toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+      const sign = (Number(e.amount) || 0) > 0 ? '+' : '';
+      return `<div class="row row--between" style="padding:7px 0;border-bottom:1px solid var(--border);gap:12px;align-items:flex-start">
+        <span class="small" style="min-width:0">
+          <b class="${Number(e.amount)<0?'neg':''}" style="white-space:nowrap">${sign}${fmtMoney(e.amount)}</b>
+          <span class="faint"> · ${esc(reserveTypeLabel[e.type] || e.type || 'Движение')}</span><br>
+          <span>${esc(e.reason || '')}</span>
+          <span class="faint">${e.comment ? ' · ' + esc(e.comment) : ''}</span><br>
+          <span class="faint">${when} · ${e.source === 'auto' ? 'автоматически' : esc(e.author_name || 'Админ')}</span>
+        </span>
+      </div>`;
+    }).join('') : '<p class="small faint" style="padding:10px 0;margin:0">Движений пока нет. Резерв начнёт учитываться с первого пополнения.</p>';
+    const reserveHtml = !staff ? '' : `<div class="card card-pad" id="reserve-card">
+      <div class="row row--between" style="gap:16px;align-items:flex-start;flex-wrap:wrap">
+        <div style="min-width:220px;flex:1">
+          <h3 style="margin-bottom:6px">Страховочный резерв</h3>
+          <p class="small faint" style="margin:0;max-width:620px">Деньги платформы на случай возвратов, срочных замен и налоговых обязательств. Каждое движение фиксируется с причиной и автором, поэтому остаток всегда можно объяснить.</p>
+        </div>
+        <div style="text-align:right;flex:none">
+          <div class="small muted">Остаток</div>
+          <b style="font-size:22px;white-space:nowrap" class="${reserve<0?'neg':''}" data-reserve-balance>${fmtMoney(reserve)}</b>
+        </div>
+      </div>
+      ${canReserve ? `<div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn--primary btn--sm" type="button" id="reserve-add">Пополнить</button>
+        <button class="btn btn--ghost btn--sm" type="button" id="reserve-sub">Списать</button>
+        <label class="check" style="display:flex;align-items:center;gap:7px;margin-left:2px">
+          <input type="checkbox" id="reserve-rule-left" ${reserveRules.orderLeft?'checked':''}>
+          <span class="box"><svg><use href="#i-check-c"/></svg></span>
+          <span class="small">Пополнять свободным остатком выполненных заказов</span>
+        </label>
+      </div>` : ''}
+      <div style="margin-top:14px">
+        <div class="row row--between" style="margin-bottom:2px"><b class="small">История движений</b><button class="rev-link" type="button" id="reserve-all">Вся история →</button></div>
+        ${reserveRowsHtml}
+      </div>
+    </div>`;
     const rows = Object.entries(pend.byUser).map(([uid, amount]) => {
       const usr = userById(uid) || { full_name:uid };
       const sc = Finance.scOf(uid);
@@ -7282,6 +7427,7 @@ const cm = root.querySelector('.chat-main');
     })();
 
     return `
+    ${reserveHtml}
     <div class="card card-pad">
       <h3 style="margin-bottom:6px">Выплаты</h3>
       <p class="small faint">По умолчанию — 1-го и 15-го числа в 15:00 МСК. В выплату попадают <b>все выполненные заказы с неоплаченными долями</b> — в том числе завершённые вне текущего периода. Любой заказ можно убрать из выплаты вручную и вернуть обратно.</p>
@@ -7332,6 +7478,21 @@ const cm = root.querySelector('.chat-main');
   }
   function bindPayouts(el){
     const p = Finance.payoutCfg();
+    const rAdd = el.querySelector('#reserve-add');
+    if (rAdd) rAdd.onclick = ()=>openReserveAdjust(1);
+    const rSub = el.querySelector('#reserve-sub');
+    if (rSub) rSub.onclick = ()=>openReserveAdjust(-1);
+    const rAll = el.querySelector('#reserve-all');
+    if (rAll) rAll.onclick = ()=>openReserveHistory();
+    const rRule = el.querySelector('#reserve-rule-left');
+    if (rRule) rRule.onchange = ()=>{
+      S.settings.finance = Object.assign({}, S.settings.finance, {
+        reserveRules: Object.assign({}, (S.settings.finance || {}).reserveRules, { orderLeft: rRule.checked })
+      });
+      saveState();
+      try { logAudit(rRule.checked ? 'Включено автопополнение резерва из остатка выполненных заказов' : 'Выключено автопополнение резерва из остатка выполненных заказов', 'Финансы'); } catch(e){}
+      toast(rRule.checked ? 'Правило включено: остаток новых выполненных заказов будет попадать в резерв' : 'Автопополнение резерва выключено', 'ok');
+    };
     el.querySelectorAll('[data-po-exc]').forEach(b => b.onclick = ()=>{
       const id = b.dataset.poExc, back = b.dataset.back === '1';
       Finance.setExcluded(id, !back);
@@ -10308,18 +10469,26 @@ function initPWA(){
       const sec = e.target.closest('.side__sec[data-sec-title]');
       const items = [];
       if (link){
-        items.push({ label:'Перейти в раздел', icon:'chev-r', onClick:()=>{ window.__navDbl = null; go(link.dataset.route); } });
-        items.push({ label:'Открыть в окне', icon:'app', onClick:()=>{ window.__navDbl = null; try { Windows.spawn(link.dataset.route); } catch(err){} } });
+        const route = link.dataset.route;
+        items.push({ label:'Перейти в раздел', icon:'chev-r', onClick:()=>{ window.__navDbl = null; go(route); } });
+        items.push({ label:'Открыть в окне', icon:'app', onClick:()=>{ window.__navDbl = null; try { Windows.spawn(route); } catch(err){} } });
+        /* Действия ниже относятся только к окнам ЭТОГО пункта меню.
+           Они идут до разделителя; общие операции — после него. */
+        if (window.Windows && Windows.hasWindow && Windows.hasWindow(route)){
+          items.push({ label:'Свернуть окна раздела', icon:'chev-d', onClick:()=>{ try { Windows.minimizeRoute(route); } catch(err){} } });
+          items.push({ label:'Закрыть окна раздела', icon:'x', danger:true, onClick:()=>{ try { Windows.closeRoute(route); } catch(err){} } });
+        }
       }
-      /* Свернуть / закрыть все окна — только если они открыты (одна группа, без разделителя) */
+      /* Общие операции со всеми окнами — отдельной группой после разделителя. */
       if (window.Windows && Windows.hasOpenWins && Windows.hasOpenWins()){
+        if (items.length) items.push('-');
         if (Windows.hasMinimized && Windows.hasMinimized()){
-          items.push({ label:'Развернуть все окна', icon:'chev-u', onClick:()=>{ try { Windows.restoreAll(); } catch(err){} } });
+          items.push({ label:'Развернуть все окна разделов', icon:'chev-u', onClick:()=>{ try { Windows.restoreAll(); } catch(err){} } });
         }
         if (Windows.hasExpanded && Windows.hasExpanded()){
-          items.push({ label:'Свернуть все окна', icon:'chev-d', onClick:()=>{ try { Windows.minimizeAll(); } catch(err){} } });
+          items.push({ label:'Свернуть все окна разделов', icon:'chev-d', onClick:()=>{ try { Windows.minimizeAll(); } catch(err){} } });
         }
-        items.push({ label:'Закрыть все окна', icon:'x', onClick:()=>{ try { Windows.closeAll(); } catch(err){} } });
+        items.push({ label:'Закрыть все окна разделов', icon:'x', danger:true, onClick:()=>{ try { Windows.closeAll(); } catch(err){} } });
       }
       items.push('-');
       items.push({ label:'Сбросить меню по умолчанию', icon:'archive', onClick:()=>{ NAV = JSON.parse(JSON.stringify(NAV_DEFAULT)); window.NAV = NAV; delete prefsFor().navCustom; delete prefsFor().navCustomOrder; saveState(); clearHoverMarks(); toast('Меню сброшено','ok'); renderNavOnly(); } });

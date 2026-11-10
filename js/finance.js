@@ -22,7 +22,7 @@ const Finance = (function(){
       /* Минимумы — настраиваемые, не хардкод: 500 ₽ за заказ и 100 ₽ исполнителю
          по умолчанию; тестовый заказ их обходит. */
       minOrderTotal: Math.round(clamp(f.minOrderTotal ?? 500, 0, 10000000)),
-      minExecutorPay: Math.round(clamp(f.minExecutorPay ?? 100, 0, 10000000))
+      minExecutorPay: Math.round(clamp(f.minExecutorPay ?? 200, 0, 10000000))
     };
   }
 
@@ -122,6 +122,127 @@ const Finance = (function(){
   }
   function debtsOf(uid){
     return (S.orders || []).reduce((sum, o) => sum + (debts(o).byUser[uid] || 0), 0);
+  }
+
+  /* ---------- Страховочный резерв ----------
+     Это отдельные деньги платформы «на случай чего», не баланс сотрудника.
+     Баланс не хранится отдельным числом: он всегда сумма opening + всех
+     движений. Поэтому удаление/исправление движения не оставляет «фантомный»
+     остаток, а каждое изменение имеет автора и причину. */
+  const RESERVE_EVENTS = {
+    orderLeft: 'Свободный остаток по выполненному заказу',
+    refund: 'Возврат клиенту',
+    tax: 'Налоговый резерв',
+    payout: 'Выплата из резерва',
+    correction: 'Корректировка'
+  };
+  function reserveRules(){
+    const f = (S.settings && S.settings.finance) || {};
+    return Object.assign({ orderLeft:true, refund:false, tax:false, payout:false }, f.reserveRules || {});
+  }
+  function reserveState(){
+    if (!S.reserve || typeof S.reserve !== 'object' || Array.isArray(S.reserve)) S.reserve = { opening:0, entries:[] };
+    if (!Array.isArray(S.reserve.entries)) S.reserve.entries = [];
+    return S.reserve;
+  }
+  function reserveBalance(){
+    const r = reserveState();
+    return Math.round((Number(r.opening) || 0) + r.entries.reduce((a, e) => a + (Number(e.amount) || 0), 0));
+  }
+  function reserveList(){
+    return reserveState().entries.slice().sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0));
+  }
+  /* Единая точка движения резерва. opts.system=true разрешает вызов из
+     автоматических сценариев; ручные операции — только админ.
+     amount со знаком: плюс — пополнение, минус — списание. */
+  function reserveAdjust(amount, reason, opts = {}){
+    const amt = Math.round(Number(amount) || 0);
+    const why = String(reason || '').trim();
+    const m = (typeof me === 'function' && me()) || {};
+    if (!amt || !why) return null;
+    if (!opts.system && m.role !== 'admin') return null;
+    const r = reserveState();
+    const rec = {
+      id: 'rv' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      at: Date.now(),
+      amount: amt,
+      reason: why,
+      comment: String(opts.comment || '').trim(),
+      type: String(opts.type || (amt > 0 ? 'manual_in' : 'manual_out')),
+      source: opts.system ? 'auto' : 'admin',
+      order_id: opts.order_id || null,
+      author_id: m.id || 'system',
+      author_name: m.full_name || 'Система'
+    };
+    r.entries.unshift(rec);
+    try { logAudit(`Резерв ${amt > 0 ? '+' : ''}${fmtMoney(amt)}: ${why}`, 'Финансы'); } catch(e){}
+    saveState();
+    try { window.dispatchEvent(new CustomEvent('aw:reserve-changed', { detail: rec })); } catch(e){}
+    return rec;
+  }
+  /* Задел под автоматические сценарии: правило включается в настройках,
+     а вызывающий код передаёт событие и сумму. Пока правила выключены,
+     вызов ничего не меняет — исторические данные не переписываются молча. */
+  function reservePost(event, amount, meta = {}){
+    if (!reserveRules()[event]) return null;
+    const label = RESERVE_EVENTS[event] || 'Движение резерва';
+    return reserveAdjust(amount, meta.reason || label, {
+      system:true, type:event, order_id:meta.order_id || null, comment:meta.comment || ''
+    });
+  }
+  /* Админ может исправить или удалить ошибочное движение. Это не «тихая»
+     правка: сохраняем автора и пишем в аудит, баланс пересчитывается из
+     журнала. */
+  function reserveUpdate(id, patch = {}){
+    const m = (typeof me === 'function' && me()) || {};
+    if (m.role !== 'admin') return null;
+    const e = reserveState().entries.find(x => x.id === id);
+    if (!e) return null;
+    const amt = Math.round(Number(patch.amount != null ? patch.amount : e.amount) || 0);
+    const why = String(patch.reason != null ? patch.reason : e.reason || '').trim();
+    if (!amt || !why) return null;
+    e.amount = amt;
+    e.reason = why;
+    if (patch.comment != null) e.comment = String(patch.comment).trim();
+    e.edited_at = Date.now();
+    e.edited_by = m.id || 'system';
+    try { logAudit(`Резерв исправлен: ${why} → ${fmtMoney(amt)}`, 'Финансы'); } catch(e2){}
+    saveState();
+    try { window.dispatchEvent(new CustomEvent('aw:reserve-changed', { detail:e })); } catch(e2){}
+    return e;
+  }
+  function reserveDelete(id){
+    const m = (typeof me === 'function' && me()) || {};
+    if (m.role !== 'admin') return false;
+    const r = reserveState();
+    const i = r.entries.findIndex(x => x.id === id);
+    if (i < 0) return false;
+    const e = r.entries[i];
+    r.entries.splice(i, 1);
+    try { logAudit(`Движение резерва удалено: ${e.reason || e.id} (${fmtMoney(e.amount)})`, 'Финансы'); } catch(e2){}
+    saveState();
+    try { window.dispatchEvent(new CustomEvent('aw:reserve-changed', { detail:e })); } catch(e2){}
+    return true;
+  }
+
+  /* Пересчёт автоматической части по конкретному заказу. Нужен при смене
+     статуса «выполнен ↔ архив/отмена» и при правке суммы: резерв должен
+     следовать за заказом, а не за устаревшим снимком. */
+  function reserveSyncOrder(o){
+    if (!o || !o.order_id) return 0;
+    const rules = reserveRules();
+    if (!rules.orderLeft) return 0;
+    const target = ['done','archived'].includes(o.status) ? split(o).left : 0;
+    const cur = reserveState().entries
+      .filter(e => e.type === 'orderLeft' && e.order_id === o.order_id)
+      .reduce((a, e) => a + (Number(e.amount) || 0), 0);
+    const delta = Math.round(target - cur);
+    if (!delta) return 0;
+    reserveAdjust(delta, `Пересчёт резерва по заказу ${o.order_id}`, {
+      system:true, type:'orderLeft', order_id:o.order_id,
+      comment: target ? 'Свободный остаток заказа' : 'Заказ больше не считается выполненным'
+    });
+    return delta;
   }
 
   /* Начисление при переходе в «Выполнено» и его отмена.
@@ -481,7 +602,9 @@ const Finance = (function(){
     };
   }
 
-  return { cfg, split, accrue, addEarned, credit, withdraw, balanceOf, debtsOf, finesFor, finesAll, fineSum, fine, revokeFine, debts, hasDebt, payoutCfg, period, fmtPeriod, pending, runPayout,
+  return { cfg, split, accrue, addEarned, credit, withdraw, balanceOf, debtsOf,
+    reserveRules, reserveState, reserveBalance, reserveList, reserveAdjust, reserveUpdate, reserveDelete, reservePost, reserveSyncOrder,
+    finesFor, finesAll, fineSum, fine, revokeFine, debts, hasDebt, payoutCfg, period, fmtPeriod, pending, runPayout,
     nextCut, lastCut, skipNextPayout, skipInfo, autoTick,
     payoutOrders, excludedIds, isExcluded, setExcluded,
     scOf, scStatusLabel, requestSmartcat, approveSmartcat, rejectSmartcat, smartcatPayload, docsForOrder };
