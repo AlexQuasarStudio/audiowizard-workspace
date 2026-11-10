@@ -624,12 +624,7 @@ const Windows = (() => {
     const total = allWins().length;
     const W_DEF = 'min(560px, calc(100vw - 80px))', H_DEF = 'min(440px, calc(100vh - 90px))';
     const sideW = (document.querySelector('.side') || { getBoundingClientRect: () => ({ right: 0 }) }).getBoundingClientRect().right;
-    const snapRect = (param && param.snap) ? snapRectFor(param.snap) : null;
-    if (snapRect){
-      /* Дроп пункта меню в подсказку сплита: окно сразу занимает половину */
-      win.style.left = snapRect.left + 'px'; win.style.top = snapRect.top + 'px';
-      win.style.width = snapRect.width + 'px'; win.style.height = snapRect.height + 'px';
-    } else if (param && typeof param.x === 'number' && typeof param.y === 'number'){
+    if (param && typeof param.x === 'number' && typeof param.y === 'number'){
       win.style.width = W_DEF; win.style.height = H_DEF;
       const wDef = 560;
       const minLeft = (param.forceRight ? sideW + 16 : 8);

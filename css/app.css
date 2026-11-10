@@ -1573,23 +1573,16 @@ body.win-dragging *{user-select:none!important}
 }
 
 /* Гайд-зона сброса окна (справа от меню) */
-.aw-win-guide{position:fixed;z-index:2499;border:2px dashed var(--accent);border-radius:14px;background:transparent;opacity:1;pointer-events:none}
-.aw-win-guide[hidden]{display:none}
-/* Подсказки сплита при драге пункта меню: видны все зоны, активная плавно
-   подсвечивается, при уходе из вьюпорта весь слой так же плавно гаснет. */
-.menu-split-hints{position:fixed;inset:0;z-index:2498;pointer-events:none;opacity:0;transition:opacity .18s var(--ease)}
-.menu-split-hints.is-on{opacity:1}
-.menu-split-hints.is-out{opacity:0}
-.menu-split-preview{position:absolute;border:2px solid var(--accent);border-radius:14px;background:var(--accent-soft);opacity:0;pointer-events:none;transition:left .2s var(--ease),top .2s var(--ease),width .2s var(--ease),height .2s var(--ease),opacity .18s var(--ease)}
-.menu-split-preview.is-on{opacity:.5}
-.menu-split-hint{position:absolute;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--border-2);border-radius:10px;background:color-mix(in srgb,var(--panel) 88%,transparent);color:var(--text-2);font-size:12px;font-weight:600;box-shadow:var(--sh-1);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);transition:background-color .18s var(--ease),border-color .18s var(--ease),color .18s var(--ease),box-shadow .18s var(--ease)}
-.menu-split-hint[data-zone="left"]{left:18px;top:50%;transform:translateY(-50%)}
-.menu-split-hint[data-zone="right"]{right:18px;top:50%;transform:translateY(-50%)}
-.menu-split-hint[data-zone="top"]{left:50%;top:18px;transform:translateX(-50%)}
-.menu-split-hint[data-zone="bottom"]{left:50%;bottom:18px;transform:translateX(-50%)}
-.menu-split-hint__ic{display:inline-flex;flex:none}
-.menu-split-hint[data-zone="bottom"] .menu-split-hint__ic{transform:rotate(180deg)}
-.menu-split-hint.is-hot{color:var(--text);border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent-soft),var(--sh-1)}
+.aw-win-guide{position:fixed;z-index:4000;border:2px dashed var(--accent);border-radius:14px;background:var(--accent-soft);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(2px);transition:opacity .18s var(--ease),transform .18s var(--ease),visibility 0s linear .18s}
+.aw-win-guide.is-on{opacity:.55;visibility:visible;transform:none;transition:opacity .18s var(--ease),transform .18s var(--ease),visibility 0s}
+/* Элемент вьюпорта под драгом меню: та же пунктирная подсветка, что у окна */
+.menu-target-guide{position:fixed;z-index:4001;border:2px dashed var(--accent);border-radius:14px;pointer-events:none;opacity:0;visibility:hidden;transition:left .16s var(--ease),top .16s var(--ease),width .16s var(--ease),height .16s var(--ease),opacity .18s var(--ease),visibility 0s linear .18s}
+.menu-target-guide.is-on{opacity:1;visibility:visible;transition:left .16s var(--ease),top .16s var(--ease),width .16s var(--ease),height .16s var(--ease),opacity .18s var(--ease),visibility 0s}
+.menu-target-corner{position:absolute;width:42px;height:42px;border:2px dashed var(--accent);border-radius:10px;background:var(--accent-soft);opacity:0;transition:opacity .18s var(--ease),background-color .18s var(--ease)}
+.menu-target-guide.has-corner .menu-target-corner{opacity:.55}
+.menu-target-corner.is-hot{opacity:1;background:color-mix(in srgb,var(--accent) 26%,transparent)}
+.menu-drop-line{position:fixed;z-index:4002;height:2px;border-radius:2px;background:var(--accent);box-shadow:0 0 0 2px var(--accent-soft);opacity:0;pointer-events:none;transition:opacity .14s var(--ease),top .1s var(--ease)}
+.menu-drop-line.is-on{opacity:1}
 
 /* Кнопка разворачивания окна */
 .aw-win__max{margin-left:auto;flex:none;color:var(--muted);position:relative}
@@ -2167,7 +2160,7 @@ body.pills-hide .head{pointer-events:none}
 
 /* Поле ввода чата: базовый контейнер и textarea (блок был потерян). */
 .chat-input{display:flex;gap:6px;padding:8px 10px;margin:0 auto 0;max-width:760px;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:24px;background:color-mix(in srgb,var(--panel) 82%,transparent);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);align-items:flex-end;box-shadow:var(--sh-1);z-index:3;position:relative}
-#chat-t{flex:1 1 auto;min-width:0;min-height:20px;max-height:140px;padding:8px 4px;background:none;border:0;outline:none;resize:none;color:var(--text);font:inherit;font-size:13.5px;line-height:1.4;overflow-y:auto;scrollbar-width:thin;transition:height .16s var(--ease)}
+#chat-t{flex:1 1 auto;min-width:0;min-height:35px;max-height:140px;padding:8px 4px;background:none;border:0;outline:none;resize:none;color:var(--text);font:inherit;font-size:13.5px;line-height:1.4;overflow-y:auto;scrollbar-width:thin;transition:height .16s var(--ease)}
 #chat-t::placeholder{color:var(--faint)}
 /* Подсказки смайлов по ключевому слову: плавно появляются и гаснут */
 .chat-emoji-hints{position:absolute;left:8px;bottom:calc(100% + 8px);z-index:7;display:flex;gap:2px;padding:5px;border:1px solid var(--border-2);border-radius:14px;background:color-mix(in srgb,var(--panel) 92%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:var(--sh-2);opacity:0;visibility:hidden;transform:translateY(6px) scale(.98);pointer-events:none;transition:opacity .18s var(--ease),transform .18s var(--ease),visibility 0s linear .18s}

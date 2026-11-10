@@ -40,6 +40,7 @@ const NavDrag = (() => {
   function cleanupAll(){
     document.querySelectorAll('.menu-drop-hover, .menu-drop-hover-sec').forEach(x => x.classList.remove('menu-drop-hover', 'menu-drop-hover-sec'));
     document.querySelectorAll(guideSel).forEach(g => g.remove());
+    document.querySelectorAll('.menu-target-guide, .menu-drop-line').forEach(g => g.remove());
     const nav = document.querySelector('.side__nav');
     if (nav) nav.classList.remove('menu-drag-active');
     document.body.classList.remove('menu-dragging');
@@ -49,7 +50,8 @@ const NavDrag = (() => {
   // Отмена: вернуть элемент на его прежнее место (по снимку)
   function cancel(){
     if (!drag) return;
-    hideSplitHints();
+    hideTargetGuide();
+    hideDropLine();
     const el = drag.el, ph = drag.placeholder;
     if (el){
       el.classList.remove('menu-drag-live');
@@ -75,6 +77,8 @@ const NavDrag = (() => {
 
   function start(el){
     if (!el || !el.parentNode) return;
+    /* Подчищаем подсветку от предыдущего жеста, если она осталась висеть */
+    document.querySelectorAll('.menu-target-guide, .menu-drop-line').forEach(x => x.remove());
     const parent = el.parentNode;
     const r = el.getBoundingClientRect();
     const ph = document.createElement('div');
@@ -99,10 +103,8 @@ const NavDrag = (() => {
     el.style.width = Math.round(r.width) + 'px';
     const guide = document.createElement('div');
     guide.className = 'aw-win-guide';
-    guide.hidden = true;
     document.body.appendChild(guide);
     drag = { el, placeholder: ph, guide, _parent: parent, _order: orderSnapshot() };
-    if (!el.classList.contains('side__sec')) ensureHints();
     const nav = document.querySelector('.side__nav');
     if (nav) nav.classList.add('menu-drag-active');
     document.body.classList.add('menu-dragging');
@@ -126,90 +128,118 @@ const NavDrag = (() => {
     g.style.top = gy + 'px';
     g.style.width = wUse + 'px';
     g.style.height = hUse + 'px';
-    g.hidden = false;
+    g.classList.add('is-on');
   }
 
   function hideGuide(){
-    if (drag && drag.guide) drag.guide.hidden = true;
-    document.querySelectorAll(guideSel).forEach(g => g.hidden = true);
+    if (drag && drag.guide) drag.guide.classList.remove('is-on');
+    document.querySelectorAll(guideSel).forEach(g => g.classList.remove('is-on'));
   }
 
-  /* Куда именно упадёт окно: четыре половины экрана. Подсказки показываем
-     все сразу, а подсвечиваем ту, к которой ближе курсор. */
-  function splitZoneAt(cx, cy){
+  /* Элемент вьюпорта под курсором: окно целиком или карточка/панель. */
+  const VIEW_TARGETS = '.aw-win, .card, .metric, .person-card, .o-card, .rev-card, .tbl-wrap, .chat-main, .settings-grid';
+  function rectHas(r, cx, cy){
+    return r.width > 0 && r.height > 0 && cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom;
+  }
+  function viewportTargetAt(cx, cy){
     if (cx < navRight()) return null;
-    const vw = window.innerWidth, vh = window.innerHeight;
-    const dx = vw * 0.22, dy = vh * 0.22;
-    const edges = [['left', cx, dx], ['right', vw - cx, dx], ['top', cy, dy], ['bottom', vh - cy, dy]];
-    edges.sort((a, b) => a[1] - b[1]);
-    return edges[0][1] <= edges[0][2] ? edges[0][0] : null;
+    /* Контент во время драга инертен (pointer-events:none), поэтому
+       elementFromPoint возвращает .shell. Ищем элемент по геометрии:
+       сначала окна (верхнее — последнее в слое), затем карточки/панели. */
+    const wins = [...document.querySelectorAll('#windows-layer .aw-win')]
+      .filter(el => rectHas(el.getBoundingClientRect(), cx, cy));
+    if (wins.length) return wins[wins.length - 1];
+    const list = [...document.querySelectorAll(VIEW_TARGETS)]
+      .filter(el => !el.classList.contains('aw-win') && rectHas(el.getBoundingClientRect(), cx, cy));
+    return list[0] || null;
   }
 
-  function ensureHints(){
+  function ensureTargetGuide(){
     if (!drag) return null;
-    if (drag.hints) return drag.hints;
-    document.querySelectorAll('.menu-split-hints').forEach(x => x.remove());
-    const h = document.createElement('div');
-    h.className = 'menu-split-hints';
-    h.innerHTML = '<div class="menu-split-preview"></div>' + [
-      ['left','Слева','split-left'], ['right','Справа','split-right'],
-      ['top','Сверху','split-quarter'], ['bottom','Снизу','split-quarter']
-    ].map(([z, label, ic]) => `<div class="menu-split-hint" data-zone="${z}"><span class="menu-split-hint__ic">${icon(ic,'ico-sm')}</span><span>${label}</span></div>`).join('');
-    document.body.appendChild(h);
-    drag.hints = h;
-    return h;
+    if (drag.targetGuide) return drag.targetGuide;
+    const g = document.createElement('div');
+    g.className = 'menu-target-guide';
+    g.innerHTML = '<span class="menu-target-corner"></span>';
+    document.body.appendChild(g);
+    drag.targetGuide = g;
+    return g;
+  }
+  function updateTargetGuide(el, cx, cy){
+    if (!el){ hideTargetGuide(); return; }
+    const g = ensureTargetGuide();
+    if (!g) return;
+    const r = el.getBoundingClientRect();
+    g.style.left = (r.left - 3) + 'px';
+    g.style.top = (r.top - 3) + 'px';
+    g.style.width = (r.width + 6) + 'px';
+    g.style.height = (r.height + 6) + 'px';
+    const isWin = el.classList.contains('aw-win');
+    g.classList.toggle('has-corner', isWin);
+    g.classList.add('is-on');
+    const c = g.querySelector('.menu-target-corner');
+    if (c){
+      if (isWin){
+        const size = 42;
+        c.style.left = (r.width - size) + 'px';
+        c.style.top = (r.height - size) + 'px';
+        c.classList.toggle('is-hot', cx >= r.right - size && cy >= r.bottom - size);
+      } else {
+        c.classList.remove('is-hot');
+      }
+    }
+    drag._viewTarget = el;
+  }
+  function hideTargetGuide(){
+    const g = drag && drag.targetGuide;
+    if (!g) return;
+    g.classList.remove('is-on', 'has-corner');
+    const c = g.querySelector('.menu-target-corner');
+    if (c) c.classList.remove('is-hot');
+    if (drag) drag._viewTarget = null;
   }
 
-  function updateHints(zone){
-    if (!drag) return;
-    const h = ensureHints();
-    if (!h) return;
-    h.classList.add('is-on');
-    h.classList.remove('is-out');
-    h.querySelectorAll('.menu-split-hint').forEach(el => el.classList.toggle('is-hot', el.dataset.zone === zone));
-    const pv = h.querySelector('.menu-split-preview');
-    if (!pv) return;
-    if (!zone){ pv.classList.remove('is-on'); return; }
-    const vw = window.innerWidth, vh = window.innerHeight;
-    const halfW = Math.round(vw / 2), halfH = Math.round(vh / 2);
-    const r = zone === 'left' ? { left:8, top:8, width:halfW-12, height:vh-16 }
-      : zone === 'right' ? { left:halfW+4, top:8, width:vw-halfW-12, height:vh-16 }
-      : zone === 'top' ? { left:8, top:8, width:vw-16, height:halfH-12 }
-      : { left:8, top:halfH+4, width:vw-16, height:vh-halfH-12 };
-    pv.style.left = r.left + 'px'; pv.style.top = r.top + 'px';
-    pv.style.width = r.width + 'px'; pv.style.height = r.height + 'px';
-    pv.classList.add('is-on');
+  /* Линия между пунктами: показывает точный зазор, куда встанет пункт. */
+  function ensureDropLine(){
+    if (!drag) return null;
+    if (drag.dropLine) return drag.dropLine;
+    const l = document.createElement('div');
+    l.className = 'menu-drop-line';
+    document.body.appendChild(l);
+    drag.dropLine = l;
+    return l;
   }
-
-  function hideSplitHints(){
-    const h = drag && drag.hints;
-    if (!h) return;
-    drag.hints = null;
-    h.classList.remove('is-on');
-    h.classList.add('is-out');
-    const pv = h.querySelector('.menu-split-preview');
-    if (pv) pv.classList.remove('is-on');
-    h.querySelectorAll('.menu-split-hint.is-hot').forEach(el => el.classList.remove('is-hot'));
-    setTimeout(() => { if (h.isConnected) h.remove(); }, 190);
+  function showDropLine(target, before){
+    const l = ensureDropLine();
+    if (!l) return;
+    const tr = target.getBoundingClientRect();
+    const nav = document.querySelector('.side__nav');
+    const nr = nav ? nav.getBoundingClientRect() : tr;
+    l.style.left = (nr.left + 8) + 'px';
+    l.style.width = Math.max(0, nr.width - 16) + 'px';
+    l.style.top = (before ? tr.top - 1 : tr.bottom - 1) + 'px';
+    l.classList.add('is-on');
+  }
+  function hideDropLine(){
+    const l = drag && drag.dropLine;
+    if (l) l.classList.remove('is-on');
   }
 
   function dropTargetAt(cx, cy){
     const nav = document.querySelector('.side__nav');
     if (!nav) return null;
-    const under = document.elementFromPoint(cx, cy);
-    if (!under) return null;
-    /* Цель  дропа — только навигация слева (.side__nav). Пункты с тем же классом
-       .side__link вне меню (например, боковое подменю настроек) не являются
-       целями и не должны подсвечиваться при драге. */
-    if (!nav.contains(under)) return null;
-    /* Пункты меняются только с пунктами, разделы — только с разделами:
-       раздел не подсвечиваем как цель для пункта и наоборот. */
+    const nr = nav.getBoundingClientRect();
+    if (cx < nr.left || cx > nr.right || cy < nr.top || cy > nr.bottom) return null;
     const draggingSec = !!(drag && drag.el && drag.el.classList.contains('side__sec'));
-    const link = under.closest('.side__link');
-    if (!draggingSec && link && link !== drag.el && nav.contains(link)) return link;
-    const sec = under.closest('.side__sec');
-    if (draggingSec && sec && sec !== drag.el && nav.contains(sec)) return sec;
-    return null;
+    const sel = draggingSec ? '.side__sec' : '.side__link';
+    let best = null, bestD = Infinity;
+    for (const el of nav.querySelectorAll(sel)){
+      if (!drag || el === drag.el) continue;
+      const r = el.getBoundingClientRect();
+      if (!r.height) continue;
+      const d = cy < r.top ? r.top - cy : (cy > r.bottom ? cy - r.bottom : 0);
+      if (d < bestD){ bestD = d; best = el; }
+    }
+    return bestD <= 12 ? best : null;
   }
 
   function position(cx, cy){
@@ -218,33 +248,36 @@ const NavDrag = (() => {
     const ew = el.offsetWidth || 160, eh = el.offsetHeight || 34;
     el.style.left = Math.max(4, Math.min(cx - ew/2, window.innerWidth - ew - 4)) + 'px';
     el.style.top = Math.max(4, Math.min(cy - Math.round(eh/2) - 4, window.innerHeight - eh - 4)) + 'px';
-    // подсветка цели
-    document.querySelectorAll('.menu-drop-hover, .menu-drop-hover-sec').forEach(x => x.classList.remove('menu-drop-hover', 'menu-drop-hover-sec'));
     const sEl = el.classList.contains('side__sec');
     const target = dropTargetAt(cx, cy);
-    /* Запоминаем подсвеченную цель: при отпускании она важнее повторного
-       elementFromPoint — иначе дроп в зазор у края подсвеченной цели
-       сбрасывался и пункт «возвращался на место». */
+    /* Линия вставки и реальный splice используют одно и то же «до/после»,
+       поэтому пункт больше не уезжает на позицию выше подсветки. */
     drag._hover = target || null;
     if (target){
-      /* Цель уже совместима: пункт подсвечивает только пункт, раздел — раздел. */
-      target.classList.add(target.classList.contains('side__link') ? 'menu-drop-hover' : 'menu-drop-hover-sec');
-    }
-    /* Ghost окна (зона справа) — только для пунктов: разделы во вьюпорт не переносятся */
-    if (!sEl && !target && cx >= navRight()){
-      const zone = splitZoneAt(cx, cy);
-      updateHints(zone);
-      if (zone) hideGuide(); else showGuide(cx, cy);
-    } else {
-      hideSplitHints();
+      const tr = target.getBoundingClientRect();
+      drag._before = cy < tr.top + tr.height / 2;
+      showDropLine(target, drag._before);
+      hideTargetGuide();
       hideGuide();
+    } else {
+      drag._before = null;
+      hideDropLine();
+      /* Пункт над вьюпортом: подсвечиваем элемент под курсором пунктиром,
+         как окно, и ведём заполненный призрак будущего окна. */
+      if (!sEl && cx >= navRight()){
+        updateTargetGuide(viewportTargetAt(cx, cy), cx, cy);
+        showGuide(cx, cy);
+      } else {
+        hideTargetGuide();
+        hideGuide();
+      }
     }
   }
 
   function finish(cx, cy){
     if (!drag) return;
-    const splitZone = splitZoneAt(cx, cy);
-    hideSplitHints();
+    hideTargetGuide();
+    hideDropLine();
     const src = drag.el;
     const under = document.elementFromPoint(cx, cy);
     const navNow = document.querySelector('.side__nav');
@@ -286,7 +319,7 @@ const NavDrag = (() => {
           const idx = V.findIndex(x => x.sec === target.dataset.secTitle);
           if (idx >= 0){
             const tr = target.getBoundingClientRect();
-            const before = cy < (tr.top + tr.height / 2);
+            const before = (drag._hover === target && drag._before != null) ? drag._before : (cy < (tr.top + tr.height / 2));
             V.splice(before ? idx : idx + 1, 0, s);
             moved = true; reordered = true;
           } else {
@@ -309,7 +342,7 @@ const NavDrag = (() => {
               /* «Куда указал»: вставляем ДО или ПОСЛЕ цели по половине курсора.
                  Курсор выше середины цели — пункт ставится перед ней, ниже — после. */
               const tr = target.getBoundingClientRect();
-              const before = cy < (tr.top + tr.height / 2);
+              const before = (drag._hover === target && drag._before != null) ? drag._before : (cy < (tr.top + tr.height / 2));
               toSec.items.splice(before ? toIdx : toIdx + 1, 0, item);
               moved = true; reordered = true;
             }
@@ -320,11 +353,7 @@ const NavDrag = (() => {
     } else if (cx >= navRight() && src.classList.contains('side__link')){
       /* Бросок в подсказку сплита — окно сразу в нужной половине;
          иначе оставляем свободное окно по месту курсора. */
-      try {
-        Windows.spawn(src.dataset.route, splitZone
-          ? { snap: splitZone }
-          : { x: cx, y: cy, forceRight: true });
-      } catch(e){}
+      try { Windows.spawn(src.dataset.route, { x: cx, y: cy, forceRight: true }); } catch(e){}
       moved = true;
     }
     /* Перестановка, которая вернула тот же порядок (например, дроп в свою же
