@@ -2621,7 +2621,14 @@ ex.innerHTML = avatarHTML(user(), '');
       <div class="rev-period small muted">${fmtDate(from)} — ${fmtDate(to - DAY)} · ${days} ${dayPlural(days)} · только выполненные заказы</div>
       <div class="rev-cards">
         <div class="rev-card"><span class="small muted">${myShareLabel}</span><b>${fmtMoney(myShare)}</b></div>
-        <div class="rev-card rev-card--reserve" data-rev-reserve-history title="Открыть историю резерва"><span class="small muted">Свободный остаток</span><b class="${Finance.reserveBalance()<0?'neg':''}">${fmtMoney(Finance.reserveBalance())}</b>${role==='admin'?`<button class="iconbtn rev-reserve-adj" type="button" data-rev-reserve-adjust title="Изменить резерв">${icon('edit','ico-sm')}</button>`:''}</div>
+        <div class="rev-card rev-card--reserve">
+          <span class="small muted">Свободный остаток</span>
+          <b class="${Finance.reserveBalance()<0?'neg':''}">${fmtMoney(Finance.reserveBalance())}</b>
+          <div class="rev-reserve-actions">
+            <button class="iconbtn rev-reserve-hist" type="button" data-rev-reserve-history title="История резерва">${icon('clock','ico-sm')}<span>История</span></button>
+            ${role==='admin'?`<button class="iconbtn rev-reserve-adj" type="button" data-rev-reserve-adjust title="Изменить резерв">${icon('edit','ico-sm')}</button>`:''}
+          </div>
+        </div>
         <div class="rev-card" title="Все неархивные заказы, созданные в выбранном периоде"><span class="small muted">Оборот за период</span><b>${fmtMoney(data.totals.system)}</b></div>
         <div class="rev-card"><span class="small muted">Заказов</span><b>${rows.length}</b></div>
         <div class="rev-card"><span class="small muted">Средний чек</span><b>${rows.length ? fmtMoney(Math.round(avg)) : '—'}</b></div>
@@ -2680,8 +2687,8 @@ ex.innerHTML = avatarHTML(user(), '');
       bindChartSelect(dailyWrap, { items: series.items, top:true,
         period:c => series.bucketDays === 1 ? `${c} ${dayPlural(c)}` : series.bucketDays === 7 ? `${c} нед.` : `${c} мес.` });
     }
-    const rvCard = box.querySelector('[data-rev-reserve-history]');
-    if (rvCard) rvCard.onclick = (e)=>{ if (e.target.closest('[data-rev-reserve-adjust]')) return; openReserveHistory(); };
+    const rvHist = box.querySelector('[data-rev-reserve-history]');
+    if (rvHist) rvHist.onclick = (e)=>{ e.stopPropagation(); openReserveHistory(); };
     const rvAdj = box.querySelector('[data-rev-reserve-adjust]');
     if (rvAdj) rvAdj.onclick = (e)=>{ e.stopPropagation(); openReserveAdjust(1); };
     const expBtn = box.querySelector('[data-rev-export]');

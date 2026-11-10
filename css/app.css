@@ -2466,9 +2466,12 @@ body.col-dragging,body.col-dragging *{cursor:col-resize!important;user-select:no
 
 /* Плавное удаление строки/карточки заказа */
 .o-row-out{opacity:0!important;transform:translateY(-3px);transition:opacity .18s var(--ease),transform .18s var(--ease)!important}
-.rev-card--reserve{position:relative;padding-right:38px}
-.rev-card--reserve .rev-reserve-adj{position:absolute;right:8px;top:8px;width:26px;height:26px;border-radius:8px;color:var(--muted)}
-.rev-card--reserve .rev-reserve-adj:hover{color:var(--text);background:var(--panel-3)}
+.rev-card--reserve{position:relative}
+.rev-reserve-actions{display:flex;align-items:center;gap:4px;margin-top:4px}
+.rev-reserve-hist{height:26px;padding:0 7px;border-radius:8px;gap:5px;font-size:11.5px;color:var(--muted)}
+.rev-reserve-hist span{display:inline-block}
+.rev-reserve-hist:hover,.rev-card--reserve .rev-reserve-adj:hover{color:var(--text);background:var(--panel-3)}
+.rev-card--reserve .rev-reserve-adj{width:26px;height:26px;border-radius:8px;color:var(--muted)}
 
 /* Подсказки при вводе клиента/исполнителя в новой строке заказа */
 .inline-suggest{position:fixed;z-index:5300;width:min(290px,calc(100vw - 16px));max-height:230px;overflow:auto;background:var(--panel);border:1px solid var(--border-2);border-radius:12px;box-shadow:var(--sh-2);padding:4px}
