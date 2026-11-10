@@ -827,7 +827,7 @@ const QA = {
   report:     { id:'report',     label:'Сообщить о проблеме',   icon:'alert',     run:()=>reportProblem() },
   invite:     { id:'invite',     label:'Пригласить в приложение', icon:'user-plus', run:()=>{ if (window.openInvites) window.openInvites(); else toast('Приглашения — в разделе «Люди»','info'); } },
   kanban:     { id:'kanban',     label:'Канбан задач',          icon:'kanban',    run:()=>go('kanban') },
-  planner:    { id:'planner',    label:'Планировщик',           icon:'calendar',  run:()=>go('settings','reminders') },
+  planner:    { id:'planner',    label:'Умный планировщик',     icon:'calendar',  run:()=>go('settings','reminders') },
   team:       { id:'team',       label:'Исполнители',           icon:'executor',  run:()=>go('executors') }
 };
 const QUICK_BY_ROLE = {
