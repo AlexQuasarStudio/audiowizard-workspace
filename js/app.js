@@ -2648,8 +2648,8 @@ ex.innerHTML = avatarHTML(user(), '');
           <span class="small muted">Свободный остаток</span>
           <b class="${Finance.reserveBalance()<0?'neg':''}">${fmtMoney(Finance.reserveBalance())}</b>
           <div class="rev-reserve-actions">
-            <button class="iconbtn rev-reserve-hist" type="button" data-rev-reserve-history title="История резерва">${icon('clock','ico-sm')}<span>История</span></button>
             ${role==='admin'?`<button class="iconbtn rev-reserve-adj" type="button" data-rev-reserve-adjust title="Изменить резерв">${icon('edit','ico-sm')}</button>`:''}
+            <button class="iconbtn rev-reserve-hist" type="button" data-rev-reserve-history title="История резерва">${icon('clock','ico-sm')}<span>История</span></button>
           </div>
         </div>
         <div class="rev-card" title="Все неархивные заказы, созданные в выбранном периоде"><span class="small muted">Оборот за период</span><b>${fmtMoney(data.totals.system)}</b></div>
@@ -3909,9 +3909,39 @@ ex.innerHTML = avatarHTML(user(), '');
     };
     window.__chatWidget = { render: renderWidget, close: closeWidget, minimize: minimizeWidget };
   /* Дата в чате: глобальное делегирование — перерисовка ленты не рвёт обработчик */
+  const dayTargetTop = (nb, mid)=>{
+    /* Цель — сама плашка этой даты: встаёт на sticky-позицию, под ней
+       сразу первое сообщение дня, и дата не переключается на соседнюю. */
+    const sepEl = nb.querySelector('.day-sep[data-ds="' + mid + '"]');
+    if (!sepEl) return null;
+    const off = parseFloat(getComputedStyle(nb).paddingTop) || 0;
+    /* У sticky-даты и rect, и offsetTop смещены к верху. Берём естественную
+       позицию из кэша, иначе — снимаем sticky на один замер. */
+    let nat = sepEl.__natTop;
+    if (nat == null){
+      const stick = sepEl.classList.contains('on-scroll');
+      if (stick) sepEl.classList.remove('on-scroll');
+      nat = nb.scrollTop + sepEl.getBoundingClientRect().top - nb.getBoundingClientRect().top;
+      if (stick) sepEl.classList.add('on-scroll');
+    }
+    const raw = nat - off;
+    const max = nb.scrollHeight - nb.clientHeight;
+    const top = Math.max(0, Math.min(max, raw));
+    return { top, moved: Math.abs(nb.scrollTop - top) > 4 };
+  };
+  const openDayList = (nb, sep, x, y)=>{
+    const seps = [...nb.querySelectorAll('.day-sep[data-ds]')];
+    if (!seps.length) return;
+    nb.__daySepPinned = sep.dataset.ds; /* плашка дат открыта — дата не рассеивается */
+    sep.classList.remove('dim'); /* клик по дате — фиксируем её, не даём рассеяться */
+    showDropdown(sep, seps.map(sp=>({
+      label: sp.textContent.trim(),
+      icon: 'calendar',
+      onClick: ()=>{ const rr = dayTargetTop(nb, sp.dataset.ds); if (rr) nb.scrollTo({ top: rr.top, behavior: 'smooth' }); }
+    })), { x, y });
+  };
   document.addEventListener('click', (e)=>{
     const sep = e.target && e.target.closest && e.target.closest('.day-sep[data-ds]');
-    const nbAll = sep ? sep.closest('.chat-msgs') : null;
     /* Клик НЕ по дате — закрыл плашку дат (или просто клик мимо): снимаем
        «закрепление», чтобы дата снова могла рассеиваться по таймеру. */
     if (!sep){
@@ -3920,28 +3950,8 @@ ex.innerHTML = avatarHTML(user(), '');
     if (!sep) return;
     const nb = sep.closest('.chat-msgs') || document.querySelector('.chat-msgs');
     if (!nb) return;
-    const targetTop = (mid)=>{
-      /* Цель — сама плашка этой даты: встаёт на sticky-позицию, под ней
-         сразу первое сообщение дня, и дата не переключается на соседнюю. */
-      const sepEl = nb.querySelector('.day-sep[data-ds="' + mid + '"]');
-      if (!sepEl) return null;
-      const off = parseFloat(getComputedStyle(nb).paddingTop) || 0;
-      /* У sticky-даты и rect, и offsetTop смещены к верху. Берём естественную
-         позицию из кэша, иначе — снимаем sticky на один замер. */
-      let nat = sepEl.__natTop;
-      if (nat == null){
-        const stick = sepEl.classList.contains('on-scroll');
-        if (stick) sepEl.classList.remove('on-scroll');
-        nat = nb.scrollTop + sepEl.getBoundingClientRect().top - nb.getBoundingClientRect().top;
-        if (stick) sepEl.classList.add('on-scroll');
-      }
-      const raw = nat - off;
-      const max = nb.scrollHeight - nb.clientHeight;
-      const top = Math.max(0, Math.min(max, raw));
-      return { top, moved: Math.abs(nb.scrollTop - top) > 4 };
-    };
     const canScroll = (nb.scrollHeight - nb.clientHeight) > 4;
-    const r0 = targetTop(sep.dataset.ds);
+    const r0 = dayTargetTop(nb, sep.dataset.ds);
     if (!r0) return;
     const nowT = Date.now();
     const prev = nb.__daySepClick;
@@ -3957,18 +3967,16 @@ ex.innerHTML = avatarHTML(user(), '');
       return; /* с момента первого клика прокрутили — снова скроллим */
     }
     nb.__daySepClick = null;
-    {
-      const seps = [...nb.querySelectorAll('.day-sep[data-ds]')];
-      if (seps.length){
-        nb.__daySepPinned = sep.dataset.ds; /* плашка дат открыта — дата не рассеивается */
-        sep.classList.remove('dim'); /* клик по дате — фиксируем её, не даём рассеяться */
-        showDropdown(sep, seps.map(sp=>({
-          label: sp.textContent.trim(),
-          icon: 'calendar',
-          onClick: ()=>{ const rr = targetTop(sp.dataset.ds); if (rr) nb.scrollTo({ top: rr.top, behavior: 'smooth' }); }
-        })), { x: e.clientX, y: e.clientY });
-      }
-    }
+    openDayList(nb, sep, e.clientX, e.clientY);
+  });
+  /* Правый клик по дате — сразу та же плашка выбора дат, без скролла */
+  document.addEventListener('contextmenu', (e)=>{
+    const sep = e.target && e.target.closest && e.target.closest('.chat-msgs .day-sep[data-ds]');
+    if (!sep) return;
+    const nb = sep.closest('.chat-msgs');
+    if (!nb) return;
+    e.preventDefault();
+    openDayList(nb, sep, e.clientX, e.clientY);
   });
     /* Фон чата убран: чат использует единый дудл-фон приложения (подложка не нужна) */
     function applyChatBg(cm){
