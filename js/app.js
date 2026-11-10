@@ -7344,12 +7344,34 @@ const cm = root.querySelector('.chat-main');
         m.querySelectorAll('[data-rv-edit]').forEach(b => b.onclick = ()=>{
           const e = rows.find(x => x.id === b.dataset.rvEdit);
           if (!e) return;
-          const amount = prompt('Сумма движения, ₽ (минус — списание)', String(e.amount));
-          if (amount == null) return;
-          const reason = prompt('Причина', e.reason || '');
-          if (reason == null) return;
-          const comment = prompt('Комментарий', e.comment || '');
-          if (Finance.reserveUpdate(e.id, { amount, reason, comment })){ close(); setTimeout(openReserveHistory, 180); }
+          const em = openModal({
+            title:'Исправить движение резерва', narrow:true,
+            body:`<div class="stack" style="gap:10px">
+              <div class="field"><label>Сумма, ₽</label><input class="input" id="rv-edit-amount" type="number" step="1" value="${e.amount}"><span class="small faint">Минус — списание.</span></div>
+              <div class="field"><label>Причина *</label><textarea class="input" id="rv-edit-reason" rows="3" placeholder="Почему изменили движение">${esc(e.reason || '')}</textarea></div>
+              <div class="field"><label>Комментарий</label><input class="input" id="rv-edit-comment" value="${esc(e.comment || '')}" placeholder="Необязательно"></div>
+            </div>`,
+            footer:`<button class="btn btn--ghost" data-c>Отмена</button><button class="btn btn--primary" data-ok>Сохранить</button>`
+          });
+          const amount = em.el.querySelector('#rv-edit-amount');
+          const reason = em.el.querySelector('#rv-edit-reason');
+          const comment = em.el.querySelector('#rv-edit-comment');
+          const save = ()=>{
+            const amt = Math.round(Number(String(amount.value).replace(',', '.')) || 0);
+            if (!amt){ toast('Укажите ненулевую сумму', 'warn'); amount.focus(); return; }
+            if (!reason.value.trim()){ toast('Укажите причину', 'warn'); reason.focus(); return; }
+            if (Finance.reserveUpdate(e.id, { amount: amt, reason: reason.value, comment: comment.value })){
+              em.close(); close(); setTimeout(openReserveHistory, 180);
+            } else {
+              toast('Не удалось сохранить движение', 'warn');
+            }
+          };
+          em.el.querySelector('[data-ok]').onclick = save;
+          em.el.querySelector('[data-c]').onclick = ()=>em.close();
+          [amount, comment].forEach(inp => inp.addEventListener('keydown', ev=>{
+            if (ev.key === 'Enter'){ ev.preventDefault(); save(); }
+          }));
+          setTimeout(()=>{ amount.focus(); amount.select(); }, 30);
         });
         m.querySelectorAll('[data-rv-del]').forEach(b => b.onclick = ()=>{
           const e = rows.find(x => x.id === b.dataset.rvDel);
