@@ -5338,6 +5338,15 @@ updatePeopleBulk();
               <select class="input" id="cx-vsvc">${volOptions}</select></div>
           </div>
           <div class="small" id="cx-volume-note" style="margin-top:6px"></div>
+          <div id="cx-char" style="margin-top:6px;display:none">
+            <textarea class="input" id="cx-char-text" rows="2" placeholder="Вставьте текст — посчитаем символы с пробелами и без"></textarea>
+            <div class="row" style="gap:10px;margin-top:4px;flex-wrap:wrap;align-items:center">
+              <span class="small">С пробелами: <b id="cx-char-all">0</b></span>
+              <span class="small">Без пробелов: <b id="cx-char-nospace">0</b></span>
+              <button type="button" class="btn btn--ghost btn--sm" data-char-apply="all">Взять с пробелами</button>
+              <button type="button" class="btn btn--ghost btn--sm" data-char-apply="nospace">Взять без пробелов</button>
+            </div>
+          </div>
           <div class="tiny faint" style="margin-top:4px">Символы для стенограмм — 600 знаков в минуту.</div>
         </div>
         <div class="row" style="margin-top:10px"><span class="small muted" id="cx-live"></span></div>
@@ -5463,6 +5472,34 @@ updatePeopleBulk();
           const v = volState();
           if (v.nid && g2('#cx-niche')){ g2('#cx-niche').value = v.nid; paintRush(); paintDiscount(); }
         });
+
+        /* Символы: показываем оба объёма — с пробелами и без — и даём выбрать. */
+        const charCounts = s => {
+          const a = [...String(s || '')];
+          return { all: a.length, noSpace: a.filter(ch => !/\s/.test(ch)).length };
+        };
+        const paintChar = () => {
+          const box = g2('#cx-char'); if (!box) return;
+          const on = g2('#cx-unit').value === 'char';
+          box.style.display = on ? '' : 'none';
+          if (!on) return;
+          const c = charCounts(g2('#cx-char-text').value);
+          const all = g2('#cx-char-all'), no = g2('#cx-char-nospace');
+          if (all) all.textContent = c.all.toLocaleString('ru-RU');
+          if (no) no.textContent = c.noSpace.toLocaleString('ru-RU');
+        };
+        const charText = g2('#cx-char-text');
+        if (charText) charText.addEventListener('input', paintChar);
+        const charBox = g2('#cx-char');
+        if (charBox) charBox.querySelectorAll('[data-char-apply]').forEach(b => b.addEventListener('click', ()=>{
+          const c = charCounts(charText ? charText.value : '');
+          const v = b.dataset.charApply === 'all' ? c.all : c.noSpace;
+          const vol = g2('#cx-volume');
+          if (vol){ vol.value = v; vol.dispatchEvent(new Event('input', { bubbles:true })); }
+          paintChar();
+        }));
+        g2('#cx-unit').addEventListener('change', paintChar);
+        paintChar();
 
         /* Услуги и доп. опции: фиксированные прибавляются напрямую,
            процентные надбавки считаются от суммы «выражение + фикс. услуги». */

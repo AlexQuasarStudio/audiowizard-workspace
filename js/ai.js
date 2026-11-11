@@ -10,6 +10,16 @@ const AI_AUDIO_SRC = 'assets/demo-podcast.wav';
 
 const AI = (() => {
 
+  /* Символы: в индустрии объём считают и с пробелами, и без. */
+  const charCounts = s => {
+    const arr = [...String(s || '')];
+    return { all: arr.length, noSpace: arr.filter(ch => !/\s/.test(ch)).length };
+  };
+  const charCounterText = s => {
+    const c = charCounts(s);
+    return `${c.all} символов с пробелами · ${c.noSpace} без пробелов`;
+  };
+
   /* ==================== ОБЩЕЕ ==================== */
   function initState(){
     if (!S.aiUsage) S.aiUsage = { plan:'Pro · демо', min:14, limit:180 };
@@ -702,7 +712,7 @@ const HOOKS = [
         variants = [0,1,2].map(v=>{ const r = composeArticle(theme, tone, len, v); return `${r.title}\n\n${r.body}`; });
         curVar = 0;
         $$('#tx-vars .chip', root).forEach((c,i)=>c.classList.toggle('on', i===0));
-        showResult('write', variants[0], `${variants[0].length} символов · тон: ${TONES[tone].name}`);
+        showResult('write', variants[0], `${charCounterText(variants[0])} · тон: ${TONES[tone].name}`);
       }
       if (kind==='head'){
         const hs = headlinesFor(theme);
@@ -722,7 +732,7 @@ const HOOKS = [
       $$('#tx-vars .chip', root).forEach(x=>x.classList.toggle('on', x===c));
       lastResult = variants[curVar];
       typeOut();
-      g('#tx-stat').textContent = `${lastResult.length} символов · вариант ${curVar+1}`;
+      g('#tx-stat').textContent = `${charCounterText(lastResult)} · вариант ${curVar+1}`;
     });
     g('#tx-regen').onclick = ()=>{
       const theme = g('#tx-theme').value.trim() || 'Наш сервис';
@@ -805,8 +815,8 @@ const HOOKS = [
     bindTabs(root);
 
     const g = s => root.querySelector(s);
-    g('#tr-src').addEventListener('input', ()=>g('#tr-count').textContent = g('#tr-src').value.length + ' символов');
-    g('#tr-count').textContent = g('#tr-src').value.length + ' символов';
+    g('#tr-src').addEventListener('input', ()=>g('#tr-count').textContent = charCounterText(g('#tr-src').value));
+    g('#tr-count').textContent = charCounterText(g('#tr-src').value);
     g('#tr-lang').onchange = e=>target = e.target.value;
 
     g('#tr-go').onclick = ()=>{
@@ -835,7 +845,7 @@ const HOOKS = [
     };
     g('#tr-swap').onclick = ()=>{
       if (!lastResult){ toast('Сначала переведите текст','info'); return; }
-      g('#tr-src').value = lastResult; g('#tr-count').textContent = lastResult.length + ' символов';
+      g('#tr-src').value = lastResult; g('#tr-count').textContent = charCounterText(lastResult);
       toast('Результат вставлен в источник','ok');
     };
     g('#tr-copy').onclick = ()=>{ navigator.clipboard && navigator.clipboard.writeText(lastResult); toast('Скопировано','ok'); };

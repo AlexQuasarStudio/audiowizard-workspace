@@ -1,0 +1,8 @@
+{
+  "output": "docs/smartcat-payments-template.xlsx",
+  "source": "docs/smartcat-payments-template.build.cjs",
+  "skill": "xlsx",
+  "assets": [],
+  "build": "multitool-node docs/smartcat-payments-template.build.cjs",
+  "verify": "multitool-node --skill xlsx check.cjs docs/smartcat-payments-template.xlsx"
+}
