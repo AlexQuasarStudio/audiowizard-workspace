@@ -3653,11 +3653,11 @@ updatePeopleBulk();
       return `<tr class="${bl?'c-row--bl':''}" data-uid="${p.id}">
         <td><input type="checkbox" class="row-sel" value="${p.id}" ${psel.has(p.id)?'checked':''} aria-label="Выбрать ${esc(p.full_name)}"></td>
         <td class="pl-num" title="${p.ext&&p.ext.num?'№ '+p.ext.num:(p.ext.xlsxRow?'Строка '+p.ext.xlsxRow+' из таблицы':'№ '+num)}">${personDisplayNum(p, num)}</td>
-        <td><span class="row row--start" style="gap:10px">${avatarHTML(p)}<span style="min-width:0"><b class="small" style="display:inline-block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" data-inline="name">${esc(p.full_name)}</b><span class="small faint" style="display:block">${esc(p.username||'')}</span></span></span></td>
+        <td data-inline="name"><span class="row row--start" style="gap:10px">${avatarHTML(p)}<span style="min-width:0"><b class="small" style="display:inline-block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.full_name)}</b><span class="small faint" style="display:block">${esc(p.username||'')}</span></span></span></td>
         ${role==='executor'
           ? `<td class="small muted" data-inline="specs">${p.ext.qualification && Object.keys(p.ext.qualification).length ? esc(Object.keys(p.ext.qualification).join(', ')) : '—'}</td>
              <td class="mono">${mt.orders}</td><td class="mono">${mt.done}</td><td class="mono ${balOf(p)<0?'neg':''}">${fmtMoney(balOf(p))}</td>
-             <td><span data-inline="workStatus">${bl?'<span class="badge c-red">ЧС</span>':'<span class="badge '+(p.ext.workStatus==='working'?'c-green':'c-gray')+'">'+(p.ext.workStatus==='working'?'Работаю':'Не работаю')+'</span>'}</span></td>
+             <td data-inline="workStatus">${bl?'<span class="badge c-red">ЧС</span>':'<span class="badge '+(p.ext.workStatus==='working'?'c-green':'c-gray')+'">'+(p.ext.workStatus==='working'?'Работаю':'Не работаю')+'</span>'}</td>
              ${rowMenuCell(p, staff)}`
           : `<td class="small muted" data-inline="email">${esc(p.email)}</td>
              <td class="mono">${mt.orders}</td><td class="mono">${fmtMoney(mt.sum)}</td>
