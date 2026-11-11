@@ -160,9 +160,10 @@ const NavDrag = (() => {
     g.classList.add('is-on');
   }
   function clearSnapPreview(){
-    if (drag) drag._snap = null;
+    if (drag){ drag._snap = null; drag._corner = null; }
     if (window.Windows && Windows.clearSnapPreview) Windows.clearSnapPreview();
   }
+  const isChatLink = () => !!(drag && drag.el && drag.el.dataset.route === 'chats');
 
   function hideGuide(){
     if (drag && drag.guide) drag.guide.classList.remove('is-on');
@@ -270,12 +271,21 @@ const NavDrag = (() => {
          окна. Свободное окно показываем призраком только вне зон сплита. */
       if (!sEl && cx >= navRight()){
         const gr = guideRect(cx, cy);
-        const snap = (window.Windows && Windows.snapPreview) ? Windows.snapPreview(gr) : null;
+        /* «Чаты» умеют уголковый режим: у углов экрана показываем тот же
+           компактный «Уголок», что и при драге окна чата. */
+        const corner = (isChatLink() && window.Windows && Windows.cornerPreview)
+          ? Windows.cornerPreview(gr, cx, cy) : null;
+        const snap = corner ? null : ((window.Windows && Windows.snapPreview) ? Windows.snapPreview(gr) : null);
+        drag._corner = corner || null;
         drag._snap = snap || null;
-        if (snap) hideGuide(); else showGuide(gr);
-        const underWin = winUnder(cx, cy);
-        if (underWin) showCorner(underWin, cx, cy); else hideCorner();
+        if (corner || snap) hideGuide(); else showGuide(gr);
+        if (corner) hideCorner();
+        else {
+          const underWin = winUnder(cx, cy);
+          if (underWin) showCorner(underWin, cx, cy); else hideCorner();
+        }
       } else {
+        drag._corner = null;
         drag._snap = null;
         clearSnapPreview();
         hideGuide();
@@ -287,6 +297,7 @@ const NavDrag = (() => {
   function finish(cx, cy){
     if (!drag) return;
     const snap = drag._snap || null;
+    const corner = drag._corner || null;
     clearSnapPreview();
     hideDropLine();
     hideCorner();
@@ -366,7 +377,7 @@ const NavDrag = (() => {
       /* Бросок в подсказку сплита — окно сразу в нужной половине;
          иначе оставляем свободное окно по месту курсора. */
       try {
-        Windows.spawn(src.dataset.route, snap ? { snap } : { x: cx, y: cy, forceRight: true });
+        Windows.spawn(src.dataset.route, corner ? { corner } : snap ? { snap } : { x: cx, y: cy, forceRight: true });
       } catch(e){}
       moved = true;
     }

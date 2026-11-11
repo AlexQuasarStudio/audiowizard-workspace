@@ -939,6 +939,8 @@ const Windows = (() => {
     /* Новое окно (и виджет) становится активным сразу: без focusWin z-index
        остаётся 'auto' и окно уходит ПОД ранее открытые (баг «виджет под окнами»). */
     focusWin(win);
+    /* Дроп «Чатов» сразу в уголок: окно рождается в компактном режиме. */
+    if (param && param.corner) enterCorner(win, param.corner);
     return win;
   }
 
@@ -1035,6 +1037,27 @@ const Windows = (() => {
     return dir;
   }
   function clearSnapPreview(){ showSnapGuide(null, false); }
+
+  /* Уголок будущего окна чата: те же зоны у углов экрана, что и при драге
+     существующего окна. Для меню — чтобы «Чаты» можно было бросить сразу
+     в компактный уголок, не открывая окно в половину экрана. */
+  function cornerAtRect(rect, cx, cy){
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const x = rect.left, y = rect.top, w = rect.width, h = rect.height;
+    const cands = [
+      { p:'tl', d: Math.min(Math.hypot(x, y), Math.hypot(cx, cy)) },
+      { p:'tr', d: Math.min(Math.hypot(x + w - vw, y), Math.hypot(vw - cx, cy)) },
+      { p:'bl', d: Math.min(Math.hypot(x, y + h - vh), Math.hypot(cx, vh - cy)) },
+      { p:'br', d: Math.min(Math.hypot(x + w - vw, y + h - vh), Math.hypot(vw - cx, vh - cy)) }
+    ];
+    const best = cands.reduce((a, b) => (b.d < a.d ? b : a));
+    return best.d <= 120 ? best.p : null;
+  }
+  function cornerPreview(rect, cx, cy){
+    const pos = cornerAtRect(rect, cx, cy);
+    if (pos) showSnapGuide(cornerRectFor(pos), true);
+    return pos;
+  }
 
   /* ---------- Уголок окна чата (эксклюзивный режим) ---------- */
   const CORNER_W = 360, CORNER_H = 520, CORNER_GAP = 16;
@@ -1886,7 +1909,7 @@ const Windows = (() => {
     return win;
   }
 
-  return { spawn, spawnCustom, refreshAllIndicators, hasWindow, isClosing, hasOpenWins, hasMinimized, hasExpanded, restoreAll, minimizeWin, restoreWindow, closeAll, minimizeAll, minimizeRoute, restoreRoute, hasMinimizedRoute, hasExpandedRoute, snapPreview, clearSnapPreview, closeRoute, closeWindow, showPreview, restoreSavedWins };
+  return { spawn, spawnCustom, refreshAllIndicators, hasWindow, isClosing, hasOpenWins, hasMinimized, hasExpanded, restoreAll, minimizeWin, restoreWindow, closeAll, minimizeAll, minimizeRoute, restoreRoute, hasMinimizedRoute, hasExpandedRoute, snapPreview, clearSnapPreview, cornerPreview, closeRoute, closeWindow, showPreview, restoreSavedWins };
 })();
 
 /* Браузер: const верхнего уровня не создаёт window.Windows — вешаем явно */

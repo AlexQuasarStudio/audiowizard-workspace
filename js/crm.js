@@ -137,13 +137,14 @@ const CRM = (() => {
     if (type === 'select') inp.addEventListener('change', ()=>finish(true));
     __crmInline = { cancel: ()=>finish(false), el };
   }
-  /* Подсказки для полей новой строки заказа: клиент — одно имя,
-     исполнители — несколько через запятую. Плашка фильтруется по вводу
+  /* Подсказки для полей новой строки заказа: клиенты и исполнители —
+     несколько через запятую. Запятая ставится только между выбранными,
+     после одного имени хвостовой запятой нет. Плашка фильтруется по вводу
      и не блокирует остальную строку. */
   function attachInlineSuggest(input, getItems, multi){
     if (!input || input.__awSuggest) return;
     input.__awSuggest = 1;
-    let panel = null, active = -1, list = [], closeTimer = null, justPicked = false, closing = false;
+    let panel = null, active = -1, list = [], closeTimer = null, pickedMode = false, fromChoose = false, closing = false;
     /* Плашка сначала плавно гаснет, и только потом удаляется: повторный
        ввод в это окно отменяет удаление и возвращает её без скачка. */
     const close = ()=>{
@@ -162,10 +163,10 @@ const CRM = (() => {
       const cut = multi ? value.lastIndexOf(',') : -1;
       const start = cut + 1;
       /* Сразу после выбора показываем полный список — чтобы можно было
-         тут же выбрать другого клиента, не закрывая плашку. */
-      const query = justPicked ? '' : norm(value.slice(start));
-      justPicked = false;
-      const picked = multi ? new Set(value.slice(0, start).split(/[,;]+/).map(x=>norm(x)).filter(Boolean)) : new Set();
+         тут же выбрать следующего, не закрывая плашку. */
+      const query = pickedMode ? '' : norm(value.slice(start));
+      const pickedText = pickedMode ? value : value.slice(0, start);
+      const picked = multi ? new Set(pickedText.split(/[,;]+/).map(x=>norm(x)).filter(Boolean)) : new Set();
       list = (getItems() || []).filter(x => !picked.has(norm(x.label)) &&
         (!query || norm(x.label).includes(query) || norm(x.search || '').includes(query))).slice(0, 8);
       if (!list.length){ close(); return; }
@@ -190,18 +191,27 @@ const CRM = (() => {
     };
     const choose = i => {
       const item = list[i]; if (!item) return;
-      const value = input.value || '';
-      const cut = multi ? value.lastIndexOf(',') : -1;
-      const prefix = cut >= 0 ? value.slice(0, cut + 1).replace(/\s*$/, ' ') : '';
-      input.value = prefix + item.label + (multi ? ', ' : '');
-      justPicked = true;
+      if (multi){
+        const value = input.value || '';
+        /* Повторный выбор без ввода — добавляем через запятую, без хвоста.
+           Если пользователь печатает новый запрос — заменяем текущий токен. */
+        if (pickedMode && value.trim()) input.value = value.replace(/\s+$/, '') + ', ' + item.label;
+        else {
+          const cut = value.lastIndexOf(',');
+          const prefix = cut >= 0 ? value.slice(0, cut + 1).replace(/\s*$/, ' ') : '';
+          input.value = prefix + item.label;
+        }
+      } else input.value = item.label;
+      pickedMode = true;
+      fromChoose = true;
       input.dispatchEvent(new Event('input', { bubbles:true }));
+      fromChoose = false;
       /* Не закрываем после выбора: плашка остаётся для следующего клиента
          или исполнителя; закрывается по blur, Escape или пустому списку. */
       input.focus();
       if (panel) panel.classList.add('is-on');
     };
-    input.addEventListener('input', ()=>{ active = -1; render(); });
+    input.addEventListener('input', ()=>{ if (!fromChoose) pickedMode = false; active = -1; render(); });
     input.addEventListener('focus', render);
     input.addEventListener('keydown', e => {
       if (!panel) return;
@@ -850,7 +860,7 @@ const CRM = (() => {
               <input class="input" data-f="id" placeholder="ID (пусто = авто AW-N)" style="font-family:var(--mono);max-width:150px">
               <button class="iconbtn" type="button" data-gen-id title="Сгенерировать ID" aria-label="Сгенерировать ID">${icon('refresh','ico-sm')}</button>
             </span>
-            <input class="input" data-f="client" placeholder="Клиент (ФИО/название)" style="min-width:170px">
+            <input class="input" data-f="client" placeholder="Клиенты через запятую" style="min-width:170px">
             <input class="input" data-f="total" placeholder="Сумма, ₽" type="number" min="0" style="max-width:120px">
             <input class="input" data-f="start" type="date" title="Начало (по умолчанию сегодня)" style="max-width:150px" value="${new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)}">
             <input class="input" data-f="execs" placeholder="Исполнители через запятую" title="Исполнители" style="min-width:170px">
@@ -1201,7 +1211,7 @@ const CRM = (() => {
           }
           const clientInp = box.querySelector('[data-f="client"]');
           attachInlineSuggest(clientInp, () => S.users.filter(x => x.role === 'client' && x.ext.status !== 'blacklisted')
-            .map(x => ({ label:x.full_name, search:(x.email || '') + ' ' + (x.username || ''), hint:x.email || '' })), false);
+            .map(x => ({ label:x.full_name, search:(x.email || '') + ' ' + (x.username || ''), hint:x.email || '' })), true);
           const execInp = box.querySelector('[data-f="execs"]');
           attachInlineSuggest(execInp, () => S.users.filter(x => x.role === 'executor' && x.ext.status !== 'blacklisted')
             .map(x => ({ label:x.full_name, search:x.username || '', hint:(x.username || '') + (x.ext.specializations && x.ext.specializations.length ? ' · ' + x.ext.specializations[0] : '') })), true);
@@ -1253,7 +1263,7 @@ const CRM = (() => {
           const v = f => { const i = box.querySelector(`[data-f="${f}"]`); return i ? i.value : ''; };
           const focusField = f => { const i = box.querySelector(`[data-f="${f}"]`); if (i) i.focus(); };
           const id = sanitizeOrderId(v('id'));
-          const cl = (v('client')||'').trim();
+          const clNames = String(v('client')||'').split(/[,;]+/).map(x=>x.trim()).filter(Boolean);
           const total = parseFloat(v('total'))||0;
           /* В инлайне тестовой отметки нет: минимумы действуют всегда,
              тестовый заказ оформляется через форму с чекбоксом. */
@@ -1263,7 +1273,7 @@ const CRM = (() => {
           const dlTs = dlRaw
             ? (/^\d{4}-\d{2}-\d{2}$/.test(dlRaw) ? new Date(dlRaw + 'T00:00:00').getTime() : parseDateText(dlRaw))
             : null;
-          if (!cl){ toast('Укажите клиента', 'warn'); focusField('client'); return; }
+          if (!clNames.length){ toast('Укажите клиента', 'warn'); focusField('client'); return; }
           if (total < minTotal){ toast(`Минимальная стоимость заказа — ${fmtMoney(minTotal)} (кроме тестового)`,'warn'); focusField('total'); return; }
           if (dlRaw && dlTs == null){
             toast('Укажите дату дедлайна', 'err');
@@ -1271,8 +1281,14 @@ const CRM = (() => {
             if (f){ f.classList.add('is-bad'); f.focus(); }
             return;
           }
-          const client = S.users.find(x => x.role==='client' && (norm(x.full_name)===norm(cl) || norm(x.email)===norm(cl)));
-          if (!client){ toast('Клиент не найден. Сначала добавьте его в список (кнопка «Добавить клиента»)','warn'); return; }
+          const clientUsers = clNames.map(nm => S.users.find(x => x.role==='client' &&
+            (norm(x.full_name)===norm(nm) || norm(x.email)===norm(nm))));
+          const clientMissing = clNames.filter((nm, i) => !clientUsers[i]);
+          if (clientMissing.length){
+            toast('Клиенты не найдены: ' + clientMissing.join(', ') + '. Сначала добавьте их в список','warn');
+            return;
+          }
+          const client = clientUsers[0];
           const now = Date.now();
           const stRaw = (v('start') || '').trim();
           const stTs = stRaw ? new Date(stRaw + 'T00:00:00').getTime() : now;
@@ -1294,7 +1310,7 @@ const CRM = (() => {
           const execShare = Math.round(total * ((window.Finance ? Finance.cfg().executorShare : 40) / 100));
           const execs = execUsers.map(u2 => ({ uid: u2.id, amount: execUsers.length ? Math.round(execShare / execUsers.length) : 0, is_paid:false }));
           if (execs.some(e => e.amount < minExec)){ toast(`Оплата исполнителя — не ниже ${fmtMoney(minExec)} (кроме тестового)`,'warn'); return; }
-          const no = { id: uid(), order_id: oid, client_id: client.id, order_date: now, deadline: dlTs,
+          const no = { id: uid(), order_id: oid, client_id: client.id, client_ids: clientUsers.map(c => c.id), order_date: now, deadline: dlTs,
             status: statusRaw, total, is_test: false, certification_amount: 0, need_cert:false, start_date: (stTs || now), manager_id: me().id,
             comment:'', project_id:'', folder_id:'', nish_id:'', executors:execs, audio:0, files:[], proposed_price:0, paid_amount:0,
             forbid_download:false, portfolio_ban:true, nda:false, history:[{ t: now, txt:'Заказ создан (инлайн)' }], created_at: now };
