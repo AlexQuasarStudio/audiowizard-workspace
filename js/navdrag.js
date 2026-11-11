@@ -47,13 +47,14 @@ const NavDrag = (() => {
     drag = null; downTarget = null; downPos = null;
   }
 
-  // Отмена: вернуть элемент на его прежнее место (по снимку)
+  // Отмена: вернуть элемент на его прежнее место с плавным прикреплением
   function cancel(){
     if (!drag) return;
     hideTargetGuide();
     hideDropLine();
     const el = drag.el, ph = drag.placeholder;
     if (el){
+      const from = el.getBoundingClientRect();
       el.classList.remove('menu-drag-live');
       el.style.cssText = '';
       const nav = document.querySelector('.side__nav');
@@ -66,6 +67,26 @@ const NavDrag = (() => {
         el.style.pointerEvents = '';
         el.style.margin = '';
         el.style.boxSizing = '';
+        /* FLIP: от последней позиции курсора к своему месту в меню */
+        const to = el.getBoundingClientRect();
+        const dx = Math.round(from.left - to.left), dy = Math.round(from.top - to.top);
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1){
+          el.style.transition = 'none';
+          el.style.transform = `translate(${dx}px, ${dy}px)`;
+          el.style.position = 'relative';
+          el.style.zIndex = '2502';
+          el.style.pointerEvents = 'none';
+          void el.offsetWidth;
+          el.style.transition = 'transform .24s var(--ease)';
+          el.style.transform = '';
+          setTimeout(()=>{
+            el.style.transition = '';
+            el.style.transform = '';
+            el.style.position = '';
+            el.style.zIndex = '';
+            el.style.pointerEvents = '';
+          }, 270);
+        }
       } else if (!navChanged){
         nav && nav.appendChild(el);
       } else {
@@ -356,21 +377,9 @@ const NavDrag = (() => {
       try { Windows.spawn(src.dataset.route, { x: cx, y: cy, forceRight: true }); } catch(e){}
       moved = true;
     }
-    /* Перестановка, которая вернула тот же порядок (например, дроп в свою же
-       позицию), — не событие: без тоста и без перерисовки. */
     if (moved && reordered && JSON.stringify(V) === beforeJson){
-      /* Цель подсвечена, но пункт уже стоял вплотную: меняемся местами,
-         чтобы дроп на цель всегда давал видимый результат. */
-      if (target && target.classList.contains('side__link') && !src.classList.contains('side__sec')){
-        const sec = V.find(s => s.items.some(i => i.route === src.dataset.route)
-                           && s.items.some(i => i.route === target.dataset.route));
-        if (sec){
-          const a = sec.items.findIndex(i => i.route === src.dataset.route);
-          const b = sec.items.findIndex(i => i.route === target.dataset.route);
-          if (a >= 0 && b >= 0 && a !== b){ [sec.items[a], sec.items[b]] = [sec.items[b], sec.items[a]]; }
-        }
-      }
-      if (JSON.stringify(V) === beforeJson){ cancel(); return; }
+      /* Линия показывает тот же зазор — пункт остаётся на месте. */
+      cancel(); return;
     }
     if (moved){
       /* Плейсхолдер НЕ удаляем: _persistNav вернёт узел ровно на его место —
