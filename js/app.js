@@ -180,6 +180,7 @@ const APP = (() => {
     const sc = navEl.scrollTop;
     navEl.innerHTML = navInnerHTML(u);
     navEl.scrollTop = sc;
+    bindNavMenu();
     /* Сброс порядка — мягко проявляем меню вместо мгновенной подмены */
     if (!window.matchMedia || !window.matchMedia('(prefers-reduced-motion: reduce)').matches){
       try { navEl.animate([{ opacity:.45 }, { opacity:1 }], { duration:200, easing:'ease-out' }); } catch(e){}
@@ -273,6 +274,68 @@ const APP = (() => {
     if (pill) pill.title = cap;
   }
   window.refreshSideBalance = refreshSideBalance;
+
+  /* Клики по пунктам и разделам меню. Меню умеет перерисовываться без
+     полного рендера (сброс порядка из контекстного меню), поэтому
+     обработчики навешиваем отдельной функцией — иначе новые ссылки
+     остаются без кликов и двойной клик по ним не открывает окно. */
+  function bindNavMenu(){
+    /* Клик по пункту меню: одинарный — мгновенный переход; двойной (второй клик
+       во время skeleton-load, ~0.5с) — открыть раздел в отдельном окне
+       (всегда НОВОЕ окно, даже если уже есть). */
+    $$('a.side__link', document).forEach(a=>a.addEventListener('click', e=>{
+      e.preventDefault();
+      const rt = a.getAttribute('href').slice(2);
+      const now = Date.now();
+      /* Двойной клик по тому же пункту — ВСЕГДА новое окно раздела,
+         даже если окна этого раздела уже есть. */
+      if (window.__navDbl && window.__navDbl.route === rt && (now - window.__navDbl.t) < SKELETON_MS){
+        const from = window.__navDbl.from;   /* {name, param} — сохранить ДО обнуления */
+        window.__navDbl = null;
+        clearTimeout(window.__navDblTimer);
+        try { Windows.spawn(rt); } catch(err){}
+        if (from && from.name !== rt && from.name !== route.name){ go(from.name, from.param); }
+        return;
+      }
+      window.__navDbl = { route: rt, t: now, from: { name: route.name, param: route.param } };
+      clearTimeout(window.__navDblTimer);
+      window.__navDblTimer = setTimeout(() => { window.__navDbl = null; }, SKELETON_MS + 60);
+      /* У пункта есть СВЁРНУТЫЕ окна — первый клик разворачивает их.
+         Если все окна уже развёрнуты — переходим в раздел. */
+      if (window.Windows && Windows.hasWindow && Windows.hasWindow(rt)
+          && Windows.hasMinimized && Windows.hasMinimized()){
+        try { Windows.restoreAll(); } catch(err){}
+        return;
+      }
+      go(rt);
+    }));
+    $$('.side__sec[data-sec-title]', document).forEach(sec=>{
+      sec.addEventListener('click', ()=>{
+        sec.classList.toggle('closed');
+        const items = document.querySelector(`.side__sec-items[data-sec-items="${sec.dataset.secTitle}"]`);
+        if (items){ items.style.overflow = 'hidden';
+          /* Схлопывание должно идти от фактической высоты: после раскрытия
+             maxHeight стоял 'none', а none → 0px не анимируется — раздел
+             закрывался рывком. Фиксируем высоту, затем ведём к нулю. */
+          if (sec.classList.contains('closed')){
+            items.style.maxHeight = items.scrollHeight + 'px';
+            void items.offsetHeight;
+            items.style.maxHeight = '0px';
+          } else {
+            items.style.maxHeight = items.scrollHeight + 'px';
+            setTimeout(()=>{ items.style.maxHeight = 'none'; }, 320);
+          }
+        }
+        prefsFor().closedSecs = prefsFor().closedSecs || [];
+        const title = sec.dataset.secTitle;
+        if (sec.classList.contains('closed')){ if (!prefsFor().closedSecs.includes(title)) prefsFor().closedSecs.push(title); }
+        else prefsFor().closedSecs = prefsFor().closedSecs.filter(x => x !== title);
+        saveState();
+      });
+    });
+    /* Восстановить индикаторы-точки окон на ссылках после перерисовки меню */
+    if (window.Windows && Windows && Windows.refreshAllIndicators) Windows.refreshAllIndicators();
+  }
 
   function renderShell(content){
     const u = user();
@@ -745,61 +808,7 @@ const APP = (() => {
     
     /* Драг меню теперь в js/navdrag.js (NavDrag) */
 
-    /* Клик по пункту меню: одинарный — мгновенный переход; двойной (второй клик
-       во время skeleton-load, ~0.5с) — открыть раздел в отдельном окне
-       (всегда НОВОЕ окно, даже если уже есть). */
-    $$('a.side__link', document).forEach(a=>a.addEventListener('click', e=>{
-      e.preventDefault();
-      const rt = a.getAttribute('href').slice(2);
-      const now = Date.now();
-      /* Двойной клик по тому же пункту — ВСЕГДА новое окно раздела,
-         даже если окна этого раздела уже есть. */
-      if (window.__navDbl && window.__navDbl.route === rt && (now - window.__navDbl.t) < SKELETON_MS){
-        const from = window.__navDbl.from;   /* сохранить ДО обнуления */
-        window.__navDbl = null;
-        clearTimeout(window.__navDblTimer);
-        try { Windows.spawn(rt); } catch(err){}
-        if (from && from !== rt && from !== route.name){ go(from); }
-        return;
-      }
-      window.__navDbl = { route: rt, t: now, from: route.name };
-      clearTimeout(window.__navDblTimer);
-      window.__navDblTimer = setTimeout(() => { window.__navDbl = null; }, SKELETON_MS + 60);
-      /* У пункта есть СВЁРНУТЫЕ окна — первый клик разворачивает их.
-         Если все окна уже развёрнуты — переходим в раздел. */
-      if (window.Windows && Windows.hasWindow && Windows.hasWindow(rt)
-          && Windows.hasMinimized && Windows.hasMinimized()){
-        try { Windows.restoreAll(); } catch(err){}
-        return;
-      }
-      go(rt);
-    }));
-    $$('.side__sec[data-sec-title]', document).forEach(sec=>{
-      sec.addEventListener('click', ()=>{
-        sec.classList.toggle('closed');
-        const items = document.querySelector(`.side__sec-items[data-sec-items="${sec.dataset.secTitle}"]`);
-        if (items){ items.style.overflow = 'hidden';
-          /* Схлопывание должно идти от фактической высоты: после раскрытия
-             maxHeight стоял 'none', а none → 0px не анимируется — раздел
-             закрывался рывком. Фиксируем высоту, затем ведём к нулю. */
-          if (sec.classList.contains('closed')){
-            items.style.maxHeight = items.scrollHeight + 'px';
-            void items.offsetHeight;
-            items.style.maxHeight = '0px';
-          } else {
-            items.style.maxHeight = items.scrollHeight + 'px';
-            setTimeout(()=>{ items.style.maxHeight = 'none'; }, 320);
-          }
-        }
-        prefsFor().closedSecs = prefsFor().closedSecs || [];
-        const title = sec.dataset.secTitle;
-        if (sec.classList.contains('closed')){ if (!prefsFor().closedSecs.includes(title)) prefsFor().closedSecs.push(title); }
-        else prefsFor().closedSecs = prefsFor().closedSecs.filter(x => x !== title);
-        saveState();
-      });
-    });
-    /* Восстановить индикаторы-точки окон на ссылках после перерисовки меню */
-    if (window.Windows && Windows && Windows.refreshAllIndicators) Windows.refreshAllIndicators();
+    bindNavMenu();
   }
 
   function unreadChats(u){
