@@ -143,16 +143,28 @@ const CRM = (() => {
   function attachInlineSuggest(input, getItems, multi){
     if (!input || input.__awSuggest) return;
     input.__awSuggest = 1;
-    let panel = null, active = -1, list = [];
+    let panel = null, active = -1, list = [], closeTimer = null, justPicked = false, closing = false;
+    /* Плашка сначала плавно гаснет, и только потом удаляется: повторный
+       ввод в это окно отменяет удаление и возвращает её без скачка. */
     const close = ()=>{
       if (!panel) return;
-      panel.remove(); panel = null; active = -1; list = [];
+      active = -1; list = []; closing = true;
+      const p = panel;
+      p.classList.remove('is-on');
+      clearTimeout(closeTimer);
+      closeTimer = setTimeout(()=>{
+        if (panel === p){ p.remove(); panel = null; }
+        closeTimer = null;
+      }, 170);
     };
     const render = ()=>{
       const value = input.value || '';
       const cut = multi ? value.lastIndexOf(',') : -1;
       const start = cut + 1;
-      const query = norm(value.slice(start));
+      /* Сразу после выбора показываем полный список — чтобы можно было
+         тут же выбрать другого клиента, не закрывая плашку. */
+      const query = justPicked ? '' : norm(value.slice(start));
+      justPicked = false;
       const picked = multi ? new Set(value.slice(0, start).split(/[,;]+/).map(x=>norm(x)).filter(Boolean)) : new Set();
       list = (getItems() || []).filter(x => !picked.has(norm(x.label)) &&
         (!query || norm(x.label).includes(query) || norm(x.search || '').includes(query))).slice(0, 8);
@@ -161,6 +173,12 @@ const CRM = (() => {
         panel = document.createElement('div');
         panel.className = 'inline-suggest';
         document.body.appendChild(panel);
+        closing = false;
+        /* Первый кадр — без is-on, чтобы был переход, а не вспышка */
+        requestAnimationFrame(()=>{ if (panel && !closing) panel.classList.add('is-on'); });
+      } else {
+        clearTimeout(closeTimer); closeTimer = null; closing = false;
+        panel.classList.add('is-on');
       }
       panel.innerHTML = list.map((x, i) => `<button type="button" class="inline-suggest__item${i===active?' on':''}" data-i="${i}">${esc(x.label)}<span class="faint">${esc(x.hint || '')}</span></button>`).join('');
       const r = input.getBoundingClientRect();
@@ -176,9 +194,12 @@ const CRM = (() => {
       const cut = multi ? value.lastIndexOf(',') : -1;
       const prefix = cut >= 0 ? value.slice(0, cut + 1).replace(/\s*$/, ' ') : '';
       input.value = prefix + item.label + (multi ? ', ' : '');
+      justPicked = true;
       input.dispatchEvent(new Event('input', { bubbles:true }));
-      close();
+      /* Не закрываем после выбора: плашка остаётся для следующего клиента
+         или исполнителя; закрывается по blur, Escape или пустому списку. */
       input.focus();
+      if (panel) panel.classList.add('is-on');
     };
     input.addEventListener('input', ()=>{ active = -1; render(); });
     input.addEventListener('focus', render);
@@ -189,8 +210,12 @@ const CRM = (() => {
         active = (active + (e.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length;
         render();
       } else if (e.key === 'Enter' && active >= 0){
-        e.preventDefault(); choose(active);
-      } else if (e.key === 'Escape'){ close(); }
+        /* Enter по подсказке не должен заодно сохранять строку */
+        e.preventDefault(); e.stopPropagation(); choose(active);
+      } else if (e.key === 'Escape'){
+        /* Сначала закрываем подсказку и не даём Escape закрыть всю строку */
+        e.preventDefault(); e.stopPropagation(); close();
+      }
     });
     input.addEventListener('blur', ()=>setTimeout(close, 120));
   }
@@ -1248,6 +1273,9 @@ const CRM = (() => {
           }
           const client = S.users.find(x => x.role==='client' && (norm(x.full_name)===norm(cl) || norm(x.email)===norm(cl)));
           if (!client){ toast('Клиент не найден. Сначала добавьте его в список (кнопка «Добавить клиента»)','warn'); return; }
+          const now = Date.now();
+          const stRaw = (v('start') || '').trim();
+          const stTs = stRaw ? new Date(stRaw + 'T00:00:00').getTime() : now;
           let oid = id || generateOrderId({ clientName: client.full_name, start: stTs, deadline: dlTs });
           if (id && orderIdTaken(id)){
             toast(`ID ${id} уже занят — выберите другой`, 'err');
@@ -1255,9 +1283,6 @@ const CRM = (() => {
             if (f){ f.classList.add('is-bad'); f.focus(); }
             return;
           }
-          const now = Date.now();
-          const stRaw = (v('start') || '').trim();
-          const stTs = stRaw ? new Date(stRaw + 'T00:00:00').getTime() : now;
           const statusRaw = v('status') || 'waiting';
           /* Исполнители из строки: ищем по ФИО/логину, суммы — 40% на всех */
           const execNames = String(v('execs')||'').split(/[,;]+/).map(x=>x.trim()).filter(Boolean);
@@ -1327,7 +1352,7 @@ const CRM = (() => {
           const box = e.target.closest && e.target.closest('.inline-add');
           if (!box || box.id) return;
           if (e.key === 'Enter' && e.target.tagName === 'INPUT'){ e.preventDefault(); saveInline(box); }
-          if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); inlineClose(box, root); }
+          if (e.key === 'Escape' && !document.querySelector('.inline-suggest.is-on')){ e.preventDefault(); e.stopPropagation(); inlineClose(box, root); }
         });
         } /* __inlineRowsBound */
       }
@@ -2847,7 +2872,7 @@ const CRM = (() => {
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
     if (__crmInline) return;
-    if (document.querySelector('.inline-pick, .modal-mask')) return;
+    if (document.querySelector('.inline-pick, .modal-mask, .inline-suggest.is-on')) return;
     /* Свёрнутые окна не считаем: они не мешают и не должны глушить Esc. */
     const winOpen = [...document.querySelectorAll('.aw-win')].some(w => {
       const st = getComputedStyle(w), r = w.getBoundingClientRect();
@@ -3315,7 +3340,7 @@ const CRM = (() => {
           const box = e.target.closest && e.target.closest('.inline-add');
           if (!box || box.id) return;
           if (e.key === 'Enter' && e.target.tagName === 'INPUT'){ e.preventDefault(); savePerson(box); }
-          if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); inlineClose(box, root); }
+          if (e.key === 'Escape' && !document.querySelector('.inline-suggest.is-on')){ e.preventDefault(); e.stopPropagation(); inlineClose(box, root); }
         });
         } /* __inlinePeopleBound */
       }
