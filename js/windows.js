@@ -1821,6 +1821,9 @@ const Windows = (() => {
   function hasMinimizedRoute(route){
     return winsFor(route).some(r => r.minimized);
   }
+  function hasExpandedRoute(route){
+    return winsFor(route).some(r => !r.minimized && !r.win._closing);
+  }
   function restoreRoute(route){
     const list = winsFor(route).filter(r => r.minimized && !r.win._closing);
     list.forEach(r => unminimizeWin(route, r.win));
@@ -1853,7 +1856,7 @@ const Windows = (() => {
     return win;
   }
 
-  return { spawn, spawnCustom, refreshAllIndicators, hasWindow, isClosing, hasOpenWins, hasMinimized, hasExpanded, restoreAll, minimizeWin, restoreWindow, closeAll, minimizeAll, minimizeRoute, restoreRoute, hasMinimizedRoute, closeRoute, closeWindow, showPreview, restoreSavedWins };
+  return { spawn, spawnCustom, refreshAllIndicators, hasWindow, isClosing, hasOpenWins, hasMinimized, hasExpanded, restoreAll, minimizeWin, restoreWindow, closeAll, minimizeAll, minimizeRoute, restoreRoute, hasMinimizedRoute, hasExpandedRoute, closeRoute, closeWindow, showPreview, restoreSavedWins };
 })();
 
 /* Браузер: const верхнего уровня не создаёт window.Windows — вешаем явно */

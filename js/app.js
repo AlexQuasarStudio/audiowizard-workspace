@@ -10617,7 +10617,9 @@ function initPWA(){
           if (Windows.hasMinimizedRoute && Windows.hasMinimizedRoute(route)){
             items.push({ label:'Развернуть все окна раздела', icon:'chev-u', onClick:()=>{ try { Windows.restoreRoute(route); } catch(err){} } });
           }
-          items.push({ label:'Свернуть окна раздела', icon:'chev-d', onClick:()=>{ try { Windows.minimizeRoute(route); } catch(err){} } });
+          if (Windows.hasExpandedRoute && Windows.hasExpandedRoute(route)){
+            items.push({ label:'Свернуть окна раздела', icon:'chev-d', onClick:()=>{ try { Windows.minimizeRoute(route); } catch(err){} } });
+          }
           items.push({ label:'Закрыть окна раздела', icon:'x', danger:true, onClick:()=>{ try { Windows.closeRoute(route); } catch(err){} } });
         }
       }
