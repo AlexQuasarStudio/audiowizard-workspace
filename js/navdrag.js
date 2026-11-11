@@ -40,7 +40,7 @@ const NavDrag = (() => {
   function cleanupAll(){
     document.querySelectorAll('.menu-drop-hover, .menu-drop-hover-sec').forEach(x => x.classList.remove('menu-drop-hover', 'menu-drop-hover-sec'));
     document.querySelectorAll(guideSel).forEach(g => g.remove());
-    document.querySelectorAll('.menu-drop-line').forEach(g => g.remove());
+    document.querySelectorAll('.menu-drop-line, .menu-target-corner').forEach(g => g.remove());
     clearSnapPreview();
     const nav = document.querySelector('.side__nav');
     if (nav) nav.classList.remove('menu-drag-active');
@@ -53,6 +53,7 @@ const NavDrag = (() => {
     if (!drag) return;
     clearSnapPreview();
     hideDropLine();
+    hideCorner();
     const el = drag.el, ph = drag.placeholder;
     if (el){
       const from = el.getBoundingClientRect();
@@ -100,7 +101,7 @@ const NavDrag = (() => {
   function start(el){
     if (!el || !el.parentNode) return;
     /* Подчищаем подсветку от предыдущего жеста, если она осталась висеть */
-    document.querySelectorAll('.menu-drop-line').forEach(x => x.remove());
+    document.querySelectorAll('.menu-drop-line, .menu-target-corner').forEach(x => x.remove());
     if (window.Windows && Windows.clearSnapPreview) Windows.clearSnapPreview();
     const parent = el.parentNode;
     const r = el.getBoundingClientRect();
@@ -168,6 +169,38 @@ const NavDrag = (() => {
     document.querySelectorAll(guideSel).forEach(g => g.classList.remove('is-on'));
   }
 
+  /* Маленький пунктирный уголок на окне под курсором: визуальная подсказка,
+     которая была до унификации сплитов. Живёт поверх окна, не перехватывает
+     мышь и плавно гаснет вместе с остальными подсказками. */
+  function winUnder(cx, cy){
+    const wins = [...document.querySelectorAll('#windows-layer .aw-win')];
+    for (let i = wins.length - 1; i >= 0; i--){
+      const r = wins[i].getBoundingClientRect();
+      if (r.width && r.height && cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return wins[i];
+    }
+    return null;
+  }
+  function ensureCorner(){
+    if (!drag) return null;
+    if (drag.cornerHint) return drag.cornerHint;
+    const c = document.createElement('div');
+    c.className = 'menu-target-corner';
+    document.body.appendChild(c);
+    drag.cornerHint = c;
+    return c;
+  }
+  function showCorner(win, cx, cy){
+    const c = ensureCorner(); if (!c) return;
+    const r = win.getBoundingClientRect();
+    c.style.left = Math.round(r.right - 45) + 'px';
+    c.style.top = Math.round(r.bottom - 45) + 'px';
+    c.classList.add('is-on');
+    c.classList.toggle('is-hot', cx >= r.right - 42 && cy >= r.bottom - 42);
+  }
+  function hideCorner(){
+    if (drag && drag.cornerHint) drag.cornerHint.classList.remove('is-on', 'is-hot');
+  }
+
   /* Линия между пунктами: показывает точный зазор, куда встанет пункт. */
   function ensureDropLine(){
     if (!drag) return null;
@@ -229,6 +262,7 @@ const NavDrag = (() => {
       showDropLine(target, drag._before);
       clearSnapPreview();
       hideGuide();
+      hideCorner();
     } else {
       drag._before = null;
       hideDropLine();
@@ -239,10 +273,13 @@ const NavDrag = (() => {
         const snap = (window.Windows && Windows.snapPreview) ? Windows.snapPreview(gr) : null;
         drag._snap = snap || null;
         if (snap) hideGuide(); else showGuide(gr);
+        const underWin = winUnder(cx, cy);
+        if (underWin) showCorner(underWin, cx, cy); else hideCorner();
       } else {
         drag._snap = null;
         clearSnapPreview();
         hideGuide();
+        hideCorner();
       }
     }
   }
@@ -252,6 +289,7 @@ const NavDrag = (() => {
     const snap = drag._snap || null;
     clearSnapPreview();
     hideDropLine();
+    hideCorner();
     const src = drag.el;
     const under = document.elementFromPoint(cx, cy);
     const navNow = document.querySelector('.side__nav');

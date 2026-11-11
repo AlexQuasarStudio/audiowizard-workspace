@@ -1579,6 +1579,11 @@ body.win-dragging *{user-select:none!important}
 .aw-win-guide.is-on{opacity:.55;visibility:visible;transform:none;transition:opacity .18s var(--ease),transform .18s var(--ease),visibility 0s}
 .menu-drop-line{position:fixed;z-index:4002;height:2px;border-radius:2px;background:var(--accent);box-shadow:0 0 0 2px var(--accent-soft);opacity:0;pointer-events:none;transition:opacity .14s var(--ease),top .1s var(--ease)}
 .menu-drop-line.is-on{opacity:1}
+/* Уголок окна под драгом пункта меню: та же подсказка, что была до сплитов */
+.menu-target-corner{position:fixed;z-index:4381;width:42px;height:42px;border:2px dashed var(--accent);border-radius:10px;background:var(--accent-soft);opacity:0;pointer-events:none;transition:opacity .16s var(--ease),background-color .16s var(--ease)}
+.menu-target-corner.is-on{opacity:.55}
+.menu-target-corner.is-hot{opacity:1;background:color-mix(in srgb,var(--accent) 26%,transparent)}
+@media (prefers-reduced-motion:reduce){.menu-target-corner{transition:none}}
 
 /* Кнопка разворачивания окна */
 .aw-win__max{margin-left:auto;flex:none;color:var(--muted);position:relative}
