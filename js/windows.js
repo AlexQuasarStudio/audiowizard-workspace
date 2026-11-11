@@ -624,7 +624,12 @@ const Windows = (() => {
     const total = allWins().length;
     const W_DEF = 'min(560px, calc(100vw - 80px))', H_DEF = 'min(440px, calc(100vh - 90px))';
     const sideW = (document.querySelector('.side') || { getBoundingClientRect: () => ({ right: 0 }) }).getBoundingClientRect().right;
-    if (param && typeof param.x === 'number' && typeof param.y === 'number'){
+    const snapRect = (param && param.snap) ? snapRectFor(param.snap) : null;
+    if (snapRect){
+      /* Дроп пункта меню в подсказку сплита: окно сразу занимает половину */
+      win.style.left = snapRect.left + 'px'; win.style.top = snapRect.top + 'px';
+      win.style.width = snapRect.width + 'px'; win.style.height = snapRect.height + 'px';
+    } else if (param && typeof param.x === 'number' && typeof param.y === 'number'){
       win.style.width = W_DEF; win.style.height = H_DEF;
       const wDef = 560;
       const minLeft = (param.forceRight ? sideW + 16 : 8);
@@ -995,6 +1000,42 @@ const Windows = (() => {
       default:      return null;
     }
   }
+  /* Единый пунктирный предпросмотр сплита — и для перетаскивания окна,
+     и для перетаскивания пункта меню во вьюпорт. */
+  function showSnapGuide(rect, corner){
+    let g = document.querySelector('.aw-snap-guide');
+    if (!g){
+      g = document.createElement('div');
+      g.className = 'aw-snap-guide';
+      document.body.appendChild(g);
+    }
+    g.classList.toggle('aw-snap-guide--corner', !!corner);
+    if (rect){
+      g.style.left = rect.left + 'px';
+      g.style.top = rect.top + 'px';
+      g.style.width = rect.width + 'px';
+      g.style.height = rect.height + 'px';
+      g.classList.add('is-on');
+    } else {
+      g.classList.remove('is-on');
+    }
+    return g;
+  }
+  function snapAtRect(r){
+    const vw = window.innerWidth, vh = window.innerHeight;
+    if (r.left < 26) return r.top < 26 ? 'tl' : 'left';
+    if (r.left + r.width > vw - 26) return r.top < 26 ? 'tr' : 'right';
+    if (r.top < 26) return 'top';
+    if (r.top + r.height > vh - 26) return 'bottom';
+    return null;
+  }
+  function snapPreview(rect){
+    const dir = snapAtRect(rect);
+    showSnapGuide(dir ? snapRectFor(dir) : null, false);
+    return dir;
+  }
+  function clearSnapPreview(){ showSnapGuide(null, false); }
+
   /* ---------- Уголок окна чата (эксклюзивный режим) ---------- */
   const CORNER_W = 360, CORNER_H = 520, CORNER_GAP = 16;
   function isChatWin(win){ return !!(win && (win._route === 'chats' || win.querySelector('.chats-layout'))); }
@@ -1307,23 +1348,13 @@ const Windows = (() => {
         else if (y + h > window.innerHeight - 26) snap = 'bottom'; /* нижняя половина */
       }
       win.__cornerDrop = cornerDrop;
-      let g = document.querySelector('.aw-snap-guide');
       if (cornerDrop){
-        const gm = cornerRectFor(cornerDrop);
-        if (!g){ g = document.createElement('div'); g.className = 'aw-snap-guide'; document.body.appendChild(g); }
-        g.classList.add('aw-snap-guide--corner');
-        g.style.cssText = `left:${gm.left}px;top:${gm.top}px;width:${gm.width}px;height:${gm.height}px;display:block`;
+        showSnapGuide(cornerRectFor(cornerDrop), true);
       } else if (snap){
-        if (g) g.classList.remove('aw-snap-guide--corner');
-        if (!g){ g = document.createElement('div'); g.className = 'aw-snap-guide'; document.body.appendChild(g); }
-        /* Прямоугольник-подсветка под целевое «прилипание»: берём из единого
-           справочника snapRectFor — правые зоны показывают правую половину,
-           угловые — четверти (для 'left' и 'right' раньше строилась одна и та
-           же карта left:0 — при драге вправо подсветка ложилась на левую
-           сторону, «выделение правой половины терялось»). */
-        const gm = snapRectFor(snap) || { left:0, top:0, width:1600, height:1000 };
-        g.style.cssText = `left:${gm.left}px;top:${gm.top}px;width:${gm.width}px;height:${gm.height}px;display:block`;
-      } else if (g){ g.style.display = 'none'; g.classList.remove('aw-snap-guide--corner'); }
+        showSnapGuide(snapRectFor(snap) || { left:0, top:0, width:window.innerWidth, height:window.innerHeight }, false);
+      } else {
+        clearSnapPreview();
+      }
       win.__lastSnap = cornerDrop ? null : snap; /* магнит к краю: применим на mouseup */
     } else if (active.kind === 'resize'){
       /* Ресайз развёрнутого окна — это уже не полный экран: иконка плавно
@@ -1721,8 +1752,7 @@ const Windows = (() => {
       }
       /* Бросили не в уголок — прежняя свёрнутость больше не действует */
       if (!win.classList.contains('aw-win--corner')) win.__cornerWasMin = false;
-      const g = document.querySelector('.aw-snap-guide');
-      if (g){ g.style.display = 'none'; g.classList.remove('aw-snap-guide--corner'); }
+      clearSnapPreview();
       if (!win.__inSplit && !snapped && !magnetDone) applyDropMagnet(win, { neighborsOnly:false });
       try {
         const store = JSON.parse(sessionStorage.getItem('aw_wins') || '{"wins":[]}');
@@ -1856,7 +1886,7 @@ const Windows = (() => {
     return win;
   }
 
-  return { spawn, spawnCustom, refreshAllIndicators, hasWindow, isClosing, hasOpenWins, hasMinimized, hasExpanded, restoreAll, minimizeWin, restoreWindow, closeAll, minimizeAll, minimizeRoute, restoreRoute, hasMinimizedRoute, hasExpandedRoute, closeRoute, closeWindow, showPreview, restoreSavedWins };
+  return { spawn, spawnCustom, refreshAllIndicators, hasWindow, isClosing, hasOpenWins, hasMinimized, hasExpanded, restoreAll, minimizeWin, restoreWindow, closeAll, minimizeAll, minimizeRoute, restoreRoute, hasMinimizedRoute, hasExpandedRoute, snapPreview, clearSnapPreview, closeRoute, closeWindow, showPreview, restoreSavedWins };
 })();
 
 /* Браузер: const верхнего уровня не создаёт window.Windows — вешаем явно */

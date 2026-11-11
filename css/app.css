@@ -1515,7 +1515,9 @@ select.inline-input{padding:3px 30px 3px 8px;background-position:right 8px cente
 @keyframes pickOut{to{opacity:0;transform:translateY(-4px) scale(.985)}}
 @media (prefers-reduced-motion:reduce){.inline-pick{animation:none}.inline-pick.pick-out{animation:none;opacity:0}}
 td .inline-input{min-width:96px}
-.aw-snap-guide{position:fixed;z-index:4380;background:var(--accent-soft);border:2px dashed var(--accent);border-radius:12px;display:none;pointer-events:none;transition:opacity .12s var(--ease)}
+
+.aw-snap-guide{position:fixed;z-index:4380;background:var(--accent-soft);border:2px dashed var(--accent);border-radius:12px;pointer-events:none;opacity:0;visibility:hidden;transform:translateY(2px);transition:left .16s var(--ease),top .16s var(--ease),width .16s var(--ease),height .16s var(--ease),opacity .16s var(--ease),transform .16s var(--ease),visibility 0s linear .16s}
+.aw-snap-guide.is-on{opacity:.9;visibility:visible;transform:none;transition:left .16s var(--ease),top .16s var(--ease),width .16s var(--ease),height .16s var(--ease),opacity .16s var(--ease),transform .16s var(--ease),visibility 0s}
 .aw-snap-guide--corner{border:2px dashed var(--accent);border-radius:16px;background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:0 12px 40px color-mix(in srgb,var(--accent) 16%,transparent)}
 .aw-snap-guide--corner::after{content:"Уголок";position:absolute;left:50%;top:12px;transform:translateX(-50%);font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);opacity:.9}
 /* Уголок окна чата: компактная панель у угла экрана */
@@ -1575,12 +1577,6 @@ body.win-dragging *{user-select:none!important}
 /* Гайд-зона сброса окна (справа от меню) */
 .aw-win-guide{position:fixed;z-index:4000;border:2px dashed var(--accent);border-radius:14px;background:var(--accent-soft);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(2px);transition:opacity .18s var(--ease),transform .18s var(--ease),visibility 0s linear .18s}
 .aw-win-guide.is-on{opacity:.55;visibility:visible;transform:none;transition:opacity .18s var(--ease),transform .18s var(--ease),visibility 0s}
-/* Элемент вьюпорта под драгом меню: та же пунктирная подсветка, что у окна */
-.menu-target-guide{position:fixed;z-index:4001;border:2px dashed var(--accent);border-radius:14px;pointer-events:none;opacity:0;visibility:hidden;transition:left .16s var(--ease),top .16s var(--ease),width .16s var(--ease),height .16s var(--ease),opacity .18s var(--ease),visibility 0s linear .18s}
-.menu-target-guide.is-on{opacity:1;visibility:visible;transition:left .16s var(--ease),top .16s var(--ease),width .16s var(--ease),height .16s var(--ease),opacity .18s var(--ease),visibility 0s}
-.menu-target-corner{position:absolute;width:42px;height:42px;border:2px dashed var(--accent);border-radius:10px;background:var(--accent-soft);opacity:0;transition:opacity .18s var(--ease),background-color .18s var(--ease)}
-.menu-target-guide.has-corner .menu-target-corner{opacity:.55}
-.menu-target-corner.is-hot{opacity:1;background:color-mix(in srgb,var(--accent) 26%,transparent)}
 .menu-drop-line{position:fixed;z-index:4002;height:2px;border-radius:2px;background:var(--accent);box-shadow:0 0 0 2px var(--accent-soft);opacity:0;pointer-events:none;transition:opacity .14s var(--ease),top .1s var(--ease)}
 .menu-drop-line.is-on{opacity:1}
 

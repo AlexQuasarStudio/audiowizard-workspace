@@ -40,7 +40,8 @@ const NavDrag = (() => {
   function cleanupAll(){
     document.querySelectorAll('.menu-drop-hover, .menu-drop-hover-sec').forEach(x => x.classList.remove('menu-drop-hover', 'menu-drop-hover-sec'));
     document.querySelectorAll(guideSel).forEach(g => g.remove());
-    document.querySelectorAll('.menu-target-guide, .menu-drop-line').forEach(g => g.remove());
+    document.querySelectorAll('.menu-drop-line').forEach(g => g.remove());
+    clearSnapPreview();
     const nav = document.querySelector('.side__nav');
     if (nav) nav.classList.remove('menu-drag-active');
     document.body.classList.remove('menu-dragging');
@@ -50,7 +51,7 @@ const NavDrag = (() => {
   // Отмена: вернуть элемент на его прежнее место с плавным прикреплением
   function cancel(){
     if (!drag) return;
-    hideTargetGuide();
+    clearSnapPreview();
     hideDropLine();
     const el = drag.el, ph = drag.placeholder;
     if (el){
@@ -99,7 +100,8 @@ const NavDrag = (() => {
   function start(el){
     if (!el || !el.parentNode) return;
     /* Подчищаем подсветку от предыдущего жеста, если она осталась висеть */
-    document.querySelectorAll('.menu-target-guide, .menu-drop-line').forEach(x => x.remove());
+    document.querySelectorAll('.menu-drop-line').forEach(x => x.remove());
+    if (window.Windows && Windows.clearSnapPreview) Windows.clearSnapPreview();
     const parent = el.parentNode;
     const r = el.getBoundingClientRect();
     const ph = document.createElement('div');
@@ -132,9 +134,9 @@ const NavDrag = (() => {
     if (downPos) position(downPos.x, downPos.y);
   }
 
-  function showGuide(x, y){
-    const g = drag.guide;
-    if (!g) return;
+  /* Геометрия свободного окна под курсором. Тот же прямоугольник отдаём
+     Windows.snapPreview — сплит-подсказки у меню и у окон одни и те же. */
+  function guideRect(x, y){
     const left = navRight() + 16;
     const avail = Math.max(0, window.innerWidth - left - 12);
     /* Гост-обводка показывает реальный размер окна (см. Windows.W_DEF/H_DEF
@@ -145,78 +147,25 @@ const NavDrag = (() => {
     gx = Math.min(gx, window.innerWidth - wUse - 12);
     let gy = Math.max(10, y - 24);
     gy = Math.min(gy, window.innerHeight - hUse - 10);
-    g.style.left = gx + 'px';
-    g.style.top = gy + 'px';
-    g.style.width = wUse + 'px';
-    g.style.height = hUse + 'px';
+    return { left:gx, top:gy, width:wUse, height:hUse };
+  }
+  function showGuide(r){
+    const g = drag && drag.guide;
+    if (!g || !r) return;
+    g.style.left = r.left + 'px';
+    g.style.top = r.top + 'px';
+    g.style.width = r.width + 'px';
+    g.style.height = r.height + 'px';
     g.classList.add('is-on');
+  }
+  function clearSnapPreview(){
+    if (drag) drag._snap = null;
+    if (window.Windows && Windows.clearSnapPreview) Windows.clearSnapPreview();
   }
 
   function hideGuide(){
     if (drag && drag.guide) drag.guide.classList.remove('is-on');
     document.querySelectorAll(guideSel).forEach(g => g.classList.remove('is-on'));
-  }
-
-  /* Элемент вьюпорта под курсором: окно целиком или карточка/панель. */
-  const VIEW_TARGETS = '.aw-win, .card, .metric, .person-card, .o-card, .rev-card, .tbl-wrap, .chat-main, .settings-grid';
-  function rectHas(r, cx, cy){
-    return r.width > 0 && r.height > 0 && cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom;
-  }
-  function viewportTargetAt(cx, cy){
-    if (cx < navRight()) return null;
-    /* Контент во время драга инертен (pointer-events:none), поэтому
-       elementFromPoint возвращает .shell. Ищем элемент по геометрии:
-       сначала окна (верхнее — последнее в слое), затем карточки/панели. */
-    const wins = [...document.querySelectorAll('#windows-layer .aw-win')]
-      .filter(el => rectHas(el.getBoundingClientRect(), cx, cy));
-    if (wins.length) return wins[wins.length - 1];
-    const list = [...document.querySelectorAll(VIEW_TARGETS)]
-      .filter(el => !el.classList.contains('aw-win') && rectHas(el.getBoundingClientRect(), cx, cy));
-    return list[0] || null;
-  }
-
-  function ensureTargetGuide(){
-    if (!drag) return null;
-    if (drag.targetGuide) return drag.targetGuide;
-    const g = document.createElement('div');
-    g.className = 'menu-target-guide';
-    g.innerHTML = '<span class="menu-target-corner"></span>';
-    document.body.appendChild(g);
-    drag.targetGuide = g;
-    return g;
-  }
-  function updateTargetGuide(el, cx, cy){
-    if (!el){ hideTargetGuide(); return; }
-    const g = ensureTargetGuide();
-    if (!g) return;
-    const r = el.getBoundingClientRect();
-    g.style.left = (r.left - 3) + 'px';
-    g.style.top = (r.top - 3) + 'px';
-    g.style.width = (r.width + 6) + 'px';
-    g.style.height = (r.height + 6) + 'px';
-    const isWin = el.classList.contains('aw-win');
-    g.classList.toggle('has-corner', isWin);
-    g.classList.add('is-on');
-    const c = g.querySelector('.menu-target-corner');
-    if (c){
-      if (isWin){
-        const size = 42;
-        c.style.left = (r.width - size) + 'px';
-        c.style.top = (r.height - size) + 'px';
-        c.classList.toggle('is-hot', cx >= r.right - size && cy >= r.bottom - size);
-      } else {
-        c.classList.remove('is-hot');
-      }
-    }
-    drag._viewTarget = el;
-  }
-  function hideTargetGuide(){
-    const g = drag && drag.targetGuide;
-    if (!g) return;
-    g.classList.remove('is-on', 'has-corner');
-    const c = g.querySelector('.menu-target-corner');
-    if (c) c.classList.remove('is-hot');
-    if (drag) drag._viewTarget = null;
   }
 
   /* Линия между пунктами: показывает точный зазор, куда встанет пункт. */
@@ -278,18 +227,21 @@ const NavDrag = (() => {
       const tr = target.getBoundingClientRect();
       drag._before = cy < tr.top + tr.height / 2;
       showDropLine(target, drag._before);
-      hideTargetGuide();
+      clearSnapPreview();
       hideGuide();
     } else {
       drag._before = null;
       hideDropLine();
-      /* Пункт над вьюпортом: подсвечиваем элемент под курсором пунктиром,
-         как окно, и ведём заполненный призрак будущего окна. */
+      /* Пункт над вьюпортом: ровно те же пунктирные сплиты, что при драге
+         окна. Свободное окно показываем призраком только вне зон сплита. */
       if (!sEl && cx >= navRight()){
-        updateTargetGuide(viewportTargetAt(cx, cy), cx, cy);
-        showGuide(cx, cy);
+        const gr = guideRect(cx, cy);
+        const snap = (window.Windows && Windows.snapPreview) ? Windows.snapPreview(gr) : null;
+        drag._snap = snap || null;
+        if (snap) hideGuide(); else showGuide(gr);
       } else {
-        hideTargetGuide();
+        drag._snap = null;
+        clearSnapPreview();
         hideGuide();
       }
     }
@@ -297,7 +249,8 @@ const NavDrag = (() => {
 
   function finish(cx, cy){
     if (!drag) return;
-    hideTargetGuide();
+    const snap = drag._snap || null;
+    clearSnapPreview();
     hideDropLine();
     const src = drag.el;
     const under = document.elementFromPoint(cx, cy);
@@ -374,7 +327,9 @@ const NavDrag = (() => {
     } else if (cx >= navRight() && src.classList.contains('side__link')){
       /* Бросок в подсказку сплита — окно сразу в нужной половине;
          иначе оставляем свободное окно по месту курсора. */
-      try { Windows.spawn(src.dataset.route, { x: cx, y: cy, forceRight: true }); } catch(e){}
+      try {
+        Windows.spawn(src.dataset.route, snap ? { snap } : { x: cx, y: cy, forceRight: true });
+      } catch(e){}
       moved = true;
     }
     if (moved && reordered && JSON.stringify(V) === beforeJson){
