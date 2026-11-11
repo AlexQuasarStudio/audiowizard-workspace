@@ -2506,34 +2506,25 @@ body.col-dragging,body.col-dragging *{cursor:col-resize!important;user-select:no
 .inline-suggest__item .faint{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
 
 
-/* Люди: подсвечивается блок имени/статуса, а не вся строка */
+/* Люди: подсвечивается ячейка рамкой, как «Контакт» и «Специализация» */
 .pl-wrap tbody tr[data-uid]:hover{background:transparent}
+.pl-wrap tbody td:has([data-inline="name"]):hover,
+.pl-wrap tbody td:has([data-inline="workStatus"]):hover{
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent)
+}
+/* У самих данных и бейджа статуса своей плашки нет — только рамка ячейки */
+.pl-wrap tbody [data-inline="name"]:hover,
+.pl-wrap [data-inline="workStatus"]:hover{background:transparent;box-shadow:none}
 
 /* На зуме отключаем backdrop-blur окон: с десятком окон он даёт артефакты */
 body.page-zoomed .aw-win--active{background:var(--panel);-webkit-backdrop-filter:none;backdrop-filter:none}
 
-/* Подсветка редактируемых блоков имени/исполнителей и статуса работы */
-.o-wrap tr[data-oid] td[data-inline="client"] .cell-main,
-.o-wrap tr[data-oid] td[data-inline="executors"] .ex-stack,
+/* Карточка заказа: клиент остаётся отдельным редактируемым блоком */
 .o-card__client[data-inline]{
   display:inline-flex;align-items:center;gap:4px;max-width:100%;border-radius:7px;
   transition:background-color .15s var(--ease),box-shadow .15s var(--ease)
 }
-.o-wrap tr[data-oid] td[data-inline="client"]:hover .cell-main,
-.o-wrap tr[data-oid] td[data-inline="executors"]:hover .ex-stack,
 .o-card__client[data-inline]:hover{
   background:var(--accent-soft);
   box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 26%,transparent)
-}
-
-/* Люди: заливка ложится на сами данные, без контура вокруг */
-.pl-wrap tbody [data-inline="name"],
-.pl-wrap [data-inline="workStatus"]{
-  border-radius:5px;line-height:1.25;
-  transition:background-color .15s var(--ease)
-}
-.pl-wrap [data-inline="workStatus"]{display:inline-flex;align-items:center;gap:4px;max-width:100%}
-.pl-wrap tbody [data-inline="name"]:hover,
-.pl-wrap [data-inline="workStatus"]:hover{
-  background:color-mix(in srgb,var(--accent) 14%,transparent)
 }
