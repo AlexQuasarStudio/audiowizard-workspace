@@ -487,8 +487,8 @@ tr.inl-tr{animation:inlRowIn .2s var(--ease)}
 .pl-act{width:40px;text-align:right}
 /* Карточный вид людей тоже растягивается вниз (как карточки заказов) */
 .pl-wrap--cards{border:none!important;background:transparent!important}
-.person-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;box-shadow:var(--sh-1);cursor:pointer;transition:border-color var(--dur),transform var(--dur)}
-.person-card:hover{border-color:var(--border-2);transform:translateY(-2px)}
+.person-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;box-shadow:var(--sh-1);cursor:pointer;transition:border-color var(--dur),background-color var(--dur),transform var(--dur)}
+.person-card:hover{border-color:var(--border-2);background:var(--panel-2);transform:translateY(-2px)}
 .person-card.bl{opacity:.6}
 .person-card.bl::after{content:"ЧС"}
 
