@@ -1673,7 +1673,7 @@ const CRM = (() => {
     const executors = S.users.filter(x=>x.role==='executor' && x.ext.status!=='blacklisted' && x.ext.workStatus==='working');
     /* Копии, а не ссылки: иначе правка суммы в форме сразу меняет заказ,
        и при сохранении не с чем сравнить прежнюю оплаченную часть. */
-    const form = { executors: (o.executors||[]).map(e=>({...e})), files: [...(o.files||[])], calcSum: 0, calcRushFee: Number(o.rush_fee)||0 };
+    const form = { executors: (o.executors||[]).map(e=>({...e})), files: (o.files||[]).map(f=>({ ...f, volumes: f.volumes ? { ...f.volumes } : undefined })), calcSum: 0, calcRushFee: Number(o.rush_fee)||0 };
 
     const m = openWinModal({
       wide:true, title: isEdit ? `Заказ ${o.order_id}` : 'Новый заказ', route:'orders',
@@ -1745,6 +1745,7 @@ const CRM = (() => {
             </div>
             <div class="small faint" id="of-exec-sum"></div>
           </div>
+          <div id="of-vol-split"></div>
           <div class="card card-pad" style="background:var(--bg-2)">
             <div class="row row--between"><b style="font-size:13px">${icon('calc','ico-sm')} Калькулятор услуг</b></div>
             <p class="small muted" style="margin:6px 0 10px">Выберите услуги ниши — сумма подставится в «Итого».</p>
@@ -1921,7 +1922,7 @@ const CRM = (() => {
               const has = form.executors.find(x=>x.uid===idv);
               if (has) form.executors = form.executors.filter(x=>x.uid!==idv);
               else { form.executors.push({ uid:idv, amount:0, is_paid:false }); splitShares(); }
-              renderExecList(); updExecSum();
+              renderExecList(); updExecSum(); renderVolSplit();
             });
             const amt = el.querySelector('.ex-amount');
             amt && amt.addEventListener('input', ()=>{ const row = form.executors.find(x=>x.uid===el.dataset.uid); if (row) row.amount = +amt.value||0; updExecSum(); });
@@ -1958,6 +1959,106 @@ const CRM = (() => {
             ? `<div>Назначено ${form.executors.length} · сумма: <b>${fmtMoney(sum)}</b></div><div class="tiny faint">${esc(parts)}</div>`
             : 'Никто не назначен';
         };
+        /* Объём по файлам: каждый аудиофайл можно разделить между
+           исполнителями поровну или пропорционально их долям/суммам. */
+        const audioFiles = ()=> form.files.filter(f=>+f.duration > 0);
+        const fileMinutes = f => Math.round(((+f.duration||0)/60)*10)/10;
+        const execShort = uid => String(((userById(uid)||{}).full_name||'—')).split(' ')[0];
+        const volWeights = ()=>{
+          const shares = form.executors.map(e=>+e.share||0);
+          if (shares.some(x=>x>0)) return shares;
+          const amounts = form.executors.map(e=>+e.amount||0);
+          if (amounts.some(x=>x>0)) return amounts;
+          return form.executors.map(()=>1);
+        };
+        const distributeVol = (fileIdx, mode)=>{
+          const f = form.files[fileIdx];
+          if (!f || !form.executors.length) return;
+          const total = fileMinutes(f);
+          const w = mode === 'equal' ? form.executors.map(()=>1) : volWeights();
+          const sumW = w.reduce((a,b)=>a+b,0) || 1;
+          let left = total;
+          f.volumes = f.volumes || {};
+          form.executors.forEach((e,i)=>{
+            const v = i === form.executors.length-1 ? Math.max(0, left) : Math.round(total*w[i]/sumW*10)/10;
+            f.volumes[e.uid] = Math.max(0, Math.round(v*10)/10);
+            left = Math.round((left - v)*10)/10;
+          });
+        };
+        const updateVolSums = ()=>{
+          const box = g('#of-vol-split');
+          if (!box) return;
+          box.querySelectorAll('[data-vol-row]').forEach(row=>{
+            const f = form.files[+row.dataset.volRow];
+            if (!f) return;
+            const sum = form.executors.reduce((a,e)=>a+(+((f.volumes||{})[e.uid])||0),0);
+            const total = fileMinutes(f);
+            const el = row.querySelector('[data-vol-sum]');
+            if (el) el.innerHTML = `Распределено <b>${sum.toFixed(1)}</b> из ${total.toFixed(1)} мин` + (sum > total + 0.05 ? ' · <span style="color:var(--red)">больше объёма</span>' : '');
+          });
+          const tot = box.querySelector('[data-vol-total]');
+          if (tot) tot.innerHTML = form.executors.map(e=>{
+            const mins = audioFiles().reduce((a,f)=>a+(+((f.volumes||{})[e.uid])||0),0);
+            return `${esc(execShort(e.uid))}: <b>${mins.toFixed(1)}</b> мин`;
+          }).join(' · ');
+        };
+        const renderVolSplit = ()=>{
+          const box = g('#of-vol-split');
+          if (!box) return;
+          const files = audioFiles();
+          if (!files.length){
+            box.innerHTML = '<div class="card card-pad" style="background:var(--bg-2)"><b style="font-size:13px">Объём по файлам</b><div class="small faint" style="margin-top:6px">Добавьте аудиофайлы — длительность определится сама, и объём можно будет разделить между исполнителями.</div></div>';
+            return;
+          }
+          if (!form.executors.length){
+            box.innerHTML = '<div class="card card-pad" style="background:var(--bg-2)"><b style="font-size:13px">Объём по файлам</b><div class="small faint" style="margin-top:6px">Сначала выберите исполнителей.</div></div>';
+            return;
+          }
+          box.innerHTML = `<div class="card card-pad" style="background:var(--bg-2)">
+            <div class="row row--between" style="gap:8px"><b style="font-size:13px">${icon('chart','ico-sm')} Объём по файлам</b>
+              <span class="row" style="gap:4px"><button class="btn btn--ghost btn--sm" type="button" data-vol-all="equal">Поровну</button><button class="btn btn--ghost btn--sm" type="button" data-vol-all="prop">Пропорц.</button></span></div>
+            <div class="small faint" style="margin:6px 0 8px">Каждый файл делится отдельно; «пропорционально» — по текущим долям или суммам исполнителей.</div>
+            ${files.map(f=>{
+              const j = form.files.indexOf(f);
+              const total = fileMinutes(f);
+              const vols = f.volumes || {};
+              return `<div data-vol-row="${j}" style="border-top:1px solid var(--border);padding-top:8px;margin-top:8px">
+                <div class="row row--between" style="gap:6px"><span class="small" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(f.name)}"><b>${esc(f.name)}</b> · ${total.toFixed(1)} мин</span>
+                  <span class="row" style="gap:4px;flex:none"><button class="btn btn--ghost btn--sm" type="button" data-vol-file="${j}" data-vol-mode="equal">Поровну</button><button class="btn btn--ghost btn--sm" type="button" data-vol-file="${j}" data-vol-mode="prop">Пропорц.</button></span></div>
+                <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:6px">
+                  ${form.executors.map(e=>`<label class="small" style="display:inline-flex;align-items:center;gap:4px">${esc(execShort(e.uid))}
+                    <input class="input" style="width:74px;padding:5px 7px" type="number" min="0" step="0.1" data-vol-file="${j}" data-vol-uid="${esc(e.uid)}" value="${(+vols[e.uid]||0).toFixed(1)}"> мин</label>`).join('')}
+                </div>
+                <div class="small faint" data-vol-sum="${j}" style="margin-top:4px"></div>
+              </div>`;
+            }).join('')}
+            <div class="small" data-vol-total style="margin-top:10px"></div>
+          </div>`;
+          updateVolSums();
+        };
+        const volBox = g('#of-vol-split');
+        if (volBox){
+          volBox.addEventListener('click', e=>{
+            const all = e.target.closest('[data-vol-all]');
+            if (all){
+              audioFiles().forEach(f=>distributeVol(form.files.indexOf(f), all.dataset.volAll));
+              renderVolSplit();
+              return;
+            }
+            const b = e.target.closest('[data-vol-file][data-vol-mode]');
+            if (b){ distributeVol(+b.dataset.volFile, b.dataset.volMode); renderVolSplit(); }
+          });
+          volBox.addEventListener('input', e=>{
+            const inp = e.target.closest('[data-vol-file][data-vol-uid]');
+            if (!inp) return;
+            const f = form.files[+inp.dataset.volFile];
+            if (!f) return;
+            f.volumes = f.volumes || {};
+            f.volumes[inp.dataset.volUid] = Math.max(0, +inp.value || 0);
+            updateVolSums();
+          });
+        }
+
         if (fld) fld.addEventListener('input', ()=>{ updExecSum(); });
         const execSearch = debounce(()=>{
           const q = norm(g('#of-ex-search').value);
@@ -1966,7 +2067,7 @@ const CRM = (() => {
           });
         });
         g('#of-ex-search').addEventListener('input', execSearch);
-        renderExecList(); updExecSum();
+        renderExecList(); updExecSum(); renderVolSplit();
 
         /* Срок: рекомендуем по фактам и подставляем, пока дедлайн не тронули руками */
         let deadlineTouched = !!o.deadline;
@@ -2037,7 +2138,7 @@ const CRM = (() => {
             if (form.executors.some(e => e.uid === id)) return;
             form.executors.push({ uid:id, amount:0, is_paid:false });
             splitShares();
-            renderExecList(); updExecSum(); paintRecs();
+            renderExecList(); updExecSum(); paintRecs(); renderVolSplit();
             toast('Исполнитель добавлен в заказ', 'ok');
           });
         }
@@ -2070,6 +2171,7 @@ const CRM = (() => {
           g('#of-files').innerHTML = form.files.map(f=>fileRowHTML(f)).join('');
           $$('#of-files .x', mask).forEach((x,i)=>x.onclick=()=>{ form.files.splice(i,1); refreshFiles(); });
           form.audio = form.files.reduce((a,f)=>a+(f.duration||0),0);
+          renderVolSplit();
         }
 
         /* калькулятор: услуги ниши */
@@ -5212,6 +5314,7 @@ updatePeopleBulk();
           <div class="small" id="cx-rush" style="margin-top:8px"></div>
         </div>
         <div class="small faint" style="margin-top:12px">Дополнительные услуги и опции. Если объём уже указан выше, основную услугу здесь не дублируйте.</div>
+        <div class="field" style="margin-top:10px"><label>Поиск услуги</label><input class="input" id="cx-svc-search" placeholder="Название, единица или ниша" autocomplete="off" spellcheck="false"></div>
         <div id="cx-svcs" style="margin-top:8px"></div>
         <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
           <button class="btn btn--ghost btn--sm" type="button" data-cx-export>${icon('export')} Экспорт услуг</button>
@@ -5418,17 +5521,37 @@ updatePeopleBulk();
         };
         g2('#cx-hours').addEventListener('input', ()=>{ paintDiscount(); upd(); });
         g2('#cx-promo').addEventListener('input', ()=>{ paintDiscount(); upd(); });
+        const filterSvcs = ()=>{
+          const q = norm(g2('#cx-svc-search').value);
+          let any = false;
+          g2('#cx-svcs').querySelectorAll('.cx-svc-group').forEach(gr=>{
+            let visible = 0;
+            gr.querySelectorAll('[data-search]').forEach(row=>{
+              const ok = !q || row.dataset.search.includes(q);
+              row.style.display = ok ? '' : 'none';
+              if (ok) visible++;
+            });
+            const et = gr.querySelector('[data-svc-extra]');
+            if (et) et.style.display = [...gr.querySelectorAll('[data-ex]')].some(r=>r.style.display !== 'none') ? '' : 'none';
+            gr.style.display = visible ? '' : 'none';
+            if (visible) any = true;
+          });
+          const empty = g2('#cx-svc-empty');
+          if (empty) empty.hidden = any;
+        };
         const paintSvcs = ()=>{
           g2('#cx-svcs').innerHTML = S.niches.map(n=>{
             const svcs = S.calcServices[n.id] || [];
             const extras = calcExtrasFor(n.id);
-            return `<div class="small"><b style="margin-bottom:4px;display:block">${esc(n.name)}</b>
-              ${svcs.map(s=>`<label class="svc-row check"><input type="checkbox" data-sv="${n.id}|${esc(s.name)}|${s.price}"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(s.name)} <span class="faint">${esc(s.unit||'')}</span></span><b>${s.price ? fmtMoney(s.price) : (s.unit === 'договорная' ? 'договорная' : fmtMoney(0))}</b></label>`).join('')}
-              ${extras.length ? `<div class="tiny faint" style="margin:6px 0 2px">Доп. опции</div>${extras.map(e=>`<label class="svc-row check"><input type="checkbox" data-ex="${n.id}|${esc(e.id)}|${Number(e.price)||0}|${Number(e.pct)||0}"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(e.name)} <span class="faint">${esc(e.unit || (e.pct ? '% от стоимости' : ''))}</span></span><b>${e.pct ? '+' + e.pct + '%' : fmtMoney(e.price)}</b></label>`).join('')}` : ''}
+            return `<div class="small cx-svc-group"><b style="margin-bottom:4px;display:block">${esc(n.name)}</b>
+              ${svcs.map(s=>`<label class="svc-row check" data-search="${esc(norm(n.name+' '+(s.name||'')+' '+(s.unit||'')))}"><input type="checkbox" data-sv="${n.id}|${esc(s.name)}|${s.price}"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(s.name)} <span class="faint">${esc(s.unit||'')}</span></span><b>${s.price ? fmtMoney(s.price) : (s.unit === 'договорная' ? 'договорная' : fmtMoney(0))}</b></label>`).join('')}
+              ${extras.length ? `<div class="tiny faint" data-svc-extra style="margin:6px 0 2px">Доп. опции</div>${extras.map(e=>`<label class="svc-row check" data-search="${esc(norm(n.name+' '+(e.name||'')+' '+(e.unit||'')+(e.pct?' процент':'')))}"><input type="checkbox" data-ex="${n.id}|${esc(e.id)}|${Number(e.price)||0}|${Number(e.pct)||0}"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(e.name)} <span class="faint">${esc(e.unit || (e.pct ? '% от стоимости' : ''))}</span></span><b>${e.pct ? '+' + e.pct + '%' : fmtMoney(e.price)}</b></label>`).join('')}` : ''}
             </div>`;
-          }).join('');
+          }).join('') + '<div id="cx-svc-empty" class="small faint" hidden style="padding:8px 0">Ничего не найдено</div>';
+          filterSvcs();
         };
         paintSvcs();
+        g2('#cx-svc-search').addEventListener('input', filterSvcs);
         paintRush();
         paintDiscount();
         upd();

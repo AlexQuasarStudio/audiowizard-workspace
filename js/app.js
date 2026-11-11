@@ -3912,10 +3912,14 @@ ex.innerHTML = avatarHTML(user(), '');
   /* Поле ввода чата растёт под текст до разумного предела, дальше — скролл */
   const growChatInput = (ta)=>{
     if (!ta) return;
-    /* Сброс в auto нужен, чтобы scrollHeight не был равен уже раздутой
-       высоте: иначе после удаления текста поле не сжималось обратно. */
+    cancelAnimationFrame(ta.__growRAF || 0);
+    /* Меряем высоту при auto, но возвращаем текущую: следующий кадр плавно
+       доводит её до цели. Без этого height менялся скачком. */
+    const prev = ta.offsetHeight;
     ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
+    const next = Math.min(ta.scrollHeight, 140);
+    ta.style.height = prev + 'px';
+    ta.__growRAF = requestAnimationFrame(()=>{ ta.style.height = next + 'px'; });
   };
   document.addEventListener('input', e=>{
     if (e.target && e.target.id === 'chat-t') growChatInput(e.target);
