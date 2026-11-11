@@ -2505,25 +2505,9 @@ body.col-dragging,body.col-dragging *{cursor:col-resize!important;user-select:no
 .inline-suggest__item:hover,.inline-suggest__item.on{background:var(--panel-2)}
 .inline-suggest__item .faint{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
 
-/* Люди: подсветка всей строки одним блоком, как в заказах. Ячейки держим
-   прозрачными, рамку рисуем сверху/снизу и по краям строки. */
-.pl-wrap table.tbl{border-collapse:separate;border-spacing:0}
-.pl-wrap tbody tr[data-uid] td{transition:background-color .15s var(--ease),box-shadow .15s var(--ease)}
-.pl-wrap tbody tr[data-uid]:hover td{
-  background:color-mix(in srgb,var(--accent) 8%,transparent);
-  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--accent) 26%,transparent),inset 0 -1px 0 color-mix(in srgb,var(--accent) 26%,transparent)
-}
-.pl-wrap tbody tr[data-uid]:hover td:first-child{
-  border-radius:10px 0 0 10px;
-  box-shadow:inset 1px 0 0 color-mix(in srgb,var(--accent) 26%,transparent),inset 0 1px 0 color-mix(in srgb,var(--accent) 26%,transparent),inset 0 -1px 0 color-mix(in srgb,var(--accent) 26%,transparent)
-}
-.pl-wrap tbody tr[data-uid]:hover td:last-child{
-  border-radius:0 10px 10px 0;
-  box-shadow:inset -1px 0 0 color-mix(in srgb,var(--accent) 26%,transparent),inset 0 1px 0 color-mix(in srgb,var(--accent) 26%,transparent),inset 0 -1px 0 color-mix(in srgb,var(--accent) 26%,transparent)
-}
-/* Внутри подсвеченной строки отдельные поля не рисуют свои плашки */
-.pl-wrap tbody tr[data-uid]:hover [data-inline]{background:transparent;box-shadow:none}
-@media (prefers-reduced-motion:reduce){.pl-wrap tbody tr[data-uid] td{transition:none}}
+
+/* Люди: подсвечивается блок имени/статуса, а не вся строка */
+.pl-wrap tbody tr[data-uid]:hover{background:transparent}
 
 /* На зуме отключаем backdrop-blur окон: с десятком окон он даёт артефакты */
 body.page-zoomed .aw-win--active{background:var(--panel);-webkit-backdrop-filter:none;backdrop-filter:none}
@@ -2532,14 +2516,16 @@ body.page-zoomed .aw-win--active{background:var(--panel);-webkit-backdrop-filter
 .o-wrap tr[data-oid] td[data-inline="client"] .cell-main,
 .o-wrap tr[data-oid] td[data-inline="executors"] .ex-stack,
 .o-card__client[data-inline],
-.person-card [data-inline="workStatus"]{
+.pl-wrap tbody [data-inline="name"],
+.pl-wrap [data-inline="workStatus"]{
   display:inline-flex;align-items:center;gap:4px;max-width:100%;border-radius:7px;
   transition:background-color .15s var(--ease),box-shadow .15s var(--ease)
 }
 .o-wrap tr[data-oid] td[data-inline="client"]:hover .cell-main,
 .o-wrap tr[data-oid] td[data-inline="executors"]:hover .ex-stack,
 .o-card__client[data-inline]:hover,
-.person-card [data-inline="workStatus"]:hover{
+.pl-wrap tbody [data-inline="name"]:hover,
+.pl-wrap [data-inline="workStatus"]:hover{
   background:var(--accent-soft);
   box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 26%,transparent)
 }
