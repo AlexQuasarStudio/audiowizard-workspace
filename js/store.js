@@ -577,12 +577,14 @@ function migrateFinance(){
   }
   S.settings.integrations = Object.assign({ payout:{ key:'smartcat', name:'Smartcat', commission:4, enabled:true, perUser:true } }, S.settings.integrations || {});
 
-  /* Сборы провайдера: прежний ориентир 5% заменяем на 4% и переносим
-     это в уже сохранённые настройки (только старый дефолт, не ручной выбор). */
+  /* Сборы провайдера: прежние ориентиры 2% и 5% заменяем на 4% и переносим
+     это в уже сохранённые настройки (только старые дефолты, не ручной выбор). */
   if (S.settings.finance._defaultsVersion !== 4){
-    if (S.settings.finance.payoutCommission == null || Number(S.settings.finance.payoutCommission) === 5) S.settings.finance.payoutCommission = 4;
+    const pc = Number(S.settings.finance.payoutCommission);
+    if (S.settings.finance.payoutCommission == null || pc === 2 || pc === 5) S.settings.finance.payoutCommission = 4;
     const ip = S.settings.integrations.payout;
-    if (ip && (ip.commission == null || Number(ip.commission) === 5)) ip.commission = 4;
+    const ic = ip ? Number(ip.commission) : null;
+    if (ip && (ip.commission == null || ic === 2 || ic === 5)) ip.commission = 4;
     S.settings.finance._defaultsVersion = 4;
   }
   S.settings.payout = Object.assign({ enabled:true, auto:true, days:[1,15], time:'15:00', tz:'Europe/Moscow', lastRunAt:null, history:[] }, S.settings.payout || {});

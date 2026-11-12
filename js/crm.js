@@ -5338,7 +5338,7 @@ updatePeopleBulk();
               <select class="input" id="cx-vsvc">${volOptions}</select></div>
           </div>
           <div class="small" id="cx-volume-note" style="margin-top:6px"></div>
-          <div class="field" id="cx-char" style="margin-top:6px;display:none;max-width:220px">
+          <div class="field calc-char" id="cx-char">
             <label>Считать символы</label>
             <select class="input" id="cx-char-mode">
               <option value="with">С пробелами</option>
@@ -5475,7 +5475,7 @@ updatePeopleBulk();
         /* Символы: только выбор «с пробелами/без» — вставлять текст не нужно. */
         const paintChar = () => {
           const box = g2('#cx-char'); if (!box) return;
-          box.style.display = g2('#cx-unit').value === 'char' ? '' : 'none';
+          box.classList.toggle('is-open', g2('#cx-unit').value === 'char');
         };
         if (g2('#cx-char-mode')) g2('#cx-char-mode').addEventListener('change', ()=>paintVolume(true));
         g2('#cx-unit').addEventListener('change', paintChar);
