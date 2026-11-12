@@ -767,7 +767,7 @@ body.zen .chat-msgs{
 .sound-toggle.is-off{color:var(--faint)}
 .sound-toggle.is-off .input-eye__slash{stroke-dashoffset:0}
 /* Опознавательный знак роли рядом с ником (staff) */
-.role-mark{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:5px;margin-left:4px;vertical-align:-2px;background:color-mix(in srgb,currentColor 14%,transparent)}
+.role-mark{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:5px;vertical-align:-2px;background:color-mix(in srgb,currentColor 14%,transparent)}
 .role-mark .ico{width:9px;height:9px}
 .role-mark--admin{color:var(--red)}
 .role-mark--top_manager{color:var(--violet)}
@@ -831,7 +831,7 @@ body.zen .day-sep.on-scroll{top:0}
    файле) переопределяло box-shadow — обводка выделения у своих пропадала.
    Селектор БЕЗ пробела: .msg--sel и .msg--own висят на одном элементе. */
 .msg--sel.msg--own .msg__bubble{box-shadow:0 0 0 2px var(--accent),0 1px 3px rgba(0,0,0,.18)}
-.who{display:inline-flex;align-items:center;gap:4px;flex-wrap:nowrap;white-space:nowrap;max-width:100%;width:fit-content;margin-bottom:2px;font-size:11.5px;font-weight:700;color:var(--accent);line-height:1.4;cursor:pointer}
+.who{display:inline-flex;align-items:center;gap:3px;flex-wrap:nowrap;white-space:nowrap;max-width:100%;width:fit-content;margin-bottom:2px;font-size:11.5px;font-weight:700;color:var(--accent);line-height:1.4;cursor:pointer}
 /* Ник всегда одной строкой: пузырь подстраивается по его ширине.
    Служебные значки рядом остаются на месте и не переносятся. */
 .who__name{min-width:max-content;white-space:nowrap;overflow-wrap:normal}
@@ -2147,7 +2147,7 @@ html.splash-hold #splash{visibility:hidden}
 .chat-reply__txt .chat-reply__quote{color:var(--muted)}
 
 /* --- Роли в чате --- */
-.chat-role-tag{display:inline-flex;align-items:center;flex:none;font-size:9.5px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;padding:1px 5px;border-radius:6px;margin-left:5px;vertical-align:middle;white-space:nowrap}
+.chat-role-tag{display:inline-flex;align-items:center;flex:none;font-size:9.5px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;padding:1px 5px;border-radius:6px;vertical-align:middle;white-space:nowrap}
 .chat-info-member__meta{white-space:nowrap}
 .chat-info-member__meta .chat-info-member__nick{display:inline-block;vertical-align:middle}
 .chat-role-tag--owner{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}

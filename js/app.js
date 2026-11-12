@@ -855,8 +855,8 @@ const QUICK_BY_ROLE = {
   admin:       ['order','calc','client','executor','-','chats','transcribe','texts','translate','-','invite','planner'],
   top_manager: ['order','calc','client','executor','-','chats','transcribe','texts','translate','-','invite','report'],
   manager:     ['order','calc','client','-','chats','texts','kanban','-','invite','report'],
-  client:      ['order','-','chats','ticket','report'],
-  executor:    ['myorders','-','chats','transcribe','translate','report','invite']
+  client:      ['order','-','chats','ticket','-','report'],
+  executor:    ['myorders','-','chats','transcribe','translate','-','report','invite']
 };
 
   function userMenu(anchor){
@@ -7636,10 +7636,8 @@ const cm = root.querySelector('.chat-main');
       <div class="cols-2 grid" style="gap:12px">
         <div class="field"><label>Дни месяца</label><input class="input" id="po-days" value="${p.days.join(', ')}" placeholder="1, 15"></div>
         <div class="field"><label>Время (МСК)</label><input class="input" id="po-time" type="time" value="${esc(p.time)}"></div>
-        <div class="field"><label title="Доля админа от суммы каждого заказа">Доля админа в заказе, %</label><input class="input" id="po-admin" type="number" min="0" max="100" step="1" value="${cfg.adminMargin}"></div>
+        <div class="field" ${u.role==='admin'?'':'hidden'}><label title="Доля админа от суммы каждого заказа">Доля админа в заказе, %</label><input class="input" id="po-admin" type="number" min="0" max="100" step="1" value="${cfg.adminMargin}"></div>
         <div class="field"><label title="Доля менеджера по умолчанию; в заказе можно изменить">Доля менеджера по умолчанию, %</label><input class="input" id="po-mgr" type="number" min="0" max="100" step="1" value="${cfg.managerFee}"></div>
-        <div class="field"><label>Мин. сумма заказа, ₽</label><input class="input" id="po-min-total" type="number" min="0" step="50" value="${cfg.minOrderTotal}"></div>
-        <div class="field"><label>Мин. оплата исполнителя, ₽</label><input class="input" id="po-min-exec" type="number" min="0" step="10" value="${cfg.minExecutorPay}"></div>
         <div class="field"><label>Автоматически</label>
           <label class="check" style="display:flex;padding-top:6px"><input type="checkbox" id="po-auto" ${p.auto?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span><span class="small">по расписанию</span></label>
           <label class="check" style="display:flex;margin-top:6px"><input type="checkbox" id="po-on" ${p.enabled?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span><span class="small">выплаты включены</span></label></div>
@@ -7699,9 +7697,7 @@ const cm = root.querySelector('.chat-main');
       /* cfg в этом обработчике нет: комиссия — ориентир провайдера, здесь не сохраняется */
       const adm = Math.max(0, Math.min(100, Number((el.querySelector('#po-admin')||{}).value)||0));
       const mgr = Math.max(0, Math.min(100, Number((el.querySelector('#po-mgr')||{}).value)||0));
-      const minTotal = Math.max(0, Math.round(Number((el.querySelector('#po-min-total')||{}).value) || 0));
-      const minExec = Math.max(0, Math.round(Number((el.querySelector('#po-min-exec')||{}).value) || 0));
-      S.settings.finance = Object.assign({}, S.settings.finance, { adminMargin:adm, managerFee:mgr, minOrderTotal:minTotal, minExecutorPay:minExec });
+      S.settings.finance = Object.assign({}, S.settings.finance, { adminMargin:adm, managerFee:mgr });
       S.settings.payout = Object.assign({}, p, {
         enabled: !!((el.querySelector('#po-on')||{}).checked),
         auto: !!((el.querySelector('#po-auto')||{}).checked),
@@ -7996,11 +7992,12 @@ const cm = root.querySelector('.chat-main');
     return { changed:true, added:res.added, updated:res.updated, skipped:parsed.errors.length };
   }
   function calcSvcRowsHTML(nid){
+    const showMargin = user().role === 'admin';
     return (S.calcServices[nid] || []).map(s => `<tr data-sid="${s.id}">
       <td><input class="input" data-f="name" value="${esc(s.name)}" style="padding:6px 10px"></td>
       <td><input class="input" data-f="price" type="number" min="0" value="${s.price}" style="padding:6px 10px;width:100px"></td>
       <td><input class="input" data-f="unit" value="${esc(s.unit||'')}" style="padding:6px 10px"></td>
-      <td><input class="input" data-f="margin" type="number" min="0" max="90" value="${s.margin||0}" style="padding:6px 10px;width:76px"></td>
+      <td ${showMargin?'':'hidden'}><input class="input" data-f="margin" type="number" min="0" max="90" value="${s.margin||0}" style="padding:6px 10px;width:76px"></td>
       <td style="width:40px"><button class="iconbtn" data-del="${s.id}" title="Удалить услугу">${icon('trash')}</button></td>
     </tr>`).join('');
   }
@@ -8059,7 +8056,7 @@ const cm = root.querySelector('.chat-main');
       ['docs','Справка и документы','file'],
       ...(['admin','top_manager','manager','executor'].includes(u.role)?[['payouts','Выплаты и оплата','card']]:[]),
       ...(['admin','top_manager','manager'].includes(u.role)?[['orderids','Нумерация заказов','cart']]:[]),
-      ...(u.role==='admin'?[['calc','Калькулятор и услуги','calc']]:[]),
+      ...(['admin','top_manager','manager'].includes(u.role)?[['calc','Калькулятор и услуги','calc']]:[]),
       ...(u.role==='admin'?[['tech','Технические работы','alert']]:[]),
       ...(u.role==='admin'?[['product','Демо-режим и версии','flag'],['data','Данные и бекапы','db']]:[]),
       /* «О приложении» — всегда последний пункт, у всех ролей */
@@ -8226,7 +8223,13 @@ const cm = root.querySelector('.chat-main');
     }
     function calcHTML(){
       const rows = nid => calcSvcRowsHTML(nid);
-      return `<div class="card card-pad" style="margin-bottom:12px"><h3 style="margin-bottom:6px">Гонорары менеджеров</h3>
+      const pending = S.settings && S.settings.calcPending;
+      const pendingHtml = pending ? `<div class="card card-pad" style="border-color:var(--accent);margin-bottom:12px">
+        <b class="small">Изменения на согласовании</b>
+        <p class="small faint" style="margin-top:4px">${esc((userById(pending.author)||{}).full_name || 'Сотрудник')} · ${fmtDT(pending.at)}</p>
+        ${u.role==='admin' ? `<div class="row" style="gap:8px;margin-top:8px"><button class="btn btn--primary btn--sm" data-calc-approve>Принять</button><button class="btn btn--ghost btn--sm" data-calc-reject>Отклонить</button></div>` : `<p class="small" style="margin-top:6px">Ждёт подтверждения администратора.</p>`}
+      </div>` : '';
+      return `${pendingHtml}<div class="card card-pad" style="margin-bottom:12px"><h3 style="margin-bottom:6px">Гонорары менеджеров</h3>
         <p class="small muted" style="margin-bottom:10px">Потолок гонорара — процент от суммы заказа, выше которого менеджер не поднимет свой гонорар. Меняет только администратор.</p>
         <div class="cols-2 grid" style="gap:13px">
           <div class="field"><label>Потолок гонорара менеджера, % от суммы</label><input class="input" id="fee-manager" type="number" min="0" max="100" value="${(S.settings.feeCeilings||{}).manager ?? 25}"></div>
@@ -8252,7 +8255,7 @@ const cm = root.querySelector('.chat-main');
           <div class="row row--between"><b class="small">${esc(n.name)}</b>
             <button class="btn btn--ghost btn--sm" data-add="${n.id}">${icon('plus')} Услуга</button></div>
           <div class="tbl-wrap" style="margin-top:8px;border:0"><table class="tbl" style="min-width:0">
-            <thead><tr><th>Услуга</th><th>Цена, ₽</th><th>Единица</th><th>Маржа в цене, %<input class="input" data-margin-all="${n.id}" type="number" min="0" max="90" placeholder="все" style="width:58px;padding:3px 6px;font-size:11px;margin-left:6px" title="Выставить маржу всем услугам группы"></th><th></th></tr></thead>
+            <thead><tr><th>Услуга</th><th>Цена, ₽</th><th>Единица</th><th ${u.role==='admin'?'':'hidden'}>Маржа в цене, %<input class="input" data-margin-all="${n.id}" type="number" min="0" max="90" placeholder="все" style="width:58px;padding:3px 6px;font-size:11px;margin-left:6px" title="Выставить маржу всем услугам группы"></th><th></th></tr></thead>
             <tbody data-niche="${n.id}">${rows(n.id)}</tbody>
           </table></div>
           <div class="row" style="gap:10px;margin-top:10px;flex-wrap:wrap;align-items:flex-end">
@@ -8913,6 +8916,21 @@ const cm = root.querySelector('.chat-main');
     function bindCalc(el){
       if (el.dataset.calcBound){ return; }
       el.dataset.calcBound = '1';
+      const calcApprove = el.querySelector('[data-calc-approve]');
+      if (calcApprove) calcApprove.onclick = ()=>{
+        const p = S.settings.calcPending;
+        if (!p) return;
+        S.calcServices = p.services || S.calcServices;
+        S.calcSettings = p.settings || S.calcSettings;
+        S.settings.calcPending = null;
+        try { logAudit('Согласованы услуги калькулятора: '+(userById(p.author)||{}).full_name,'Настройки'); } catch(e){}
+        saveState(); toast('Изменения приняты','ok'); renderSec();
+      };
+      const calcReject = el.querySelector('[data-calc-reject]');
+      if (calcReject) calcReject.onclick = ()=>{
+        S.settings.calcPending = null;
+        saveState(); toast('Изменения отклонены','warn'); renderSec();
+      };
       el.querySelectorAll('[data-svc-export]').forEach(b => {
         b.onclick = () => exportCalcServices(b.dataset.svcExport);
       });
@@ -8949,6 +8967,9 @@ const cm = root.querySelector('.chat-main');
         el.querySelectorAll('[data-daily-norm]').forEach(inp => { inp.value = normAll.value; });
       });
       const save = ()=>{
+        const isAdmin = user().role === 'admin';
+        const beforeServices = isAdmin ? null : JSON.parse(JSON.stringify(S.calcServices || {}));
+        const beforeSettings = isAdmin ? null : JSON.parse(JSON.stringify(S.calcSettings || {}));
         el.querySelectorAll('tbody[data-niche]').forEach(tb=>{
           const nid = tb.dataset.niche;
           const list = [];
@@ -8982,6 +9003,17 @@ const cm = root.querySelector('.chat-main');
           S.calcSettings.rushPct[nid] = Math.max(0, Math.min(200, +((rp || {}).value) || 0));
         });
         S.calcSettings.clientBufferPct = Math.max(0, Math.min(200, Number((el.querySelector('#calc-buffer')||{}).value) || 0));
+        if (!isAdmin){
+          const proposedServices = JSON.parse(JSON.stringify(S.calcServices || {}));
+          const proposedSettings = JSON.parse(JSON.stringify(S.calcSettings || {}));
+          S.calcServices = beforeServices;
+          S.calcSettings = beforeSettings;
+          S.settings.calcPending = { author: user().id, at: Date.now(), services: proposedServices, settings: proposedSettings };
+          saveState();
+          toast('Отправлено администратору на согласование','ok');
+          renderSec();
+          return;
+        }
         logAudit('Услуги калькулятора обновлены', 'Настройки');
         saveState();
         toast('Услуги и настройки срочности сохранены', 'ok');
