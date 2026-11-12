@@ -832,9 +832,9 @@ body.zen .day-sep.on-scroll{top:0}
    Селектор БЕЗ пробела: .msg--sel и .msg--own висят на одном элементе. */
 .msg--sel.msg--own .msg__bubble{box-shadow:0 0 0 2px var(--accent),0 1px 3px rgba(0,0,0,.18)}
 .who{display:inline-flex;align-items:center;gap:4px;flex-wrap:nowrap;white-space:nowrap;max-width:100%;width:fit-content;margin-bottom:2px;font-size:11.5px;font-weight:700;color:var(--accent);line-height:1.4;cursor:pointer}
-/* Служебные значки рядом с ником никогда не переносятся на новую строку;
-   длинное имя усекается, а значки остаются на месте. */
-.who__name{min-width:0;white-space:normal;overflow-wrap:anywhere}
+/* Ник всегда одной строкой: пузырь подстраивается по его ширине.
+   Служебные значки рядом остаются на месте и не переносятся. */
+.who__name{min-width:max-content;white-space:nowrap;overflow-wrap:normal}
 .who .role-mark,.who .chat-role-tag,.who .ghost-mode-note{flex:none}
 .who .ghost-mode-note{display:inline-flex;align-items:center;gap:3px;color:var(--muted);font-weight:600;font-size:10.5px}
 /* Упоминание @ник в тексте — кликабельно, ведёт в ЛС */
