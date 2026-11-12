@@ -2524,3 +2524,5 @@ body.page-zoomed .aw-win--active{background:var(--panel);-webkit-backdrop-filter
   background:var(--accent-soft);
   box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 26%,transparent)
 }
+/* Крупная вращающаяся иконка в модалке «Функция в разработке» */
+svg.ico.wip-ico{width:38px;height:38px}

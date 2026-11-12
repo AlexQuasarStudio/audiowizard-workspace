@@ -369,7 +369,7 @@ function wipModal(name='Эта функция'){
     title:'Функция в разработке',
     body: `<div style="text-align:center;padding:10px 0 4px">
       <div style="width:74px;height:74px;border-radius:22px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;color:var(--accent)">
-        ${icon('refresh','spin')}
+        ${icon('refresh','spin wip-ico')}
       </div>
       <p style="font-weight:650;font-size:15px">${esc(name)} появится в ближайших версиях</p>
       <p class="muted small" style="margin-top:6px">Мы уже работаем над ней. Следите за патчноутами — уведомление придёт в центр уведомлений.</p>
