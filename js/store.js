@@ -505,10 +505,10 @@ const audit = getDemoAudit();
       /* Доли от суммы заказа: админ — 25% (маржа услуг), менеджер — 5%.
          Разница (итого − исполнители − админ − менеджер) показывается как
          свободный остаток; отрицательная — предупреждение о превышении. */
-      finance:{ adminMargin:25, managerFee:10, executorShare:40, payoutCommission:5, minOrderTotal:500, minExecutorPay:200, reviewFee:10 },
+      finance:{ adminMargin:25, managerFee:10, executorShare:40, payoutCommission:4, minOrderTotal:500, minExecutorPay:200, reviewFee:10 },
       /* Платёжный провайдер не захардкожен: имя, комиссия и включённость
          берутся отсюда, чтобы смена/отключение провайдера не требовали правок кода. */
-      integrations:{ payout:{ key:'smartcat', name:'Smartcat', commission:5, enabled:true, perUser:true } },
+      integrations:{ payout:{ key:'smartcat', name:'Smartcat', commission:4, enabled:true, perUser:true } },
       /* Выплаты исполнителям: 1-е и 15-е число в 15:00 МСК, полуинтервалы
          [1;14] и [15;последнее число]. Полностью настраивается. */
       payout:{ enabled:true, auto:true, days:[1,15], time:'15:00', tz:'Europe/Moscow', lastRunAt:null, history:[] },
@@ -564,7 +564,7 @@ function migrateStaffBalances(){
 }
 function migrateFinance(){
   if (!S.settings) S.settings = {};
-  S.settings.finance = Object.assign({ adminMargin:25, managerFee:10, executorShare:40, payoutCommission:5, minOrderTotal:500, minExecutorPay:200, reviewFee:10 }, S.settings.finance || {});
+  S.settings.finance = Object.assign({ adminMargin:25, managerFee:10, executorShare:40, payoutCommission:4, minOrderTotal:500, minExecutorPay:200, reviewFee:10 }, S.settings.finance || {});
   /* Старые сохранения держали прежний дефолт 5% — поднимаем до 10%,
      если пользователь явно не менял значение (метка версии дефолтов). */
   if (S.settings.finance._defaultsVersion !== 2){
@@ -575,7 +575,16 @@ function migrateFinance(){
     if (S.settings.finance.minExecutorPay == null || Number(S.settings.finance.minExecutorPay) === 100) S.settings.finance.minExecutorPay = 200;
     S.settings.finance._defaultsVersion = 3;
   }
-  S.settings.integrations = Object.assign({ payout:{ key:'smartcat', name:'Smartcat', commission:5, enabled:true, perUser:true } }, S.settings.integrations || {});
+  S.settings.integrations = Object.assign({ payout:{ key:'smartcat', name:'Smartcat', commission:4, enabled:true, perUser:true } }, S.settings.integrations || {});
+
+  /* Сборы провайдера: прежний ориентир 5% заменяем на 4% и переносим
+     это в уже сохранённые настройки (только старый дефолт, не ручной выбор). */
+  if (S.settings.finance._defaultsVersion !== 4){
+    if (S.settings.finance.payoutCommission == null || Number(S.settings.finance.payoutCommission) === 5) S.settings.finance.payoutCommission = 4;
+    const ip = S.settings.integrations.payout;
+    if (ip && (ip.commission == null || Number(ip.commission) === 5)) ip.commission = 4;
+    S.settings.finance._defaultsVersion = 4;
+  }
   S.settings.payout = Object.assign({ enabled:true, auto:true, days:[1,15], time:'15:00', tz:'Europe/Moscow', lastRunAt:null, history:[] }, S.settings.payout || {});
   if (!Array.isArray(S.fines)) S.fines = [];
   /* Резерв: старые сохранения его не знали. Не подставляем демо-сумму —

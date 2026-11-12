@@ -5338,14 +5338,12 @@ updatePeopleBulk();
               <select class="input" id="cx-vsvc">${volOptions}</select></div>
           </div>
           <div class="small" id="cx-volume-note" style="margin-top:6px"></div>
-          <div id="cx-char" style="margin-top:6px;display:none">
-            <textarea class="input" id="cx-char-text" rows="2" placeholder="Вставьте текст — посчитаем символы с пробелами и без"></textarea>
-            <div class="row" style="gap:10px;margin-top:4px;flex-wrap:wrap;align-items:center">
-              <span class="small">С пробелами: <b id="cx-char-all">0</b></span>
-              <span class="small">Без пробелов: <b id="cx-char-nospace">0</b></span>
-              <button type="button" class="btn btn--ghost btn--sm" data-char-apply="all">Взять с пробелами</button>
-              <button type="button" class="btn btn--ghost btn--sm" data-char-apply="nospace">Взять без пробелов</button>
-            </div>
+          <div class="field" id="cx-char" style="margin-top:6px;display:none;max-width:220px">
+            <label>Считать символы</label>
+            <select class="input" id="cx-char-mode">
+              <option value="with">С пробелами</option>
+              <option value="without">Без пробелов</option>
+            </select>
           </div>
           <div class="tiny faint" style="margin-top:4px">Символы для стенограмм — 600 знаков в минуту.</div>
         </div>
@@ -5453,7 +5451,8 @@ updatePeopleBulk();
             note.innerHTML = '<span style="color:var(--red)">Для этой услуги выберите другую единицу объёма</span>';
             return;
           }
-          const label = v.unit === 'min' ? 'мин' : v.unit === 'hour' ? 'ч' : v.unit === 'char' ? 'симв.' : 'стр.';
+          const charModeVal = g2('#cx-char-mode') ? g2('#cx-char-mode').value : 'with';
+          const label = v.unit === 'min' ? 'мин' : v.unit === 'hour' ? 'ч' : v.unit === 'char' ? (charModeVal === 'without' ? 'симв. без пробелов' : 'симв. с пробелами') : 'стр.';
           const rateStr = +v.rate.toFixed(6);
           const qtyTxt = Number(v.qty).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
           note.innerHTML = `${qtyTxt} ${label} × ${(+v.rate.toFixed(2)).toLocaleString('ru-RU')} ₽ = <b>${fmtMoney(Math.round(v.qty * v.rate))}</b>`;
@@ -5473,31 +5472,12 @@ updatePeopleBulk();
           if (v.nid && g2('#cx-niche')){ g2('#cx-niche').value = v.nid; paintRush(); paintDiscount(); }
         });
 
-        /* Символы: показываем оба объёма — с пробелами и без — и даём выбрать. */
-        const charCounts = s => {
-          const a = [...String(s || '')];
-          return { all: a.length, noSpace: a.filter(ch => !/\s/.test(ch)).length };
-        };
+        /* Символы: только выбор «с пробелами/без» — вставлять текст не нужно. */
         const paintChar = () => {
           const box = g2('#cx-char'); if (!box) return;
-          const on = g2('#cx-unit').value === 'char';
-          box.style.display = on ? '' : 'none';
-          if (!on) return;
-          const c = charCounts(g2('#cx-char-text').value);
-          const all = g2('#cx-char-all'), no = g2('#cx-char-nospace');
-          if (all) all.textContent = c.all.toLocaleString('ru-RU');
-          if (no) no.textContent = c.noSpace.toLocaleString('ru-RU');
+          box.style.display = g2('#cx-unit').value === 'char' ? '' : 'none';
         };
-        const charText = g2('#cx-char-text');
-        if (charText) charText.addEventListener('input', paintChar);
-        const charBox = g2('#cx-char');
-        if (charBox) charBox.querySelectorAll('[data-char-apply]').forEach(b => b.addEventListener('click', ()=>{
-          const c = charCounts(charText ? charText.value : '');
-          const v = b.dataset.charApply === 'all' ? c.all : c.noSpace;
-          const vol = g2('#cx-volume');
-          if (vol){ vol.value = v; vol.dispatchEvent(new Event('input', { bubbles:true })); }
-          paintChar();
-        }));
+        if (g2('#cx-char-mode')) g2('#cx-char-mode').addEventListener('change', ()=>paintVolume(true));
         g2('#cx-unit').addEventListener('change', paintChar);
         paintChar();
 

@@ -18,7 +18,7 @@ const Finance = (function(){
       /* Ставка за вычитку/доработку после сдачи — по умолчанию 10% от
          суммы исполнителям; настраивается глобально и в самом заказе. */
       reviewFee: clamp(f.reviewFee ?? 10, 0, 50),
-      commission: clamp(f.payoutCommission ?? 5, 0, 50),
+      commission: clamp(f.payoutCommission ?? 4, 0, 50),
       /* Минимумы — настраиваемые, не хардкод: 500 ₽ за заказ и 100 ₽ исполнителю
          по умолчанию; тестовый заказ их обходит. */
       minOrderTotal: Math.round(clamp(f.minOrderTotal ?? 500, 0, 10000000)),

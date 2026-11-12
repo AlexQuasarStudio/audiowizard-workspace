@@ -7377,7 +7377,7 @@ const cm = root.querySelector('.chat-main');
     const [cls,label] = map[st] || map.none;
     return `<span class="badge ${cls}">${label}</span>`;
   }
-  function payoutProvider(){ return Object.assign({ key:'smartcat', name:'Smartcat', commission:5, enabled:true }, ((S.settings.integrations||{}).payout||{})); }
+  function payoutProvider(){ return Object.assign({ key:'smartcat', name:'Smartcat', commission:4, enabled:true }, ((S.settings.integrations||{}).payout||{})); }
   const RESERVE_TYPE_LABELS = {
     manual_in:'Пополнение', manual_out:'Списание', manual:'Корректировка',
     orderLeft:'Остаток заказа', refund:'Возврат', tax:'Налоги',
