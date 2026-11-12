@@ -3697,7 +3697,9 @@ ex.innerHTML = avatarHTML(user(), '');
   function restoreInlineTime(mid){
     const msg = document.querySelector('.msg[data-msg="' + mid + '"]');
     if (!msg) return;
-    if (msg.querySelector('.msg__file, .msg__artifact, .poll')) return;
+    /* Вложения (фото, файл, голосовое) и артефакты держат время в подвале:
+       возвращать его в строку текста нельзя — это и ломало голосовые. */
+    if (msg.querySelector('.msg__img, .msg__file, .vn, .msg__artifact, .poll')) return;
     const foot = msg.querySelector('.msg__foot');
     const time = foot && foot.querySelector('.time');
     const txt = msg.querySelector('.txt');
