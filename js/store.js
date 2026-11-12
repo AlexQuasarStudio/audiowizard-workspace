@@ -123,10 +123,20 @@ async function pwMigrateAll(){
   if (n) saveState();
   return n;
 }
+/* Часовой пояс текущего пользователя: город из профиля, по умолчанию Москва.
+   Все даты и дедлайны показываем в нём, а не в часовом поясе браузера. */
+function currentTz(){
+  try {
+    const u = (typeof S !== 'undefined' && S && Array.isArray(S.users)) ? S.users.find(x => x.id === S.currentUserId) : null;
+    const tz = (u && u.tz) || 'Europe/Moscow';
+    new Intl.DateTimeFormat('en', { timeZone: tz }).format(0);
+    return tz;
+  } catch(e){ return 'Europe/Moscow'; }
+}
 const fmtNum = n => new Intl.NumberFormat('ru-RU').format(n||0);
-const fmtDate = t => t ? new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'short',year:'numeric'}).format(new Date(t)) : '—';
-const fmtDT = t => t ? new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(t)) : '—';
-const fmtTime = t => new Intl.DateTimeFormat('ru-RU',{hour:'2-digit',minute:'2-digit'}).format(new Date(t));
+const fmtDate = t => t ? new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'short',year:'numeric',timeZone:currentTz()}).format(new Date(t)) : '—';
+const fmtDT = t => t ? new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:currentTz()}).format(new Date(t)) : '—';
+const fmtTime = t => new Intl.DateTimeFormat('ru-RU',{hour:'2-digit',minute:'2-digit',timeZone:currentTz()}).format(new Date(t));
 const fmtDur = s => { s = Math.round(s||0); const m = Math.floor(s/60); return m >= 60 ? `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}:${String(s%60).padStart(2,'0')}` : `${m}:${String(s%60).padStart(2,'0')}`; };
 const timeAgo = t => {
   const d = Date.now() - t;
@@ -240,6 +250,14 @@ function minExecPriceFor(nid){
 function deadlineDaysFor(nid){
   const v = (((S || {}).calcSettings || {}).deadlineDays || {})[nid];
   return Math.max(0, Math.round(Number(v) || 0));
+}
+function dailyNormFor(nid){
+  const v = (((S || {}).calcSettings || {}).dailyNorm || {})[nid];
+  return Math.max(0, Number(v) || 0);
+}
+function clientBufferPct(){
+  const v = (((S || {}).calcSettings || {}).clientBufferPct);
+  return Math.max(0, Math.min(200, Number(v == null ? 30 : v) || 0));
 }
 
 /* ---------- Сид-данные ---------- */

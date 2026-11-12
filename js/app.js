@@ -10,6 +10,18 @@ const APP = (() => {
   /* Скелетон НЕ показывается автоматически — только по требованию в тяжёлых/асинхронных
      операциях (showSkeleton). Длительность по умолчанию — для двойного клика по меню */
   const SKELETON_MS = 460;
+  /* Города профиля: город задаёт часовой пояс дедлайнов. По умолчанию Москва. */
+  const TZ_CITIES = [
+    ['Москва','Europe/Moscow'], ['Санкт-Петербург','Europe/Moscow'], ['Калининград','Europe/Kaliningrad'],
+    ['Самара','Europe/Samara'], ['Екатеринбург','Asia/Yekaterinburg'], ['Омск','Asia/Omsk'],
+    ['Новосибирск','Asia/Novosibirsk'], ['Красноярск','Asia/Krasnoyarsk'], ['Иркутск','Asia/Irkutsk'],
+    ['Якутск','Asia/Yakutsk'], ['Владивосток','Asia/Vladivostok'], ['Магадан','Asia/Magadan'],
+    ['Петропавловск-Камчатский','Asia/Kamchatka'], ['Минск','Europe/Minsk'], ['Алматы','Asia/Almaty'],
+    ['Тбилиси','Asia/Tbilisi'], ['Ереван','Asia/Yerevan'], ['Баку','Asia/Baku'], ['Ташкент','Asia/Tashkent'],
+    ['Бишкек','Asia/Bishkek'], ['Дубай','Asia/Dubai'], ['Стамбул','Europe/Istanbul'],
+    ['Лондон','Europe/London'], ['Берлин','Europe/Berlin'], ['Париж','Europe/Paris'],
+    ['Нью-Йорк','America/New_York'], ['Лос-Анджелес','America/Los_Angeles']
+  ];
 
   /* Эталон NAV для сброса порядка меню */
   const NAV_DEFAULT = [
@@ -2021,6 +2033,10 @@ ex.innerHTML = avatarHTML(user(), '');
         <div class="stack" style="gap:12px;margin-top:14px">
           <div class="field"><label>Как к вам обращаться</label><input class="input" id="ob-name" value="${esc(u2.full_name)}"></div>
           <div class="field"><label>О себе</label><textarea class="input" id="ob-about" placeholder="Пара слов для коллег" rows="2">${esc(u2.about||'')}</textarea></div>
+          <div class="field"><label>Город и часовой пояс</label>
+            <select class="input" id="ob-city">${TZ_CITIES.map(([c,z])=>`<option value="${c}|${z}" ${((u2.city||'Москва')+'|'+(u2.tz||'Europe/Moscow'))===c+'|'+z?'selected':''}>${esc(c)} · ${esc(z)}</option>`).join('')}</select>
+            <div class="tiny faint" style="margin-top:6px">Время дедлайнов будет в вашем часовом поясе. По умолчанию — Москва.</div>
+          </div>
           <div class="row" style="gap:14px;align-items:center">
             <div style="position:relative;width:64px;height:64px">
               <span id="ob-avatar-preview" class="avatar avatar--lg" style="width:64px;height:64px">${initials(u2.full_name)}</span>
@@ -2073,6 +2089,8 @@ ex.innerHTML = avatarHTML(user(), '');
           const name = m2.querySelector('#ob-name').value.trim();
           if (name) u2.full_name = name;
           u2.about = m2.querySelector('#ob-about').value.trim();
+          const obCity = m2.querySelector('#ob-city');
+          if (obCity){ const [city,tz] = String(obCity.value || '').split('|'); if (city && tz){ u2.city = city; u2.tz = tz; } }
           if (avatarData) u2.avatar = avatarData;
           u2.tour_completed = true;
           logAudit('Онбординг: профиль настроен', 'Профиль');
@@ -2203,7 +2221,7 @@ ex.innerHTML = avatarHTML(user(), '');
       <div class="dash-hero" data-tour="hero">
         <div style="flex:1;position:relative;z-index:1">
           <h2>${__t('dash.greeting', greet)}, ${esc(u.full_name.split(' ')[0])}!</h2>
-          <p class="muted small">${__t('dash.subtitle', isExec?'Ваши заказы и заработок':isClient?'Ваши заказы и проекты':isAdmin?'Рабочая панель':'Ваши заказы, клиенты и команда')} · ${fmtDate(Date.now())} · <span class="dash-clock">${__t('dash.clock', nowTxt)}</span></p>
+          <p class="muted small">${__t('dash.subtitle', isExec?'Ваши заказы и заработок':isClient?'Ваши заказы и проекты':isAdmin?'Рабочая панель':'Ваши заказы, клиенты и команда')} · ${fmtDate(Date.now())} · ${esc(u.city || 'Москва')} · <span class="dash-clock">${__t('dash.clock', nowTxt)}</span></p>
         </div>
         <div class="chart-wrap chart-wrap--hero" style="position:relative;z-index:1">
           <svg class="spark" width="220" height="70" viewBox="0 0 220 70">
@@ -2390,7 +2408,7 @@ ex.innerHTML = avatarHTML(user(), '');
     const clockTick = () => {
       const el = document.querySelector('.dash-clock');
       if (el && document.body.contains(el)){
-        el.textContent = new Date().toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
+        el.textContent = new Date().toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit', timeZone: currentTz() });
       }
       const now = new Date();
       const msToNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds() + 20;
@@ -7190,8 +7208,33 @@ const cm = root.querySelector('.chat-main');
       $$('[data-delspec]', root).forEach(b=>b.onclick = ()=>{ S.specializations = S.specializations.filter(s=>s.id!==b.dataset.delspec); saveState(); render(); });
       $$('[data-del]', root).forEach(b=>b.onclick = async ()=>{
         const n = S.niches.find(x=>x.id===b.dataset.del);
+        if (!n) return;
         const ok = await confirmModal({ title:`Удалить нишу «${n.name}»?`, danger:true, okText:'Удалить', text:`Все связанные специализации (${S.specializations.filter(s=>s.nish_id===n.id).length}) будут удалены каскадом.` });
-        if (ok){ S.specializations = S.specializations.filter(s=>s.nish_id!==n.id); S.niches = S.niches.filter(x=>x.id!==n.id); saveState(); render(); toast('Ниша удалена','ok'); }
+        if (!ok) return;
+        b.disabled = true;
+        const card = b.closest('.card');
+        const commit = ()=>{
+          S.specializations = S.specializations.filter(s=>s.nish_id!==n.id);
+          S.niches = S.niches.filter(x=>x.id!==n.id);
+          saveState(); render(); toast('Ниша удалена','ok');
+        };
+        const reduce = S.settings.noAnim || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        if (!card || reduce){ commit(); return; }
+        /* Удаление так же плавно, как добавление: карточка гаснет и складывается,
+           и только потом список перерисовывается. */
+        card.style.overflow = 'hidden';
+        card.style.maxHeight = card.offsetHeight + 'px';
+        card.style.transition = 'opacity .18s var(--ease), transform .18s var(--ease), max-height .24s var(--ease), margin .24s var(--ease), padding .24s var(--ease)';
+        requestAnimationFrame(()=>{
+          card.style.opacity = '0';
+          card.style.transform = 'translateY(-6px)';
+          card.style.maxHeight = '0px';
+          card.style.marginTop = '0px';
+          card.style.marginBottom = '0px';
+          card.style.paddingTop = '0px';
+          card.style.paddingBottom = '0px';
+        });
+        setTimeout(commit, 260);
       });
     };
     render();
@@ -7593,8 +7636,8 @@ const cm = root.querySelector('.chat-main');
       <div class="cols-2 grid" style="gap:12px">
         <div class="field"><label>Дни месяца</label><input class="input" id="po-days" value="${p.days.join(', ')}" placeholder="1, 15"></div>
         <div class="field"><label>Время (МСК)</label><input class="input" id="po-time" type="time" value="${esc(p.time)}"></div>
-        <div class="field"><label>Маржа админа, %</label><input class="input" id="po-admin" type="number" min="0" max="100" step="1" value="${cfg.adminMargin}"></div>
-        <div class="field"><label>Доля менеджера, %</label><input class="input" id="po-mgr" type="number" min="0" max="100" step="1" value="${cfg.managerFee}"></div>
+        <div class="field"><label title="Доля админа от суммы каждого заказа">Доля админа в заказе, %</label><input class="input" id="po-admin" type="number" min="0" max="100" step="1" value="${cfg.adminMargin}"></div>
+        <div class="field"><label title="Доля менеджера по умолчанию; в заказе можно изменить">Доля менеджера по умолчанию, %</label><input class="input" id="po-mgr" type="number" min="0" max="100" step="1" value="${cfg.managerFee}"></div>
         <div class="field"><label>Мин. сумма заказа, ₽</label><input class="input" id="po-min-total" type="number" min="0" step="50" value="${cfg.minOrderTotal}"></div>
         <div class="field"><label>Мин. оплата исполнителя, ₽</label><input class="input" id="po-min-exec" type="number" min="0" step="10" value="${cfg.minExecutorPay}"></div>
         <div class="field"><label>Автоматически</label>
@@ -8134,6 +8177,10 @@ const cm = root.querySelector('.chat-main');
           <div class="field"><label>Email</label><input class="input" id="pf-email" value="${esc(u2.email)}"></div>
           <div class="field"><label>Телефон</label><input class="input" id="pf-phone" value="${esc(u2.phone)}"></div>
         </div>
+        <div class="field" style="margin-top:12px"><label>Город (часовой пояс)</label>
+          <select class="input" id="pf-city">${TZ_CITIES.map(([c,z])=>`<option value="${c}|${z}" ${((u2.city||'Москва')+'|'+(u2.tz||'Europe/Moscow'))===c+'|'+z?'selected':''}>${esc(c)} · ${esc(z)}</option>`).join('')}</select>
+          <div class="tiny faint" style="margin-top:4px">Время дедлайнов — в вашем часовом поясе. По умолчанию — Москва.</div>
+        </div>
         <div class="field" style="margin-top:12px"><label>О себе</label><textarea class="input" id="pf-about">${esc(u2.about||'')}</textarea></div>
         <div class="row row--between" style="margin-top:12px"><b class="small">Рабочий статус</b>
           <div class="seg" id="pf-ws"><button data-w="working" class="${u2.ext&&u2.ext.workStatus==='not_working'?'':'on'}">Работаю</button><button data-w="not_working" class="${u2.ext&&u2.ext.workStatus==='not_working'?'on':''}">Не работаю</button></div></div>
@@ -8182,10 +8229,16 @@ const cm = root.querySelector('.chat-main');
       return `<div class="card card-pad" style="margin-bottom:12px"><h3 style="margin-bottom:6px">Гонорары менеджеров</h3>
         <p class="small muted" style="margin-bottom:10px">Потолок гонорара — процент от суммы заказа, выше которого менеджер не поднимет свой гонорар. Меняет только администратор.</p>
         <div class="cols-2 grid" style="gap:13px">
-          <div class="field"><label>Менеджер, % от суммы</label><input class="input" id="fee-manager" type="number" min="0" max="100" value="${(S.settings.feeCeilings||{}).manager ?? 25}"></div>
-          <div class="field"><label>Топ-менеджер, % от суммы</label><input class="input" id="fee-top" type="number" min="0" max="100" value="${(S.settings.feeCeilings||{}).top_manager ?? 25}"></div>
+          <div class="field"><label>Потолок гонорара менеджера, % от суммы</label><input class="input" id="fee-manager" type="number" min="0" max="100" value="${(S.settings.feeCeilings||{}).manager ?? 25}"></div>
+          <div class="field"><label>Потолок гонорара топ-менеджера, % от суммы</label><input class="input" id="fee-top" type="number" min="0" max="100" value="${(S.settings.feeCeilings||{}).top_manager ?? 25}"></div>
         </div>
         <button class="btn btn--primary btn--sm" id="fee-save" style="margin-top:10px">Сохранить потолки</button>
+      </div><div class="card card-pad" style="margin-bottom:12px"><h3>Сроки</h3>
+        <p class="small muted" style="margin-bottom:10px">Норма объёма в сутки: срок исполнителя = объём ÷ норма. Клиенту показывается срок с запасом (+30% по умолчанию).</p>
+        <div class="cols-2 grid" style="gap:12px">
+          <div class="field"><label>Запас клиенту, %</label><input class="input" id="calc-buffer" type="number" min="0" max="200" step="1" value="${clientBufferPct()}"></div>
+          <div class="field"><label>Норма для всех ниш, ед./сутки</label><input class="input" id="calc-norm-all" type="number" min="0" step="0.1" placeholder="все"></div>
+        </div>
       </div><div class="card card-pad"><h3 style="margin-bottom:6px">Услуги калькулятора</h3>
         <p class="small muted" style="margin-bottom:10px">Перечень услуг, стоимость и маржа платформы — по нишам. Настраивается администратором — владельцем платформы. Калькулятор принимает ввод с клавиатуры.</p>
         <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:10px">
@@ -8199,7 +8252,7 @@ const cm = root.querySelector('.chat-main');
           <div class="row row--between"><b class="small">${esc(n.name)}</b>
             <button class="btn btn--ghost btn--sm" data-add="${n.id}">${icon('plus')} Услуга</button></div>
           <div class="tbl-wrap" style="margin-top:8px;border:0"><table class="tbl" style="min-width:0">
-            <thead><tr><th>Услуга</th><th>Цена, ₽</th><th>Единица</th><th>Маржа, %<input class="input" data-margin-all="${n.id}" type="number" min="0" max="90" placeholder="все" style="width:58px;padding:3px 6px;font-size:11px;margin-left:6px" title="Выставить маржу всем услугам группы"></th><th></th></tr></thead>
+            <thead><tr><th>Услуга</th><th>Цена, ₽</th><th>Единица</th><th>Маржа в цене, %<input class="input" data-margin-all="${n.id}" type="number" min="0" max="90" placeholder="все" style="width:58px;padding:3px 6px;font-size:11px;margin-left:6px" title="Выставить маржу всем услугам группы"></th><th></th></tr></thead>
             <tbody data-niche="${n.id}">${rows(n.id)}</tbody>
           </table></div>
           <div class="row" style="gap:10px;margin-top:10px;flex-wrap:wrap;align-items:flex-end">
@@ -8207,6 +8260,8 @@ const cm = root.querySelector('.chat-main');
               <input class="input" data-min-price="${n.id}" type="number" min="0" step="50" value="${minPriceFor(n.id)}"></div>
             <div class="field" style="max-width:200px"><label>Мин. оплата исполнителю, ₽</label>
               <input class="input" data-min-exec="${n.id}" type="number" min="0" step="10" value="${minExecPriceFor(n.id)}"></div>
+            <div class="field" style="max-width:190px"><label>Норма объёма в сутки</label>
+              <input class="input" data-daily-norm="${n.id}" type="number" min="0" step="0.1" value="${dailyNormFor(n.id) || ''}" placeholder="ед./сутки"></div>
             <div class="field" style="max-width:150px"><label>Срок, дней</label>
               <input class="input" data-deadline-days="${n.id}" type="number" min="0" step="1" value="${deadlineDaysFor(n.id) || ''}" placeholder="авто"></div>
             <div class="field" style="max-width:210px"><label>Надбавка за срочность, %</label>
@@ -8889,6 +8944,10 @@ const cm = root.querySelector('.chat-main');
         inp.addEventListener('change', applyAll);
         inp.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); applyAll(); } });
       });
+      const normAll = el.querySelector('#calc-norm-all');
+      if (normAll) normAll.addEventListener('input', ()=>{
+        el.querySelectorAll('[data-daily-norm]').forEach(inp => { inp.value = normAll.value; });
+      });
       const save = ()=>{
         el.querySelectorAll('tbody[data-niche]').forEach(tb=>{
           const nid = tb.dataset.niche;
@@ -8908,18 +8967,21 @@ const cm = root.querySelector('.chat-main');
             if (!name) return;
             extras.push({ id: tr.dataset.eid, name, price: Math.max(0, +gf('price').value || 0), pct: Math.max(0, Math.min(200, +((gf('pct')||{}).value) || 0)), unit: gf('unit').value.trim(), active: !!gf('active').checked });
           });
-          S.calcSettings = S.calcSettings || { rushPct:{}, extras:{}, minPrice:{}, minExecPrice:{}, deadlineDays:{} };
+          S.calcSettings = S.calcSettings || { rushPct:{}, extras:{}, minPrice:{}, minExecPrice:{}, deadlineDays:{}, dailyNorm:{}, clientBufferPct:30 };
           S.calcSettings.extras[nid] = extras;
           S.calcSettings.minPrice = S.calcSettings.minPrice || {};
           S.calcSettings.minExecPrice = S.calcSettings.minExecPrice || {};
           S.calcSettings.deadlineDays = S.calcSettings.deadlineDays || {};
+          S.calcSettings.dailyNorm = S.calcSettings.dailyNorm || {};
           const num = sel => Math.max(0, Math.round(+((el.querySelector(sel) || {}).value) || 0));
           S.calcSettings.minPrice[nid] = num(`[data-min-price="${nid}"]`);
           S.calcSettings.minExecPrice[nid] = num(`[data-min-exec="${nid}"]`);
           S.calcSettings.deadlineDays[nid] = num(`[data-deadline-days="${nid}"]`);
+          S.calcSettings.dailyNorm[nid] = Math.max(0, Number((el.querySelector(`[data-daily-norm="${nid}"]`)||{}).value) || 0);
           const rp = el.querySelector(`[data-rush-pct="${nid}"]`);
           S.calcSettings.rushPct[nid] = Math.max(0, Math.min(200, +((rp || {}).value) || 0));
         });
+        S.calcSettings.clientBufferPct = Math.max(0, Math.min(200, Number((el.querySelector('#calc-buffer')||{}).value) || 0));
         logAudit('Услуги калькулятора обновлены', 'Настройки');
         saveState();
         toast('Услуги и настройки срочности сохранены', 'ok');
@@ -9199,6 +9261,15 @@ const cm = root.querySelector('.chat-main');
             pfCommit(key, ()=>APP && APP.render && requestAnimationFrame(APP.render));
             toast('Профиль сохранён','ok');
           });
+        });
+        /* Город определяет часовой пояс, в котором показываются дедлайны. */
+        const pfCity = $('#pf-city', el);
+        if (pfCity) pfCity.addEventListener('change', ()=>{
+          const [city,tz] = String(pfCity.value || '').split('|');
+          if (!city || !tz) return;
+          u.city = city; u.tz = tz;
+          pfCommit('город '+city, ()=>APP && APP.render && requestAnimationFrame(APP.render));
+          toast('Город сохранён: '+city,'ok');
         });
         /* Логин меняем аккуратно: только a-z, 0-9, точка, дефис, подчёркивание;
            проверяем занятость и не даём сохранить пустое/короткое. */

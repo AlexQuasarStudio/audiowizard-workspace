@@ -134,7 +134,7 @@ const CRM = (() => {
       else if (e.key === 'Enter'){ e.preventDefault(); finish(true); }
     });
     inp.addEventListener('blur', ()=>finish(true));
-    if (type === 'select') inp.addEventListener('change', ()=>finish(true));
+    if (type === 'select' || type === 'date' || type === 'datetime-local') inp.addEventListener('change', ()=>finish(true));
     __crmInline = { cancel: ()=>finish(false), el };
   }
   /* Подсказки для полей новой строки заказа: клиенты и исполнители —
@@ -1000,6 +1000,9 @@ const CRM = (() => {
          Правки ложатся в localStorage так же, как у обычных записей. */
       if (!o) return;
       const f = el.dataset.inline;
+      const pad2 = n => String(n).padStart(2, '0');
+      const dateInput = ts => { if (!ts) return ''; const d = new Date(ts); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; };
+      const dateTimeInput = ts => { if (!ts) return ''; const d = new Date(ts); return `${dateInput(ts)}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
       const done = msg => { saveState(); try { logAudit(msg, 'Заказы'); } catch(e){} inlineRefresh(() => render(false)); };
       if (f === 'client'){
         inlinePicker(el, {
@@ -1069,20 +1072,20 @@ const CRM = (() => {
         return;
       }
       if (f === 'start'){
-        inlineField(el, { value:dateText(o.start_date || o.order_date), wide:true, placeholder:'дд.мм.гггг', onSave:v => {
-          if (!v.trim()) return;
-          const t = parseDateText(v, o.start_date || o.order_date);
-          if (t == null){ toast('Дата в формате дд.мм.гггг', 'err'); return; }
+        inlineField(el, { type:'date', value:dateInput(o.start_date || o.order_date), wide:true, onSave:v => {
+          if (!v) return;
+          const t = new Date(v + 'T00:00:00').getTime();
+          if (!isFinite(t)){ toast('Некорректная дата', 'err'); return; }
           o.start_date = t; if (!o.order_date) o.order_date = t;
           done('Начало заказа ' + o.order_id + ' изменено');
         }});
         return;
       }
       if (f === 'deadline'){
-        inlineField(el, { value:dateText(o.deadline), wide:true, placeholder:'дд.мм.гггг', onSave:v => {
-          if (!v.trim()){ o.deadline = null; done('Дедлайн заказа ' + o.order_id + ' снят'); return; }
-          const t = parseDateText(v, o.deadline);
-          if (t == null){ toast('Дата в формате дд.мм.гггг', 'err'); return; }
+        inlineField(el, { type:'datetime-local', value:dateTimeInput(o.deadline), wide:true, onSave:v => {
+          if (!v){ o.deadline = null; done('Дедлайн заказа ' + o.order_id + ' снят'); return; }
+          const t = new Date(v).getTime();
+          if (!isFinite(t)){ toast('Некорректные дата и время', 'err'); return; }
           o.deadline = t; done('Дедлайн заказа ' + o.order_id + ' изменён');
         }});
         return;
@@ -1652,7 +1655,7 @@ const CRM = (() => {
     const med = median(vals);
     const fixedDays = deadlineDaysFor(nishId);
     const base = fixedDays > 0 ? fixedDays : (med ? Math.max(1, Math.ceil(med)) : (DEADLINE_FALLBACK[nishId] || 4));
-    const buffer = Math.max(1, Math.ceil(base * 0.1));
+    const buffer = Math.max(0, Math.ceil(base * clientBufferPct() / 100));
     return { days: base + buffer, base, buffer, sample: vals.length, source: fixedDays > 0 ? 'настройке категории' : (vals.length ? source : 'типовому сроку ниши') };
   }
   /* Кого предложить: опыт с этим клиентом, профильная специализация, работа
@@ -1737,7 +1740,7 @@ const CRM = (() => {
           <div class="cols-2 grid" style="gap:13px">
             <div class="field"><label>Ниша *</label><select class="input" id="of-niche">
               <option value="">— выбрать —</option>${S.niches.map(n=>`<option value="${n.id}" ${o.nish_id===n.id?'selected':''}>${esc(n.name)}</option>`).join('')}</select></div>
-            <div class="field"><label>Доля менеджера, %</label><input type="number" class="input" id="of-mgrfee" min="0" max="100" step="1" value="${o.managerFee != null ? o.managerFee : (window.Finance ? Finance.cfg().managerFee : 10)}"></div>
+            <div class="field"><label>Доля менеджера по заказу, %</label><input type="number" class="input" id="of-mgrfee" min="0" max="100" step="1" value="${o.managerFee != null ? o.managerFee : (window.Finance ? Finance.cfg().managerFee : 10)}"></div>
             <div class="field"><label>Статус</label><select class="input" id="of-status">
               ${Object.entries(STATUS_META).map(([st,mt])=>`<option value="${st}" ${o.status===st?'selected':''}>${mt.label}</option>`).join('')}</select></div>
           </div>
@@ -5360,6 +5363,7 @@ updatePeopleBulk();
               <input class="input" id="cx-deadline" type="datetime-local" value="${dlValue}"></div>
           </div>
           <div class="small" id="cx-rush" style="margin-top:8px"></div>
+          <div class="small" id="cx-norm-deadline" style="margin-top:6px"></div>
         </div>
         <div class="small faint" style="margin-top:12px">Дополнительные услуги и опции. Если объём уже указан выше, основную услугу здесь не дублируйте.</div>
         <div class="field" style="margin-top:10px"><label>Поиск услуги</label><input class="input" id="cx-svc-search" placeholder="Название, единица или ниша" autocomplete="off" spellcheck="false"></div>
@@ -5439,6 +5443,25 @@ updatePeopleBulk();
           }
           return { qty, unit, nid, s, rate };
         };
+        /* Срок по суточной норме объёма: исполнителю — объём ÷ норма,
+           клиенту — тот же срок плюс настраиваемый запас (по умолчанию 30%). */
+        const paintNormDeadline = () => {
+          const box = g2('#cx-norm-deadline'); if (!box) return;
+          const v = volState();
+          const nid = g2('#cx-niche') ? g2('#cx-niche').value : '';
+          const norm = dailyNormFor(nid);
+          if (!v.qty || !norm){ box.innerHTML = '<span class="faint">Норма объёма в сутки не задана — срок можно указать вручную.</span>'; return; }
+          const exec = v.qty / norm;
+          const pct = clientBufferPct();
+          const client = exec * (1 + pct / 100);
+          const fmtD = n => n.toLocaleString('ru-RU', { maximumFractionDigits: 1 });
+          box.innerHTML = `Срок исполнителя: <b>${fmtD(exec)} дн.</b> · клиенту с запасом ${pct}%: <b>${fmtD(client)} дн.</b>`;
+          const days = g2('#cx-days');
+          if (days && !days.value){
+            days.value = String(Math.max(1, Math.ceil(client)));
+            days.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        };
         const paintVolume = (auto=true) => {
           const v = volState();
           const note = g2('#cx-volume-note');
@@ -5460,6 +5483,7 @@ updatePeopleBulk();
             g2('#cx-in').value = `${v.qty} × ${rateStr}`;
             upd();
           }
+          paintNormDeadline();
         };
         ['#cx-volume','#cx-unit','#cx-vsvc'].forEach(sel => {
           const el = g2(sel);
@@ -5614,7 +5638,7 @@ updatePeopleBulk();
         paintDiscount();
         upd();
         paintVolume(false);
-        g2('#cx-niche').addEventListener('change', ()=>{ paintRush(); paintDiscount(); upd(); });
+        g2('#cx-niche').addEventListener('change', ()=>{ paintRush(); paintNormDeadline(); paintDiscount(); upd(); });
         /* Срок можно задать в днях — точная дата подставляется сама;
            ручная дата так же пересчитывает дни. */
         const localDT = ts => new Date(ts - new Date(ts).getTimezoneOffset()*60000).toISOString().slice(0,16);
