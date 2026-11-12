@@ -848,7 +848,7 @@ const CRM = (() => {
               <button data-view="table" class="${cardsView?'':'on'}" title="Таблица" aria-label="Таблица">${icon('table','ico-sm')}</button>
               <button data-view="cards" class="${cardsView?'on':''}" title="Карточки" aria-label="Карточки">${icon('cards-view','ico-sm')}</button>
             </div>
-            <button class="btn btn--ghost" id="btn-tools">${icon('import')} Импорт / экспорт</button>
+            ${staff?`<button class="btn btn--ghost" id="btn-tools">${icon('import')} Импорт / экспорт</button>`:''}
             ${staff?`<button class="btn btn--soft" id="btn-inline-order" title="Добавить ${cardsView?'карточку':'строку'} прямо в список">${icon('plus')} <span class="inline-add-label">${cardsView?'Карточка':'Строка'}</span></button>`:''}
             ${staff?`<button class="btn btn--primary" id="btn-new-order">${icon('plus')} Новый заказ</button>`:''}
           </div>

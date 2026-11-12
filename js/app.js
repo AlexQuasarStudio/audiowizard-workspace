@@ -844,7 +844,7 @@ const QUICK_BY_ROLE = {
   top_manager: ['order','calc','client','executor','-','chats','transcribe','texts','translate','-','invite','report'],
   manager:     ['order','calc','client','-','chats','texts','kanban','-','invite','report'],
   client:      ['order','-','chats','ticket','report'],
-  executor:    ['myorders','-','chats','transcribe','translate','ticket','invite']
+  executor:    ['myorders','-','chats','transcribe','translate','report','invite']
 };
 
   function userMenu(anchor){
