@@ -3709,6 +3709,35 @@ ex.innerHTML = avatarHTML(user(), '');
     const el = document.querySelector('.msg[data-msg="' + mid + '"] .msg__bubble');
     return el ? el.offsetHeight : 0;
   }
+  /* Ширина пузыря при реакции не должна меняться — только высота.
+     Запоминаем ширину до изменения и фиксируем её, пока есть реакции. */
+  function bubbleWidthOf(mid){
+    const el = document.querySelector('.msg[data-msg="' + mid + '"] .msg__bubble');
+    return el ? el.offsetWidth : 0;
+  }
+  function lockBubbleWidth(mid, width){
+    if (!width) return;
+    const el = document.querySelector('.msg[data-msg="' + mid + '"] .msg__bubble');
+    if (el){
+      el.style.width = width + 'px';
+      el.style.minWidth = width + 'px';
+      el.style.maxWidth = width + 'px';
+      el.style.flex = 'none';
+    }
+  }
+  function unlockBubbleWidth(mid){
+    const el = document.querySelector('.msg[data-msg="' + mid + '"] .msg__bubble');
+    if (el){
+      el.style.width = '';
+      el.style.minWidth = '';
+      el.style.maxWidth = '';
+      el.style.flex = '';
+    }
+  }
+  function msgHasReactions(mid){
+    const el = document.querySelector('.msg[data-msg="' + mid + '"]');
+    return !!(el && el.querySelector('.react-pill'));
+  }
   /* После снятия последней реакции у короткого сообщения время должно
      вернуться в строку текста, как при обычном рендере. Точечно, без
      перерисовки ленты: иначе элементы справа остаются в отдельной строке. */
@@ -3718,6 +3747,7 @@ ex.innerHTML = avatarHTML(user(), '');
     /* Вложения (фото, файл, голосовое) и артефакты держат время в подвале:
        возвращать его в строку текста нельзя — это и ломало голосовые. */
     if (msg.querySelector('.msg__img, .msg__file, .vn, .msg__artifact, .poll')) return;
+    if (msg.querySelector('.react-pill')) return;
     const foot = msg.querySelector('.msg__foot');
     const time = foot && foot.querySelector('.time');
     const txt = msg.querySelector('.txt');
@@ -5979,6 +6009,7 @@ const cm = root.querySelector('.chat-main');
         if (rBtn){
           const [mid, em] = rBtn.dataset.react.split('|');
           const prevH = bubbleHeightOf(mid);
+          const prevW = bubbleWidthOf(mid);
           const m = S.messages.find(x=>x.id===mid);
           m.reactions = m.reactions||{};
           m.reactions[em] = m.reactions[em]||[];
@@ -6000,10 +6031,12 @@ const cm = root.querySelector('.chat-main');
               if (row && !row.querySelector('.react-pill')) row.remove();
               restoreInlineTime(mid);
               animateBubbleHeight(mid, prevH);
+              if (!msgHasReactions(mid)) unlockBubbleWidth(mid);
             }, 190);
           } else {
             patchReactionPill(rBtn, ids, em);
             rBtn.classList.toggle('on', ids.includes(u.id));
+            lockBubbleWidth(mid, prevW);
           }
           return;
         }
@@ -6095,6 +6128,7 @@ const cm = root.querySelector('.chat-main');
         if (!m) return;
         const toggleReaction = (em)=>{
           const prevH = bubbleHeightOf(m.id);
+          const prevW = bubbleWidthOf(m.id);
           m.reactions = m.reactions || {};
           m.reactions[em] = m.reactions[em] || [];
           const idx = m.reactions[em].indexOf(u.id);
@@ -6105,16 +6139,19 @@ const cm = root.querySelector('.chat-main');
           const pill = box.querySelector('.react-pill[data-react="' + m.id + '|' + em + '"]');
           const ids = m.reactions[em] || [];
           if (!ids.length){
-            if (pill){ pill.classList.add('react-fade'); setTimeout(()=>{ renderChat(); animateBubbleHeight(m.id, prevH); }, 190); }
-            else { renderChat(); animateBubbleHeight(m.id, prevH); }
+            const done = ()=>{ renderChat(); animateBubbleHeight(m.id, prevH); if (!msgHasReactions(m.id)) unlockBubbleWidth(m.id); };
+            if (pill){ pill.classList.add('react-fade'); setTimeout(done, 190); }
+            else done();
             return;
           }
           if (pill){
             patchReactionPill(pill, ids, em);
             pill.classList.toggle('on', ids.includes(u.id));
+            lockBubbleWidth(m.id, prevW);
           } else {
             renderChat();
             animateBubbleHeight(m.id, prevH);
+            lockBubbleWidth(m.id, prevW);
             requestAnimationFrame(()=>{
               const np = root.querySelector('.react-pill[data-react="' + m.id + '|' + em + '"]')
                 || document.querySelector('.react-pill[data-react="' + m.id + '|' + em + '"]');
@@ -6268,6 +6305,7 @@ const cm = root.querySelector('.chat-main');
       const mm = S.messages.find(x=>x.id===el2.dataset.msg);
       if (!mm) return;
       const prevH = bubbleHeightOf(mm.id);
+      const prevW = bubbleWidthOf(mm.id);
       mm.reactions = mm.reactions || {};
       const arr = mm.reactions['👍'] = mm.reactions['👍'] || [];
       const i = arr.indexOf(u.id);
@@ -6279,6 +6317,7 @@ const cm = root.querySelector('.chat-main');
       if (arr.length && pill){
         patchReactionPill(pill, arr, '👍');
         pill.classList.toggle('on', arr.includes(u.id));
+        lockBubbleWidth(mm.id, prevW);
       } else if (!arr.length && pill){
         pill.classList.add('react-fade');
         el2.classList.add('msg--reacting');
@@ -6288,16 +6327,19 @@ const cm = root.querySelector('.chat-main');
           if (row && !row.querySelector('.react-pill')) row.remove();
           restoreInlineTime(mm.id);
           animateBubbleHeight(mm.id, prevH);
+          if (!msgHasReactions(mm.id)) unlockBubbleWidth(mm.id);
         }, 190);
       } else if (arr.length){
         el2.classList.add('msg--reacting');
         rerenderKeepScroll();
         animateBubbleHeight(mm.id, prevH);
+        lockBubbleWidth(mm.id, prevW);
         const np = root.querySelector('.msg[data-msg="' + mm.id + '"] .react-pill[data-react="' + mm.id + '|👍"]')
           || document.querySelector('.msg[data-msg="' + mm.id + '"] .react-pill[data-react="' + mm.id + '|👍"]');
         if (np) np.classList.add('react-pill--in');
       } else {
         rerenderKeepScroll();
+        if (!msgHasReactions(mm.id)) unlockBubbleWidth(mm.id);
       }
       setTimeout(()=>el2.classList.remove('msg--reacting'), 1300);
     };
