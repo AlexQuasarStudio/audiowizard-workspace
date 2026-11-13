@@ -7651,6 +7651,7 @@ const cm = root.querySelector('.chat-main');
       (S.orders||[]).forEach(o => { const d = Finance.debts(o); if (d.byUser[myId]) mine.push({o, amount:d.byUser[myId]}); });
       return mine.reduce((a,x)=>a+x.amount,0);
     })();
+    const myNet = Math.round(myDebt * (1 - Finance.cfg().commission / 100));
 
     return `
     ${reserveHtml}
@@ -7684,11 +7685,14 @@ const cm = root.querySelector('.chat-main');
 
     <div class="card card-pad">
       <h3 style="margin-bottom:8px">К выплате ${staff?'сейчас':''}</h3>
+      ${staff?`
       <div class="row row--between" style="margin-bottom:8px"><span class="small faint">Итого</span><b>${fmtMoney(pend.total)}</b></div>
-      <div class="row row--between" style="margin-bottom:10px"><span class="small faint">Сборы провайдера (ориентир) / на руки</span><b class="small">${fmtMoney(pend.commission)} / ${fmtMoney(pend.net)}</b></div>
+      <div class="row row--between" style="margin-bottom:10px"><span class="small faint">Сборы провайдера (ориентир) / на руки</span><b class="small">${fmtMoney(pend.commission)} / ${fmtMoney(pend.net)}</b></div>`:`
+      <div class="row row--between" style="margin-bottom:8px"><span class="small faint">Начислено</span><b>${fmtMoney(myDebt)}</b></div>
+      <div class="row row--between" style="margin-bottom:10px"><span class="small faint">На руки (ориентир)</span><b>${fmtMoney(myNet)}</b></div>`}
       ${staff?rows:''}
       ${staff?`<h4 class="small" style="margin:12px 0 4px">Заказы к выплате${pend.excluded?' · убрано вручную: '+pend.excluded:''}</h4>${list}`:''}
-      ${!staff?`<p class="small">Вам к выплате по выполненным заказам: <b>${fmtMoney(myDebt)}</b></p><p class="small faint">Выплата приходит на привязанный аккаунт ${provName} или вне системы — по договорённости с менеджером. ${provName} не берёт комиссию с заработка: удерживаются только транзакционные сборы банка/платёжной системы — их размер зависит от страны и способа выплаты, проверяйте на <a href="https://help.smartcat.com/understanding-freelancer-fees-in-smartcat" target="_blank" rel="noopener">официальной странице</a>.</p>`:''}
+      ${!staff?`<p class="small faint">Выплата приходит на привязанный аккаунт ${provName} или вне системы — по договорённости с менеджером. Сумма «на руки» — ориентир, итоговая зависит от способа выплаты.</p>`:''}
     </div>
 
     <div class="card card-pad">
