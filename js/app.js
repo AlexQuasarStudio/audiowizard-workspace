@@ -3709,34 +3709,25 @@ ex.innerHTML = avatarHTML(user(), '');
     const el = document.querySelector('.msg[data-msg="' + mid + '"] .msg__bubble');
     return el ? el.offsetHeight : 0;
   }
-  /* Ширина пузыря при реакции не должна меняться — только высота.
-     Запоминаем ширину до изменения и фиксируем её, пока есть реакции. */
+  /* Ширина пузыря плавно подстраивается под реакцию и время: если они
+     не помещаются в одну строку, пузырь расширяется ровно настолько,
+     чтобы встать с небольшим отступом, но не шире разумного предела. */
   function bubbleWidthOf(mid){
     const el = document.querySelector('.msg[data-msg="' + mid + '"] .msg__bubble');
     return el ? el.offsetWidth : 0;
   }
-  function lockBubbleWidth(mid, width){
-    if (!width) return;
+  function animateBubbleWidth(mid, prevW){
+    if (!prevW) return;
     const el = document.querySelector('.msg[data-msg="' + mid + '"] .msg__bubble');
-    if (el){
-      el.style.width = width + 'px';
-      el.style.minWidth = width + 'px';
-      el.style.maxWidth = width + 'px';
-      el.style.flex = 'none';
-    }
-  }
-  function unlockBubbleWidth(mid){
-    const el = document.querySelector('.msg[data-msg="' + mid + '"] .msg__bubble');
-    if (el){
-      el.style.width = '';
-      el.style.minWidth = '';
-      el.style.maxWidth = '';
-      el.style.flex = '';
-    }
-  }
-  function msgHasReactions(mid){
-    const el = document.querySelector('.msg[data-msg="' + mid + '"]');
-    return !!(el && el.querySelector('.react-pill'));
+    if (!el) return;
+    const nextW = el.offsetWidth;
+    if (!nextW || Math.abs(nextW - prevW) < 1) return;
+    el.style.width = prevW + 'px';
+    el.style.overflow = 'hidden';
+    el.getBoundingClientRect();
+    el.style.transition = 'width .18s var(--ease)';
+    el.style.width = nextW + 'px';
+    setTimeout(()=>{ el.style.width = ''; el.style.transition = ''; el.style.overflow = ''; }, 230);
   }
   /* После снятия последней реакции у короткого сообщения время должно
      вернуться в строку текста, как при обычном рендере. Точечно, без
@@ -6031,12 +6022,12 @@ const cm = root.querySelector('.chat-main');
               if (row && !row.querySelector('.react-pill')) row.remove();
               restoreInlineTime(mid);
               animateBubbleHeight(mid, prevH);
-              if (!msgHasReactions(mid)) unlockBubbleWidth(mid);
+              animateBubbleWidth(mid, prevW);
             }, 190);
           } else {
             patchReactionPill(rBtn, ids, em);
             rBtn.classList.toggle('on', ids.includes(u.id));
-            lockBubbleWidth(mid, prevW);
+            animateBubbleWidth(mid, prevW);
           }
           return;
         }
@@ -6139,7 +6130,7 @@ const cm = root.querySelector('.chat-main');
           const pill = box.querySelector('.react-pill[data-react="' + m.id + '|' + em + '"]');
           const ids = m.reactions[em] || [];
           if (!ids.length){
-            const done = ()=>{ renderChat(); animateBubbleHeight(m.id, prevH); if (!msgHasReactions(m.id)) unlockBubbleWidth(m.id); };
+            const done = ()=>{ renderChat(); animateBubbleHeight(m.id, prevH); animateBubbleWidth(m.id, prevW); };
             if (pill){ pill.classList.add('react-fade'); setTimeout(done, 190); }
             else done();
             return;
@@ -6147,11 +6138,11 @@ const cm = root.querySelector('.chat-main');
           if (pill){
             patchReactionPill(pill, ids, em);
             pill.classList.toggle('on', ids.includes(u.id));
-            lockBubbleWidth(m.id, prevW);
+            animateBubbleWidth(m.id, prevW);
           } else {
             renderChat();
             animateBubbleHeight(m.id, prevH);
-            lockBubbleWidth(m.id, prevW);
+            animateBubbleWidth(m.id, prevW);
             requestAnimationFrame(()=>{
               const np = root.querySelector('.react-pill[data-react="' + m.id + '|' + em + '"]')
                 || document.querySelector('.react-pill[data-react="' + m.id + '|' + em + '"]');
@@ -6317,7 +6308,7 @@ const cm = root.querySelector('.chat-main');
       if (arr.length && pill){
         patchReactionPill(pill, arr, '👍');
         pill.classList.toggle('on', arr.includes(u.id));
-        lockBubbleWidth(mm.id, prevW);
+        animateBubbleWidth(mm.id, prevW);
       } else if (!arr.length && pill){
         pill.classList.add('react-fade');
         el2.classList.add('msg--reacting');
@@ -6327,19 +6318,19 @@ const cm = root.querySelector('.chat-main');
           if (row && !row.querySelector('.react-pill')) row.remove();
           restoreInlineTime(mm.id);
           animateBubbleHeight(mm.id, prevH);
-          if (!msgHasReactions(mm.id)) unlockBubbleWidth(mm.id);
+          animateBubbleWidth(mm.id, prevW);
         }, 190);
       } else if (arr.length){
         el2.classList.add('msg--reacting');
         rerenderKeepScroll();
         animateBubbleHeight(mm.id, prevH);
-        lockBubbleWidth(mm.id, prevW);
+        animateBubbleWidth(mm.id, prevW);
         const np = root.querySelector('.msg[data-msg="' + mm.id + '"] .react-pill[data-react="' + mm.id + '|👍"]')
           || document.querySelector('.msg[data-msg="' + mm.id + '"] .react-pill[data-react="' + mm.id + '|👍"]');
         if (np) np.classList.add('react-pill--in');
       } else {
         rerenderKeepScroll();
-        if (!msgHasReactions(mm.id)) unlockBubbleWidth(mm.id);
+        animateBubbleWidth(mm.id, prevW);
       }
       setTimeout(()=>el2.classList.remove('msg--reacting'), 1300);
     };
@@ -7678,12 +7669,11 @@ const cm = root.querySelector('.chat-main');
       <div class="cols-2 grid" style="gap:12px">
         <div class="field"><label>Дни месяца</label><input class="input" id="po-days" value="${p.days.join(', ')}" placeholder="1, 15"></div>
         <div class="field"><label>Время (МСК)</label><input class="input" id="po-time" type="time" value="${esc(p.time)}"></div>
-        <div class="field" ${u.role==='admin'?'':'hidden'}><label title="Доля админа от суммы каждого заказа">Доля админа в заказе, %</label><input class="input" id="po-admin" type="number" min="0" max="100" step="1" value="${cfg.adminMargin}"></div>
-        <div class="field"><label title="Доля менеджера по умолчанию; в заказе можно изменить">Доля менеджера по умолчанию, %</label><input class="input" id="po-mgr" type="number" min="0" max="100" step="1" value="${cfg.managerFee}"></div>
         <div class="field"><label>Автоматически</label>
           <label class="check" style="display:flex;padding-top:6px"><input type="checkbox" id="po-auto" ${p.auto?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span><span class="small">по расписанию</span></label>
           <label class="check" style="display:flex;margin-top:6px"><input type="checkbox" id="po-on" ${p.enabled?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span><span class="small">выплаты включены</span></label></div>
       </div>
+      <p class="small faint" style="margin-top:8px">Доли админа и менеджера настраиваются в «Калькуляторе и услугах».</p>
       <div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap">
         <button class="btn btn--primary btn--sm" id="po-save">Сохранить расписание</button>
         <button class="btn btn--soft btn--sm" id="po-run">Выплатить сейчас</button>
@@ -7698,7 +7688,7 @@ const cm = root.querySelector('.chat-main');
       <div class="row row--between" style="margin-bottom:10px"><span class="small faint">Сборы провайдера (ориентир) / на руки</span><b class="small">${fmtMoney(pend.commission)} / ${fmtMoney(pend.net)}</b></div>
       ${staff?rows:''}
       ${staff?`<h4 class="small" style="margin:12px 0 4px">Заказы к выплате${pend.excluded?' · убрано вручную: '+pend.excluded:''}</h4>${list}`:''}
-      ${!staff?`<p class="small">Ваш долг по выполненным заказам: <b>${fmtMoney(myDebt)}</b></p><p class="small faint">Выплата приходит на привязанный аккаунт ${provName} или вне системы — по договорённости с менеджером. ${provName} не берёт комиссию с заработка: удерживаются только транзакционные сборы банка/платёжной системы — их размер зависит от страны и способа выплаты, проверяйте на <a href="https://help.smartcat.com/understanding-freelancer-fees-in-smartcat" target="_blank" rel="noopener">официальной странице</a>.</p>`:''}
+      ${!staff?`<p class="small">Вам к выплате по выполненным заказам: <b>${fmtMoney(myDebt)}</b></p><p class="small faint">Выплата приходит на привязанный аккаунт ${provName} или вне системы — по договорённости с менеджером. ${provName} не берёт комиссию с заработка: удерживаются только транзакционные сборы банка/платёжной системы — их размер зависит от страны и способа выплаты, проверяйте на <a href="https://help.smartcat.com/understanding-freelancer-fees-in-smartcat" target="_blank" rel="noopener">официальной странице</a>.</p>`:''}
     </div>
 
     <div class="card card-pad">
@@ -7737,9 +7727,6 @@ const cm = root.querySelector('.chat-main');
       const days = String((el.querySelector('#po-days')||{}).value||'').split(/[^0-9]+/).map(Number).filter(d=>d>=1&&d<=28);
       const time = ((el.querySelector('#po-time')||{}).value||'15:00').trim() || '15:00';
       /* cfg в этом обработчике нет: комиссия — ориентир провайдера, здесь не сохраняется */
-      const adm = Math.max(0, Math.min(100, Number((el.querySelector('#po-admin')||{}).value)||0));
-      const mgr = Math.max(0, Math.min(100, Number((el.querySelector('#po-mgr')||{}).value)||0));
-      S.settings.finance = Object.assign({}, S.settings.finance, { adminMargin:adm, managerFee:mgr });
       S.settings.payout = Object.assign({}, p, {
         enabled: !!((el.querySelector('#po-on')||{}).checked),
         auto: !!((el.querySelector('#po-auto')||{}).checked),
@@ -8271,7 +8258,14 @@ const cm = root.querySelector('.chat-main');
         <p class="small faint" style="margin-top:4px">${esc((userById(pending.author)||{}).full_name || 'Сотрудник')} · ${fmtDT(pending.at)}</p>
         ${u.role==='admin' ? `<div class="row" style="gap:8px;margin-top:8px"><button class="btn btn--primary btn--sm" data-calc-approve>Принять</button><button class="btn btn--ghost btn--sm" data-calc-reject>Отклонить</button></div>` : `<p class="small" style="margin-top:6px">Ждёт подтверждения администратора.</p>`}
       </div>` : '';
-      return `${pendingHtml}<div class="card card-pad" style="margin-bottom:12px"><h3 style="margin-bottom:6px">Гонорары менеджеров</h3>
+      const financeCard = `<div class="card card-pad" style="margin-bottom:12px"><h3>Доли в заказе</h3>
+        <p class="small muted" style="margin-bottom:10px">Доли от суммы каждого заказа. Действуют на новые заказы; в конкретном заказе менеджер может изменить свою долю.</p>
+        <div class="cols-2 grid" style="gap:12px">
+          ${u.role==='admin'?`<div class="field"><label>Доля админа в заказе, %</label><input class="input" id="calc-admin-margin" type="number" min="0" max="100" step="1" value="${Finance.cfg().adminMargin}"></div>`:''}
+          <div class="field"><label>Доля менеджера по умолчанию, %</label><input class="input" id="calc-manager-fee" type="number" min="0" max="100" step="1" value="${Finance.cfg().managerFee}"></div>
+        </div>
+      </div>`;
+      return `${pendingHtml}${financeCard}<div class="card card-pad" style="margin-bottom:12px"><h3 style="margin-bottom:6px">Гонорары менеджеров</h3>
         <p class="small muted" style="margin-bottom:10px">Потолок гонорара — процент от суммы заказа, выше которого менеджер не поднимет свой гонорар. Меняет только администратор.</p>
         <div class="cols-2 grid" style="gap:13px">
           <div class="field"><label>Потолок гонорара менеджера, % от суммы</label><input class="input" id="fee-manager" type="number" min="0" max="100" value="${(S.settings.feeCeilings||{}).manager ?? 25}"></div>
@@ -8964,6 +8958,7 @@ const cm = root.querySelector('.chat-main');
         if (!p) return;
         S.calcServices = p.services || S.calcServices;
         S.calcSettings = p.settings || S.calcSettings;
+        if (p.finance) S.settings.finance = p.finance;
         S.settings.calcPending = null;
         try { logAudit('Согласованы услуги калькулятора: '+(userById(p.author)||{}).full_name,'Настройки'); } catch(e){}
         saveState(); toast('Изменения приняты','ok'); renderSec();
@@ -9012,6 +9007,7 @@ const cm = root.querySelector('.chat-main');
         const isAdmin = user().role === 'admin';
         const beforeServices = isAdmin ? null : JSON.parse(JSON.stringify(S.calcServices || {}));
         const beforeSettings = isAdmin ? null : JSON.parse(JSON.stringify(S.calcSettings || {}));
+        const beforeFinance = isAdmin ? null : JSON.parse(JSON.stringify(S.settings.finance || {}));
         el.querySelectorAll('tbody[data-niche]').forEach(tb=>{
           const nid = tb.dataset.niche;
           const list = [];
@@ -9045,12 +9041,22 @@ const cm = root.querySelector('.chat-main');
           S.calcSettings.rushPct[nid] = Math.max(0, Math.min(200, +((rp || {}).value) || 0));
         });
         S.calcSettings.clientBufferPct = Math.max(0, Math.min(200, Number((el.querySelector('#calc-buffer')||{}).value) || 0));
+        const adminMarginEl = el.querySelector('#calc-admin-margin');
+        const managerFeeEl = el.querySelector('#calc-manager-fee');
+        if (adminMarginEl || managerFeeEl){
+          S.settings.finance = Object.assign({}, S.settings.finance, {
+            ...(adminMarginEl ? { adminMargin: Math.max(0, Math.min(100, +adminMarginEl.value || 0)) } : {}),
+            ...(managerFeeEl ? { managerFee: Math.max(0, Math.min(100, +managerFeeEl.value || 0)) } : {})
+          });
+        }
         if (!isAdmin){
           const proposedServices = JSON.parse(JSON.stringify(S.calcServices || {}));
           const proposedSettings = JSON.parse(JSON.stringify(S.calcSettings || {}));
+          const proposedFinance = JSON.parse(JSON.stringify(S.settings.finance || {}));
           S.calcServices = beforeServices;
           S.calcSettings = beforeSettings;
-          S.settings.calcPending = { author: user().id, at: Date.now(), services: proposedServices, settings: proposedSettings };
+          S.settings.finance = beforeFinance;
+          S.settings.calcPending = { author: user().id, at: Date.now(), services: proposedServices, settings: proposedSettings, finance: proposedFinance };
           saveState();
           toast('Отправлено администратору на согласование','ok');
           renderSec();

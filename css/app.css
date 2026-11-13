@@ -851,7 +851,7 @@ body.zen .day-sep.on-scroll{top:0}
 /* Время и галочки — всегда у нижнего края пузыря (и после реакций),
    прижаты вправо, даже если сообщение широкое. Строка не переносится:
    реакции живут слева в этой же строке, переносятся только пилюли. */
-.msg__foot{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:flex-end;gap:6px;margin-top:4px}
+.msg__foot{display:flex;flex-wrap:nowrap;justify-content:flex-end;align-items:flex-end;gap:8px;margin-top:4px}
 .msg__foot .time{flex:none;display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--faint);line-height:1.2;white-space:nowrap}
 /* Появление/исчезновение сообщений — как в ТГ: плавно и только для новых
    (класс .msg--in вешает JS по diff'у id), история при перерисовке не дёргается. */
