@@ -2500,6 +2500,45 @@ body.col-dragging,body.col-dragging *{cursor:col-resize!important;user-select:no
 .rev-reserve-hist:hover,.rev-card--reserve .rev-reserve-adj:hover{color:var(--text);background:var(--panel-3)}
 .rev-card--reserve .rev-reserve-adj{width:26px;height:26px;border-radius:8px;color:var(--muted)}
 
+/* Детализация выручки: статистика по услугам/клиентам/исполнителям */
+.rev-stats{margin:0 0 12px}
+.ragg-card{padding:10px 12px 8px;background:var(--bg-2);transition:opacity .14s var(--ease),transform .14s var(--ease)}
+.ragg-card.is-fading{opacity:0;transform:translateY(2px)}
+.ragg-head{margin-bottom:8px}
+.ragg-title-row{margin-bottom:7px}
+.ragg-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.ragg-seg{flex:0 1 auto}
+.ragg-search{flex:1 1 190px;max-width:280px;min-width:140px}
+.ragg-search .input{height:32px;padding:0 10px 0 32px;font-size:12.5px;border-radius:9px}
+.ragg-search>.ico{width:14px;height:14px;left:10px}
+.ragg-tbl{max-height:340px;overflow:auto;border:1px solid var(--border);border-radius:12px;background:var(--panel)}
+.ragg-tbl .tbl{margin:0}
+.ragg-tbl thead th{position:sticky;top:0;background:var(--panel);z-index:1}
+.ragg-tbl .pay-cell{font-variant-numeric:tabular-nums;white-space:nowrap}
+.ragg-tbl .ragg-name{min-width:130px}
+.ragg-title{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ragg-meter{display:block;height:4px;margin-top:4px;border-radius:99px;background:var(--border);overflow:hidden}
+.ragg-meter i{display:block;height:100%;border-radius:99px;background:var(--accent);opacity:.75;transition:width .2s var(--ease)}
+.ragg-body tr{transition:background-color .12s var(--ease)}
+@keyframes raggIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ragg-card.is-in .ragg-body tr{animation:raggIn .18s var(--ease) both}
+.ragg-empty{text-align:center;color:var(--faint);padding:22px 10px!important;font-size:12.5px}
+.ragg-note{margin-top:6px;line-height:1.45}
+.ragg-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:8px}
+.ragg-pager{display:inline-flex;align-items:center;gap:7px}
+.ragg-page-num{min-width:46px;text-align:center;font-variant-numeric:tabular-nums}
+.ragg-pager .btn[disabled]{opacity:.4}
+@media (max-width:640px){
+  .ragg-search{max-width:none;flex:1 1 100%}
+  .ragg-tbl{max-height:300px}
+}
+@media (prefers-reduced-motion:reduce){
+  .ragg-card{transition:none}
+  .ragg-card.is-fading{opacity:1;transform:none}
+  .ragg-meter i{transition:none}
+  .ragg-card.is-in .ragg-body tr{animation:none}
+}
+
 /* Подсказки при вводе клиента/исполнителя в новой строке заказа */
 .inline-suggest{position:fixed;z-index:5300;width:min(290px,calc(100vw - 16px));max-height:230px;overflow:auto;background:var(--panel);border:1px solid var(--border-2);border-radius:12px;box-shadow:var(--sh-2);padding:4px;opacity:0;transform:translateY(-4px);pointer-events:none;transition:opacity .16s var(--ease),transform .16s var(--ease)}
 .inline-suggest.is-on{opacity:1;transform:none;pointer-events:auto}

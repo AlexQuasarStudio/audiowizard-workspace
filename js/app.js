@@ -2543,6 +2543,72 @@ ex.innerHTML = avatarHTML(user(), '');
       byDay
     };
   }
+  /* ---------- Статистика по разрезам: услуги, клиенты, исполнители ----------
+     Одна и та же структура метрики для всех таблиц: выручка, заказы,
+     средний чек, доля выручки, долг. Исполнителю дополнительно —
+     начислено, оплачено и его долг. */
+  const REV_AGG_DIMS = {
+    niche:    { label: 'Услуги',       empty: 'Без услуги',    none: 'Услуг за период нет' },
+    client:   { label: 'Клиенты',      empty: 'Без клиента',   none: 'Клиентов за период нет' },
+    executor: { label: 'Исполнители',  empty: 'Без исполнителя', none: 'Исполнителей за период нет' }
+  };
+  function revAggDims(){ return Object.keys(REV_AGG_DIMS); }
+  function revAggDim(dim){ return REV_AGG_DIMS[dim] ? dim : 'niche'; }
+  function revAggLabel(dim, key){
+    const d = REV_AGG_DIMS[dim];
+    return key || d.empty;
+  }
+  /* Метрики одного разреза. Используется в интерфейсе и в экспорте. */
+  function revAggMetrics(dim, items, revenue){
+    const list = (items || []).map(it => ({
+      key: it.key,
+      label: it.label,
+      revenue: Number(it.revenue) || 0,
+      orders: it.orders || 0,
+      avg: it.orders ? Math.round((Number(it.revenue) || 0) / it.orders) : 0,
+      share: revenue ? (Number(it.revenue) || 0) / revenue * 100 : 0,
+      debt: Number(it.debt) || 0,
+      accrued: dim === 'executor' ? Number(it.accrued) || 0 : null,
+      paid: dim === 'executor' ? Number(it.paid) || 0 : null,
+      exec_debt: dim === 'executor' ? Number(it.debt) || 0 : null
+    }));
+    return list.sort((a, b) => b.revenue - a.revenue || a.label.localeCompare(b.label, 'ru'));
+  }
+  function revAggregate(rows, byExecutor, dim, revenue){
+    if (dim === 'executor'){
+      /* Исполнители — из расшифровки заказ/исполнитель: сумма долей исполнителей
+         равна выручке, а оплата и долг считаются по каждому исполнителю. */
+      const map = new Map();
+      (byExecutor || []).forEach(r => {
+        const key = r.executor || '';
+        const cur = map.get(key) || { key, label: revAggLabel(dim, key), revenue:0, orders:0, debt:0, accrued:0, paid:0, orderSet:new Set() };
+        cur.revenue += Number(r.amount) || 0;
+        cur.accrued += Number(r.amount) || 0;
+        cur.paid += Number(r.paid) || 0;
+        cur.debt += Number(r.debt) || 0;
+        if (r.order_id && !cur.orderSet.has(r.order_id)){ cur.orderSet.add(r.order_id); cur.orders += 1; }
+        map.set(key, cur);
+      });
+      return revAggMetrics(dim, [...map.values()], revenue);
+    }
+    /* Услуги и клиенты — по уникальным заказам, а не по строкам расшифровок. */
+    const map = new Map();
+    (rows || []).forEach(r => {
+      const key = r[dim] || '';
+      const cur = map.get(key) || { key, label: revAggLabel(dim, key), revenue:0, orders:0, debt:0 };
+      cur.revenue += Number(r.total) || 0;
+      cur.orders += 1;
+      cur.debt += Number(r.debt) || 0;
+      map.set(key, cur);
+    });
+    return revAggMetrics(dim, [...map.values()], revenue);
+  }
+  function revAggStats(rows, byExecutor, revenue){
+    const out = {};
+    revAggDims().forEach(dim => { out[dim] = revAggregate(rows, byExecutor, dim, revenue); });
+    return out;
+  }
+
   function revDownload(name, blob){
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -2607,6 +2673,19 @@ ex.innerHTML = avatarHTML(user(), '');
     data.byDay.forEach(r => dayRows.push([r.date, r.orders, r.revenue]));
     dayRows.push(['Итого', data.totals.orders, data.totals.revenue]);
     const book = { 'Сводка': summary, 'Заказы': [header, ...rows], 'Исполнители': execRows, 'По дням': dayRows };
+    revAggDims().forEach(dim => {
+      const stats = revAggregate(data.rows, data.byExecutor, dim, data.totals.revenue);
+      if (!stats.length) return;
+      const exec = dim === 'executor';
+      const head = [REV_AGG_DIMS[dim].label, 'Выручка', 'Заказов', 'Средний чек', 'Доля выручки, %']
+        .concat(exec ? ['Начислено', 'Оплачено'] : [], ['Долг']);
+      const aggRows = stats.map(r => [r.label, r.revenue, r.orders, r.avg, +r.share.toFixed(1)]
+        .concat(exec ? [r.accrued, r.paid] : [], [r.debt]));
+      const sum = k => stats.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+      aggRows.push(['Итого', sum('revenue'), data.totals.orders, data.totals.avg, 100]
+        .concat(exec ? [sum('accrued'), sum('paid')] : [], [sum('debt')]));
+      book['По ' + REV_AGG_DIMS[dim].label.toLowerCase()] = [head, ...aggRows];
+    });
     revDownload(revFileName(data, 'xlsx'), new Blob([AWX.writeSheets(book)], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
     toast(`Детализация: ${data.rows.length} ${revPlural(data.rows.length)} в Excel`, 'ok');
   }
@@ -2635,6 +2714,7 @@ ex.innerHTML = avatarHTML(user(), '');
     const top = rows.reduce((a,x) => (!a || (x.o.total||0) > (a.o.total||0)) ? x : a, null);
     const days = Math.max(1, Math.round((revDayStart(to - 1) - revDayStart(from)) / DAY) + 1);
     const data = revData(rows, total, from, to);
+    const agg = revAggStats(data.rows, data.byExecutor, total);
     const series = revChartSeries(rows, from, to);
     const bucketWord = series.bucketDays === 1 ? 'дням' : series.bucketDays === 7 ? 'неделям' : 'месяцам';
     const labelEvery = Math.max(1, Math.ceil(series.items.length / 7));
@@ -2695,6 +2775,7 @@ ex.innerHTML = avatarHTML(user(), '');
           <div class="rev-bars">${mgrBars}</div>
         </div>
       </div>` : ''}
+      <div class="rev-stats" id="rev-stats" data-ragg-view>${rows.length ? revAggViewHtml(agg, revAggDim(revAggState.dim), total) : ''}</div>
       ${rows.length ? `
       <div class="row row--between rev-actions">
         <b class="small">Заказы периода</b>
@@ -2738,6 +2819,7 @@ ex.innerHTML = avatarHTML(user(), '');
       bindChartSelect(dailyWrap, { items: series.items, top:true,
         period:c => series.bucketDays === 1 ? `${c} ${dayPlural(c)}` : series.bucketDays === 7 ? `${c} нед.` : `${c} мес.` });
     }
+    if (box.querySelector('#rev-stats')) bindRevAgg(box, agg, revAggDim(revAggState.dim), total);
     const rvHist = box.querySelector('[data-rev-reserve-history]');
     if (rvHist) rvHist.onclick = (e)=>{ e.stopPropagation(); openReserveHistory(); };
     const rvAdj = box.querySelector('[data-rev-reserve-adjust]');
@@ -3029,6 +3111,156 @@ ex.innerHTML = avatarHTML(user(), '');
       map.set(k, (map.get(k) || 0) + (Number(r.total) || 0));
     });
     return [...map].map(([label, value]) => ({ label, value })).sort((a,b) => b.value - a.value);
+  }
+
+  /* ---------- Блок статистики в окне детализации ---------- */
+  const REV_AGG_PAGE = 10;
+  const revAggState = { dim:'niche', q:'', page:{ niche:1, client:1, executor:1 } };
+  function revAggFmtPct(v){ return (Number(v) || 0).toFixed(1).replace('.', ',') + '%'; }
+  function revAggHead(dim){
+    const exec = dim === 'executor';
+    return `<thead><tr>
+      <th class="ragg-name">${esc(REV_AGG_DIMS[dim].label)}</th>
+      <th class="pay-cell">Выручка</th>
+      <th class="pay-cell">Заказов</th>
+      <th class="pay-cell">Средний чек</th>
+      <th class="pay-cell">Доля выручки</th>
+      ${exec ? '<th class="pay-cell">Начислено</th><th class="pay-cell">Оплачено</th>' : ''}
+      <th class="pay-cell">Долг</th>
+    </tr></thead>`;
+  }
+  function revAggRowHtml(r, dim, total, maxShare){
+    const exec = dim === 'executor';
+    const share = total ? (r.revenue / total * 100) : 0;
+    const barW = maxShare ? Math.max(2, Math.round(share / maxShare * 100)) : 0;
+    return `<tr>
+      <td class="ragg-name"><span class="ragg-title" title="${esc(r.label)}">${esc(r.label)}</span><span class="ragg-meter" aria-hidden="true"><i style="width:${barW}%"></i></span></td>
+      <td class="pay-cell"><b>${fmtMoney(r.revenue)}</b></td>
+      <td class="pay-cell">${r.orders}</td>
+      <td class="pay-cell">${r.orders ? fmtMoney(r.avg) : '—'}</td>
+      <td class="pay-cell">${revAggFmtPct(share)}</td>
+      ${exec ? `<td class="pay-cell">${fmtMoney(r.accrued)}</td><td class="pay-cell">${fmtMoney(r.paid)}</td>` : ''}
+      <td class="pay-cell ${r.debt ? '' : 'faint'}">${fmtMoney(r.debt)}</td>
+    </tr>`;
+  }
+  function revAggViewHtml(stats, dim, revenue){
+    const all = stats[dim] || [];
+    const q = revAggState.q.trim().toLowerCase();
+    const items = q ? all.filter(r => r.label.toLowerCase().includes(q)) : all;
+    const pages = Math.max(1, Math.ceil(items.length / REV_AGG_PAGE));
+    const page = Math.min(Math.max(1, revAggState.page[dim] || 1), pages);
+    revAggState.page[dim] = page;
+    const from = items.length ? (page - 1) * REV_AGG_PAGE + 1 : 0;
+    const to = Math.min(items.length, page * REV_AGG_PAGE);
+    const slice = items.slice(from ? from - 1 : 0, to);
+    const maxShare = items.reduce((a, r) => Math.max(a, revenue ? r.revenue / revenue * 100 : 0), 0);
+    const dims = revAggDims();
+    const tabs = dims.map(d => `<button type="button" class="${d === dim ? 'on' : ''}" data-ragg-tab="${d}">${esc(REV_AGG_DIMS[d].label)}</button>`).join('');
+    const body = slice.length
+      ? slice.map(r => revAggRowHtml(r, dim, revenue, maxShare)).join('')
+      : `<tr><td colspan="${dim === 'executor' ? 8 : 6}" class="ragg-empty">${q ? `Ничего не найдено по запросу «${esc(revAggState.q.trim())}»` : esc(REV_AGG_DIMS[dim].none)}</td></tr>`;
+    const found = q ? `<span class="faint">найдено ${items.length} из ${all.length}</span>` : `<span class="faint">${all.length} в разрезе</span>`;
+    const note = dim === 'executor'
+      ? '<div class="small faint ragg-note">Доля выручки — от общей выручки периода: остальное уходит админу, менеджеру и в свободный остаток.</div>'
+      : '';
+    return `
+      <div class="ragg-card card">
+        <div class="ragg-head">
+          <div class="row row--between ragg-title-row">
+            <b class="small">Статистика по разрезам</b>
+            <span class="small faint">выручка ${fmtMoney(revenue)}</span>
+          </div>
+          <div class="ragg-tools">
+            <div class="seg ragg-seg" role="tablist" aria-label="Разрез статистики">${tabs}</div>
+            <div class="input-wrap ragg-search">
+              ${icon('search','ico-sm')}
+              <input class="input" type="search" id="ragg-q" data-ragg-q value="${esc(revAggState.q)}" placeholder="Поиск по названию" aria-label="Поиск в статистике">
+            </div>
+          </div>
+        </div>
+        <div class="tbl-wrap ragg-tbl"><table class="tbl">
+          ${revAggHead(dim)}
+          <tbody id="ragg-body" class="ragg-body">${body}</tbody>
+        </table></div>
+        ${note}
+        <div class="ragg-foot">
+          <span class="small">${found}</span>
+          <div class="ragg-pager" role="group" aria-label="Страницы">
+            <button type="button" class="btn btn--ghost btn--sm" data-ragg-page="-1" ${page <= 1 ? 'disabled' : ''} aria-label="Назад">${icon('chev-l','ico-sm')}</button>
+            <span class="small faint ragg-page-num" id="ragg-page-num">${page} / ${pages}</span>
+            <button type="button" class="btn btn--ghost btn--sm" data-ragg-page="1" ${page >= pages ? 'disabled' : ''} aria-label="Вперёд">${icon('chev-r','ico-sm')}</button>
+          </div>
+        </div>
+      </div>`;
+  }
+  /* Перерисовка только тела таблицы: поиск и пагинация не трогают окно. */
+  function revAggPaint(root, stats, dim, revenue){
+    const body = root.querySelector('#ragg-body');
+    if (!body) return;
+    const itemsAll = stats[dim] || [];
+    const q = revAggState.q.trim().toLowerCase();
+    const items = q ? itemsAll.filter(r => r.label.toLowerCase().includes(q)) : itemsAll;
+    const pages = Math.max(1, Math.ceil(items.length / REV_AGG_PAGE));
+    const page = Math.min(Math.max(1, revAggState.page[dim] || 1), pages);
+    revAggState.page[dim] = page;
+    const slice = items.slice((page - 1) * REV_AGG_PAGE, page * REV_AGG_PAGE);
+    const maxShare = items.reduce((a, r) => Math.max(a, revenue ? r.revenue / revenue * 100 : 0), 0);
+    body.innerHTML = slice.length
+      ? slice.map(r => revAggRowHtml(r, dim, revenue, maxShare)).join('')
+      : `<tr><td colspan="${dim === 'executor' ? 8 : 6}" class="ragg-empty">${q ? `Ничего не найдено по запросу «${esc(revAggState.q.trim())}»` : esc(REV_AGG_DIMS[dim].none)}</td></tr>`;
+    const num = root.querySelector('#ragg-page-num');
+    if (num) num.textContent = page + ' / ' + pages;
+    root.querySelectorAll('[data-ragg-page]').forEach(b => {
+      const dir = Number(b.dataset.raggPage) || 0;
+      b.disabled = dir < 0 ? page <= 1 : page >= pages;
+    });
+    const found = root.querySelector('.ragg-foot > .small');
+    if (found) found.innerHTML = q ? `<span class="faint">найдено ${items.length} из ${itemsAll.length}</span>` : `<span class="faint">${itemsAll.length} в разрезе</span>`;
+  }
+  function revAggSwitch(root, stats, dim, revenue){
+    const card = root.querySelector('.ragg-card');
+    if (card) card.classList.add('is-fading');
+    setTimeout(() => {
+      const host = root.querySelector('[data-ragg-view]');
+      if (!host) return;
+      host.innerHTML = revAggViewHtml(stats, dim, revenue);
+      const card2 = root.querySelector('.ragg-card');
+      if (card2){
+        card2.classList.remove('is-fading');
+        card2.classList.add('is-in');
+        setTimeout(() => card2.classList.remove('is-in'), 220);
+      }
+      bindRevAgg(root, stats, dim, revenue);
+    }, 110);
+  }
+  function bindRevAgg(root, stats, dim, revenue){
+    root.querySelectorAll('[data-ragg-tab]').forEach(b => b.onclick = () => {
+      const next = revAggDim(b.dataset.raggTab);
+      if (next === dim) return;
+      revAggState.dim = next;
+      revAggSwitch(root, stats, next, revenue);
+    });
+    const q = root.querySelector('[data-ragg-q]');
+    if (q){
+      let t = 0;
+      q.oninput = () => {
+        clearTimeout(t);
+        t = setTimeout(() => { revAggState.q = q.value; revAggState.page[dim] = 1; revAggPaint(root, stats, dim, revenue); }, 120);
+      };
+      q.onkeydown = e => {
+        if (e.key === 'Enter'){ e.preventDefault(); clearTimeout(t); revAggState.q = q.value; revAggState.page[dim] = 1; revAggPaint(root, stats, dim, revenue); }
+      };
+      q.onchange = () => { revAggState.q = q.value; revAggState.page[dim] = 1; revAggPaint(root, stats, dim, revenue); };
+    }
+    root.querySelectorAll('[data-ragg-page]').forEach(b => b.onclick = () => {
+      const dir = Number(b.dataset.raggPage) || 0;
+      const itemsAll = stats[dim] || [];
+      const qv = revAggState.q.trim().toLowerCase();
+      const n = (qv ? itemsAll.filter(r => r.label.toLowerCase().includes(qv)) : itemsAll).length;
+      const pages = Math.max(1, Math.ceil(n / REV_AGG_PAGE));
+      revAggState.page[dim] = Math.min(pages, Math.max(1, (revAggState.page[dim] || 1) + dir));
+      revAggPaint(root, stats, dim, revenue);
+    });
   }
 
   function activeDeadlineItems(rows){
