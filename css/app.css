@@ -2579,6 +2579,12 @@ svg.ico.wip-ico{width:38px;height:38px}
 /* ToDo: связи с тикетом/заказом, напоминание, промежуточная галочка,
    плавный уход в архив и возврат */
 .td-add-row .field{margin-bottom:0}
+.td-link-pick{display:flex;align-items:center;gap:7px;text-align:left;cursor:pointer;width:100%;min-height:38px;overflow:hidden}
+.td-link-pick .ico{flex:none}
+.td-link-pick__sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.td-pick-item{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--panel);text-align:left;cursor:pointer;transition:border-color .15s var(--ease),background-color .15s var(--ease)}
+.td-pick-item:hover,.td-pick-item.on{border-color:var(--accent);background:var(--accent-soft)}
+.td-pick-item .badge{flex:none}
 .td-row{transition:opacity .18s var(--ease),border-color .18s var(--ease),background-color .18s var(--ease)}
 .td-row:hover{border-color:color-mix(in srgb,var(--accent) 34%,var(--border))}
 .td-partial{width:18px;height:18px;padding:0;border:1px solid var(--border);border-radius:5px;background:var(--panel);color:transparent;display:inline-flex;align-items:center;justify-content:center;flex:none;cursor:pointer;transition:color .15s var(--ease),background-color .15s var(--ease),border-color .15s var(--ease),transform .12s var(--ease)}

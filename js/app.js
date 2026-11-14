@@ -8141,23 +8141,90 @@ const cm = root.querySelector('.chat-main');
     const p = n => String(n).padStart(2,'0');
     return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
   };
-  const todoLinkOptions = (u2, cur) => {
-    const tickets = noDemo(S.tickets||[]).filter(x=>isStaff(u2.role) || x.user_id===u2.id)
-      .sort((a,b)=>(b.created_at||0)-(a.created_at||0)).slice(0,60);
-    const orders = ordersFor(u2).filter(o=>o.status!=='archived' || (cur && cur.link_type==='order' && cur.link_id===o.id))
-      .sort((a,b)=>(b.created_at||0)-(a.created_at||0)).slice(0,60);
-    const groups = [];
-    if (tickets.length) groups.push(`<optgroup label="Тикеты">${tickets.map(tk=>{
-      const id = 'ticket:'+tk.id;
-      return `<option value="${esc(id)}" ${cur&&cur.link_type==='ticket'&&cur.link_id===tk.id?'selected':''}>#${esc(tk.id.slice(0,4).toUpperCase())} · ${esc(String(tk.subject||'').slice(0,70))}</option>`;
-    }).join('')}</optgroup>`);
-    if (orders.length) groups.push(`<optgroup label="Заказы">${orders.map(o=>{
-      const id = 'order:'+o.id;
-      const cl = (clientById(o.client_id)||{}).full_name||'';
-      return `<option value="${esc(id)}" ${cur&&cur.link_type==='order'&&cur.link_id===o.id?'selected':''}>${esc(o.order_id||'Заказ')}${cl?' · '+esc(String(cl).slice(0,40)):''}</option>`;
-    }).join('')}</optgroup>`);
-    return `<option value="">Без связи</option>${groups.join('')}`;
+  const todoLinkPickHtml = value => {
+    const { link_type, link_id } = todoParseLink(value);
+    if (!link_type || !link_id) return 'Без связи';
+    const l = todoLinkOf({ link_type, link_id });
+    if (!l) return 'Без связи';
+    return `${icon(TODO_LINK_ICON[l.type],'ico-sm')}<span>${esc(l.label)}</span>${l.sub?`<span class="faint td-link-pick__sub">${esc(l.sub)}</span>`:''}`;
   };
+  const TODO_STATUS_SHORT = { waiting:'В ожидании', work:'В работе', done:'Выполнен', revision:'Доработка', problem:'Проблема', draft:'Черновик', archived:'Архив' };
+  const todoLinkItems = (u2, type, cur) => {
+    if (type === 'ticket'){
+      return noDemo(S.tickets||[]).filter(x=>isStaff(u2.role) || x.user_id===u2.id)
+        .sort((a,b)=>(b.created_at||0)-(a.created_at||0))
+        .map(tk=>({ type:'ticket', id:tk.id, label:'#'+tk.id.slice(0,4).toUpperCase(),
+          sub:tk.subject||'', meta:{new:'Новое',in_progress:'В работе',resolved:'Решено'}[tk.status]||tk.status||'' }));
+    }
+    return ordersFor(u2).filter(o=>o.status!=='archived' || (cur && cur.link_type==='order' && cur.link_id===o.id))
+      .sort((a,b)=>(b.created_at||0)-(a.created_at||0))
+      .map(o=>({ type:'order', id:o.id, label:o.order_id||'Заказ',
+        sub:(clientById(o.client_id)||{}).full_name||'', meta:TODO_STATUS_SHORT[o.status]||o.status||'' }));
+  };
+  const todoLinkPicker = (u2, cur) => new Promise(resolve => {
+    let tab = cur && cur.link_type === 'order' ? 'order' : 'ticket';
+    let page = 0, q = '', settled = false;
+    const done = v => { if (settled) return; settled = true; resolve(v); };
+    const m = openModal({
+      title:'Связать задачу', narrow:true,
+      body:`<div class="stack" style="gap:10px">
+        <div class="seg" id="td-pick-tabs">
+          <button type="button" data-pick-tab="ticket" class="${tab==='ticket'?'on':''}">Тикеты</button>
+          <button type="button" data-pick-tab="order" class="${tab==='order'?'on':''}">Заказы</button>
+        </div>
+        <div class="field"><input class="input" id="td-pick-q" placeholder="Поиск: номер, тема, клиент" autocomplete="off"></div>
+        <div id="td-pick-list" class="stack" style="gap:6px"></div>
+        <div class="row row--between" id="td-pick-pager" style="gap:8px">
+          <button class="btn btn--ghost btn--sm" type="button" id="td-pick-prev">←</button>
+          <span class="small faint" id="td-pick-info"></span>
+          <button class="btn btn--ghost btn--sm" type="button" id="td-pick-next">→</button>
+        </div>
+      </div>`,
+      footer:`<button class="btn btn--ghost" data-clear>Без связи</button><button class="btn btn--ghost" data-c>Отмена</button>`,
+      onClose:()=>done(null)
+    });
+    const list = m.el.querySelector('#td-pick-list');
+    const info = m.el.querySelector('#td-pick-info');
+    const prev = m.el.querySelector('#td-pick-prev');
+    const next = m.el.querySelector('#td-pick-next');
+    const search = m.el.querySelector('#td-pick-q');
+    const PAGE = 7;
+    const paint = () => {
+      const all = todoLinkItems(u2, tab, cur);
+      const text = q.trim().toLowerCase();
+      const items = text ? all.filter(x => (x.label+' '+x.sub+' '+x.meta+' '+x.id).toLowerCase().includes(text)) : all;
+      const pages = Math.max(1, Math.ceil(items.length / PAGE));
+      if (page >= pages) page = pages - 1;
+      const slice = items.slice(page*PAGE, page*PAGE + PAGE);
+      list.innerHTML = slice.map(x=>{
+        const on = cur && cur.link_type===x.type && cur.link_id===x.id;
+        return `<button type="button" class="td-pick-item ${on?'on':''}" data-pick-type="${esc(x.type)}" data-pick-id="${esc(x.id)}">
+          <span class="badge ${x.type==='ticket'?'c-gray':'c-violet'}">${x.type==='ticket'?'Тикет':'Заказ'}</span>
+          <span style="flex:1;min-width:0"><b class="small">${esc(x.label)}</b><br><span class="faint" style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.sub||'—')}</span></span>
+          <span class="small faint" style="white-space:nowrap">${esc(x.meta||'')}</span>
+        </button>`;
+      }).join('') || '<p class="small faint" style="padding:10px 0;margin:0">Ничего не найдено</p>';
+      if (info) info.textContent = `Стр. ${page+1} из ${pages} · ${items.length}`;
+      if (prev) prev.disabled = page <= 0;
+      if (next) next.disabled = page >= pages - 1;
+      m.el.querySelectorAll('[data-pick-tab]').forEach(b=>b.classList.toggle('on', b.dataset.pickTab===tab));
+    };
+    m.el.querySelectorAll('[data-pick-tab]').forEach(b=>b.onclick=()=>{ tab=b.dataset.pickTab; page=0; q=''; if (search) search.value=''; paint(); });
+    if (search) search.oninput = ()=>{ q=search.value; page=0; paint(); };
+    if (prev) prev.onclick = ()=>{ if (page>0){ page--; paint(); } };
+    if (next) next.onclick = ()=>{ page++; paint(); };
+    list.onclick = e=>{
+      const b = e.target.closest('[data-pick-type]');
+      if (!b) return;
+      done({ link_type:b.dataset.pickType, link_id:b.dataset.pickId });
+      m.close();
+    };
+    const clear = m.el.querySelector('[data-clear]');
+    if (clear) clear.onclick = ()=>{ done({ link_type:'', link_id:'' }); m.close(); };
+    const cancel = m.el.querySelector('[data-c]');
+    if (cancel) cancel.onclick = ()=>{ done(null); m.close(); };
+    paint();
+  });
   const todoLinkChip = t => {
     const l = todoLinkOf(t); if (!l) return '';
     return `<button type="button" class="td-link ${l.alive?'':'is-dead'}" data-td-link="${esc(t.id)}" title="${esc(l.type==='ticket'?'Открыть тикет':'Открыть заказ')}">${icon(TODO_LINK_ICON[l.type],'ico-sm')}<span>${esc(l.label)}</span></button>`;
@@ -8765,7 +8832,8 @@ const cm = root.querySelector('.chat-main');
         </div>
         <div class="row" style="gap:8px;margin-bottom:8px;flex-wrap:wrap">
           <div class="field" style="flex:1;min-width:190px"><label class="small faint">Связать с</label>
-            <select class="input" id="td-link">${todoLinkOptions(u2)}</select></div>
+            <input type="hidden" id="td-link" value="">
+            <button type="button" class="input td-link-pick" id="td-link-pick" data-td-pick>Без связи</button></div>
           <div class="field" style="flex:none;max-width:230px"><label class="small faint">Напомнить</label>
             <input class="input" type="datetime-local" id="td-remind-at"></div>
         </div>
@@ -9959,6 +10027,15 @@ const cm = root.querySelector('.chat-main');
       }
       if (sec==='reminders'){
         /* --- Умный планировщик (ToDo) --- */
+        const tdLinkPick = el.querySelector('#td-link-pick');
+        if (tdLinkPick) tdLinkPick.onclick = async ()=>{
+          const hidden = el.querySelector('#td-link');
+          const cur = todoParseLink(hidden && hidden.value);
+          const v = await todoLinkPicker(u, cur);
+          if (!v) return;
+          if (hidden) hidden.value = v.link_type ? v.link_type+':'+v.link_id : '';
+          tdLinkPick.innerHTML = todoLinkPickHtml(hidden ? hidden.value : '');
+        };
         const tdAdd = el.querySelector('#td-add');
         if (tdAdd) tdAdd.onclick = ()=>{
           const t = el.querySelector('#td-text').value.trim();
@@ -10009,7 +10086,10 @@ const cm = root.querySelector('.chat-main');
                 </select></div>
               </div>
               <div class="cols-2 grid" style="gap:10px">
-                <div class="field"><label>Связать с</label><select class="input" id="td-edit-link">${todoLinkOptions(u,t)}</select></div>
+                <div class="field"><label>Связать с</label>
+                  <input type="hidden" id="td-edit-link" value="${esc(t.link_type?t.link_type+':'+t.link_id:'')}">
+                  <button type="button" class="input td-link-pick" id="td-edit-link-pick">${todoLinkPickHtml(t.link_type?t.link_type+':'+t.link_id:'')}</button>
+                </div>
                 <div class="field"><label>Напомнить</label><input class="input" type="datetime-local" id="td-edit-remind" value="${(()=>{const r=todoReminderOf(t);return r && !r.done && r.at > Date.now()?todoLocalInput(r.at):'';})()}"></div>
               </div>
             </div>`,
@@ -10017,6 +10097,15 @@ const cm = root.querySelector('.chat-main');
             onClose:()=>resolve(null)
           });
           const inp = m.el.querySelector('#td-edit-text');
+          const editLinkPick = m.el.querySelector('#td-edit-link-pick');
+          if (editLinkPick) editLinkPick.onclick = async ()=>{
+            const hidden = m.el.querySelector('#td-edit-link');
+            const cur = todoParseLink(hidden && hidden.value);
+            const v = await todoLinkPicker(u, cur);
+            if (!v) return;
+            if (hidden) hidden.value = v.link_type ? v.link_type+':'+v.link_id : '';
+            editLinkPick.innerHTML = todoLinkPickHtml(hidden ? hidden.value : '');
+          };
           const ok = m.el.querySelector('[data-ok]');
           const save = ()=>{
             const text = inp.value.trim();
