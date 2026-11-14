@@ -8064,6 +8064,86 @@ const cm = root.querySelector('.chat-main');
   let todoFilter = 'all';
   function todoType(t){ return TODO_TYPES[t && t.type] ? t.type : 'task'; }
 
+  /* Связи ToDo: напоминание, тикет или заказ. В записи храним reminder_id,
+     link_type ('ticket'|'order') и link_id — без дублирования текста. */
+  const TODO_LINK_ICON = { ticket:'tickets', order:'orders' };
+  const todoLinkOf = t => {
+    if (!t || !t.link_type || !t.link_id) return null;
+    if (t.link_type === 'ticket'){
+      const tk = (S.tickets||[]).find(x=>x.id===t.link_id);
+      return { type:'ticket', id:t.link_id, label: tk ? '#'+tk.id.slice(0,4).toUpperCase() : 'Тикет',
+        sub: tk ? (tk.subject||'') : 'не найден', alive:!!tk };
+    }
+    if (t.link_type === 'order'){
+      const o = (S.orders||[]).find(x=>x.id===t.link_id);
+      return { type:'order', id:t.link_id, label: o ? (o.order_id||'Заказ') : 'Заказ',
+        sub: o ? ((clientById(o.client_id)||{}).full_name||'') : 'не найден', alive:!!o };
+    }
+    return null;
+  };
+  const todoReminderOf = t => t && t.reminder_id ? (S.reminders||[]).find(r=>r.id===t.reminder_id) : null;
+  const todoParseLink = v => {
+    const raw = String(v||''); const i = raw.indexOf(':');
+    return i > 0 ? { link_type:raw.slice(0,i), link_id:raw.slice(i+1) } : { link_type:'', link_id:'' };
+  };
+  const todoLocalInput = ts => {
+    const d = new Date(ts); if (!isFinite(d.getTime())) return '';
+    const p = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  };
+  const todoLinkOptions = (u2, cur) => {
+    const tickets = noDemo(S.tickets||[]).filter(x=>isStaff(u2.role) || x.user_id===u2.id)
+      .sort((a,b)=>(b.created_at||0)-(a.created_at||0)).slice(0,60);
+    const orders = ordersFor(u2).filter(o=>o.status!=='archived' || (cur && cur.link_type==='order' && cur.link_id===o.id))
+      .sort((a,b)=>(b.created_at||0)-(a.created_at||0)).slice(0,60);
+    const groups = [];
+    if (tickets.length) groups.push(`<optgroup label="Тикеты">${tickets.map(tk=>{
+      const id = 'ticket:'+tk.id;
+      return `<option value="${esc(id)}" ${cur&&cur.link_type==='ticket'&&cur.link_id===tk.id?'selected':''}>#${esc(tk.id.slice(0,4).toUpperCase())} · ${esc(String(tk.subject||'').slice(0,70))}</option>`;
+    }).join('')}</optgroup>`);
+    if (orders.length) groups.push(`<optgroup label="Заказы">${orders.map(o=>{
+      const id = 'order:'+o.id;
+      const cl = (clientById(o.client_id)||{}).full_name||'';
+      return `<option value="${esc(id)}" ${cur&&cur.link_type==='order'&&cur.link_id===o.id?'selected':''}>${esc(o.order_id||'Заказ')}${cl?' · '+esc(String(cl).slice(0,40)):''}</option>`;
+    }).join('')}</optgroup>`);
+    return `<option value="">Без связи</option>${groups.join('')}`;
+  };
+  const todoLinkChip = t => {
+    const l = todoLinkOf(t); if (!l) return '';
+    return `<button type="button" class="td-link ${l.alive?'':'is-dead'}" data-td-link="${esc(t.id)}" title="${esc(l.type==='ticket'?'Открыть тикет':'Открыть заказ')}">${icon(TODO_LINK_ICON[l.type],'ico-sm')}<span>${esc(l.label)}</span></button>`;
+  };
+  const todoReminderChip = t => {
+    const r = todoReminderOf(t); if (!r) return '';
+    const when = r.done ? 'напоминание закрыто'
+      : new Date(r.at).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    return `<span class="td-remind ${r.done?'is-done':''}" title="Напоминание">${icon('clock','ico-sm')}<span>${esc(when)}</span></span>`;
+  };
+  const todoMeta = t => {
+    const parts = [todoLinkChip(t), todoReminderChip(t)].filter(Boolean);
+    return parts.length ? `<span class="td-meta">${parts.join('')}</span>` : '';
+  };
+  const todoCloseReminder = t => {
+    const r = todoReminderOf(t);
+    if (r && !r.done){ r.done = true; r.fired = true; }
+  };
+  const todoExportMeta = t => {
+    const meta = [];
+    const l = todoLinkOf(t);
+    if (l) meta.push((l.type==='ticket'?'тикет ':'заказ ')+l.label+(l.sub?' · '+l.sub:''));
+    const r = todoReminderOf(t);
+    if (r) meta.push(`напоминание: ${new Date(r.at).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${r.done?' (закрыто)':''}`);
+    if (t && t.archived) meta.unshift('архив');
+    return meta.length ? `  > ${meta.join(' · ')}` : '';
+  };
+  function openTodoTicket(id){
+    const t = (S.tickets||[]).find(x=>x.id===id);
+    if (!t){ toast('Тикет не найден','warn'); return; }
+    openWinModal({ title:`Тикет · ${t.subject}`, narrow:true, route:'tickets',
+      body:`<p class="small" style="color:var(--text-2)">${nl2br(t.message)}</p><p class="small faint" style="margin-top:10px">От: ${esc((userById(t.user_id)||{}).full_name||'')} ${t.order_id?'· заказ '+esc(t.order_id):''} · ${fmtDT(t.created_at)}</p>`,
+      footer:`<button class="btn btn--primary" data-x>Закрыть</button>`,
+      onMount:(m2,c2)=>{ const x=m2.querySelector('[data-x]'); if (x) x.onclick=c2; } });
+  }
+
   /* ---------- Услуги калькулятора: экспорт и импорт ---------- */
   /* Один формат на все виды выгрузки: ниша, услуга, цена, единица, маржа.
      Импорт узнаёт колонки по заголовку, нишу — по названию или id. */
@@ -8585,8 +8665,10 @@ const cm = root.querySelector('.chat-main');
          к наименее важному (приоритет 1 = критично … 5 = не срочно).
          Хранится в S.todos (per-user); заготовки-варианты — для всех ролей. */
       const mine = (S.todos||[]).filter(t=>t.owner_id===u2.id);
+      const active = mine.filter(t=>!t.archived);
+      const archived = mine.filter(t=>t.archived);
       const byPrio = (a,b)=> (a.done?1:0)-(b.done?1:0) || (a.prio||5)-(b.prio||5) || ((b.created_at||0)-(a.created_at||0));
-      const sorted = [...mine].sort(byPrio);
+      const sorted = [...active].sort(byPrio);
       const openCount = sorted.filter(t=>!t.done).length;
       const isAdminTodo = u2.role === 'admin';
       const OPEN_BUGS = sorted.filter(t=>!t.done && todoType(t)==='bug').length;
@@ -8615,6 +8697,12 @@ const cm = root.querySelector('.chat-main');
           </div>
           <div style="align-self:flex-end"><button class="btn btn--primary btn--sm" id="td-add">${icon('plus','ico-sm')} Добавить</button></div>
         </div>
+        <div class="row" style="gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          <div class="field" style="flex:1;min-width:190px"><label class="small faint">Связать с</label>
+            <select class="input" id="td-link">${todoLinkOptions(u2)}</select></div>
+          <div class="field" style="flex:none;max-width:230px"><label class="small faint">Напомнить</label>
+            <input class="input" type="datetime-local" id="td-remind-at"></div>
+        </div>
         <div class="chips" style="gap:6px;margin-bottom:12px">
           ${PRESETS.map(p=>`<span class="chip" data-td-preset="${esc(p)}" style="cursor:pointer">${esc(p)}</span>`).join('')}
         </div>
@@ -8631,23 +8719,33 @@ const cm = root.querySelector('.chat-main');
         <div class="stack" style="gap:8px">${sorted.map(t=>{
           const lbl = PRIO_LABEL[t.prio] || ('Приоритет '+t.prio);
           const ty = todoType(t);
-          return `<div class="row row--between" data-td-type="${ty}" style="padding:10px 12px;border:1px solid var(--border);border-radius:12px;${t.done?'opacity:.55':''}${todoFilter!=='all'&&todoFilter!==ty?'display:none':''}">
+          return `<div class="row row--between td-row" data-td-id="${t.id}" data-td-type="${ty}" style="padding:10px 12px;border:1px solid var(--border);border-radius:12px;${t.done?'opacity:.55':''}${todoFilter!=='all'&&todoFilter!==ty?'display:none':''}">
             <span class="small" style="display:flex;gap:8px;align-items:center;min-width:0">
               <label class="check" style="gap:0;flex:none;margin:0" title="Выбрать задачу">
                 <input type="checkbox" data-td-check value="${esc(t.id)}" ${t.done?'disabled':''} aria-label="Выбрать задачу">
                 <span class="box"><svg><use href="#i-check-c"/></svg></span>
               </label>
-              ${t.done?'<span class="badge c-green">готово</span>':`<span class="badge ${t.prio===1?'c-red':(t.prio===2?'c-orange':'c-gray')}" title="Приоритет ${t.prio} из 5">${esc(lbl)}</span>`}
+              <button type="button" class="td-partial ${t.partial?'on':''}" data-td-partial="${t.id}" title="В процессе / частично выполнено" aria-pressed="${t.partial?'true':'false'}">${icon('check','ico-sm')}</button>
+              ${t.done?'<span class="badge c-green">готово</span>':t.partial?'<span class="badge c-orange">в процессе</span>':`<span class="badge ${t.prio===1?'c-red':(t.prio===2?'c-orange':'c-gray')}" title="Приоритет ${t.prio} из 5">${esc(lbl)}</span>`}
               <span class="badge ${TODO_TYPES[ty].cls}" title="Тип записи">${TODO_TYPES[ty].label}</span>
-              <b>${esc(t.text)}</b>
+              <span style="display:flex;flex-direction:column;gap:2px;min-width:0"><b style="overflow-wrap:anywhere">${esc(t.text)}</b>${todoMeta(t)}</span>
             </span>
             <span style="display:flex;gap:6px;align-items:center">
               <button class="iconbtn" data-td-edit="${t.id}" title="Редактировать">${icon('edit','ico-sm')}</button>
-              ${t.done?'':`<button class="btn btn--ghost btn--sm" data-td-done="${t.id}">Готово</button>`}
+              ${t.done?`<button class="btn btn--ghost btn--sm" data-td-archive="${t.id}">В архив</button><button class="btn btn--ghost btn--sm" data-td-reopen="${t.id}">В незакрытое</button>`:`<button class="btn btn--ghost btn--sm" data-td-done="${t.id}">Готово</button>`}
               <button class="iconbtn" data-td-del="${t.id}" title="Удалить">${icon('trash','ico-sm')}</button>
             </span>
           </div>`; }).join('')}</div>`
         : '<p class="small faint">Пока пусто — добавьте первую задачу или выберите вариант ниже</p>'}
+        ${archived.length ? `<div class="td-archive" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+          <div class="row row--between" style="margin-bottom:8px"><b class="small">Архив</b><span class="small faint">${archived.length}</span></div>
+          <div class="stack" style="gap:8px">${archived.map(t=>{
+            const ty = todoType(t);
+            return `<div class="row row--between td-row td-archived" data-td-id="${t.id}" data-td-type="${ty}">
+              <span class="small" style="display:flex;gap:8px;align-items:center;min-width:0"><span class="badge c-gray">архив</span><span class="badge ${TODO_TYPES[ty].cls}">${TODO_TYPES[ty].label}</span><span style="display:flex;flex-direction:column;gap:2px;min-width:0"><b style="overflow-wrap:anywhere">${esc(t.text)}</b>${todoMeta(t)}</span></span>
+              <span style="display:flex;gap:6px;align-items:center"><button class="btn btn--ghost btn--sm" data-td-restore="${t.id}">Вернуть</button><button class="btn btn--ghost btn--sm" data-td-reopen="${t.id}">В незакрытое</button><button class="iconbtn" data-td-del="${t.id}" title="Удалить">${icon('trash','ico-sm')}</button></span>
+            </div>`; }).join('')}</div>
+        </div>` : ''}
         <div class="row row--between" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);gap:10px;flex-wrap:wrap">
           <div style="flex:1;min-width:190px"><b class="small">Обмен с ИИ-помощниками</b>
             <div class="small faint">Экспорт — Markdown с приоритетами и заданием для ассистента. Импорт принимает текст, Markdown или JSON, в том числе ответ ИИ.</div></div>
@@ -8694,11 +8792,17 @@ const cm = root.querySelector('.chat-main');
         const list = rest.filter(t => (t.prio||3) === p);
         if (!list.length) continue;
         lines.push('', `### ${p} — ${TODO_PRIO[p]}`);
-        list.forEach(t => lines.push(`- [ ] (P${p}) ${todoType(t)!=='task' ? '['+TODO_TYPES[todoType(t)].label.toLowerCase()+'] ' : ''}${String(t.text||'').trim()}`));
+        list.forEach(t => {
+          lines.push(`- [ ] (P${p}) ${todoType(t)!=='task' ? '['+TODO_TYPES[todoType(t)].label.toLowerCase()+'] ' : ''}${String(t.text||'').trim()}`);
+          const m = todoExportMeta(t); if (m) lines.push(m);
+        });
       }
       if (done.length){
         lines.push('', '### Выполнено');
-        [...done].sort((a,b)=>((b.created_at||0)-(a.created_at||0))).forEach(t => lines.push(`- [x] (P${t.prio||3}) ${todoType(t)!=='task' ? '['+TODO_TYPES[todoType(t)].label.toLowerCase()+'] ' : ''}${String(t.text||'').trim()}`));
+        [...done].sort((a,b)=>((b.created_at||0)-(a.created_at||0))).forEach(t => {
+          lines.push(`- [x] (P${t.prio||3}) ${todoType(t)!=='task' ? '['+TODO_TYPES[todoType(t)].label.toLowerCase()+'] ' : ''}${String(t.text||'').trim()}`);
+          const m = todoExportMeta(t); if (m) lines.push(m);
+        });
       }
       lines.push('', '## Правила',
         '- (P1) — критично, (P5) — когда-нибудь.',
@@ -8799,7 +8903,7 @@ const cm = root.querySelector('.chat-main');
             const rep = r.repeat || 'none';
             const whenStr = r.done ? 'выполнено' : (r.at <= Date.now() ? 'наступило' : 'след. ' + fmt(r.at));
             return `<div class="row row--between" style="padding:10px 12px;border:1px solid var(--border);border-radius:12px;${r.done?'opacity:.55':''}">
-            <span class="small"><b>${esc(r.text)}</b><br><span class="faint">${REP_LABEL[rep] || rep} · ${whenStr}${r.notify?' · с уведомлением':' · тихо'}</span></span>
+            <span class="small"><b>${esc(r.text)}</b><br><span class="faint">${REP_LABEL[rep] || rep} · ${whenStr}${r.notify?' · с уведомлением':' · тихо'}</span>${r.todo_id && (S.todos||[]).some(t=>t.id===r.todo_id) ? `<br><button type="button" class="td-link" data-rm-todo="${esc(r.todo_id)}">к задаче</button>` : ''}</span>
             <span style="display:flex;gap:6px;align-items:center">
               ${(r.done?'':`<button class="btn btn--ghost btn--sm" data-rm-done="${r.id}">Готово</button>`)}
               ${(!r.done && rep!=='none')?`<button class="btn btn--ghost btn--sm" data-rm-skip="${r.id}" title="Пропустить ближайший срок">Пропустить</button>`:''}
@@ -9709,9 +9813,21 @@ const cm = root.querySelector('.chat-main');
           if (!t){ toast('Введите задачу','warn'); return; }
           const prio = +el.querySelector('#td-prio').value || 3;
           const type = todoType({ type: el.querySelector('#td-type') && el.querySelector('#td-type').value });
+          const link = todoParseLink(el.querySelector('#td-link') && el.querySelector('#td-link').value);
+          const rid = uid();
+          const remindVal = el.querySelector('#td-remind-at') ? el.querySelector('#td-remind-at').value : '';
+          let reminder_id = '';
+          if (remindVal){
+            const at = new Date(remindVal).getTime();
+            if (!isFinite(at) || at <= Date.now()){ toast('Время напоминания должно быть в будущем','warn'); return; }
+            S.reminders = S.reminders || [];
+            const r = { id:uid(), owner_id:u.id, text:t, at, repeat:'none', notify:true, done:false, fired:false, created_at:Date.now(), todo_id:rid };
+            S.reminders.push(r); reminder_id = r.id;
+          }
           S.todos = S.todos || [];
-          S.todos.push({ id:uid(), owner_id:u.id, text:t, prio, type, done:false, created_at:Date.now() });
-          saveState(); toast('Задача добавлена','ok'); renderSec();
+          S.todos.push({ id:rid, owner_id:u.id, text:t, prio, type, done:false, partial:false, archived:false,
+            reminder_id, link_type:link.link_type, link_id:link.link_id, created_at:Date.now() });
+          saveState(); toast(reminder_id?'Задача добавлена, напоминание создано':'Задача добавлена','ok'); renderSec();
         };
         const tdText = el.querySelector('#td-text');
         if (tdText) tdText.addEventListener('keydown', e=>{ if (e.key==='Enter') tdAdd && tdAdd.click(); });
@@ -9740,6 +9856,10 @@ const cm = root.querySelector('.chat-main');
                   ${[1,2,3,4,5].map(p=>`<option value="${p}" ${(+t.prio||3)===p?'selected':''}>${p} — ${TODO_PRIO[p]}</option>`).join('')}
                 </select></div>
               </div>
+              <div class="cols-2 grid" style="gap:10px">
+                <div class="field"><label>Связать с</label><select class="input" id="td-edit-link">${todoLinkOptions(u,t)}</select></div>
+                <div class="field"><label>Напомнить</label><input class="input" type="datetime-local" id="td-edit-remind" value="${(()=>{const r=todoReminderOf(t);return r && !r.done && r.at > Date.now()?todoLocalInput(r.at):'';})()}"></div>
+              </div>
             </div>`,
             footer:`<button class="btn btn--ghost" data-c>Отмена</button><button class="btn btn--primary" data-ok>Сохранить</button>`,
             onClose:()=>resolve(null)
@@ -9749,7 +9869,14 @@ const cm = root.querySelector('.chat-main');
           const save = ()=>{
             const text = inp.value.trim();
             if (!text){ toast('Введите текст задачи','warn'); inp.focus(); return; }
-            resolve({ text, type: todoType({ type: m.el.querySelector('#td-edit-type').value }), prio: +m.el.querySelector('#td-edit-prio').value || 3 });
+            const remindVal = m.el.querySelector('#td-edit-remind').value;
+            if (remindVal){
+              const at = new Date(remindVal).getTime();
+              if (!isFinite(at) || at <= Date.now()){ toast('Время напоминания должно быть в будущем','warn'); return; }
+            }
+            const link = todoParseLink(m.el.querySelector('#td-edit-link').value);
+            resolve({ text, type: todoType({ type: m.el.querySelector('#td-edit-type').value }), prio: +m.el.querySelector('#td-edit-prio').value || 3,
+              link_type:link.link_type, link_id:link.link_id, remind_at:remindVal });
             m.close();
           };
           ok.onclick = save;
@@ -9763,6 +9890,19 @@ const cm = root.querySelector('.chat-main');
           const v = await todoEditModal(t);
           if (!v) return;
           t.text = v.text; t.type = v.type; t.prio = v.prio;
+          t.link_type = v.link_type; t.link_id = v.link_id;
+          let r = todoReminderOf(t);
+          if (v.remind_at){
+            const at = new Date(v.remind_at).getTime();
+            if (r){ r.text = v.text; r.at = at; r.done = false; r.fired = false; r.notify = true; }
+            else {
+              r = { id:uid(), owner_id:u.id, text:v.text, at, repeat:'none', notify:true, done:false, fired:false, created_at:Date.now(), todo_id:t.id };
+              S.reminders = S.reminders || []; S.reminders.push(r); t.reminder_id = r.id;
+            }
+          } else if (r){
+            S.reminders = (S.reminders||[]).filter(x=>x.id!==r.id);
+            t.reminder_id = '';
+          }
           saveState(); renderSec(); toast('Задача обновлена','ok');
         });
         /* Фильтр по типу — без перерисовки: прячем строки на месте. */
@@ -9773,12 +9913,85 @@ const cm = root.querySelector('.chat-main');
             row.style.display = todoFilter === 'all' || row.dataset.tdType === todoFilter ? '' : 'none';
           });
         });
+        const tdFade = (row, cb)=>{
+          const noAnim = (S.settings && S.settings.noAnim) || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+          if (!row || noAnim){ cb(); return; }
+          row.style.overflow = 'hidden';
+          row.style.maxHeight = row.offsetHeight + 'px';
+          row.style.transition = 'opacity .18s ease, transform .18s ease, max-height .22s ease, margin .22s ease, padding .22s ease, border-width .22s ease';
+          requestAnimationFrame(()=>{
+            row.style.opacity = '0';
+            row.style.transform = 'translateY(-4px)';
+            row.style.maxHeight = '0px';
+            row.style.marginTop = '0'; row.style.marginBottom = '0';
+            row.style.paddingTop = '0'; row.style.paddingBottom = '0';
+            row.style.borderWidth = '0';
+          });
+          setTimeout(cb, 230);
+        };
+        const tdReveal = id => {
+          setTimeout(()=>{
+            const row = document.querySelector(`[data-td-id="${id}"]`);
+            if (!row) return;
+            row.classList.add('td-enter');
+            try { row.scrollIntoView({ block:'nearest', behavior:'smooth' }); } catch(e){}
+            setTimeout(()=>row.classList.remove('td-enter'), 650);
+          }, 40);
+        };
         el.querySelectorAll('[data-td-done]').forEach(b=>b.onclick=()=>{
           const t = (S.todos||[]).find(x=>x.id===b.dataset.tdDone);
-          if (t){ t.done = true; saveState(); renderSec(); toast('Задача выполнена','ok'); }
+          if (!t) return;
+          tdFade(b.closest('.td-row'), ()=>{
+            t.done = true; t.partial = false; t.archived = false; todoCloseReminder(t);
+            saveState(); renderSec(); toast('Задача выполнена','ok');
+          });
+        });
+        el.querySelectorAll('[data-td-partial]').forEach(b=>b.onclick=()=>{
+          const t = (S.todos||[]).find(x=>x.id===b.dataset.tdPartial);
+          if (!t) return;
+          t.partial = !t.partial;
+          if (t.partial) t.done = false;
+          saveState(); renderSec(); toast(t.partial?'Отмечено: в процессе':'Отметка «в процессе» снята','ok');
+        });
+        el.querySelectorAll('[data-td-archive]').forEach(b=>b.onclick=()=>{
+          const t = (S.todos||[]).find(x=>x.id===b.dataset.tdArchive);
+          if (!t) return;
+          tdFade(b.closest('.td-row'), ()=>{
+            t.archived = true; t.done = true; t.partial = false; todoCloseReminder(t);
+            saveState(); renderSec(); toast('Задача в архиве','ok');
+          });
+        });
+        el.querySelectorAll('[data-td-restore]').forEach(b=>b.onclick=()=>{
+          const t = (S.todos||[]).find(x=>x.id===b.dataset.tdRestore);
+          if (!t) return;
+          tdFade(b.closest('.td-row'), ()=>{
+            t.archived = false;
+            saveState(); renderSec(); tdReveal(t.id); toast('Задача возвращена из архива','ok');
+          });
+        });
+        el.querySelectorAll('[data-td-reopen]').forEach(b=>b.onclick=()=>{
+          const t = (S.todos||[]).find(x=>x.id===b.dataset.tdReopen);
+          if (!t) return;
+          tdFade(b.closest('.td-row'), ()=>{
+            t.archived = false; t.done = false; t.partial = false;
+            const r = todoReminderOf(t);
+            if (r && r.done && r.at > Date.now()){ r.done = false; r.fired = false; }
+            saveState(); renderSec(); tdReveal(t.id); toast('Задача возвращена в работу','ok');
+          });
+        });
+        el.querySelectorAll('[data-td-link]').forEach(b=>b.onclick=()=>{
+          const t = (S.todos||[]).find(x=>x.id===b.dataset.tdLink);
+          const l = todoLinkOf(t);
+          if (!l) return;
+          if (!l.alive){ toast(l.type==='ticket'?'Тикет не найден':'Заказ не найден','warn'); return; }
+          if (l.type==='ticket') openTodoTicket(l.id);
+          else if (typeof CRM !== 'undefined' && CRM.openOrderDetail) CRM.openOrderDetail(l.id);
+          else toast('Не удалось открыть заказ','err');
         });
         el.querySelectorAll('[data-td-del]').forEach(b=>b.onclick=()=>{
-          S.todos = (S.todos||[]).filter(x=>x.id!==b.dataset.tdDel);
+          const id = b.dataset.tdDel;
+          S.todos = (S.todos||[]).filter(x=>x.id!==id);
+          S.reminders = (S.reminders||[]).filter(x=>x.todo_id!==id);
           saveState(); renderSec();
         });
         /* Массовое закрытие: выбранная группа задач или все открытые разом */
@@ -9805,13 +10018,13 @@ const cm = root.querySelector('.chat-main');
         if (tdCloseSel) tdCloseSel.onclick = ()=>{
           const ids = new Set(tdBulkChecks().filter(c=>c.checked).map(c=>c.value));
           if (!ids.size) return;
-          (S.todos||[]).forEach(t=>{ if (t.owner_id===u.id && ids.has(t.id)) t.done = true; });
+          (S.todos||[]).forEach(t=>{ if (t.owner_id===u.id && ids.has(t.id)){ t.done = true; t.partial = false; todoCloseReminder(t); } });
           saveState(); toast(`Закрыто задач: ${ids.size}`,'ok'); renderSec();
         };
         if (tdCloseAll) tdCloseAll.onclick = ()=>{
           const open = (S.todos||[]).filter(t=>t.owner_id===u.id && !t.done);
           if (!open.length) return;
-          open.forEach(t=>{ t.done = true; });
+          open.forEach(t=>{ t.done = true; t.partial = false; todoCloseReminder(t); });
           saveState(); toast(`Закрыто задач: ${open.length}`,'ok'); renderSec();
         };
         syncTdBulk();
@@ -9824,8 +10037,8 @@ const cm = root.querySelector('.chat-main');
           openWinModal({
             title:'Экспорт ToDo для ИИ', icon:'export', narrow:true,
             body:`<div class="stack" style="gap:10px">
-              <p class="small muted" style="margin:0">Шапка, приоритеты и задание для ассистента. Скопируйте в чат или скачайте файл — вернуть список можно через «Импорт».</p>
-              <textarea class="input" id="td-exp-text" rows="11" readonly spellcheck="false" style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.5"></textarea>
+              <p class="small muted" style="margin:0">Шапка, приоритеты и задание для ассистента. Текст можно править прямо здесь, затем скопировать или скачать — вернуть список можно через «Импорт».</p>
+              <textarea class="input" id="td-exp-text" rows="11" spellcheck="false" style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.5"></textarea>
             </div>`,
             footer:`<button class="btn btn--ghost" data-x>Закрыть</button><button class="btn btn--ghost" id="td-exp-copy">${icon('copy')} Скопировать</button><button class="btn btn--primary" id="td-exp-dl">${icon('export')} Скачать .md</button>`,
             onMount:(host)=>{
@@ -9835,7 +10048,7 @@ const cm = root.querySelector('.chat-main');
               if (copyBtn) copyBtn.onclick = ()=>{
                 const ok = ()=> toast('ToDo скопирован для ИИ','ok');
                 if (navigator.clipboard && navigator.clipboard.writeText){
-                  navigator.clipboard.writeText(text).then(ok, ()=>{
+                  navigator.clipboard.writeText(ta ? ta.value : text).then(ok, ()=>{
                     if (ta){ ta.select(); try { document.execCommand('copy'); } catch(e){} ok(); }
                   });
                 } else if (ta){
@@ -9844,7 +10057,7 @@ const cm = root.querySelector('.chat-main');
               };
               const dl = host.querySelector('#td-exp-dl');
               if (dl) dl.onclick = ()=>{
-                const blob = new Blob([text], { type:'text/markdown;charset=utf-8' });
+                const blob = new Blob([ta ? ta.value : text], { type:'text/markdown;charset=utf-8' });
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob); a.download = fileName;
                 document.body.appendChild(a); a.click(); a.remove();
@@ -9936,6 +10149,13 @@ const cm = root.querySelector('.chat-main');
         el.querySelectorAll('[data-rm-del]').forEach(b=>b.onclick=()=>{
           S.reminders = (S.reminders||[]).filter(x=>x.id!==b.dataset.rmDel);
           saveState(); renderSec();
+        });
+        el.querySelectorAll('[data-rm-todo]').forEach(b=>b.onclick=()=>{
+          const row = document.querySelector(`[data-td-id="${b.dataset.rmTodo}"]`);
+          if (!row){ toast('Задача не найдена','warn'); return; }
+          try { row.scrollIntoView({ block:'center', behavior:'smooth' }); } catch(e){}
+          row.classList.add('td-flash');
+          setTimeout(()=>row.classList.remove('td-flash'), 1200);
         });
         el.querySelectorAll('[data-rm-skip]').forEach(b=>b.onclick=()=>{
           const r = (S.reminders||[]).find(x=>x.id===b.dataset.rmSkip);

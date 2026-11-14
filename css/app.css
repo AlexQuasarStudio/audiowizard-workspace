@@ -2565,3 +2565,31 @@ body.page-zoomed .aw-win--active{background:var(--panel);-webkit-backdrop-filter
 }
 /* Крупная вращающаяся иконка в модалке «Функция в разработке» */
 svg.ico.wip-ico{width:38px;height:38px}
+
+
+/* ToDo: связи с тикетом/заказом, напоминание, промежуточная галочка,
+   плавный уход в архив и возврат */
+.td-row{transition:opacity .18s var(--ease),border-color .18s var(--ease),background-color .18s var(--ease)}
+.td-row:hover{border-color:color-mix(in srgb,var(--accent) 34%,var(--border))}
+.td-partial{width:18px;height:18px;padding:0;border:1px solid var(--border);border-radius:5px;background:var(--panel);color:transparent;display:inline-flex;align-items:center;justify-content:center;flex:none;cursor:pointer;transition:color .15s var(--ease),background-color .15s var(--ease),border-color .15s var(--ease),transform .12s var(--ease)}
+.td-partial .ico{width:12px;height:12px}
+.td-partial:hover{color:var(--accent);border-color:var(--accent)}
+.td-partial:active{transform:scale(.92)}
+.td-partial.on{color:#fff;background:var(--accent);border-color:var(--accent)}
+.td-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.td-link{display:inline-flex;align-items:center;gap:4px;max-width:220px;padding:1px 7px;border:1px solid var(--border);border-radius:99px;background:var(--panel-2);color:var(--text-2);font:inherit;font-size:11.5px;line-height:1.5;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:border-color .15s var(--ease),color .15s var(--ease),background-color .15s var(--ease)}
+.td-link .ico{width:12px;height:12px;flex:none}
+.td-link:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.td-link.is-dead{opacity:.5;text-decoration:line-through}
+.td-remind{display:inline-flex;align-items:center;gap:4px;color:var(--faint);font-size:11.5px;white-space:nowrap}
+.td-remind .ico{width:12px;height:12px;flex:none}
+.td-remind.is-done{opacity:.55}
+.td-archived{opacity:.72}
+.td-enter{animation:tdEnter .42s var(--ease) both}
+@keyframes tdEnter{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+.td-flash{animation:tdFlash 1.15s var(--ease)}
+@keyframes tdFlash{0%,100%{background:transparent}28%{background:var(--accent-soft)}}
+@media (prefers-reduced-motion:reduce){
+  .td-row,.td-partial,.td-link{transition:none}
+  .td-enter,.td-flash{animation:none}
+}
