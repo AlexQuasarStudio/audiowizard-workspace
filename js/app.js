@@ -12,16 +12,41 @@ const APP = (() => {
   const SKELETON_MS = 460;
   /* Города профиля: город задаёт часовой пояс дедлайнов. По умолчанию Москва. */
   const TZ_CITIES = [
-    ['Москва','Europe/Moscow'], ['Санкт-Петербург','Europe/Moscow'], ['Калининград','Europe/Kaliningrad'],
-    ['Самара','Europe/Samara'], ['Екатеринбург','Asia/Yekaterinburg'], ['Омск','Asia/Omsk'],
-    ['Новосибирск','Asia/Novosibirsk'], ['Красноярск','Asia/Krasnoyarsk'], ['Иркутск','Asia/Irkutsk'],
-    ['Якутск','Asia/Yakutsk'], ['Владивосток','Asia/Vladivostok'], ['Магадан','Asia/Magadan'],
-    ['Петропавловск-Камчатский','Asia/Kamchatka'], ['Минск','Europe/Minsk'], ['Алматы','Asia/Almaty'],
-    ['Тбилиси','Asia/Tbilisi'], ['Ереван','Asia/Yerevan'], ['Баку','Asia/Baku'], ['Ташкент','Asia/Tashkent'],
-    ['Бишкек','Asia/Bishkek'], ['Дубай','Asia/Dubai'], ['Стамбул','Europe/Istanbul'],
-    ['Лондон','Europe/London'], ['Берлин','Europe/Berlin'], ['Париж','Europe/Paris'],
-    ['Нью-Йорк','America/New_York'], ['Лос-Анджелес','America/Los_Angeles']
+    ['Москва','Europe/Moscow',55.7558,37.6173], ['Санкт-Петербург','Europe/Moscow',59.9343,30.3351], ['Калининград','Europe/Kaliningrad',54.7104,20.4522],
+    ['Самара','Europe/Samara',53.1959,50.1002], ['Екатеринбург','Asia/Yekaterinburg',56.8389,60.6057], ['Омск','Asia/Omsk',54.9885,73.3242],
+    ['Новосибирск','Asia/Novosibirsk',55.0084,82.9357], ['Красноярск','Asia/Krasnoyarsk',56.0153,92.8932], ['Иркутск','Asia/Irkutsk',52.2870,104.3050],
+    ['Якутск','Asia/Yakutsk',62.0355,129.6755], ['Владивосток','Asia/Vladivostok',43.1155,131.8855], ['Магадан','Asia/Magadan',59.5638,150.8035],
+    ['Петропавловск-Камчатский','Asia/Kamchatka',53.0370,158.6559], ['Минск','Europe/Minsk',53.9006,27.5590], ['Алматы','Asia/Almaty',43.2389,76.8897],
+    ['Тбилиси','Asia/Tbilisi',41.7151,44.8271], ['Ереван','Asia/Yerevan',40.1872,44.5152], ['Баку','Asia/Baku',40.4093,49.8671], ['Ташкент','Asia/Tashkent',41.2995,69.2401],
+    ['Бишкек','Asia/Bishkek',42.8746,74.5698], ['Дубай','Asia/Dubai',25.2048,55.2708], ['Стамбул','Europe/Istanbul',41.0082,28.9784],
+    ['Лондон','Europe/London',51.5074,-0.1278], ['Берлин','Europe/Berlin',52.5200,13.4050], ['Париж','Europe/Paris',48.8566,2.3522],
+    ['Нью-Йорк','America/New_York',40.7128,-74.0060], ['Лос-Анджелес','America/Los_Angeles',34.0522,-118.2437]
   ];
+
+  /* Подпись города: UTC-смещение и текущее местное время — чтобы пояс
+     выбирали глазами, а не по названию IANA. */
+  const tzOptionLabel = (city, zone) => {
+    try {
+      const now = new Date();
+      const parts = new Intl.DateTimeFormat('ru-RU', { timeZone: zone, hour:'2-digit', minute:'2-digit', timeZoneName:'shortOffset' }).formatToParts(now);
+      const get = t => (parts.find(p=>p.type===t) || {}).value || '';
+      const off = get('timeZoneName').replace('GMT','UTC') || 'UTC';
+      return `${city} · ${off} · ${get('hour')}:${get('minute')}`;
+    } catch(e){ return `${city} · ${zone}`; }
+  };
+
+  /* Ближайший город по координатам: для кнопки «Определить». */
+  const nearestTzCity = (lat, lon) => {
+    let best = null, bestD = Infinity;
+    TZ_CITIES.forEach(([city, tz, clat, clon]) => {
+      if (clat == null || clon == null) return;
+      const dLat = lat - clat;
+      const dLon = (lon - clon) * Math.cos(lat * Math.PI / 180);
+      const d = dLat*dLat + dLon*dLon;
+      if (d < bestD){ bestD = d; best = [city, tz]; }
+    });
+    return best;
+  };
 
   /* Эталон NAV для сброса порядка меню */
   const NAV_DEFAULT = [
@@ -1136,6 +1161,25 @@ const QUICK_BY_ROLE = {
         const n = S.notifs.find(x=>x.id===it.dataset.nf);
         (n.read = n.read||{})[u.id] = true;
         saveState();
+        /* Напоминание из колокольчика ведёт в «Напоминания», а не просто
+           закрывает панель. Старые записи узнаём по иконке и заголовку. */
+        const isReminder = n.kind === 'reminder' || (String(n.icon||'') === 'i-clock' && /^Напоминание\b/.test(String(n.title||'')));
+        if (isReminder){
+          const rid = n.reminder_id || '';
+          panel.classList.add('closing');
+          setTimeout(()=>{
+            panel.remove();
+            go('settings','reminders');
+            if (rid) setTimeout(()=>{
+              const row = document.querySelector(`[data-rm-id="${rid}"]`);
+              if (!row) return;
+              try { row.scrollIntoView({ block:'center', behavior:'smooth' }); } catch(e){}
+              row.classList.add('rm-flash');
+              setTimeout(()=>row.classList.remove('rm-flash'), 1250);
+            }, 300);
+          }, 170);
+          return;
+        }
         if (n.bc){
           it.classList.toggle('bc-open');
           const bx = it.querySelector('.nf-bc');
@@ -2034,7 +2078,7 @@ ex.innerHTML = avatarHTML(user(), '');
           <div class="field"><label>Как к вам обращаться</label><input class="input" id="ob-name" value="${esc(u2.full_name)}"></div>
           <div class="field"><label>О себе</label><textarea class="input" id="ob-about" placeholder="Пара слов для коллег" rows="2">${esc(u2.about||'')}</textarea></div>
           <div class="field"><label>Город и часовой пояс</label>
-            <select class="input" id="ob-city">${TZ_CITIES.map(([c,z])=>`<option value="${c}|${z}" ${((u2.city||'Москва')+'|'+(u2.tz||'Europe/Moscow'))===c+'|'+z?'selected':''}>${esc(c)} · ${esc(z)}</option>`).join('')}</select>
+            <select class="input" id="ob-city">${TZ_CITIES.map(([c,z])=>`<option value="${c}|${z}" ${((u2.city||'Москва')+'|'+(u2.tz||'Europe/Moscow'))===c+'|'+z?'selected':''}>${esc(tzOptionLabel(c,z))}</option>`).join('')}</select>
             <div class="tiny faint" style="margin-top:6px">Время дедлайнов будет в вашем часовом поясе. По умолчанию — Москва.</div>
           </div>
           <div class="row" style="gap:14px;align-items:center">
@@ -7912,6 +7956,7 @@ const cm = root.querySelector('.chat-main');
         <button class="btn btn--soft btn--sm" id="po-run">Выплатить сейчас</button>
         ${p.enabled&&p.auto?`<button class="btn btn--ghost btn--sm" id="po-skip">${skip?'Вернуть выплату':'Отменить разово'}</button>`:''}
         <button class="btn btn--ghost btn--sm" id="po-export">Экспорт для ${provName}</button>
+        <span class="small faint" style="flex-basis:100%">В выгрузку попадают только подтверждённые ${provName}-аккаунты; остальным — обычная ручная выплата.</span>
       </div>
     </div>`:''}
 
@@ -8006,10 +8051,15 @@ const cm = root.querySelector('.chat-main');
       const uids = Object.keys(pend.byUser).filter(uid => Finance.isPayoutRecipient(uid));
       if (!uids.length){ toast('Нет данных для экспорта','info'); return; }
       const payloads = uids.map(uid => Finance.smartcatPayload(uid, pend.orders.filter(o => Finance.debts(o).byUser[uid]))).filter(Boolean);
-      const data = { schema:'smartcat.payout.batch.v1', generatedAt:new Date().toISOString(), period:{ from:new Date(pend.period.from).toISOString(), to:new Date(pend.period.to).toISOString() }, payouts: payloads, totals:{ amount:pend.total, commission:pend.commission, net:pend.net } };
+      if (!payloads.length){ toast('Нет подтверждённых '+provName+'-аккаунтов — выгружать нечего','warn'); return; }
+      const amount = payloads.reduce((s,p) => s + (Number(p.totals && p.totals.amount) || 0), 0);
+      const commission = payloads.reduce((s,p) => s + (Number(p.totals && p.totals.commission) || 0), 0);
+      const skipped = uids.length - payloads.length;
+      const data = { schema:'smartcat.payout.batch.v1', generatedAt:new Date().toISOString(), period:{ from:new Date(pend.period.from).toISOString(), to:new Date(pend.period.to).toISOString() }, payouts: payloads, totals:{ amount, commission, net:amount-commission } };
       const a=document.createElement('a');
       a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
       a.download='smartcat-payout-'+new Date().toISOString().slice(0,10)+'.json'; a.click();
+      toast('Smartcat: '+payloads.length+' получателей'+(skipped?', пропущено без привязки: '+skipped:''),'ok');
     };
     /* Список аккаунтов: постранично, чтобы не рендерить сотни строк сразу */
     const scPage = 8; let scShown = scPage;
@@ -8336,6 +8386,10 @@ const cm = root.querySelector('.chat-main');
     toast(`Импорт услуг: +${res.added} · обновлено ${res.updated}${parsed.errors.length ? ` · пропущено ${parsed.errors.length}` : ''}`, 'ok');
     return { changed:true, added:res.added, updated:res.updated, skipped:parsed.errors.length };
   }
+  function calcSvcNormVal(nid, sid){
+    const v = (((S.calcSettings || {}).dailyNormSvc || {})[nid] || {})[sid];
+    return v != null && Number(v) > 0 ? v : '';
+  }
   function calcSvcRowsHTML(nid){
     const showMargin = user().role === 'admin';
     return (S.calcServices[nid] || []).map(s => `<tr data-sid="${s.id}">
@@ -8343,6 +8397,7 @@ const cm = root.querySelector('.chat-main');
       <td><input class="input" data-f="price" type="number" min="0" value="${s.price}" style="padding:6px 10px;width:100px"></td>
       <td><input class="input" data-f="unit" value="${esc(s.unit||'')}" style="padding:6px 10px"></td>
       <td ${showMargin?'':'hidden'}><input class="input" data-f="margin" type="number" min="0" max="90" value="${s.margin||0}" style="padding:6px 10px;width:76px"></td>
+      <td><input class="input" data-f="norm" type="number" min="0" step="0.1" value="${calcSvcNormVal(nid,s.id)}" placeholder="${dailyNormFor(nid)||'—'}" style="padding:6px 10px;width:86px"></td>
       <td style="width:40px"><button class="iconbtn" data-del="${s.id}" title="Удалить услугу">${icon('trash')}</button></td>
     </tr>`).join('');
   }
@@ -8424,6 +8479,7 @@ const cm = root.querySelector('.chat-main');
     const docRolesLabel = d => (!d.roles || !d.roles.length)
       ? 'Все'
       : ALL_DOC_ROLES.filter(r => d.roles.includes(r.id)).map(r => r.label).join(', ');
+    const REP_LABEL = { none:'Разовое', daily:'Ежедневно', weekly:'Еженедельно', monthly:'Ежемесячно' };
     const renderSec = ()=>{
       const el = root.querySelector('#set-body');
       if (section==='profile') el.innerHTML = profileHTML(u);
@@ -8520,8 +8576,19 @@ const cm = root.querySelector('.chat-main');
           <div class="field"><label>Телефон</label><input class="input" id="pf-phone" value="${esc(u2.phone)}"></div>
         </div>
         <div class="field" style="margin-top:12px"><label>Город (часовой пояс)</label>
-          <select class="input" id="pf-city">${TZ_CITIES.map(([c,z])=>`<option value="${c}|${z}" ${((u2.city||'Москва')+'|'+(u2.tz||'Europe/Moscow'))===c+'|'+z?'selected':''}>${esc(c)} · ${esc(z)}</option>`).join('')}</select>
-          <div class="tiny faint" style="margin-top:4px">Время дедлайнов — в вашем часовом поясе. По умолчанию — Москва.</div>
+          <div class="row" style="gap:8px;align-items:center">
+            <select class="input" id="pf-city" style="flex:1">${TZ_CITIES.map(([c,z])=>`<option value="${c}|${z}" ${((u2.city||'Москва')+'|'+(u2.tz||'Europe/Moscow'))===c+'|'+z?'selected':''}>${esc(tzOptionLabel(c,z))}</option>`).join('')}</select>
+            <button class="btn btn--ghost btn--sm" type="button" id="pf-geo" style="flex:none">Определить</button>
+          </div>
+          <div class="tiny faint" style="margin-top:4px">В списке — UTC и текущее местное время. Время дедлайнов — в вашем поясе; VPN может подменить пояс, проверьте город.</div>
+        </div>
+        <div class="cols-2 grid" style="gap:12px;margin-top:12px">
+          <div class="field"><label>Пол</label><select class="input" id="pf-gender">
+            <option value="">Не указан</option>
+            <option value="female" ${u2.gender==='female'?'selected':''}>Женский</option>
+            <option value="male" ${u2.gender==='male'?'selected':''}>Мужской</option>
+          </select></div>
+          <div class="field"><label>Дата рождения</label><input class="input" type="date" id="pf-birthdate" max="${new Date().toISOString().slice(0,10)}" value="${esc(u2.birthdate||'')}"></div>
         </div>
         <div class="field" style="margin-top:12px"><label>О себе</label><textarea class="input" id="pf-about">${esc(u2.about||'')}</textarea></div>
         <div class="row row--between" style="margin-top:12px"><b class="small">Рабочий статус</b>
@@ -8590,10 +8657,7 @@ const cm = root.querySelector('.chat-main');
         <button class="btn btn--primary btn--sm" id="fee-save" style="margin-top:10px">Сохранить потолки</button>
       </div><div class="card card-pad" style="margin-bottom:12px"><h3>Сроки</h3>
         <p class="small muted" style="margin-bottom:10px">Норма объёма в сутки: срок исполнителя = объём ÷ норма. Клиенту показывается срок с запасом (+30% по умолчанию).</p>
-        <div class="cols-2 grid" style="gap:12px">
-          <div class="field"><label>Запас клиенту, %</label><input class="input" id="calc-buffer" type="number" min="0" max="200" step="1" value="${clientBufferPct()}"></div>
-          <div class="field"><label>Норма для всех ниш, ед./сутки</label><input class="input" id="calc-norm-all" type="number" min="0" step="0.1" placeholder="все"></div>
-        </div>
+        <div class="field" style="max-width:240px"><label>Запас клиенту, %</label><input class="input" id="calc-buffer" type="number" min="0" max="200" step="1" value="${clientBufferPct()}"></div>
       </div><div class="card card-pad"><h3 style="margin-bottom:6px">Услуги калькулятора</h3>
         <p class="small muted" style="margin-bottom:10px">Перечень услуг, стоимость и маржа платформы — по нишам. Настраивается администратором — владельцем платформы. Калькулятор принимает ввод с клавиатуры.</p>
         <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:10px">
@@ -8607,7 +8671,7 @@ const cm = root.querySelector('.chat-main');
           <div class="row row--between"><b class="small">${esc(n.name)}</b>
             <button class="btn btn--ghost btn--sm" data-add="${n.id}">${icon('plus')} Услуга</button></div>
           <div class="tbl-wrap" style="margin-top:8px;border:0"><table class="tbl" style="min-width:0">
-            <thead><tr><th>Услуга</th><th>Цена, ₽</th><th>Единица</th><th ${u.role==='admin'?'':'hidden'}>Маржа в цене, %<input class="input" data-margin-all="${n.id}" type="number" min="0" max="90" placeholder="все" style="width:58px;padding:3px 6px;font-size:11px;margin-left:6px" title="Выставить маржу всем услугам группы"></th><th></th></tr></thead>
+            <thead><tr><th>Услуга</th><th>Цена, ₽</th><th>Единица</th><th ${u.role==='admin'?'':'hidden'}>Маржа в цене, %<input class="input" data-margin-all="${n.id}" type="number" min="0" max="90" placeholder="все" style="width:58px;padding:3px 6px;font-size:11px;margin-left:6px" title="Выставить маржу всем услугам группы"></th><th>Норма, ед./сутки<input class="input" data-norm-all="${n.id}" type="number" min="0" step="0.1" placeholder="все" style="width:58px;padding:3px 6px;font-size:11px;margin-left:6px" title="Выставить норму всем услугам группы"></th><th></th></tr></thead>
             <tbody data-niche="${n.id}">${rows(n.id)}</tbody>
           </table></div>
           <div class="row" style="gap:10px;margin-top:10px;flex-wrap:wrap;align-items:flex-end">
@@ -8646,8 +8710,8 @@ const cm = root.querySelector('.chat-main');
       </div>`;
     }
     /* Строки промокодов: одна разметка для рендера и добавления новой. */
-    function promoRows(){
-      return (S.settings.promos || []).map(p => `<tr data-promo="${p.id}">
+    function promoRow(p){
+      return `<tr data-promo="${p.id}">
         <td><input class="input" data-pf="code" value="${esc(p.code)}" style="padding:6px 10px;width:120px"></td>
         <td><input class="input" data-pf="percent" type="number" min="0" max="90" value="${+p.percent || 0}" style="padding:6px 10px;width:80px"></td>
         <td><select class="input" data-pf="kind" style="padding:6px 10px">
@@ -8657,9 +8721,11 @@ const cm = root.querySelector('.chat-main');
         <td><input class="input" data-pf="minHours" type="number" min="0" value="${+p.minHours || 0}" style="padding:6px 10px;width:80px"></td>
         <td><label class="check"><input type="checkbox" data-pf="active" ${p.active !== false ? 'checked' : ''}><span class="box"><svg><use href="#i-check-c"/></svg></span></label></td>
         <td><button class="iconbtn" type="button" data-promo-del="${p.id}" title="Удалить">${icon('trash','ico-sm')}</button></td>
-      </tr>`).join('');
+      </tr>`;
     }
-    const REP_LABEL = { none:'Разовое', daily:'Ежедневно', weekly:'Еженедельно', monthly:'Ежемесячно' };
+    function promoRows(){
+      return (S.settings.promos || []).map(promoRow).join('');
+    }
     function todosHTML(u2){
       /* Умный планировщик: ToDo список, отсортированный от наиболее важного
          к наименее важному (приоритет 1 = критично … 5 = не срочно).
@@ -8683,7 +8749,7 @@ const cm = root.querySelector('.chat-main');
       return `<div class="card card-pad">
         <h3 style="margin-bottom:10px">Умный планировщик (ToDo)</h3>
         <p class="small muted" style="margin:0 0 12px">Задачи сортируются от важного к наименее важному.${OPEN_BUGS ? ` <span class="badge c-red" style="margin-left:4px">открытых багов: ${OPEN_BUGS}</span>` : ''} Варианты для быстрого старта — ниже.</p>
-        <div class="row" style="gap:8px;margin-bottom:8px;flex-wrap:wrap">
+        <div class="row td-add-row" style="gap:8px;margin-bottom:8px;flex-wrap:wrap">
           <div class="field" style="flex:1;min-width:180px"><input class="input" id="td-text" placeholder="Что нужно сделать?"></div>
           <div class="field" style="flex:none;max-width:130px">
             <select class="input" id="td-type">
@@ -8695,7 +8761,7 @@ const cm = root.querySelector('.chat-main');
               ${[1,2,3,4,5].map(p=>`<option value="${p}">${p} — ${PRIO_LABEL[p]}</option>`).join('')}
             </select>
           </div>
-          <div style="align-self:flex-end"><button class="btn btn--primary btn--sm" id="td-add">${icon('plus','ico-sm')} Добавить</button></div>
+          <div style="align-self:center"><button class="btn btn--primary btn--sm" id="td-add">${icon('plus','ico-sm')} Добавить</button></div>
         </div>
         <div class="row" style="gap:8px;margin-bottom:8px;flex-wrap:wrap">
           <div class="field" style="flex:1;min-width:190px"><label class="small faint">Связать с</label>
@@ -8902,7 +8968,7 @@ const cm = root.querySelector('.chat-main');
           ${mine.length ? mine.map(r=>{
             const rep = r.repeat || 'none';
             const whenStr = r.done ? 'выполнено' : (r.at <= Date.now() ? 'наступило' : 'след. ' + fmt(r.at));
-            return `<div class="row row--between" style="padding:10px 12px;border:1px solid var(--border);border-radius:12px;${r.done?'opacity:.55':''}">
+            return `<div class="row row--between" data-rm-id="${r.id}" style="padding:10px 12px;border:1px solid var(--border);border-radius:12px;${r.done?'opacity:.55':''}">
             <span class="small"><b>${esc(r.text)}</b><br><span class="faint">${REP_LABEL[rep] || rep} · ${whenStr}${r.notify?' · с уведомлением':' · тихо'}</span>${r.todo_id && (S.todos||[]).some(t=>t.id===r.todo_id) ? `<br><button type="button" class="td-link" data-rm-todo="${esc(r.todo_id)}">к задаче</button>` : ''}</span>
             <span style="display:flex;gap:6px;align-items:center">
               ${(r.done?'':`<button class="btn btn--ghost btn--sm" data-rm-done="${r.id}">Готово</button>`)}
@@ -9339,9 +9405,16 @@ const cm = root.querySelector('.chat-main');
         inp.addEventListener('change', applyAll);
         inp.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); applyAll(); } });
       });
-      const normAll = el.querySelector('#calc-norm-all');
-      if (normAll) normAll.addEventListener('input', ()=>{
-        el.querySelectorAll('[data-daily-norm]').forEach(inp => { inp.value = normAll.value; });
+      el.querySelectorAll('[data-norm-all]').forEach(inp=>{
+        const applyAll = ()=>{
+          if (inp.value === '') return;
+          const v = Math.max(0, +inp.value || 0);
+          const tb = el.querySelector('tbody[data-niche="' + inp.dataset.normAll + '"]');
+          if (!tb) return;
+          tb.querySelectorAll('[data-f="norm"]').forEach(f => { f.value = v; });
+        };
+        inp.addEventListener('change', applyAll);
+        inp.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); applyAll(); } });
       });
       const save = ()=>{
         const isAdmin = user().role === 'admin';
@@ -9351,11 +9424,14 @@ const cm = root.querySelector('.chat-main');
         el.querySelectorAll('tbody[data-niche]').forEach(tb=>{
           const nid = tb.dataset.niche;
           const list = [];
+          const normMap = {};
           tb.querySelectorAll('tr[data-sid]').forEach(tr=>{
             const g = f => tr.querySelector(`[data-f="${f}"]`).value.trim();
             const name = g('name');
             if (!name) return;
             list.push({ id: tr.dataset.sid, name, price: +g('price')||0, unit: g('unit'), margin: Math.min(90, Math.max(0, +g('margin')||0)) });
+            const nv = Math.max(0, Number(g('norm')) || 0);
+            if (nv) normMap[tr.dataset.sid] = nv;
           });
           S.calcServices[nid] = list;
           const extras = [];
@@ -9372,6 +9448,8 @@ const cm = root.querySelector('.chat-main');
           S.calcSettings.minExecPrice = S.calcSettings.minExecPrice || {};
           S.calcSettings.deadlineDays = S.calcSettings.deadlineDays || {};
           S.calcSettings.dailyNorm = S.calcSettings.dailyNorm || {};
+          S.calcSettings.dailyNormSvc = S.calcSettings.dailyNormSvc || {};
+          S.calcSettings.dailyNormSvc[nid] = normMap;
           const num = sel => Math.max(0, Math.round(+((el.querySelector(sel) || {}).value) || 0));
           S.calcSettings.minPrice[nid] = num(`[data-min-price="${nid}"]`);
           S.calcSettings.minExecPrice[nid] = num(`[data-min-exec="${nid}"]`);
@@ -9406,8 +9484,20 @@ const cm = root.querySelector('.chat-main');
         saveState();
         toast('Услуги и настройки срочности сохранены', 'ok');
       };
+      /* Удаление строки: сначала плавно гасим, потом убираем из DOM. */
+      const calcRowOut = (tr, after) => {
+        if (!tr){ after && after(); return; }
+        const reduce = (S.settings && S.settings.noAnim) || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+        if (reduce){ tr.remove(); after && after(); return; }
+        tr.style.pointerEvents = 'none';
+        tr.style.transition = 'opacity .16s var(--ease), transform .16s var(--ease)';
+        tr.style.opacity = '0';
+        tr.style.transform = 'translateY(-3px)';
+        setTimeout(()=>{ tr.remove(); after && after(); }, 170);
+      };
       const addRow = nid => {
         const tb = el.querySelector(`tbody[data-niche="${nid}"]`);
+        if (!tb) return;
         const id = 'cs' + uid();
         const tr = document.createElement('tr');
         tr.dataset.sid = id;
@@ -9417,8 +9507,11 @@ const cm = root.querySelector('.chat-main');
           <td><input class="input" data-f="price" type="number" min="0" value="0" style="padding:6px 10px;width:100px"></td>
           <td><input class="input" data-f="unit" placeholder="за час / за трек" style="padding:6px 10px"></td>
           <td><input class="input" data-f="margin" type="number" min="0" max="90" value="20" style="padding:6px 10px;width:76px"></td>
+          <td><input class="input" data-f="norm" type="number" min="0" step="0.1" placeholder="${dailyNormFor(nid)||'—'}" style="padding:6px 10px;width:86px"></td>
           <td style="width:40px"><button class="iconbtn" data-del="${id}" title="Удалить">${icon('trash')}</button></td>`;
         tb.appendChild(tr);
+        const inp = tr.querySelector('[data-f="name"]');
+        if (inp) setTimeout(()=>inp.focus(), 30);
       };
       const addExtraRow = nid => {
         const tb = el.querySelector(`tbody[data-extra="${nid}"]`);
@@ -9435,14 +9528,16 @@ const cm = root.querySelector('.chat-main');
           <td><label class="check"><input type="checkbox" data-ef="active" checked><span class="box"><svg><use href="#i-check-c"/></svg></span></label></td>
           <td style="width:40px"><button class="iconbtn" data-extra-del="${id}" title="Удалить опцию">${icon('trash','ico-sm')}</button></td>`;
         tb.appendChild(tr);
+        const inp = tr.querySelector('[data-ef="name"]');
+        if (inp) setTimeout(()=>inp.focus(), 30);
       };
       el.addEventListener('click', e=>{
         const exDel = e.target.closest('[data-extra-del]');
-        if (exDel){ exDel.closest('tr').remove(); toast('Опция удалена — не забудьте сохранить','info'); return; }
+        if (exDel){ calcRowOut(exDel.closest('tr')); toast('Опция удалена — не забудьте сохранить','info'); return; }
         const addEx = e.target.closest('[data-add-extra]');
         if (addEx){ addExtraRow(addEx.dataset.addExtra); return; }
         const del = e.target.closest('[data-del]');
-        if (del){ del.closest('tr').remove(); toast('Строка удалена — не забудьте сохранить','info'); return; }
+        if (del){ calcRowOut(del.closest('tr')); toast('Строка удалена — не забудьте сохранить','info'); return; }
         const add = e.target.closest('[data-add]');
         if (add) addRow(add.dataset.add);
         const promoSave = e.target.closest('#promo-save');
@@ -9469,18 +9564,26 @@ const cm = root.querySelector('.chat-main');
         }
         if (e.target.closest('#promo-add')){
           S.settings.promos = S.settings.promos || [];
-          S.settings.promos.push({ id:'pm' + uid(), code:'NEW10', percent:10, kind:'once', minHours:0, active:true });
+          const p = { id:'pm' + uid(), code:'NEW10', percent:10, kind:'once', minHours:0, active:true };
+          S.settings.promos.push(p);
           const tb = el.querySelector('#promo-rows');
-          if (tb){ tb.innerHTML = promoRows(); }
+          if (tb){
+            tb.insertAdjacentHTML('beforeend', promoRow(p));
+            const tr = tb.lastElementChild;
+            if (tr) tr.classList.add('calc-new-row');
+            const inp = tr && tr.querySelector('[data-pf="code"]');
+            if (inp) setTimeout(()=>{ inp.focus(); inp.select(); }, 30);
+          }
           toast('Промокод добавлен — задайте код и сохраните', 'info');
           return;
         }
         const promoDel = e.target.closest('[data-promo-del]');
         if (promoDel){
-          S.settings.promos = (S.settings.promos || []).filter(x => x.id !== promoDel.dataset.promoDel);
-          const tb = el.querySelector('#promo-rows');
-          if (tb) tb.innerHTML = promoRows();
-          saveState();
+          const tr = promoDel.closest('tr');
+          calcRowOut(tr, ()=>{
+            S.settings.promos = (S.settings.promos || []).filter(x => x.id !== promoDel.dataset.promoDel);
+            saveState();
+          });
           return;
         }
         if (e.target.closest('#calc-save')) save();
@@ -9690,6 +9793,55 @@ const cm = root.querySelector('.chat-main');
           u.city = city; u.tz = tz;
           pfCommit('город '+city, ()=>APP && APP.render && requestAnimationFrame(APP.render));
           toast('Город сохранён: '+city,'ok');
+        });
+        const pfGeo = $('#pf-geo', el);
+        if (pfGeo) pfGeo.onclick = ()=>{
+          const applyCity = (city, tz, msg) => {
+            u.city = city; u.tz = tz;
+            if (pfCity) pfCity.value = city+'|'+tz;
+            pfCommit('город '+city, ()=>APP && APP.render && requestAnimationFrame(APP.render));
+            toast(msg, 'ok');
+          };
+          const byBrowserTz = () => {
+            let tz = '';
+            try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch(e){}
+            const hit = TZ_CITIES.find(([c,z])=>z===tz);
+            if (hit) applyCity(hit[0], hit[1], 'Определено по поясу браузера: '+hit[0]);
+            else toast('Пояс браузера'+(tz?' ('+tz+')':'')+' не сопоставлен с городом — выберите вручную','warn');
+          };
+          if (!navigator.geolocation){ byBrowserTz(); return; }
+          toast('Определяем город…','info');
+          navigator.geolocation.getCurrentPosition(
+            pos => {
+              const hit = nearestTzCity(pos.coords.latitude, pos.coords.longitude);
+              if (!hit){ byBrowserTz(); return; }
+              let sysTz = '';
+              try { sysTz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch(e){}
+              const vpn = !!(sysTz && sysTz !== hit[1]);
+              applyCity(hit[0], hit[1], vpn
+                ? 'Определено: '+hit[0]+' · пояс браузера '+sysTz+' отличается — возможно, VPN'
+                : 'Определено: '+hit[0]);
+            },
+            byBrowserTz,
+            { enableHighAccuracy:false, timeout:6000, maximumAge:600000 }
+          );
+        };
+        const pfGender = $('#pf-gender', el);
+        if (pfGender) pfGender.addEventListener('change', ()=>{
+          u.gender = pfGender.value;
+          pfCommit('пол', ()=>APP && APP.render && requestAnimationFrame(APP.render));
+          toast('Пол сохранён','ok');
+        });
+        const pfBirth = $('#pf-birthdate', el);
+        if (pfBirth) pfBirth.addEventListener('change', ()=>{
+          if (pfBirth.value && new Date(pfBirth.value) > new Date()){
+            toast('Дата рождения не может быть в будущем','warn');
+            pfBirth.value = u.birthdate || '';
+            return;
+          }
+          u.birthdate = pfBirth.value;
+          pfCommit('дата рождения', ()=>APP && APP.render && requestAnimationFrame(APP.render));
+          toast('Дата рождения сохранена','ok');
         });
         /* Логин меняем аккуратно: только a-z, 0-9, точка, дефис, подчёркивание;
            проверяем занятость и не даём сохранить пустое/короткое. */
@@ -11000,9 +11152,11 @@ function initPWA(){
       ico.__ringT = setTimeout(()=>{ ico.classList.remove('bell-ring'); }, 900);
     }catch(e){}
   }
-  function pushNotifTo(owner, title, text, iconName){
+  function pushNotifTo(owner, title, text, iconName, meta){
     S.notifs = S.notifs || [];
-    S.notifs.unshift({ id:uid(), icon:iconName||'i-clients', title, text, t:Date.now(), read:{}, owner_id: owner?owner.id:null });
+    const n = { id:uid(), icon:iconName||'i-clients', title, text, t:Date.now(), read:{}, owner_id: owner?owner.id:null };
+    if (meta) Object.assign(n, meta);
+    S.notifs.unshift(n);
     const meU = (typeof me === 'function') ? me() : null;
     if (!owner || (meU && owner.id === meU.id)){
       /* В реальном времени: обновляем счётчик, «звоним» колокольчиком,
@@ -11077,7 +11231,7 @@ function initPWA(){
       if (r.done || r.at > now) return;
       if (r.notify){
         const owner = S.users.find(x=>x.id===r.owner_id) || null;
-        pushNotifTo(owner, 'Напоминание', r.text, 'i-clock');
+        pushNotifTo(owner, 'Напоминание', r.text, 'i-clock', { kind:'reminder', reminder_id:r.id });
       }
       r.lastFiredAt = Date.now();
       const rep = r.repeat || 'none';

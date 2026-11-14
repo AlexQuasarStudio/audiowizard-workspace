@@ -1,5 +1,5 @@
 /* Audiowizard Workspace — Service Worker (кеш оболочки, обновления, офлайн) */
-const VER = '0.1-prototype.1449';
+const VER = '0.1-prototype.1452';
 const CACHE = `aw-shell-${VER}`;
 
 const PRECACHE = [

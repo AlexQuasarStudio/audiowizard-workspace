@@ -1523,14 +1523,45 @@ const CRM = (() => {
       list = computeList();
       const row = root.querySelector(`tr[data-oid="${o.id}"]`);
       const card = root.querySelector(`.o-card[data-oid="${o.id}"]`);
+      const debtNow = window.Finance ? Finance.debts(o).total : 0;
+      /* Появление бейджа долга — анимацией, исчезновение — сначала плавно
+         гасим старый бейдж, потом заменяем строку/карточку. */
+      const replaceRow = (el) => {
+        const old = el.querySelector('.o-debt');
+        if (old && !debtNow){
+          if (old.classList.contains('is-out')) return;
+          old.classList.add('is-out');
+          setTimeout(()=>{ if (el.isConnected) el.outerHTML = rowHTML(o); }, 190);
+          return;
+        }
+        el.outerHTML = rowHTML(o);
+        if (old){
+          const fresh = root.querySelector(`tr[data-oid="${o.id}"] .o-debt`);
+          if (fresh) fresh.classList.add('no-anim');
+        }
+      };
+      const replaceCard = (el) => {
+        const old = el.querySelector('.o-debt');
+        if (old && !debtNow){
+          if (old.classList.contains('is-out')) return;
+          old.classList.add('is-out');
+          setTimeout(()=>{ if (el.isConnected) el.outerHTML = cardHTML(o); }, 190);
+          return;
+        }
+        el.outerHTML = cardHTML(o);
+        if (old){
+          const fresh = root.querySelector(`.o-card[data-oid="${o.id}"] .o-debt`);
+          if (fresh) fresh.classList.add('no-anim');
+        }
+      };
       if (!list.some(x => x.id === o.id)){
         if (row){ row.remove(); shown = Math.max(0, shown - 1); }
         if (card){ card.remove(); shown = Math.max(0, shown - 1); }
         updateCount();
         return;
       }
-      if (cardsView && card) card.outerHTML = cardHTML(o);
-      else if (!cardsView && row) row.outerHTML = rowHTML(o);
+      if (cardsView && card) replaceCard(card);
+      else if (!cardsView && row) replaceRow(row);
       else if (!card && !row){
         const host = root.querySelector('#o-rows');
         const target = host && (cardsView ? host.querySelector('.o-cards') : host.querySelector('tbody'));
@@ -5313,10 +5344,17 @@ updatePeopleBulk();
     const dlValue = dlTs ? new Date(dlTs - new Date(dlTs).getTimezoneOffset()*60000).toISOString().slice(0,16) : '';
     const daysValue = dlTs ? String(Math.max(0, Math.ceil((dlTs - Date.now())/DAY))) : '';
     /* Для объёма: ставка услуги и подходящая единица по умолчанию. */
+    const CALC_LANGS = [['ru','Русский'],['en','Английский'],['de','Немецкий'],['fr','Французский'],['es','Испанский'],['it','Итальянский'],['zh','Китайский'],['tr','Турецкий'],['pl','Польский']];
+    const langOptions = sel => CALC_LANGS.map(([code,name])=>`<option value="${code}" ${code===sel?'selected':''}>${name}</option>`).join('');
     const volList = [];
     (S.niches || []).forEach(n => (S.calcServices[n.id] || []).forEach((s,i)=>{ if (+s.price > 0) volList.push({ nid:n.id, idx:i, niche:n.name, s }); }));
     const firstVol = volList.find(v => v.nid === initNiche) || volList[0];
-    const volOptions = volList.map(v => `<option value="${v.nid}|${v.idx}" ${v===firstVol?'selected':''}>${esc(v.niche)} · ${esc(v.s.name)} — ${fmtMoney(v.s.price)} ${esc(v.s.unit||'')}</option>`).join('');
+    const volOptionHtml = v => `<option value="${v.nid}|${v.idx}" ${v===firstVol?'selected':''}>${esc(v.niche)} · ${esc(v.s.name)} — ${fmtMoney(v.s.price)} ${esc(v.s.unit||'')}</option>`;
+    const volOptionsFor = nid => {
+      const list = volList.filter(v => !nid || v.nid === nid);
+      return list.length ? list.map(volOptionHtml).join('') : '<option value="">Нет услуг в этой специализации</option>';
+    };
+    const volOptions = volOptionsFor(initNiche);
     const volUnit = firstVol && /страниц|лист/i.test(firstVol.s.unit) ? 'page' : firstVol && /1000.*знак|символ/i.test(firstVol.s.unit) ? 'char' : 'min';
     const m = openWinModal({
       narrow:true, tall:true, title:'Калькулятор услуг', route:'orders', persistKey: onResult ? '' : 'calculator',
@@ -5340,6 +5378,13 @@ updatePeopleBulk();
             <div class="field" style="flex:1;min-width:220px"><label>Услуга</label>
               <select class="input" id="cx-vsvc">${volOptions}</select></div>
           </div>
+          <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
+            <div class="field" style="flex:1;min-width:150px"><label>Язык оригинала</label>
+              <select class="input" id="cx-lang-from">${langOptions('en')}</select></div>
+            <div class="field" style="flex:1;min-width:150px"><label>Язык перевода</label>
+              <select class="input" id="cx-lang-to">${langOptions('ru')}</select></div>
+          </div>
+          <div class="tiny faint" id="cx-lang-note" style="margin-top:4px"></div>
           <div class="small" id="cx-volume-note" style="margin-top:6px"></div>
           <div class="field calc-char" id="cx-char">
             <label>Считать символы</label>
@@ -5365,7 +5410,7 @@ updatePeopleBulk();
           <div class="small" id="cx-rush" style="margin-top:8px"></div>
           <div class="small" id="cx-norm-deadline" style="margin-top:6px"></div>
         </div>
-        <div class="small faint" style="margin-top:12px">Дополнительные услуги и опции. Если объём уже указан выше, основную услугу здесь не дублируйте.</div>
+        <div class="small muted" style="margin-top:12px;line-height:1.5"><b>Дополнительные услуги и опции</b> — вычитка, оформление, срочность и другие надбавки. Основную услугу (перевод, транскрибацию) выберите в блоке «Объём» выше: если объём уже указан, не дублируйте её здесь, иначе сумма посчитается дважды.</div>
         <div class="field" style="margin-top:10px"><label>Поиск услуги</label><input class="input" id="cx-svc-search" placeholder="Название, единица или ниша" autocomplete="off" spellcheck="false"></div>
         <div id="cx-svcs" style="margin-top:8px"></div>
         <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
@@ -5443,13 +5488,31 @@ updatePeopleBulk();
           }
           return { qty, unit, nid, s, rate };
         };
+        const paintVolOptions = nid => {
+          const sel = g2('#cx-vsvc'); if (!sel) return;
+          const list = volList.filter(v => !nid || v.nid === nid);
+          sel.innerHTML = list.length
+            ? list.map(v => `<option value="${v.nid}|${v.idx}">${esc(v.niche)} · ${esc(v.s.name)} — ${fmtMoney(v.s.price)} ${esc(v.s.unit||'')}</option>`).join('')
+            : '<option value="">Нет услуг в этой специализации</option>';
+        };
+        const paintLang = () => {
+          const box = g2('#cx-lang-note'); if (!box) return;
+          const from = g2('#cx-lang-from') ? g2('#cx-lang-from').value : '';
+          const to = g2('#cx-lang-to') ? g2('#cx-lang-to').value : '';
+          const name = c => ((CALC_LANGS.find(x => x[0] === c) || [])[1]) || c;
+          box.textContent = from && to ? `Языковая пара: ${name(from)} → ${name(to)}` : '';
+        };
+        ['#cx-lang-from','#cx-lang-to'].forEach(sel => {
+          const el = g2(sel); if (el) el.addEventListener('change', paintLang);
+        });
+        paintLang();
         /* Срок по суточной норме объёма: исполнителю — объём ÷ норма,
            клиенту — тот же срок плюс настраиваемый запас (по умолчанию 30%). */
         const paintNormDeadline = () => {
           const box = g2('#cx-norm-deadline'); if (!box) return;
           const v = volState();
           const nid = g2('#cx-niche') ? g2('#cx-niche').value : '';
-          const norm = dailyNormFor(nid);
+          const norm = v.s ? dailyNormForSvc(v.nid, v.s.id) : dailyNormFor(nid);
           if (!v.qty || !norm){ box.innerHTML = '<span class="faint">Норма объёма в сутки не задана — срок можно указать вручную.</span>'; return; }
           const exec = v.qty / norm;
           const pct = clientBufferPct();
@@ -5559,7 +5622,14 @@ updatePeopleBulk();
           return { base, pct: discountPct, discounted, rushFee, sum, minTotal, minApplied: sum > rawSum, rush: dl.urgent,
             rushPct: dl.pct, deadline: dl.dl, nid: dl.nid, best, code, hours, known, extraPct, extraFee };
         };
-        const metaOf = d => ({ deadline:d.deadline, rush:d.rush, rushPct:d.rushPct, rushFee:d.rushFee, nishId:d.nid });
+        const langPair = () => {
+          const from = g2('#cx-lang-from') ? g2('#cx-lang-from').value : '';
+          const to = g2('#cx-lang-to') ? g2('#cx-lang-to').value : '';
+          return from && to ? from+'→'+to : '';
+        };
+        const metaOf = d => ({ deadline:d.deadline, rush:d.rush, rushPct:d.rushPct, rushFee:d.rushFee, nishId:d.nid,
+          langFrom: g2('#cx-lang-from') ? g2('#cx-lang-from').value : '',
+          langTo: g2('#cx-lang-to') ? g2('#cx-lang-to').value : '', langPair:langPair() });
         const paintTotals = () => {
           const d = calcDiscount();
           const empty = (val == null || isNaN(val)) && !svcSum() && !d.deadline;
@@ -5622,7 +5692,8 @@ updatePeopleBulk();
           if (empty) empty.hidden = any;
         };
         const paintSvcs = ()=>{
-          g2('#cx-svcs').innerHTML = S.niches.map(n=>{
+          const onlyNid = g2('#cx-niche') ? g2('#cx-niche').value : '';
+          g2('#cx-svcs').innerHTML = S.niches.filter(n => !onlyNid || n.id === onlyNid).map(n=>{
             const svcs = S.calcServices[n.id] || [];
             const extras = calcExtrasFor(n.id);
             return `<div class="small cx-svc-group"><b style="margin-bottom:4px;display:block">${esc(n.name)}</b>
@@ -5638,7 +5709,12 @@ updatePeopleBulk();
         paintDiscount();
         upd();
         paintVolume(false);
-        g2('#cx-niche').addEventListener('change', ()=>{ paintRush(); paintNormDeadline(); paintDiscount(); upd(); });
+        g2('#cx-niche').addEventListener('change', ()=>{
+          paintVolOptions(g2('#cx-niche').value);
+          paintSvcs();
+          paintVolume(true);
+          paintRush(); paintNormDeadline(); paintDiscount(); upd();
+        });
         /* Срок можно задать в днях — точная дата подставляется сама;
            ручная дата так же пересчитывает дни. */
         const localDT = ts => new Date(ts - new Date(ts).getTimezoneOffset()*60000).toISOString().slice(0,16);

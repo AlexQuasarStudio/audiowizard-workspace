@@ -255,6 +255,11 @@ function dailyNormFor(nid){
   const v = (((S || {}).calcSettings || {}).dailyNorm || {})[nid];
   return Math.max(0, Number(v) || 0);
 }
+function dailyNormForSvc(nid, sid){
+  const all = (((S || {}).calcSettings || {}).dailyNormSvc || {})[nid] || {};
+  const v = all[sid];
+  return v != null && Number(v) > 0 ? Math.max(0, Number(v) || 0) : dailyNormFor(nid);
+}
 function clientBufferPct(){
   const v = (((S || {}).calcSettings || {}).clientBufferPct);
   return Math.max(0, Math.min(200, Number(v == null ? 30 : v) || 0));

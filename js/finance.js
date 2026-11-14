@@ -577,6 +577,10 @@ const Finance = (function(){
     const u = userById(uid);
     if (!isPayoutRecipient(uid)) return null;
     const sc = scOf(uid);
+    /* В Smartcat-выгрузку — только подтверждённые аккаунты с логином.
+       Непривязанные/ожидающие остаются в ручной выплате, но не в файле:
+       иначе импорт в Smartcat падает на неизвестном vendor.login. */
+    if (sc.status !== 'approved' || !String(sc.login || '').trim()) return null;
     const docs = [];
     (entries || []).forEach(o => {
       /* Сумма документа должна совпадать с долгом по этому заказу: иначе
@@ -600,7 +604,7 @@ const Finance = (function(){
       schema: 'smartcat.payout.v1',
       generatedAt: new Date().toISOString(),
       vendor: {
-        login: sc.login || (u && u.username) || '',
+        login: String(sc.login || '').trim(),
         internalId: uid,
         fullName: (u && u.full_name) || '',
         email: (u && u.email) || ''
