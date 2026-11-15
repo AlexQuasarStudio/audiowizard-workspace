@@ -2294,7 +2294,7 @@ ex.innerHTML = avatarHTML(user(), '');
               ${Object.entries(stCounts).map(([st,n])=>`<div class="row" data-st="${st}"><span class="dot" style="background:${donutColors[st]||'var(--gray)'}"></span>${STATUS_META[st].label}<b>${n}</b></div>`).join('')}
             </div>
           </div></div>
-        <div class="card"><div class="card-h"><h3>Выручка по дням</h3><span class="row" style="gap:10px;align-items:center"><span class="small faint">14 дней</span><button type="button" class="small rev-link" data-rev-detail>Подробнее</button></span></div>
+        <div class="card"><div class="card-h"><h3>${isClient?'Расходы по дням':'Выручка по дням'}</h3><span class="row" style="gap:10px;align-items:center"><span class="small faint">14 дней</span><button type="button" class="small rev-link" data-rev-detail>Подробнее</button></span></div>
           <div class="card-b">
             <div class="chart-wrap" id="rev-chart">
               <svg class="spark" width="100%" height="130" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
@@ -2311,7 +2311,7 @@ ex.innerHTML = avatarHTML(user(), '');
           </div></div>
       </div>
             <div class="cols-4 grid" style="margin-top:12px">
-        <div class="metric"><div class="metric__label">${icon(isAdmin?'card':'chart','ico-sm')} ${isAdmin?'Чистая выручка':'Выручка (выполнено)'}</div>
+        <div class="metric"><div class="metric__label">${icon(isAdmin?'card':'chart','ico-sm')} ${isClient?'Расходы (выполнено)':isAdmin?'Чистая выручка':'Выручка (выполнено)'}</div>
           <div class="metric__value">${fmtMoney(revenue)}</div>
           <div class="metric__delta"><span class="delta-up">▲ 12%</span> за 14 дней</div>
           <button type="button" class="metric__more" data-rev-detail>Детализация →</button>
@@ -2331,7 +2331,7 @@ ex.innerHTML = avatarHTML(user(), '');
           <span class="metric__ico c-yellow">${icon('calc')}</span></div>
       </div>
 
-      ${isExec?``:`
+      ${!canAnalytics?``:`
       <div class="cols-2 grid" style="margin-top:12px">
         <div class="card"><div class="card-h"><h3>ТОП исполнителей</h3><a href="#/executors" class="small">Все →</a></div>
           <div class="card-b stack" style="gap:2px">
@@ -2363,12 +2363,12 @@ ex.innerHTML = avatarHTML(user(), '');
           <div class="small faint" style="margin-top:4px">приток за 14 дней по дате регистрации</div>
         </div>
       </div>`:''}`}
-      ${isAdmin?`
+      ${canAnalytics?`
       <div class="card" style="margin-top:12px"><div class="card-h"><h3>${icon('chart')} Использование функций платформы</h3><span class="badge c-gray">согласие на статистику</span></div>
         <div class="card-b stack" style="gap:10px">
           ${noDemo(S.featureUsage).map(f=>`<div class="bar-row"><span class="small">${esc(f.name)}</span><span class="progress"><span style="width:${f.share*2.6}%"></span></span><b>${f.share}%</b></div>`).join('')}
         </div></div>`:`
-      <div class="card" style="margin-top:12px"><div class="card-h"><h3>Активность команды</h3><span class="badge c-gray">14 дней</span></div>
+      <div class="card" style="display:none;margin-top:12px"><div class="card-h"><h3>Активность команды</h3><span class="badge c-gray">14 дней</span></div>
         <div class="card-b stack" style="gap:10px">
             ${noDemo(S.featureUsage).slice(0,4).map(f=>`<div class="bar-row"><span class="small">${esc(f.name)}</span><span class="progress"><span style="width:${f.share*2.6}%"></span></span><b>${f.share}%</b></div>`).join('')}
         </div></div>`}
@@ -2618,7 +2618,10 @@ ex.innerHTML = avatarHTML(user(), '');
     executor: { label: 'Исполнители',  empty: 'Без исполнителя', none: 'Исполнителей за период нет' }
   };
   function revAggDims(){ return Object.keys(REV_AGG_DIMS); }
-  function revAggDim(dim){ return REV_AGG_DIMS[dim] ? dim : 'niche'; }
+  function revAggDim(dim){
+    const staff = ['admin','top_manager','manager'].includes((typeof me === 'function' && me() ? me().role : ''));
+    return (staff && REV_AGG_DIMS[dim]) ? dim : 'niche';
+  }
   function revAggLabel(dim, key){
     const d = REV_AGG_DIMS[dim];
     return key || d.empty;
@@ -2804,7 +2807,7 @@ ex.innerHTML = avatarHTML(user(), '');
         : total;
     const myShareLabel = role === 'admin' ? 'Выручка админа'
       : (role === 'manager' || role === 'top_manager') ? 'Выручка менеджера'
-      : role === 'executor' ? 'Выручка исполнителя' : 'Выручка';
+      : role === 'executor' ? 'Выручка исполнителя' : 'Расходы';
 
     const presetHtml = REV_PRESETS.map(p =>
       `<button type="button" class="btn btn--sm ${revRange.preset === p.id ? 'btn--primary' : 'btn--ghost'}" data-rp="${p.id}">${p.label}</button>`).join('');
@@ -2837,10 +2840,10 @@ ex.innerHTML = avatarHTML(user(), '');
       </div>
       ${rows.length ? `<div class="rev-charts">
         <div class="rev-chart-block">
-          <div class="row row--between rev-chart-head"><b class="small">Выручка по ${bucketWord}</b><span class="small faint">${fmtMoney(total)}</span></div>
+          <div class="row row--between rev-chart-head"><b class="small">${role === 'client' ? 'Расходы по' : 'Выручка по'} ${bucketWord}</b><span class="small faint">${fmtMoney(total)}</span></div>
           ${chartBars(series.items, { height:150, labelEvery, aria:'Выручка по дням' })}
         </div>
-        <div class="rev-chart-block">
+        <div class="rev-chart-block" style="display:${['admin','top_manager','manager'].includes(role)?'':'none'}">
           <div class="row row--between rev-chart-head"><b class="small">Выручка по менеджерам</b><span class="small faint">${fmtMoney(total)}</span></div>
           <div class="rev-bars">${mgrBars}</div>
         </div>
@@ -2909,7 +2912,7 @@ ex.innerHTML = avatarHTML(user(), '');
     const firstAt = base.length ? Math.min(...base.map(x => x.at)) : Date.now();
     if (!revRange) revRange = revRangeFor('30', firstAt);
     openWinModal({
-      title:'Детализация выручки', icon:'chart', wide:true,
+      title:(me() && me().role === 'client') ? 'Детализация расходов' : 'Детализация выручки', icon:'chart', wide:true,
       body:'<div id="rev-detail" style="min-height:620px"></div>',
       onMount:(host) => {
         const box = host.querySelector('#rev-detail');
@@ -3190,13 +3193,14 @@ ex.innerHTML = avatarHTML(user(), '');
   function revAggFmtVol(v, unit){ return (Number(v) || 0).toLocaleString('ru-RU', { maximumFractionDigits: 1 }) + (unit ? ' ' + unit : ''); }
   function revAggHead(dim){
     const exec = dim === 'executor';
+    const isClient = !!(typeof me === 'function' && me() && me().role === 'client');
     return `<thead><tr>
       <th class="ragg-name">${esc(REV_AGG_DIMS[dim].label)}</th>
-      <th class="pay-cell">Выручка</th>
+      <th class="pay-cell">${isClient ? 'Расходы' : 'Выручка'}</th>
       <th class="pay-cell">Заказов</th>
       ${dim === 'niche' ? '<th class="pay-cell">Объём</th><th class="pay-cell">Ср. объём</th>' : ''}
       <th class="pay-cell">Средний чек</th>
-      <th class="pay-cell">Доля выручки</th>
+      <th class="pay-cell">Доля ${isClient ? 'расходов' : 'выручки'}</th>
       ${exec ? '<th class="pay-cell">Начислено</th><th class="pay-cell">Оплачено</th>' : ''}
       <th class="pay-cell">Долг</th>
     </tr></thead>`;
@@ -3227,7 +3231,7 @@ ex.innerHTML = avatarHTML(user(), '');
     const to = Math.min(items.length, page * REV_AGG_PAGE);
     const slice = items.slice(from ? from - 1 : 0, to);
     const maxShare = items.reduce((a, r) => Math.max(a, revenue ? r.revenue / revenue * 100 : 0), 0);
-    const dims = revAggDims();
+    const dims = ['admin','top_manager','manager'].includes((typeof me === 'function' && me() ? me().role : '')) ? revAggDims() : ['niche'];
     const tabs = dims.map(d => `<button type="button" class="${d === dim ? 'on' : ''}" data-ragg-tab="${d}">${esc(REV_AGG_DIMS[d].label)}</button>`).join('');
     const body = slice.length
       ? slice.map(r => revAggRowHtml(r, dim, revenue, maxShare)).join('')
