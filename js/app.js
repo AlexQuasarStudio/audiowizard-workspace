@@ -1479,9 +1479,9 @@ const QUICK_BY_ROLE = {
             <button class="tab ${tab==='client'?'on':''}" data-tab="client">${icon('clients','ico-sm')} Клиентский портал</button>
           </div>
           <div id="login-error"></div>
-          <form id="login-form">
+          <form id="login-form" autocomplete="off">
             <div class="field"><label>Логин или Email</label>
-              <div class="input-wrap">${icon('clients')}<input class="input" id="lg" autocomplete="username" placeholder="логин или email" value="${esc(S.rememberedLogin||'')}" style="padding-left:36px"></div></div>
+              <div class="input-wrap">${icon('clients')}<input class="input" id="lg" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="логин или email" value="${esc(S.rememberedLogin||'')}" style="padding-left:36px"></div></div>
             <div class="field" style="margin-top:12px"><label>Пароль</label>
               <div class="input-wrap has-eye">${icon('key')}<input class="input" id="pw" type="password" autocomplete="current-password" placeholder="••••••••" style="padding-left:36px">
                 <button type="button" class="input-eye" id="eye" aria-label="Показать пароль">${icon('eye','ico-sm')}${EYE_SLASH}</button></div></div>
@@ -2025,6 +2025,9 @@ ex.innerHTML = avatarHTML(user(), '');
     if (u2) u2.is_online = false;
     logAudit(`Выход: ${u2.full_name}`, 'Авторизация');
     S.currentUserId = null;
+    /* После явного выхода логин не должен подставляться в форму: иначе
+       на экране входа остаётся имя предыдущего пользователя. */
+    S.rememberedLogin = null;
     /* Опасное состояние: окна не должны переживать выход — иначе после
        входа другим пользователем на экране остаются чужие окна. */
     try { if (window.Windows && typeof Windows.closeAll === 'function') Windows.closeAll(); } catch(e){}
