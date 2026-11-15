@@ -225,7 +225,32 @@ const DEFAULT_CALC_SETTINGS = {
     ]
   }
 };
-function siteCalcServices(){ return JSON.parse(JSON.stringify(SITE_CALC_SERVICES)); }
+/* Категории услуг, которые нужны для выгрузки в Smartcat. Добавляем их
+   в специализацию «Переводы», не перетирая уже настроенный каталог. */
+const SMARTCAT_SERVICES = [
+  { id:'cs-sc1',  name:'Перевод', price:400, unit:'за страницу', margin:25 },
+  { id:'cs-sc2',  name:'Редактура перевода', price:250, unit:'за страницу', margin:25 },
+  { id:'cs-sc3',  name:'Корректура', price:200, unit:'за страницу', margin:25 },
+  { id:'cs-sc4',  name:'Вычитка', price:150, unit:'за страницу', margin:25 },
+  { id:'cs-sc5',  name:'Локализация', price:450, unit:'за страницу', margin:25 },
+  { id:'cs-sc6',  name:'Транскреация', price:600, unit:'за страницу', margin:25 },
+  { id:'cs-sc7',  name:'Постредактирование машинного перевода', price:200, unit:'за страницу', margin:25 },
+  { id:'cs-sc8',  name:'Субтитрование', price:150, unit:'за минуту', margin:25 },
+  { id:'cs-sc9',  name:'Транскрибация', price:100, unit:'за минуту', margin:25 },
+  { id:'cs-sc10', name:'Перевод аудио и видео', price:200, unit:'за минуту', margin:25 },
+  { id:'cs-sc11', name:'Копирайтинг', price:300, unit:'за страницу', margin:25 },
+  { id:'cs-sc12', name:'Озвучивание', price:3000, unit:'за час', margin:25 },
+  { id:'cs-sc13', name:'Верстка и DTP', price:300, unit:'за страницу', margin:25 },
+  { id:'cs-sc14', name:'Тестирование и QA', price:2000, unit:'за час', margin:25 },
+  { id:'cs-sc15', name:'Управление проектами', price:1500, unit:'за час', margin:25 },
+  { id:'cs-sc16', name:'Терминология', price:500, unit:'за час', margin:25 },
+  { id:'cs-sc17', name:'Машинный перевод', price:100, unit:'за страницу', margin:25 }
+];
+function siteCalcServices(){
+  const copy = JSON.parse(JSON.stringify(SITE_CALC_SERVICES));
+  copy.n3 = (copy.n3 || []).concat(SMARTCAT_SERVICES.map(x => ({ ...x })));
+  return copy;
+}
 function defaultCalcSettings(){ return JSON.parse(JSON.stringify(DEFAULT_CALC_SETTINGS)); }
 function calcSettingsSeed(){
   const base = defaultCalcSettings();
@@ -559,7 +584,7 @@ let S;
 function loadState(){
   try{
     const raw = localStorage.getItem(LS_KEY);
-    if (raw){ S = JSON.parse(raw); if (S && (S._v >= 1 || Array.isArray(S.users))){ S._v = Number(S._v) || 1; migrateSchema(); migrateSiteCatalog(); migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); migrateKeys(); migrateStaffBalances(); migrateFinance(); saveState(); return; } }
+    if (raw){ S = JSON.parse(raw); if (S && (S._v >= 1 || Array.isArray(S.users))){ S._v = Number(S._v) || 1; migrateSchema(); migrateSiteCatalog(); migrateSmartcatServices(); migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); migrateKeys(); migrateStaffBalances(); migrateFinance(); saveState(); return; } }
   }catch(e){}
   S = seedState();
   saveState();
@@ -667,6 +692,17 @@ function migrateSiteCatalog(){
     if (def.deadlineDays[n.id] != null) S.calcSettings.deadlineDays[n.id] = def.deadlineDays[n.id];
   });
   S.settings.calcCatalogVersion = SITE_CALC_VERSION;
+}
+/* Разовая добавка категорий Smartcat в «Переводы» для уже сохранённых
+   профилей. Существующие услуги и цены не трогаем. */
+function migrateSmartcatServices(){
+  if (!S || !S.settings) return;
+  if (S.settings.smartcatCatsVersion >= 1) return;
+  S.calcServices = S.calcServices || {};
+  const list = S.calcServices.n3 = Array.isArray(S.calcServices.n3) ? S.calcServices.n3 : [];
+  const have = new Set(list.map(x => String(x.name || '').toLowerCase()));
+  SMARTCAT_SERVICES.forEach(x => { if (!have.has(x.name.toLowerCase())) list.push({ ...x }); });
+  S.settings.smartcatCatsVersion = 1;
 }
 
 /* Обновление схемы сохранения до текущей версии. Вызывается при загрузке

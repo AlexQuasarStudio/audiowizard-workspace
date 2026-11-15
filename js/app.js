@@ -2508,6 +2508,24 @@ ex.innerHTML = avatarHTML(user(), '');
   /* ---------- Экспорт детализации: сводка + расшифровка ---------- */
   const REV_COLS = ['Заказ','Клиент','Ниша','Проект','Менеджер','Исполнители','Выполнен','Сумма','Доля, %','Исполнителям','Менеджеру','Админу','Остаток','Оплачено клиентом','Долг','Долг исполнителям','Долг менеджеру','Статус'];
   const revNum = v => (Math.round((Number(v) || 0) * 100) / 100).toFixed(2).replace('.', ',');
+  /* Объём заказа: аудио — минуты; файлы — суммы по исполнителям;
+     иначе — явный o.volume. Для агрегатов по услугам/специализациям. */
+  function revOrderVolume(o){
+    const audio = Number(o.audio) || 0;
+    if (audio > 0) return { v: Math.round(audio * 10) / 10, u: 'мин' };
+    let sum = 0;
+    (o.files || []).forEach(f => {
+      if (!f) return;
+      if (f.volumes && typeof f.volumes === 'object'){
+        Object.values(f.volumes).forEach(v => { sum += Number(v) || 0; });
+      } else {
+        sum += Number(f.volume || f.size || f.pages || 0) || 0;
+      }
+    });
+    if (!sum) sum = Number(o.volume) || 0;
+    const unit = o.volume_unit || (String(o.nish_id) === 'n1' ? 'мин' : 'стр.');
+    return { v: Math.round(sum * 10) / 10, u: unit };
+  }
   function revData(rows, total, from, to){
     const u = user();
     const days = Math.max(1, Math.round((revDayStart(to - 1) - revDayStart(from)) / DAY) + 1);
@@ -2521,6 +2539,7 @@ ex.innerHTML = avatarHTML(user(), '');
       const sp = window.Finance ? Finance.split(o) : { exec:0, manager:0, admin:0, left:0 };
       const dbt = window.Finance ? Finance.debts(o) : { total:0, exec:0, manager:0 };
       const mgr = userById(o.manager_id) || {};
+      const vol = revOrderVolume(o);
       return {
         order_id: o.order_id || '',
         client: revClientName(o),
@@ -2539,6 +2558,8 @@ ex.innerHTML = avatarHTML(user(), '');
         debt: dbt.total || 0,
         debt_exec: dbt.exec || 0,
         debt_manager: dbt.manager || 0,
+        volume: vol.v,
+        volume_unit: vol.u,
         status: (STATUS_META[o.status] || {}).label || o.status || ''
       };
     });
@@ -2612,6 +2633,9 @@ ex.innerHTML = avatarHTML(user(), '');
       avg: it.orders ? Math.round((Number(it.revenue) || 0) / it.orders) : 0,
       share: revenue ? (Number(it.revenue) || 0) / revenue * 100 : 0,
       debt: Number(it.debt) || 0,
+      volume: dim === 'niche' ? Number(it.volume) || 0 : null,
+      volume_unit: dim === 'niche' ? (it.volume_unit || '') : null,
+      avg_volume: dim === 'niche' && it.orders ? Math.round((Number(it.volume) || 0) / it.orders * 10) / 10 : null,
       accrued: dim === 'executor' ? Number(it.accrued) || 0 : null,
       paid: dim === 'executor' ? Number(it.paid) || 0 : null,
       exec_debt: dim === 'executor' ? Number(it.debt) || 0 : null
@@ -2639,10 +2663,12 @@ ex.innerHTML = avatarHTML(user(), '');
     const map = new Map();
     (rows || []).forEach(r => {
       const key = r[dim] || '';
-      const cur = map.get(key) || { key, label: revAggLabel(dim, key), revenue:0, orders:0, debt:0 };
+      const cur = map.get(key) || { key, label: revAggLabel(dim, key), revenue:0, orders:0, debt:0, volume:0, volume_unit:'' };
       cur.revenue += Number(r.total) || 0;
       cur.orders += 1;
       cur.debt += Number(r.debt) || 0;
+      cur.volume += Number(r.volume) || 0;
+      if (!cur.volume_unit) cur.volume_unit = r.volume_unit || '';
       map.set(key, cur);
     });
     return revAggMetrics(dim, [...map.values()], revenue);
@@ -3161,12 +3187,14 @@ ex.innerHTML = avatarHTML(user(), '');
   const REV_AGG_PAGE = 10;
   const revAggState = { dim:'niche', q:'', page:{ niche:1, client:1, executor:1 } };
   function revAggFmtPct(v){ return (Number(v) || 0).toFixed(1).replace('.', ',') + '%'; }
+  function revAggFmtVol(v, unit){ return (Number(v) || 0).toLocaleString('ru-RU', { maximumFractionDigits: 1 }) + (unit ? ' ' + unit : ''); }
   function revAggHead(dim){
     const exec = dim === 'executor';
     return `<thead><tr>
       <th class="ragg-name">${esc(REV_AGG_DIMS[dim].label)}</th>
       <th class="pay-cell">Выручка</th>
       <th class="pay-cell">Заказов</th>
+      ${dim === 'niche' ? '<th class="pay-cell">Объём</th><th class="pay-cell">Ср. объём</th>' : ''}
       <th class="pay-cell">Средний чек</th>
       <th class="pay-cell">Доля выручки</th>
       ${exec ? '<th class="pay-cell">Начислено</th><th class="pay-cell">Оплачено</th>' : ''}
@@ -3181,6 +3209,7 @@ ex.innerHTML = avatarHTML(user(), '');
       <td class="ragg-name"><span class="ragg-title" title="${esc(r.label)}">${esc(r.label)}</span><span class="ragg-meter" aria-hidden="true"><i style="width:${barW}%"></i></span></td>
       <td class="pay-cell"><b>${fmtMoney(r.revenue)}</b></td>
       <td class="pay-cell">${r.orders}</td>
+      ${dim === 'niche' ? `<td class="pay-cell">${r.volume ? revAggFmtVol(r.volume, r.volume_unit) : '—'}</td><td class="pay-cell">${r.avg_volume ? revAggFmtVol(r.avg_volume, r.volume_unit) : '—'}</td>` : ''}
       <td class="pay-cell">${r.orders ? fmtMoney(r.avg) : '—'}</td>
       <td class="pay-cell">${revAggFmtPct(share)}</td>
       ${exec ? `<td class="pay-cell">${fmtMoney(r.accrued)}</td><td class="pay-cell">${fmtMoney(r.paid)}</td>` : ''}
@@ -3202,7 +3231,7 @@ ex.innerHTML = avatarHTML(user(), '');
     const tabs = dims.map(d => `<button type="button" class="${d === dim ? 'on' : ''}" data-ragg-tab="${d}">${esc(REV_AGG_DIMS[d].label)}</button>`).join('');
     const body = slice.length
       ? slice.map(r => revAggRowHtml(r, dim, revenue, maxShare)).join('')
-      : `<tr><td colspan="${dim === 'executor' ? 8 : 6}" class="ragg-empty">${q ? `Ничего не найдено по запросу «${esc(revAggState.q.trim())}»` : esc(REV_AGG_DIMS[dim].none)}</td></tr>`;
+      : `<tr><td colspan="${dim === 'client' ? 6 : 8}" class="ragg-empty">${q ? `Ничего не найдено по запросу «${esc(revAggState.q.trim())}»` : esc(REV_AGG_DIMS[dim].none)}</td></tr>`;
     const found = q ? `<span class="faint">найдено ${items.length} из ${all.length}</span>` : `<span class="faint">${all.length} в разрезе</span>`;
     const note = dim === 'executor'
       ? '<div class="small faint ragg-note">Доля выручки — от общей выручки периода: остальное уходит админу, менеджеру и в свободный остаток.</div>'
@@ -3251,7 +3280,7 @@ ex.innerHTML = avatarHTML(user(), '');
     const maxShare = items.reduce((a, r) => Math.max(a, revenue ? r.revenue / revenue * 100 : 0), 0);
     body.innerHTML = slice.length
       ? slice.map(r => revAggRowHtml(r, dim, revenue, maxShare)).join('')
-      : `<tr><td colspan="${dim === 'executor' ? 8 : 6}" class="ragg-empty">${q ? `Ничего не найдено по запросу «${esc(revAggState.q.trim())}»` : esc(REV_AGG_DIMS[dim].none)}</td></tr>`;
+      : `<tr><td colspan="${dim === 'client' ? 6 : 8}" class="ragg-empty">${q ? `Ничего не найдено по запросу «${esc(revAggState.q.trim())}»` : esc(REV_AGG_DIMS[dim].none)}</td></tr>`;
     const num = root.querySelector('#ragg-page-num');
     if (num) num.textContent = page + ' / ' + pages;
     root.querySelectorAll('[data-ragg-page]').forEach(b => {
@@ -8189,7 +8218,8 @@ const cm = root.querySelector('.chat-main');
     const next = m.el.querySelector('#td-pick-next');
     const search = m.el.querySelector('#td-pick-q');
     const PAGE = 7;
-    const paint = () => {
+    let paintT = 0;
+    const render = () => {
       const all = todoLinkItems(u2, tab, cur);
       const text = q.trim().toLowerCase();
       const items = text ? all.filter(x => (x.label+' '+x.sub+' '+x.meta+' '+x.id).toLowerCase().includes(text)) : all;
@@ -8209,10 +8239,21 @@ const cm = root.querySelector('.chat-main');
       if (next) next.disabled = page >= pages - 1;
       m.el.querySelectorAll('[data-pick-tab]').forEach(b=>b.classList.toggle('on', b.dataset.pickTab===tab));
     };
-    m.el.querySelectorAll('[data-pick-tab]').forEach(b=>b.onclick=()=>{ tab=b.dataset.pickTab; page=0; q=''; if (search) search.value=''; paint(); });
-    if (search) search.oninput = ()=>{ q=search.value; page=0; paint(); };
-    if (prev) prev.onclick = ()=>{ if (page>0){ page--; paint(); } };
-    if (next) next.onclick = ()=>{ page++; paint(); };
+    const paint = (animate=false) => {
+      clearTimeout(paintT);
+      if (!animate){ render(); return; }
+      list.classList.add('is-switching');
+      paintT = setTimeout(()=>{
+        render();
+        list.classList.remove('is-switching');
+        list.classList.add('is-entering');
+        requestAnimationFrame(()=>list.classList.remove('is-entering'));
+      }, 120);
+    };
+    m.el.querySelectorAll('[data-pick-tab]').forEach(b=>b.onclick=()=>{ tab=b.dataset.pickTab; page=0; q=''; if (search) search.value=''; paint(true); });
+    if (search) search.oninput = ()=>{ q=search.value; page=0; paint(false); };
+    if (prev) prev.onclick = ()=>{ if (page>0){ page--; paint(true); } };
+    if (next) next.onclick = ()=>{ page++; paint(true); };
     list.onclick = e=>{
       const b = e.target.closest('[data-pick-type]');
       if (!b) return;
@@ -8223,7 +8264,7 @@ const cm = root.querySelector('.chat-main');
     if (clear) clear.onclick = ()=>{ done({ link_type:'', link_id:'' }); m.close(); };
     const cancel = m.el.querySelector('[data-c]');
     if (cancel) cancel.onclick = ()=>{ done(null); m.close(); };
-    paint();
+    paint(false);
   });
   const todoLinkChip = t => {
     const l = todoLinkOf(t); if (!l) return '';
@@ -8737,7 +8778,7 @@ const cm = root.querySelector('.chat-main');
         ${S.niches.map(n=>`<div class="card card-pad" style="background:var(--bg-2);margin-top:10px">
           <div class="row row--between"><b class="small">${esc(n.name)}</b>
             <button class="btn btn--ghost btn--sm" data-add="${n.id}">${icon('plus')} Услуга</button></div>
-          <div class="tbl-wrap" style="margin-top:8px;border:0"><table class="tbl" style="min-width:0">
+          <div class="tbl-wrap calc-svc-wrap" style="margin-top:8px;border:0"><table class="tbl" style="min-width:0">
             <thead><tr><th>Услуга</th><th>Цена, ₽</th><th>Единица</th><th ${u.role==='admin'?'':'hidden'}>Маржа в цене, %<input class="input" data-margin-all="${n.id}" type="number" min="0" max="90" placeholder="все" style="width:58px;padding:3px 6px;font-size:11px;margin-left:6px" title="Выставить маржу всем услугам группы"></th><th>Норма, ед./сутки<input class="input" data-norm-all="${n.id}" type="number" min="0" step="0.1" placeholder="все" style="width:58px;padding:3px 6px;font-size:11px;margin-left:6px" title="Выставить норму всем услугам группы"></th><th></th></tr></thead>
             <tbody data-niche="${n.id}">${rows(n.id)}</tbody>
           </table></div>

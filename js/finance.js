@@ -560,14 +560,40 @@ const Finance = (function(){
     if (Array.isArray(o.scDocs) && o.scDocs.length) return o.scDocs;
     const seed = String(o.order_id || '').replace(/\D/g, '').slice(-4) || '1042';
     const n = Number(seed);
+    const niche = (typeof nicheName === 'function' ? nicheName(o.nish_id) : '') || '';
+    const low = niche.toLowerCase();
+    const pageRate = 100 + (n % 5) * 20; /* 100–180 ₽ за страницу */
+    const pageQty = Math.max(1, Math.ceil((Number(o.total) || 1000) / pageRate));
+    if (low.includes('аудио') || low.includes('видео')){
+      return [{
+        documentId: `sc-${o.order_id}-av`,
+        documentName: `${o.order_id}_AUDIO-RU_page.docx`,
+        category: 'Перевод аудио и видео',
+        sourceLanguage: 'ru', targetLanguage: 'ru',
+        unit: 'page', quantity: pageQty, wordCount: pageQty,
+        rate: pageRate, amount: pageQty * pageRate
+      }];
+    }
+    if (low.includes('текст')){
+      return [{
+        documentId: `sc-${o.order_id}-copy`,
+        documentName: `${o.order_id}_COPY-RU_page.docx`,
+        category: 'Копирайтинг',
+        sourceLanguage: 'ru', targetLanguage: 'ru',
+        unit: 'page', quantity: pageQty, wordCount: pageQty,
+        rate: pageRate, amount: pageQty * pageRate
+      }];
+    }
     const src = LANGS[n % LANGS.length];
     const words = 1200 + (n * 137) % 9000;
     const rate = 2.4 + (n % 7) * 0.35;
     return [{
       documentId: `sc-${o.order_id}-1`,
       documentName: `${o.order_id}_${src.toUpperCase()}-RU_${['contract','manual','audit','website','report'][n % 5]}.docx`,
+      category: 'Перевод',
       sourceLanguage: src,
       targetLanguage: 'ru',
+      unit: 'word',
       wordCount: words,
       rate: Math.round(rate * 100) / 100,
       amount: Math.round(words * rate)
@@ -592,8 +618,12 @@ const Finance = (function(){
       raw.forEach(d => {
         const amount = debt ? Math.round(debt * (d.amount || 0) / rawSum) : d.amount;
         const rate = d.rate || 1;
+        const qty = Math.max(1, Math.round(amount / rate));
+        const isPage = d.unit === 'page';
         docs.push({
-          ...d, amount, wordCount: Math.round(amount / rate), rate,
+          ...d, amount, rate,
+          wordCount: qty,
+          ...(isPage ? { quantity: qty } : {}),
           orderId: o.order_id, completedAt: new Date(o.done_at || Date.now()).toISOString()
         });
       });
@@ -612,7 +642,7 @@ const Finance = (function(){
       currency: 'RUB',
       directions: [...new Set(docs.map(d => `${d.sourceLanguage}→${d.targetLanguage}`))],
       documents: docs,
-      totals: { documents: docs.length, words: docs.reduce((a, d) => a + d.wordCount, 0), amount, commission, net: amount - commission }
+      totals: { documents: docs.length, words: docs.reduce((a, d) => a + d.wordCount, 0), pages: docs.filter(d => d.unit === 'page').reduce((a, d) => a + (d.quantity || 0), 0), amount, commission, net: amount - commission }
     };
   }
 
