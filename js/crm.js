@@ -1738,7 +1738,7 @@ const CRM = (() => {
     const o = isEdit ? S.orders.find(x=>x.id===editId) : {
       id:uid(), order_id:'', client_id:'', order_date:Date.now(), deadline:null, status:'draft',
       total:0, certification_amount:0, need_cert:false, comment:'', manager_id:u.id, project_id:'',
-      folder_id:'', nish_id:'', executors:[], audio:0, files:[], proposed_price:0, paid_amount:0,
+      folder_id:'', nish_id:'', service:'', executors:[], audio:0, files:[], proposed_price:0, paid_amount:0,
       forbid_download:false, portfolio_ban:true, nda:false, history:[], created_at:Date.now(),
       rush:false, rush_pct:0, rush_fee:0,
       /* Дата начала работ по умолчанию — сегодня (для нового заказа) */
@@ -1749,6 +1749,11 @@ const CRM = (() => {
     /* Копии, а не ссылки: иначе правка суммы в форме сразу меняет заказ,
        и при сохранении не с чем сравнить прежнюю оплаченную часть. */
     const form = { executors: (o.executors||[]).map(e=>({...e})), files: (o.files||[]).map(f=>({ ...f, volumes: f.volumes ? { ...f.volumes } : undefined })), calcSum: 0, calcRushFee: Number(o.rush_fee)||0 };
+    const serviceChoices = (nid, value) => {
+      const list = ((S.calcServices || {})[nid] || []).map(s => s && s.name).filter(Boolean);
+      return '<option value="">— не указана —</option>' + list.map(name =>
+        `<option value="${esc(name)}" ${name === value ? 'selected' : ''}>${esc(name)}</option>`).join('');
+    };
 
     const m = openWinModal({
       wide:true, title: isEdit ? `Заказ ${o.order_id}` : 'Новый заказ', route:'orders',
@@ -1775,9 +1780,12 @@ const CRM = (() => {
             <div class="field"><label>Статус</label><select class="input" id="of-status">
               ${Object.entries(STATUS_META).map(([st,mt])=>`<option value="${st}" ${o.status===st?'selected':''}>${mt.label}</option>`).join('')}</select></div>
           </div>
-          <div class="field"><label>Тариф</label><select class="input" id="of-tariff">
-            <option value="">— не указан —</option>
-            ${TARIFFS.map(t=>`<option value="${t.id}" ${o.tariff===t.id?'selected':''}>${esc(t.label)}</option>`).join('')}</select></div>
+          <div class="cols-2 grid" style="gap:13px">
+            <div class="field"><label>Услуга</label><select class="input" id="of-service">${serviceChoices(o.nish_id, o.service)}</select></div>
+            <div class="field"><label>Тариф</label><select class="input" id="of-tariff">
+              <option value="">— не указан —</option>
+              ${TARIFFS.map(t=>`<option value="${t.id}" ${o.tariff===t.id?'selected':''}>${esc(t.label)}</option>`).join('')}</select></div>
+          </div>
           <div class="cols-2 grid" style="gap:13px">
             <div class="field"><label>Дата начала работ</label><input type="date" class="input" id="of-start"></div>
             <div class="field"><label>Дедлайн</label><input type="datetime-local" class="input" id="of-deadline"><div class="small" id="of-deadline-hint" style="color:var(--muted);margin-top:4px"></div></div>
@@ -2265,7 +2273,13 @@ const CRM = (() => {
           $$('#of-calc-svcs input:checked', mask).forEach(inp=>{ sum += (svcs[+inp.dataset.svc]||{}).price||0; });
           if (sum > 0){ g('#of-total').value = sum + form.calcSum; }
         };
-        g('#of-niche').addEventListener('change', ()=>{ renderSvcs(); applyDeadline(false); paintRecs(); }); renderSvcs();
+        const paintService = ()=>{
+          const sel = g('#of-service');
+          if (!sel) return;
+          const cur = sel.value;
+          sel.innerHTML = serviceChoices(g('#of-niche').value, cur);
+        };
+        g('#of-niche').addEventListener('change', ()=>{ paintService(); renderSvcs(); applyDeadline(false); paintRecs(); }); paintService(); renderSvcs();
         g('#of-open-calc').onclick = ()=>openCalculator({
           nishId: g('#of-niche').value,
           deadline: g('#of-deadline').value ? new Date(g('#of-deadline').value).getTime() : null,
@@ -2275,9 +2289,11 @@ const CRM = (() => {
             form.calcRushFee = Number(meta.rushFee) || 0;
             if (meta.nishId && g('#of-niche').value !== meta.nishId){
               g('#of-niche').value = meta.nishId;
+              paintService();
               renderSvcs();
               paintRecs();
             }
+            if (meta.service && g('#of-service')) g('#of-service').value = meta.service;
             if (meta.deadline){
               const dl = g('#of-deadline');
               dl.value = new Date(meta.deadline - new Date(meta.deadline).getTimezoneOffset()*60000).toISOString().slice(0,16);
@@ -2291,9 +2307,11 @@ const CRM = (() => {
         if (prefillMeta){
           if (prefillMeta.nishId && g('#of-niche').value !== prefillMeta.nishId){
             g('#of-niche').value = prefillMeta.nishId;
+            paintService();
             renderSvcs();
             paintRecs();
           }
+          if (prefillMeta.service && g('#of-service')) g('#of-service').value = prefillMeta.service;
           if (prefillMeta.deadline){
             const dl = g('#of-deadline');
             dl.value = new Date(prefillMeta.deadline - new Date(prefillMeta.deadline).getTimezoneOffset()*60000).toISOString().slice(0,16);
@@ -2317,7 +2335,7 @@ const CRM = (() => {
         function collect(){
           const rush = isRushOrder();
           return cleanRecord({
-            order_id:sanitizeOrderId(g('#of-id').value), client_id:g('#of-client').value, client_ids:[...selClients], nish_id:g('#of-niche').value, tariff:g('#of-tariff').value,
+            order_id:sanitizeOrderId(g('#of-id').value), client_id:g('#of-client').value, client_ids:[...selClients], nish_id:g('#of-niche').value, service:g('#of-service').value, tariff:g('#of-tariff').value,
             status:g('#of-status').value, deadline:g('#of-deadline').value||null, start:g('#of-start').value||null, total:+g('#of-total').value||0, is_test:!!(g('#of-test')||{}).checked,
             rush: rush.urgent, rush_pct: rush.urgent ? rush.pct : 0, rush_fee: rush.urgent ? (Number(form.calcRushFee)||0) : 0,
             managerFee: Math.max(0, Math.min(100, +g('#of-mgrfee').value || 10)),
@@ -2501,6 +2519,7 @@ const CRM = (() => {
     function applyDraft(v){
       const set=(s,val)=>{ const el=$(s); if(!el) return; el.value = val; el.dispatchEvent(new Event(val&&el.tagName==='SELECT'?'change':'input',{bubbles:true})); };
       set('#of-id', v.order_id||''); set('#of-client', v.client_id||''); set('#of-niche', v.nish_id||'');
+      set('#of-service', v.service||'');
       set('#of-status', v.status||'draft'); set('#of-total', v.total||''); set('#of-prepay', v.prepay??50);
       set('#of-cert', v.cert||''); set('#of-comment', v.comment||''); set('#of-proposed', v.proposed||'');
       const nc = $('#of-need-cert'); if (nc){ nc.checked=!!v.need_cert; nc.dispatchEvent(new Event('change')); }
@@ -4002,7 +4021,7 @@ updatePeopleBulk();
         <div class="stack" style="gap:14px">
           <div class="cols-2 grid small" style="gap:8px">
             <div class="stat-mini"><b>${mt.orders}</b><span>заказов</span></div>
-            ${isStaffUser?`<div class="stat-mini"><b data-bal class="${balOf(p)<0?'neg':''}">${fmtMoney(balOf(p))}</b><span>баланс</span></div>`:''}
+            ${(roleEff==='client' || (isStaffUser && roleEff!=='executor'))?`<div class="stat-mini"><b data-bal class="${balOf(p)<0?'neg':''}">${fmtMoney(balOf(p))}</b><span>баланс</span></div>`:''}
             ${roleEff==='executor'?`
               <div class="stat-mini"><b data-bal class="${balOf(p)<0?'neg':''}">${fmtMoney(balOf(p))}</b><span>баланс</span></div>
               <div class="stat-mini"><b data-debt>${fmtMoney(window.Finance ? Finance.debtsOf(p.id) : 0)}</b><span>к выплате</span></div>
@@ -5628,6 +5647,7 @@ updatePeopleBulk();
           return from && to ? from+'→'+to : '';
         };
         const metaOf = d => ({ deadline:d.deadline, rush:d.rush, rushPct:d.rushPct, rushFee:d.rushFee, nishId:d.nid,
+          service: (volState().s || {}).name || '',
           langFrom: g2('#cx-lang-from') ? g2('#cx-lang-from').value : '',
           langTo: g2('#cx-lang-to') ? g2('#cx-lang-to').value : '', langPair:langPair() });
         const paintTotals = () => {

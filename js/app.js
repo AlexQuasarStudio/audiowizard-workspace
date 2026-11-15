@@ -281,12 +281,11 @@ const APP = (() => {
   function platformBalance(){
     return noDemo(S.users || []).reduce((sum, u) => sum + (Number(u.ext && u.ext.earned) || 0), 0);
   }
-  /* Что видит текущий пользователь в плашке баланса: стафф — общий баланс
-     платформы, исполнитель — свой личный. Клиентам внутренние деньги
-     платформы не показываем совсем. */
+  /* Плашку баланса видит каждый авторизованный пользователь: у клиента
+     это его личный доступный баланс, у стаффа дополнительно — баланс
+     платформы в истории операций. */
   function balanceVisible(){
-    const u = user();
-    return !!u && u.role !== 'client';
+    return !!user();
   }
   /* У каждого профиля — только его личный баланс. Платформенный итог
      (сумма всех балансов) показываем отдельно в панели баланса, иначе
@@ -2543,6 +2542,7 @@ ex.innerHTML = avatarHTML(user(), '');
       return {
         order_id: o.order_id || '',
         client: revClientName(o),
+        service: o.service || '',
         niche: nicheName(o.nish_id),
         project: (S.projects.find(p => p.id === o.project_id) || {}).name || '',
         manager: mgr.full_name || '',
@@ -2613,14 +2613,16 @@ ex.innerHTML = avatarHTML(user(), '');
      средний чек, доля выручки, долг. Исполнителю дополнительно —
      начислено, оплачено и его долг. */
   const REV_AGG_DIMS = {
-    niche:    { label: 'Услуги',       empty: 'Без услуги',    none: 'Услуг за период нет' },
-    client:   { label: 'Клиенты',      empty: 'Без клиента',   none: 'Клиентов за период нет' },
-    executor: { label: 'Исполнители',  empty: 'Без исполнителя', none: 'Исполнителей за период нет' }
+    service:  { label: 'Услуги',        empty: 'Без услуги',    none: 'Услуг за период нет' },
+    niche:    { label: 'Специализации', empty: 'Без специализации', none: 'Специализаций за период нет' },
+    client:   { label: 'Клиенты',       empty: 'Без клиента',   none: 'Клиентов за период нет' },
+    executor: { label: 'Исполнители',   empty: 'Без исполнителя', none: 'Исполнителей за период нет' }
   };
   function revAggDims(){ return Object.keys(REV_AGG_DIMS); }
   function revAggDim(dim){
     const staff = ['admin','top_manager','manager'].includes((typeof me === 'function' && me() ? me().role : ''));
-    return (staff && REV_AGG_DIMS[dim]) ? dim : 'niche';
+    const dims = staff ? revAggDims() : ['service', 'niche'];
+    return dims.includes(dim) ? dim : 'niche';
   }
   function revAggLabel(dim, key){
     const d = REV_AGG_DIMS[dim];
@@ -2628,6 +2630,7 @@ ex.innerHTML = avatarHTML(user(), '');
   }
   /* Метрики одного разреза. Используется в интерфейсе и в экспорте. */
   function revAggMetrics(dim, items, revenue){
+    const vol = dim === 'niche' || dim === 'service';
     const list = (items || []).map(it => ({
       key: it.key,
       label: it.label,
@@ -2636,9 +2639,9 @@ ex.innerHTML = avatarHTML(user(), '');
       avg: it.orders ? Math.round((Number(it.revenue) || 0) / it.orders) : 0,
       share: revenue ? (Number(it.revenue) || 0) / revenue * 100 : 0,
       debt: Number(it.debt) || 0,
-      volume: dim === 'niche' ? Number(it.volume) || 0 : null,
-      volume_unit: dim === 'niche' ? (it.volume_unit || '') : null,
-      avg_volume: dim === 'niche' && it.orders ? Math.round((Number(it.volume) || 0) / it.orders * 10) / 10 : null,
+      volume: vol ? Number(it.volume) || 0 : null,
+      volume_unit: vol ? (it.volume_unit || '') : null,
+      avg_volume: vol && it.orders ? Math.round((Number(it.volume) || 0) / it.orders * 10) / 10 : null,
       accrued: dim === 'executor' ? Number(it.accrued) || 0 : null,
       paid: dim === 'executor' ? Number(it.paid) || 0 : null,
       exec_debt: dim === 'executor' ? Number(it.debt) || 0 : null
@@ -2942,6 +2945,7 @@ ex.innerHTML = avatarHTML(user(), '');
         id: o.id,
         order_id: o.order_id || '',
         client: revClientName(o),
+        service: o.service || '',
         niche: nicheName(o.nish_id),
         project: (S.projects.find(p => p.id === o.project_id) || {}).name || '',
         manager: (userById(o.manager_id) || {}).full_name || '',
@@ -3188,17 +3192,18 @@ ex.innerHTML = avatarHTML(user(), '');
 
   /* ---------- Блок статистики в окне детализации ---------- */
   const REV_AGG_PAGE = 10;
-  const revAggState = { dim:'niche', q:'', page:{ niche:1, client:1, executor:1 } };
+  const revAggState = { dim:'service', q:'', page:{ service:1, niche:1, client:1, executor:1 } };
   function revAggFmtPct(v){ return (Number(v) || 0).toFixed(1).replace('.', ',') + '%'; }
   function revAggFmtVol(v, unit){ return (Number(v) || 0).toLocaleString('ru-RU', { maximumFractionDigits: 1 }) + (unit ? ' ' + unit : ''); }
   function revAggHead(dim){
     const exec = dim === 'executor';
+    const vol = dim === 'niche' || dim === 'service';
     const isClient = !!(typeof me === 'function' && me() && me().role === 'client');
     return `<thead><tr>
       <th class="ragg-name">${esc(REV_AGG_DIMS[dim].label)}</th>
       <th class="pay-cell">${isClient ? 'Расходы' : 'Выручка'}</th>
       <th class="pay-cell">Заказов</th>
-      ${dim === 'niche' ? '<th class="pay-cell">Объём</th><th class="pay-cell">Ср. объём</th>' : ''}
+      ${vol ? '<th class="pay-cell">Объём</th><th class="pay-cell">Ср. объём</th>' : ''}
       <th class="pay-cell">Средний чек</th>
       <th class="pay-cell">Доля ${isClient ? 'расходов' : 'выручки'}</th>
       ${exec ? '<th class="pay-cell">Начислено</th><th class="pay-cell">Оплачено</th>' : ''}
@@ -3207,13 +3212,14 @@ ex.innerHTML = avatarHTML(user(), '');
   }
   function revAggRowHtml(r, dim, total, maxShare){
     const exec = dim === 'executor';
+    const vol = dim === 'niche' || dim === 'service';
     const share = total ? (r.revenue / total * 100) : 0;
     const barW = maxShare ? Math.max(2, Math.round(share / maxShare * 100)) : 0;
     return `<tr>
       <td class="ragg-name"><span class="ragg-title" title="${esc(r.label)}">${esc(r.label)}</span><span class="ragg-meter" aria-hidden="true"><i style="width:${barW}%"></i></span></td>
       <td class="pay-cell"><b>${fmtMoney(r.revenue)}</b></td>
       <td class="pay-cell">${r.orders}</td>
-      ${dim === 'niche' ? `<td class="pay-cell">${r.volume ? revAggFmtVol(r.volume, r.volume_unit) : '—'}</td><td class="pay-cell">${r.avg_volume ? revAggFmtVol(r.avg_volume, r.volume_unit) : '—'}</td>` : ''}
+      ${vol ? `<td class="pay-cell">${r.volume ? revAggFmtVol(r.volume, r.volume_unit) : '—'}</td><td class="pay-cell">${r.avg_volume ? revAggFmtVol(r.avg_volume, r.volume_unit) : '—'}</td>` : ''}
       <td class="pay-cell">${r.orders ? fmtMoney(r.avg) : '—'}</td>
       <td class="pay-cell">${revAggFmtPct(share)}</td>
       ${exec ? `<td class="pay-cell">${fmtMoney(r.accrued)}</td><td class="pay-cell">${fmtMoney(r.paid)}</td>` : ''}
@@ -3231,7 +3237,7 @@ ex.innerHTML = avatarHTML(user(), '');
     const to = Math.min(items.length, page * REV_AGG_PAGE);
     const slice = items.slice(from ? from - 1 : 0, to);
     const maxShare = items.reduce((a, r) => Math.max(a, revenue ? r.revenue / revenue * 100 : 0), 0);
-    const dims = ['admin','top_manager','manager'].includes((typeof me === 'function' && me() ? me().role : '')) ? revAggDims() : ['niche'];
+    const dims = ['admin','top_manager','manager'].includes((typeof me === 'function' && me() ? me().role : '')) ? revAggDims() : ['service', 'niche'];
     const tabs = dims.map(d => `<button type="button" class="${d === dim ? 'on' : ''}" data-ragg-tab="${d}">${esc(REV_AGG_DIMS[d].label)}</button>`).join('');
     const body = slice.length
       ? slice.map(r => revAggRowHtml(r, dim, revenue, maxShare)).join('')
@@ -8150,36 +8156,48 @@ const cm = root.querySelector('.chat-main');
   /* Связи ToDo: напоминание, тикет или заказ. В записи храним reminder_id,
      link_type ('ticket'|'order') и link_id — без дублирования текста. */
   const TODO_LINK_ICON = { ticket:'tickets', order:'orders' };
-  const todoLinkOf = t => {
-    if (!t || !t.link_type || !t.link_id) return null;
-    if (t.link_type === 'ticket'){
-      const tk = (S.tickets||[]).find(x=>x.id===t.link_id);
-      return { type:'ticket', id:t.link_id, label: tk ? '#'+tk.id.slice(0,4).toUpperCase() : 'Тикет',
+  const todoTicketIdOf = t => t ? (t.link_ticket || (t.link_type === 'ticket' ? t.link_id : '') || '') : '';
+  const todoOrderIdOf = t => t ? (t.link_order || (t.link_type === 'order' ? t.link_id : '') || '') : '';
+  const todoLinkInfo = (type, id) => {
+    if (!type || !id) return null;
+    if (type === 'ticket'){
+      const tk = (S.tickets||[]).find(x=>x.id===id);
+      return { type:'ticket', id, label: tk ? '#'+tk.id.slice(0,4).toUpperCase() : 'Тикет',
         sub: tk ? (tk.subject||'') : 'не найден', alive:!!tk };
     }
-    if (t.link_type === 'order'){
-      const o = (S.orders||[]).find(x=>x.id===t.link_id);
-      return { type:'order', id:t.link_id, label: o ? (o.order_id||'Заказ') : 'Заказ',
+    if (type === 'order'){
+      const o = (S.orders||[]).find(x=>x.id===id);
+      return { type:'order', id, label: o ? (o.order_id||'Заказ') : 'Заказ',
         sub: o ? ((clientById(o.client_id)||{}).full_name||'') : 'не найден', alive:!!o };
     }
     return null;
   };
-  const todoReminderOf = t => t && t.reminder_id ? (S.reminders||[]).find(r=>r.id===t.reminder_id) : null;
-  const todoParseLink = v => {
-    const raw = String(v||''); const i = raw.indexOf(':');
-    return i > 0 ? { link_type:raw.slice(0,i), link_id:raw.slice(i+1) } : { link_type:'', link_id:'' };
+  const todoLinkOf = t => {
+    const type = t && (t.link_type || (todoTicketIdOf(t) ? 'ticket' : todoOrderIdOf(t) ? 'order' : ''));
+    const id = type === 'ticket' ? todoTicketIdOf(t) : type === 'order' ? todoOrderIdOf(t) : '';
+    return todoLinkInfo(type, id);
   };
+  const todoLinksOf = t => [
+    ['ticket', todoTicketIdOf(t)],
+    ['order', todoOrderIdOf(t)]
+  ].map(([type,id]) => todoLinkInfo(type,id)).filter(Boolean);
+  const todoReminderOf = t => t && t.reminder_id ? (S.reminders||[]).find(r=>r.id===t.reminder_id) : null;
   const todoLocalInput = ts => {
     const d = new Date(ts); if (!isFinite(d.getTime())) return '';
     const p = n => String(n).padStart(2,'0');
     return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
   };
-  const todoLinkPickHtml = value => {
-    const { link_type, link_id } = todoParseLink(value);
-    if (!link_type || !link_id) return 'Без связи';
-    const l = todoLinkOf({ link_type, link_id });
-    if (!l) return 'Без связи';
-    return `${icon(TODO_LINK_ICON[l.type],'ico-sm')}<span>${esc(l.label)}</span>${l.sub?`<span class="faint td-link-pick__sub">${esc(l.sub)}</span>`:''}`;
+  const todoLinkPickHtml = (ticketId, orderId) => {
+    const parts = [];
+    if (ticketId){
+      const l = todoLinkInfo('ticket', ticketId);
+      if (l) parts.push(`${icon('tickets','ico-sm')}<span>${esc(l.label)}</span>`);
+    }
+    if (orderId){
+      const l = todoLinkInfo('order', orderId);
+      if (l) parts.push(`${icon('orders','ico-sm')}<span>${esc(l.label)}</span>`);
+    }
+    return parts.length ? parts.join('<span class="td-link-pick__sep">·</span>') : 'Без связи';
   };
   const TODO_STATUS_SHORT = { waiting:'В ожидании', work:'В работе', done:'Выполнен', revision:'Доработка', problem:'Проблема', draft:'Черновик', archived:'Архив' };
   const todoLinkItems = (u2, type, cur) => {
@@ -8189,17 +8207,22 @@ const cm = root.querySelector('.chat-main');
         .map(tk=>({ type:'ticket', id:tk.id, label:'#'+tk.id.slice(0,4).toUpperCase(),
           sub:tk.subject||'', meta:{new:'Новое',in_progress:'В работе',resolved:'Решено'}[tk.status]||tk.status||'' }));
     }
-    return ordersFor(u2).filter(o=>o.status!=='archived' || (cur && cur.link_type==='order' && cur.link_id===o.id))
+    const curOrder = cur && (cur.order_id || (cur.link_type === 'order' ? cur.link_id : ''));
+    return ordersFor(u2).filter(o=>o.status!=='archived' || o.id === curOrder)
       .sort((a,b)=>(b.created_at||0)-(a.created_at||0))
       .map(o=>({ type:'order', id:o.id, label:o.order_id||'Заказ',
         sub:(clientById(o.client_id)||{}).full_name||'', meta:TODO_STATUS_SHORT[o.status]||o.status||'' }));
   };
   const todoLinkPicker = (u2, cur) => new Promise(resolve => {
-    let tab = cur && cur.link_type === 'order' ? 'order' : 'ticket';
-    let page = 0, q = '', settled = false;
+    const sel = {
+      ticket_id: (cur && (cur.ticket_id || (cur.link_type === 'ticket' ? cur.link_id : ''))) || '',
+      order_id: (cur && (cur.order_id || (cur.link_type === 'order' ? cur.link_id : ''))) || ''
+    };
+    let tab = sel.order_id && !sel.ticket_id ? 'order' : 'ticket';
+    let page = 0, q = '', settled = false, paintT = 0;
     const done = v => { if (settled) return; settled = true; resolve(v); };
-    const m = openModal({
-      title:'Связать задачу', narrow:true,
+    const m = openWinModal({
+      title:'Связать задачу', narrow:true, route:'settings',
       body:`<div class="stack" style="gap:10px">
         <div class="seg" id="td-pick-tabs">
           <button type="button" data-pick-tab="ticket" class="${tab==='ticket'?'on':''}">Тикеты</button>
@@ -8213,7 +8236,7 @@ const cm = root.querySelector('.chat-main');
           <button class="btn btn--ghost btn--sm" type="button" id="td-pick-next">→</button>
         </div>
       </div>`,
-      footer:`<button class="btn btn--ghost" data-clear>Без связи</button><button class="btn btn--ghost" data-c>Отмена</button>`,
+      footer:`<button class="btn btn--ghost" data-clear>Без связи</button><span class="spacer"></span><button class="btn btn--ghost" data-c>Отмена</button><button class="btn btn--primary" data-ok>Готово</button>`,
       onClose:()=>done(null)
     });
     const list = m.el.querySelector('#td-pick-list');
@@ -8222,7 +8245,6 @@ const cm = root.querySelector('.chat-main');
     const next = m.el.querySelector('#td-pick-next');
     const search = m.el.querySelector('#td-pick-q');
     const PAGE = 7;
-    let paintT = 0;
     const render = () => {
       const all = todoLinkItems(u2, tab, cur);
       const text = q.trim().toLowerCase();
@@ -8231,11 +8253,11 @@ const cm = root.querySelector('.chat-main');
       if (page >= pages) page = pages - 1;
       const slice = items.slice(page*PAGE, page*PAGE + PAGE);
       list.innerHTML = slice.map(x=>{
-        const on = cur && cur.link_type===x.type && cur.link_id===x.id;
+        const on = x.type === 'ticket' ? sel.ticket_id === x.id : sel.order_id === x.id;
         return `<button type="button" class="td-pick-item ${on?'on':''}" data-pick-type="${esc(x.type)}" data-pick-id="${esc(x.id)}">
           <span class="badge ${x.type==='ticket'?'c-gray':'c-violet'}">${x.type==='ticket'?'Тикет':'Заказ'}</span>
           <span style="flex:1;min-width:0"><b class="small">${esc(x.label)}</b><br><span class="faint" style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.sub||'—')}</span></span>
-          <span class="small faint" style="white-space:nowrap">${esc(x.meta||'')}</span>
+          ${on ? '<span class="badge c-green">выбрано</span>' : `<span class="small faint" style="white-space:nowrap">${esc(x.meta||'')}</span>`}
         </button>`;
       }).join('') || '<p class="small faint" style="padding:10px 0;margin:0">Ничего не найдено</p>';
       if (info) info.textContent = `Стр. ${page+1} из ${pages} · ${items.length}`;
@@ -8261,18 +8283,22 @@ const cm = root.querySelector('.chat-main');
     list.onclick = e=>{
       const b = e.target.closest('[data-pick-type]');
       if (!b) return;
-      done({ link_type:b.dataset.pickType, link_id:b.dataset.pickId });
-      m.close();
+      const type = b.dataset.pickType, id = b.dataset.pickId;
+      if (type === 'ticket') sel.ticket_id = sel.ticket_id === id ? '' : id;
+      else sel.order_id = sel.order_id === id ? '' : id;
+      paint(false);
     };
     const clear = m.el.querySelector('[data-clear]');
-    if (clear) clear.onclick = ()=>{ done({ link_type:'', link_id:'' }); m.close(); };
+    if (clear) clear.onclick = ()=>{ done({ ticket_id:'', order_id:'' }); m.close(); };
     const cancel = m.el.querySelector('[data-c]');
     if (cancel) cancel.onclick = ()=>{ done(null); m.close(); };
+    const ok = m.el.querySelector('[data-ok]');
+    if (ok) ok.onclick = ()=>{ done({ ticket_id:sel.ticket_id, order_id:sel.order_id }); m.close(); };
     paint(false);
   });
-  const todoLinkChip = t => {
-    const l = todoLinkOf(t); if (!l) return '';
-    return `<button type="button" class="td-link ${l.alive?'':'is-dead'}" data-td-link="${esc(t.id)}" title="${esc(l.type==='ticket'?'Открыть тикет':'Открыть заказ')}">${icon(TODO_LINK_ICON[l.type],'ico-sm')}<span>${esc(l.label)}</span></button>`;
+  const todoLinkChip = (t, type, id) => {
+    const l = todoLinkInfo(type, id); if (!l) return '';
+    return `<button type="button" class="td-link ${l.alive?'':'is-dead'}" data-td-link="${esc(t.id)}" data-td-link-type="${esc(type)}" data-td-link-id="${esc(id)}" title="${esc(type==='ticket'?'Открыть тикет':'Открыть заказ')}">${icon(TODO_LINK_ICON[type],'ico-sm')}<span>${esc(l.label)}</span></button>`;
   };
   const todoReminderChip = t => {
     const r = todoReminderOf(t); if (!r) return '';
@@ -8281,7 +8307,7 @@ const cm = root.querySelector('.chat-main');
     return `<span class="td-remind ${r.done?'is-done':''}" title="Напоминание">${icon('clock','ico-sm')}<span>${esc(when)}</span></span>`;
   };
   const todoMeta = t => {
-    const parts = [todoLinkChip(t), todoReminderChip(t)].filter(Boolean);
+    const parts = [...todoLinksOf(t).map(l=>todoLinkChip(t, l.type, l.id)), todoReminderChip(t)].filter(Boolean);
     return parts.length ? `<span class="td-meta">${parts.join('')}</span>` : '';
   };
   const todoCloseReminder = t => {
@@ -8290,8 +8316,7 @@ const cm = root.querySelector('.chat-main');
   };
   const todoExportMeta = t => {
     const meta = [];
-    const l = todoLinkOf(t);
-    if (l) meta.push((l.type==='ticket'?'тикет ':'заказ ')+l.label+(l.sub?' · '+l.sub:''));
+    todoLinksOf(t).forEach(l => meta.push((l.type==='ticket'?'тикет ':'заказ ')+l.label+(l.sub?' · '+l.sub:'')));
     const r = todoReminderOf(t);
     if (r) meta.push(`напоминание: ${new Date(r.at).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${r.done?' (закрыто)':''}`);
     if (t && t.archived) meta.unshift('архив');
@@ -8877,7 +8902,8 @@ const cm = root.querySelector('.chat-main');
         </div>
         <div class="row" style="gap:8px;margin-bottom:8px;flex-wrap:wrap">
           <div class="field" style="flex:1;min-width:190px"><label class="small faint">Связать с</label>
-            <input type="hidden" id="td-link" value="">
+            <input type="hidden" id="td-link-ticket" value="">
+            <input type="hidden" id="td-link-order" value="">
             <button type="button" class="input td-link-pick" id="td-link-pick" data-td-pick>Без связи</button></div>
           <div class="field" style="flex:none;max-width:230px"><label class="small faint">Напомнить</label>
             <input class="input" type="datetime-local" id="td-remind-at"></div>
@@ -10074,12 +10100,14 @@ const cm = root.querySelector('.chat-main');
         /* --- Умный планировщик (ToDo) --- */
         const tdLinkPick = el.querySelector('#td-link-pick');
         if (tdLinkPick) tdLinkPick.onclick = async ()=>{
-          const hidden = el.querySelector('#td-link');
-          const cur = todoParseLink(hidden && hidden.value);
+          const ticketHidden = el.querySelector('#td-link-ticket');
+          const orderHidden = el.querySelector('#td-link-order');
+          const cur = { ticket_id: ticketHidden ? ticketHidden.value : '', order_id: orderHidden ? orderHidden.value : '' };
           const v = await todoLinkPicker(u, cur);
           if (!v) return;
-          if (hidden) hidden.value = v.link_type ? v.link_type+':'+v.link_id : '';
-          tdLinkPick.innerHTML = todoLinkPickHtml(hidden ? hidden.value : '');
+          if (ticketHidden) ticketHidden.value = v.ticket_id || '';
+          if (orderHidden) orderHidden.value = v.order_id || '';
+          tdLinkPick.innerHTML = todoLinkPickHtml(ticketHidden ? ticketHidden.value : '', orderHidden ? orderHidden.value : '');
         };
         const tdAdd = el.querySelector('#td-add');
         if (tdAdd) tdAdd.onclick = ()=>{
@@ -10087,7 +10115,8 @@ const cm = root.querySelector('.chat-main');
           if (!t){ toast('Введите задачу','warn'); return; }
           const prio = +el.querySelector('#td-prio').value || 3;
           const type = todoType({ type: el.querySelector('#td-type') && el.querySelector('#td-type').value });
-          const link = todoParseLink(el.querySelector('#td-link') && el.querySelector('#td-link').value);
+          const linkTicket = el.querySelector('#td-link-ticket');
+          const linkOrder = el.querySelector('#td-link-order');
           const rid = uid();
           const remindVal = el.querySelector('#td-remind-at') ? el.querySelector('#td-remind-at').value : '';
           let reminder_id = '';
@@ -10100,7 +10129,7 @@ const cm = root.querySelector('.chat-main');
           }
           S.todos = S.todos || [];
           S.todos.push({ id:rid, owner_id:u.id, text:t, prio, type, done:false, partial:false, archived:false,
-            reminder_id, link_type:link.link_type, link_id:link.link_id, created_at:Date.now() });
+            reminder_id, link_ticket:(linkTicket && linkTicket.value)||'', link_order:(linkOrder && linkOrder.value)||'', created_at:Date.now() });
           saveState(); toast(reminder_id?'Задача добавлена, напоминание создано':'Задача добавлена','ok'); renderSec();
         };
         const tdText = el.querySelector('#td-text');
@@ -10132,8 +10161,9 @@ const cm = root.querySelector('.chat-main');
               </div>
               <div class="cols-2 grid" style="gap:10px">
                 <div class="field"><label>Связать с</label>
-                  <input type="hidden" id="td-edit-link" value="${esc(t.link_type?t.link_type+':'+t.link_id:'')}">
-                  <button type="button" class="input td-link-pick" id="td-edit-link-pick">${todoLinkPickHtml(t.link_type?t.link_type+':'+t.link_id:'')}</button>
+                  <input type="hidden" id="td-edit-link-ticket" value="${esc(todoTicketIdOf(t))}">
+                  <input type="hidden" id="td-edit-link-order" value="${esc(todoOrderIdOf(t))}">
+                  <button type="button" class="input td-link-pick" id="td-edit-link-pick">${todoLinkPickHtml(todoTicketIdOf(t), todoOrderIdOf(t))}</button>
                 </div>
                 <div class="field"><label>Напомнить</label><input class="input" type="datetime-local" id="td-edit-remind" value="${(()=>{const r=todoReminderOf(t);return r && !r.done && r.at > Date.now()?todoLocalInput(r.at):'';})()}"></div>
               </div>
@@ -10144,12 +10174,14 @@ const cm = root.querySelector('.chat-main');
           const inp = m.el.querySelector('#td-edit-text');
           const editLinkPick = m.el.querySelector('#td-edit-link-pick');
           if (editLinkPick) editLinkPick.onclick = async ()=>{
-            const hidden = m.el.querySelector('#td-edit-link');
-            const cur = todoParseLink(hidden && hidden.value);
+            const ticketHidden = m.el.querySelector('#td-edit-link-ticket');
+            const orderHidden = m.el.querySelector('#td-edit-link-order');
+            const cur = { ticket_id: ticketHidden ? ticketHidden.value : '', order_id: orderHidden ? orderHidden.value : '' };
             const v = await todoLinkPicker(u, cur);
             if (!v) return;
-            if (hidden) hidden.value = v.link_type ? v.link_type+':'+v.link_id : '';
-            editLinkPick.innerHTML = todoLinkPickHtml(hidden ? hidden.value : '');
+            if (ticketHidden) ticketHidden.value = v.ticket_id || '';
+            if (orderHidden) orderHidden.value = v.order_id || '';
+            editLinkPick.innerHTML = todoLinkPickHtml(ticketHidden ? ticketHidden.value : '', orderHidden ? orderHidden.value : '');
           };
           const ok = m.el.querySelector('[data-ok]');
           const save = ()=>{
@@ -10160,9 +10192,10 @@ const cm = root.querySelector('.chat-main');
               const at = new Date(remindVal).getTime();
               if (!isFinite(at) || at <= Date.now()){ toast('Время напоминания должно быть в будущем','warn'); return; }
             }
-            const link = todoParseLink(m.el.querySelector('#td-edit-link').value);
+            const ticketHidden = m.el.querySelector('#td-edit-link-ticket');
+            const orderHidden = m.el.querySelector('#td-edit-link-order');
             resolve({ text, type: todoType({ type: m.el.querySelector('#td-edit-type').value }), prio: +m.el.querySelector('#td-edit-prio').value || 3,
-              link_type:link.link_type, link_id:link.link_id, remind_at:remindVal });
+              ticket_id:(ticketHidden && ticketHidden.value)||'', order_id:(orderHidden && orderHidden.value)||'', remind_at:remindVal });
             m.close();
           };
           ok.onclick = save;
@@ -10176,7 +10209,8 @@ const cm = root.querySelector('.chat-main');
           const v = await todoEditModal(t);
           if (!v) return;
           t.text = v.text; t.type = v.type; t.prio = v.prio;
-          t.link_type = v.link_type; t.link_id = v.link_id;
+          t.link_ticket = v.ticket_id; t.link_order = v.order_id;
+          t.link_type = ''; t.link_id = '';
           let r = todoReminderOf(t);
           if (v.remind_at){
             const at = new Date(v.remind_at).getTime();
@@ -10266,8 +10300,7 @@ const cm = root.querySelector('.chat-main');
           });
         });
         el.querySelectorAll('[data-td-link]').forEach(b=>b.onclick=()=>{
-          const t = (S.todos||[]).find(x=>x.id===b.dataset.tdLink);
-          const l = todoLinkOf(t);
+          const l = todoLinkInfo(b.dataset.tdLinkType, b.dataset.tdLinkId);
           if (!l) return;
           if (!l.alive){ toast(l.type==='ticket'?'Тикет не найден':'Заказ не найден','warn'); return; }
           if (l.type==='ticket') openTodoTicket(l.id);

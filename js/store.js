@@ -291,6 +291,13 @@ function clientBufferPct(){
 }
 
 /* ---------- Сид-данные ---------- */
+const DEMO_ORDER_SERVICES = {
+  o1:'Стенограмма аудиозаписи', o2:'Стенограмма с несколькими участниками',
+  o3:'Перевод с иностранного', o4:'Копирайтинг', o5:'Стенограмма аудиозаписи',
+  o6:'Перевод с иностранного', o7:'Копирайтинг', o8:'Стенограмма аудиозаписи',
+  o9:'Улучшение звука и очистка от шумов', o10:'Перевод с иностранного',
+  o11:'Копирайтинг', o12:'Стенограмма аудиозаписи', o13:'Копирайтинг'
+};
 function seedState(){
   const now = Date.now(), T = today();
   const days = n => new Date(T.getTime() - n*DAY).getTime();
@@ -385,6 +392,7 @@ function seedState(){
     project_id: opts.project || null,
     folder_id: opts.folder || null,
     nish_id: opts.nish,
+    service: opts.service || '',
     executors: opts.execs || [],
     audio: opts.audio || 0,
     files: opts.files || [],
@@ -414,6 +422,7 @@ function seedState(){
     mk('o12','AW-1035','u-cl1','archived',21500,{ nish:'n1', project:'p1', folder:'f1', execs:[{uid:'u-ex1',amount:8700,is_paid:true}], audio:4210, date:days(40), deadline:days(33), history:[{t:days(33),txt:'Выполнено'},{t:days(3),txt:'Перемещено в архив'}] }),
     mk('o13','AW-1031','u-cl4','archived',9700,{ nish:'n2', execs:[{uid:'u-ex2',amount:4800,is_paid:true}], date:days(55), deadline:days(48), history:[{t:days(48),txt:'Выполнено'},{t:days(20),txt:'Перемещено в архив'}] })
   ];
+  orders.forEach(o => { o.service = DEMO_ORDER_SERVICES[o.id] || ''; });
 
   /* Финансовые доли выполненных заказов. Хранятся в самом заказе (splitAccrual):
      админу — маржа 25%, менеджеру заказа — 5%, исполнителям — их суммы.
@@ -584,7 +593,7 @@ let S;
 function loadState(){
   try{
     const raw = localStorage.getItem(LS_KEY);
-    if (raw){ S = JSON.parse(raw); if (S && (S._v >= 1 || Array.isArray(S.users))){ S._v = Number(S._v) || 1; migrateSchema(); migrateSiteCatalog(); migrateSmartcatServices(); migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); migrateKeys(); migrateStaffBalances(); migrateFinance(); saveState(); return; } }
+    if (raw){ S = JSON.parse(raw); if (S && (S._v >= 1 || Array.isArray(S.users))){ S._v = Number(S._v) || 1; migrateSchema(); migrateSiteCatalog(); migrateSmartcatServices(); migrateOrderServices(); migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); migrateKeys(); migrateStaffBalances(); migrateFinance(); saveState(); return; } }
   }catch(e){}
   S = seedState();
   saveState();
@@ -703,6 +712,14 @@ function migrateSmartcatServices(){
   const have = new Set(list.map(x => String(x.name || '').toLowerCase()));
   SMARTCAT_SERVICES.forEach(x => { if (!have.has(x.name.toLowerCase())) list.push({ ...x }); });
   S.settings.smartcatCatsVersion = 1;
+}
+/* У старых демо-заказов не было услуги — без неё разрез «Услуги» показывал
+   бы только «Без услуги». Заполняем известные демо-заказы, пользовательские
+   записи не трогаем: их услугу выбирает менеджер в форме заказа. */
+function migrateOrderServices(){
+  (S.orders || []).forEach(o => {
+    if (!o.service && DEMO_ORDER_SERVICES[o.id]) o.service = DEMO_ORDER_SERVICES[o.id];
+  });
 }
 
 /* Обновление схемы сохранения до текущей версии. Вызывается при загрузке
