@@ -1255,7 +1255,10 @@ body.zen .bal-panel{top:10px}
 .whats-new .wn-item .dot{margin-top:6px!important;flex:none}
 
 /* Живой мультивыбор клиентов в форме заказа */
-.client-live{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:60;background:var(--panel);border:1px solid var(--border-2);border-radius:12px;box-shadow:var(--sh-2);max-height:260px;overflow-y:auto;padding:5px}
+.client-live{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:60;background:var(--panel);border:1px solid var(--border-2);border-radius:12px;box-shadow:var(--sh-2);max-height:260px;overflow-y:auto;padding:5px;opacity:1;transform:translateY(0);transition:opacity .16s var(--ease),transform .16s var(--ease);animation:clientLiveIn .16s var(--ease)}
+.client-live.is-hiding{opacity:0;transform:translateY(-4px);pointer-events:none}
+@keyframes clientLiveIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.client-live{animation:none;transition:none}}
 .client-live__item{display:flex;align-items:center;gap:9px;width:100%;padding:8px 10px;border-radius:9px;border:none;background:none;color:var(--text-2);font-size:13px;cursor:pointer;text-align:left;transition:background var(--dur)}
 .client-live__item:hover{background:var(--panel-2);color:var(--text)}
 .client-live__item.sel{color:var(--accent);font-weight:650}
@@ -2529,6 +2532,13 @@ body.col-dragging,body.col-dragging *{cursor:col-resize!important;user-select:no
 .ragg-meter{display:block;height:4px;margin-top:4px;border-radius:99px;background:var(--border);overflow:hidden}
 .ragg-meter i{display:block;height:100%;border-radius:99px;background:var(--accent);opacity:.75;transition:width .2s var(--ease)}
 .ragg-body tr{transition:background-color .12s var(--ease)}
+.ragg-group td{background:var(--panel-2);font-weight:650}
+.ragg-group .ragg-meter{display:none}
+.ragg-group-count{display:inline-block;margin-left:6px;font-size:10.5px;color:var(--faint);font-weight:400}
+.ragg-sub td{background:transparent}
+.ragg-sub-name{padding-left:28px!important;position:relative}
+.ragg-sub-name::before{content:'↳';position:absolute;left:12px;color:var(--faint)}
+.ragg-sub .ragg-title{font-weight:400;color:var(--text-2)}
 @keyframes raggIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 .ragg-card.is-in .ragg-body tr{animation:raggIn .18s var(--ease) both}
 .ragg-empty{text-align:center;color:var(--faint);padding:22px 10px!important;font-size:12.5px}
@@ -2620,3 +2630,4 @@ svg.ico.wip-ico{width:38px;height:38px}
 /* Калькулятор: длинный каталог услуг не растягивает окно */
 #cx-svcs{max-height:380px;overflow:auto;padding-right:4px;overscroll-behavior:contain}
 .calc-svc-wrap{max-height:420px;overflow:auto}
+.calc-niche-card[hidden]{display:none}

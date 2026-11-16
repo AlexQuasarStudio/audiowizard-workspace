@@ -2505,6 +2505,8 @@ ex.innerHTML = avatarHTML(user(), '');
   }
   const revPlural = n => (n%10===1 && n%100!==11) ? 'заказ'
     : ((n%10>=2 && n%10<=4 && !(n%100>=12 && n%100<=14)) ? 'заказа' : 'заказов');
+  const svcPlural = n => (n%10===1 && n%100!==11) ? 'услуга'
+    : ((n%10>=2 && n%10<=4 && !(n%100>=12 && n%100<=14)) ? 'услуги' : 'услуг');
   const dayPlural = n => (n%10===1 && n%100!==11) ? 'день'
     : ((n%10>=2 && n%10<=4 && !(n%100>=12 && n%100<=14)) ? 'дня' : 'дней');
   /* ---------- Экспорт детализации: сводка + расшифровка ---------- */
@@ -2621,10 +2623,10 @@ ex.innerHTML = avatarHTML(user(), '');
     client:   { label: 'Клиенты',       empty: 'Без клиента',   none: 'Клиентов за период нет' },
     executor: { label: 'Исполнители',   empty: 'Без исполнителя', none: 'Исполнителей за период нет' }
   };
-  function revAggDims(){ return Object.keys(REV_AGG_DIMS); }
+  function revAggDims(){ return ['niche', 'client', 'executor']; }
   function revAggDim(dim){
     const staff = ['admin','top_manager','manager'].includes((typeof me === 'function' && me() ? me().role : ''));
-    const dims = staff ? revAggDims() : ['service', 'niche'];
+    const dims = staff ? revAggDims() : ['niche'];
     return dims.includes(dim) ? dim : 'niche';
   }
   function revAggLabel(dim, key){
@@ -2645,6 +2647,7 @@ ex.innerHTML = avatarHTML(user(), '');
       volume: vol ? Number(it.volume) || 0 : null,
       volume_unit: vol ? (it.volume_unit || '') : null,
       avg_volume: vol && it.orders ? Math.round((Number(it.volume) || 0) / it.orders * 10) / 10 : null,
+      services: dim === 'niche' ? (it.services || []) : null,
       accrued: dim === 'executor' ? Number(it.accrued) || 0 : null,
       paid: dim === 'executor' ? Number(it.paid) || 0 : null,
       exec_debt: dim === 'executor' ? Number(it.debt) || 0 : null
@@ -2682,9 +2685,36 @@ ex.innerHTML = avatarHTML(user(), '');
     });
     return revAggMetrics(dim, [...map.values()], revenue);
   }
+  function revNicheAggregate(rows, revenue){
+    const map = new Map();
+    (rows || []).forEach(r => {
+      const key = r.niche || '';
+      const g = map.get(key) || { key, label: revAggLabel('niche', key), revenue:0, orders:0, debt:0, volume:0, volume_unit:'', services:new Map() };
+      g.revenue += Number(r.total) || 0;
+      g.orders += 1;
+      g.debt += Number(r.debt) || 0;
+      g.volume += Number(r.volume) || 0;
+      if (!g.volume_unit) g.volume_unit = r.volume_unit || '';
+      const sk = r.service || '';
+      const s = g.services.get(sk) || { key:sk, label:revAggLabel('service', sk), revenue:0, orders:0, debt:0, volume:0, volume_unit:'' };
+      s.revenue += Number(r.total) || 0;
+      s.orders += 1;
+      s.debt += Number(r.debt) || 0;
+      s.volume += Number(r.volume) || 0;
+      if (!s.volume_unit) s.volume_unit = r.volume_unit || '';
+      g.services.set(sk, s);
+      map.set(key, g);
+    });
+    return revAggMetrics('niche', [...map.values()].map(g => ({
+      ...g,
+      services: revAggMetrics('service', [...g.services.values()], revenue)
+    })), revenue);
+  }
   function revAggStats(rows, byExecutor, revenue){
     const out = {};
-    revAggDims().forEach(dim => { out[dim] = revAggregate(rows, byExecutor, dim, revenue); });
+    revAggDims().forEach(dim => {
+      out[dim] = dim === 'niche' ? revNicheAggregate(rows, revenue) : revAggregate(rows, byExecutor, dim, revenue);
+    });
     return out;
   }
 
@@ -2753,14 +2783,29 @@ ex.innerHTML = avatarHTML(user(), '');
     dayRows.push(['Итого', data.totals.orders, data.totals.revenue]);
     const book = { 'Сводка': summary, 'Заказы': [header, ...rows], 'Исполнители': execRows, 'По дням': dayRows };
     revAggDims().forEach(dim => {
-      const stats = revAggregate(data.rows, data.byExecutor, dim, data.totals.revenue);
+      const stats = dim === 'niche'
+        ? revNicheAggregate(data.rows, data.totals.revenue)
+        : revAggregate(data.rows, data.byExecutor, dim, data.totals.revenue);
       if (!stats.length) return;
       const exec = dim === 'executor';
+      const sum = k => stats.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+      if (dim === 'niche'){
+        const head = ['Специализация', 'Услуга', 'Выручка', 'Заказов', 'Объём', 'Ср. объём', 'Средний чек', 'Доля выручки, %', 'Долг'];
+        const aggRows = [];
+        stats.forEach(g => {
+          aggRows.push([g.label, 'Все услуги', g.revenue, g.orders, g.volume || '', g.avg_volume || '', g.avg, +g.share.toFixed(1), g.debt]);
+          (g.services || []).forEach(s => {
+            aggRows.push(['', s.label, s.revenue, s.orders, s.volume || '', s.avg_volume || '', s.avg, +s.share.toFixed(1), s.debt]);
+          });
+        });
+        aggRows.push(['Итого', '', data.totals.revenue, data.totals.orders, sum('volume'), '', data.totals.avg, 100, sum('debt')]);
+        book['По специализациям'] = [head, ...aggRows];
+        return;
+      }
       const head = [REV_AGG_DIMS[dim].label, 'Выручка', 'Заказов', 'Средний чек', 'Доля выручки, %']
         .concat(exec ? ['Начислено', 'Оплачено'] : [], ['Долг']);
       const aggRows = stats.map(r => [r.label, r.revenue, r.orders, r.avg, +r.share.toFixed(1)]
         .concat(exec ? [r.accrued, r.paid] : [], [r.debt]));
-      const sum = k => stats.reduce((a, r) => a + (Number(r[k]) || 0), 0);
       aggRows.push(['Итого', sum('revenue'), data.totals.orders, data.totals.avg, 100]
         .concat(exec ? [sum('accrued'), sum('paid')] : [], [sum('debt')]));
       book['По ' + REV_AGG_DIMS[dim].label.toLowerCase()] = [head, ...aggRows];
@@ -3195,7 +3240,7 @@ ex.innerHTML = avatarHTML(user(), '');
 
   /* ---------- Блок статистики в окне детализации ---------- */
   const REV_AGG_PAGE = 10;
-  const revAggState = { dim:'service', q:'', page:{ service:1, niche:1, client:1, executor:1 } };
+  const revAggState = { dim:'niche', q:'', page:{ niche:1, client:1, executor:1 } };
   function revAggFmtPct(v){ return (Number(v) || 0).toFixed(1).replace('.', ',') + '%'; }
   function revAggFmtVol(v, unit){ return (Number(v) || 0).toLocaleString('ru-RU', { maximumFractionDigits: 1 }) + (unit ? ' ' + unit : ''); }
   function revAggHead(dim){
@@ -3203,7 +3248,7 @@ ex.innerHTML = avatarHTML(user(), '');
     const vol = dim === 'niche' || dim === 'service';
     const isClient = !!(typeof me === 'function' && me() && me().role === 'client');
     return `<thead><tr>
-      <th class="ragg-name">${esc(REV_AGG_DIMS[dim].label)}</th>
+      <th class="ragg-name">${esc(dim === 'niche' ? 'Специализация / услуга' : REV_AGG_DIMS[dim].label)}</th>
       <th class="pay-cell">${isClient ? 'Расходы' : 'Выручка'}</th>
       <th class="pay-cell">Заказов</th>
       ${vol ? '<th class="pay-cell">Объём</th><th class="pay-cell">Ср. объём</th>' : ''}
@@ -3213,13 +3258,13 @@ ex.innerHTML = avatarHTML(user(), '');
       <th class="pay-cell">Долг</th>
     </tr></thead>`;
   }
-  function revAggRowHtml(r, dim, total, maxShare){
+  function revAggRowHtml(r, dim, total, maxShare, cls=''){
     const exec = dim === 'executor';
     const vol = dim === 'niche' || dim === 'service';
     const share = total ? (r.revenue / total * 100) : 0;
     const barW = maxShare ? Math.max(2, Math.round(share / maxShare * 100)) : 0;
-    return `<tr>
-      <td class="ragg-name"><span class="ragg-title" title="${esc(r.label)}">${esc(r.label)}</span><span class="ragg-meter" aria-hidden="true"><i style="width:${barW}%"></i></span></td>
+    return `<tr class="${cls}">
+      <td class="ragg-name ${dim === 'service' ? 'ragg-sub-name' : ''}"><span class="ragg-title" title="${esc(r.label)}">${esc(r.label)}</span>${dim === 'niche' && (r.services || []).length ? `<span class="ragg-group-count">${r.services.length} ${svcPlural(r.services.length)}</span>` : ''}<span class="ragg-meter" aria-hidden="true"><i style="width:${barW}%"></i></span></td>
       <td class="pay-cell"><b>${fmtMoney(r.revenue)}</b></td>
       <td class="pay-cell">${r.orders}</td>
       ${vol ? `<td class="pay-cell">${r.volume ? revAggFmtVol(r.volume, r.volume_unit) : '—'}</td><td class="pay-cell">${r.avg_volume ? revAggFmtVol(r.avg_volume, r.volume_unit) : '—'}</td>` : ''}
@@ -3232,23 +3277,43 @@ ex.innerHTML = avatarHTML(user(), '');
   function revAggViewHtml(stats, dim, revenue){
     const all = stats[dim] || [];
     const q = revAggState.q.trim().toLowerCase();
-    const items = q ? all.filter(r => r.label.toLowerCase().includes(q)) : all;
+    let items = all;
+    if (q){
+      if (dim === 'niche'){
+        items = all.map(g => {
+          const groupMatch = g.label.toLowerCase().includes(q);
+          const services = (g.services || []).filter(s => s.label.toLowerCase().includes(q));
+          if (!groupMatch && !services.length) return null;
+          return { ...g, services: groupMatch ? (g.services || []) : services };
+        }).filter(Boolean);
+      } else {
+        items = all.filter(r => r.label.toLowerCase().includes(q));
+      }
+    }
     const pages = Math.max(1, Math.ceil(items.length / REV_AGG_PAGE));
     const page = Math.min(Math.max(1, revAggState.page[dim] || 1), pages);
     revAggState.page[dim] = page;
     const from = items.length ? (page - 1) * REV_AGG_PAGE + 1 : 0;
     const to = Math.min(items.length, page * REV_AGG_PAGE);
     const slice = items.slice(from ? from - 1 : 0, to);
-    const maxShare = items.reduce((a, r) => Math.max(a, revenue ? r.revenue / revenue * 100 : 0), 0);
-    const dims = ['admin','top_manager','manager'].includes((typeof me === 'function' && me() ? me().role : '')) ? revAggDims() : ['service', 'niche'];
+    const maxShare = items.reduce((a, r) => {
+      let m = Math.max(a, revenue ? r.revenue / revenue * 100 : 0);
+      (r.services || []).forEach(s => { m = Math.max(m, revenue ? s.revenue / revenue * 100 : 0); });
+      return m;
+    }, 0);
+    const dims = ['admin','top_manager','manager'].includes((typeof me === 'function' && me() ? me().role : '')) ? revAggDims() : ['niche'];
     const tabs = dims.map(d => `<button type="button" class="${d === dim ? 'on' : ''}" data-ragg-tab="${d}">${esc(REV_AGG_DIMS[d].label)}</button>`).join('');
     const body = slice.length
-      ? slice.map(r => revAggRowHtml(r, dim, revenue, maxShare)).join('')
+      ? (dim === 'niche'
+        ? slice.map(g => revAggRowHtml(g, 'niche', revenue, maxShare, 'ragg-group') + (g.services || []).map(s => revAggRowHtml(s, 'service', revenue, maxShare, 'ragg-sub')).join('')).join('')
+        : slice.map(r => revAggRowHtml(r, dim, revenue, maxShare)).join(''))
       : `<tr><td colspan="${dim === 'client' ? 6 : 8}" class="ragg-empty">${q ? `Ничего не найдено по запросу «${esc(revAggState.q.trim())}»` : esc(REV_AGG_DIMS[dim].none)}</td></tr>`;
     const found = q ? `<span class="faint">найдено ${items.length} из ${all.length}</span>` : `<span class="faint">${all.length} в разрезе</span>`;
     const note = dim === 'executor'
       ? '<div class="small faint ragg-note">Доля выручки — от общей выручки периода: остальное уходит админу, менеджеру и в свободный остаток.</div>'
-      : '';
+      : dim === 'niche'
+        ? '<div class="small faint ragg-note">Услуги сгруппированы внутри специализаций: строка специализации — итог, ниже — её услуги.</div>'
+        : '';
     return `
       <div class="ragg-card card">
         <div class="ragg-head">
@@ -3285,14 +3350,32 @@ ex.innerHTML = avatarHTML(user(), '');
     if (!body) return;
     const itemsAll = stats[dim] || [];
     const q = revAggState.q.trim().toLowerCase();
-    const items = q ? itemsAll.filter(r => r.label.toLowerCase().includes(q)) : itemsAll;
+    let items = itemsAll;
+    if (q){
+      if (dim === 'niche'){
+        items = itemsAll.map(g => {
+          const groupMatch = g.label.toLowerCase().includes(q);
+          const services = (g.services || []).filter(s => s.label.toLowerCase().includes(q));
+          if (!groupMatch && !services.length) return null;
+          return { ...g, services: groupMatch ? (g.services || []) : services };
+        }).filter(Boolean);
+      } else {
+        items = itemsAll.filter(r => r.label.toLowerCase().includes(q));
+      }
+    }
     const pages = Math.max(1, Math.ceil(items.length / REV_AGG_PAGE));
     const page = Math.min(Math.max(1, revAggState.page[dim] || 1), pages);
     revAggState.page[dim] = page;
     const slice = items.slice((page - 1) * REV_AGG_PAGE, page * REV_AGG_PAGE);
-    const maxShare = items.reduce((a, r) => Math.max(a, revenue ? r.revenue / revenue * 100 : 0), 0);
+    const maxShare = items.reduce((a, r) => {
+      let m = Math.max(a, revenue ? r.revenue / revenue * 100 : 0);
+      (r.services || []).forEach(s => { m = Math.max(m, revenue ? s.revenue / revenue * 100 : 0); });
+      return m;
+    }, 0);
     body.innerHTML = slice.length
-      ? slice.map(r => revAggRowHtml(r, dim, revenue, maxShare)).join('')
+      ? (dim === 'niche'
+        ? slice.map(g => revAggRowHtml(g, 'niche', revenue, maxShare, 'ragg-group') + (g.services || []).map(s => revAggRowHtml(s, 'service', revenue, maxShare, 'ragg-sub')).join('')).join('')
+        : slice.map(r => revAggRowHtml(r, dim, revenue, maxShare)).join(''))
       : `<tr><td colspan="${dim === 'client' ? 6 : 8}" class="ragg-empty">${q ? `Ничего не найдено по запросу «${esc(revAggState.q.trim())}»` : esc(REV_AGG_DIMS[dim].none)}</td></tr>`;
     const num = root.querySelector('#ragg-page-num');
     if (num) num.textContent = page + ' / ' + pages;
@@ -8007,8 +8090,7 @@ const cm = root.querySelector('.chat-main');
       ${staff?`
       <div class="row row--between" style="margin-bottom:8px"><span class="small faint">Итого</span><b>${fmtMoney(pend.total)}</b></div>
       <div class="row row--between" style="margin-bottom:10px"><span class="small faint">Сборы провайдера (ориентир) / на руки</span><b class="small">${fmtMoney(pend.commission)} / ${fmtMoney(pend.net)}</b></div>`:`
-      <div class="row row--between" style="margin-bottom:8px"><span class="small faint">Начислено</span><b>${fmtMoney(myDebt)}</b></div>
-      <div class="row row--between" style="margin-bottom:10px"><span class="small faint">На руки (ориентир)</span><b>${fmtMoney(myNet)}</b></div>`}
+      <div class="row row--between" style="margin-bottom:10px"><span class="small faint">К выплате за вычетом ${cfg.commission}%</span><b>${fmtMoney(myNet)}</b></div>`}
       ${staff?rows:''}
       ${staff?`<h4 class="small" style="margin:12px 0 4px">Заказы к выплате${pend.excluded?' · убрано вручную: '+pend.excluded:''}</h4>${list}`:''}
       ${!staff?`<p class="small faint">Выплата приходит на привязанный аккаунт ${provName} или вне системы — по договорённости с менеджером. Сумма «на руки» — ориентир, итоговая зависит от способа выплаты.</p>`:''}
@@ -8800,6 +8882,11 @@ const cm = root.querySelector('.chat-main');
         <div class="field" style="max-width:240px"><label>Запас клиенту, %</label><input class="input" id="calc-buffer" type="number" min="0" max="200" step="1" value="${clientBufferPct()}"></div>
       </div><div class="card card-pad"><h3 style="margin-bottom:6px">Услуги калькулятора</h3>
         <p class="small muted" style="margin-bottom:10px">Перечень услуг, стоимость и маржа платформы — по нишам. Настраивается администратором — владельцем платформы. Калькулятор принимает ввод с клавиатуры.</p>
+        <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
+          <div class="input-wrap" style="flex:1;min-width:220px;max-width:420px">${icon('search')}
+            <input class="input" id="calc-svc-q" type="search" placeholder="Поиск по названию или единице" autocomplete="off" spellcheck="false" aria-label="Поиск по услугам" style="padding-left:36px"></div>
+          <span class="small faint" id="calc-svc-found"></span>
+        </div>
         <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:10px">
           <button class="btn btn--ghost btn--sm" data-svc-export="xlsx" type="button">${icon('export')} XLSX</button>
           <button class="btn btn--ghost btn--sm" data-svc-export="csv" type="button">CSV</button>
@@ -8807,7 +8894,7 @@ const cm = root.querySelector('.chat-main');
           <span class="spacer"></span>
           <button class="btn btn--soft btn--sm" data-svc-import type="button">${icon('import')} Импорт услуг</button>
         </div>
-        ${S.niches.map(n=>`<div class="card card-pad" style="background:var(--bg-2);margin-top:10px">
+        ${S.niches.map(n=>`<div class="card card-pad calc-niche-card" data-calc-niche="${n.id}" style="background:var(--bg-2);margin-top:10px">
           <div class="row row--between"><b class="small">${esc(n.name)}</b>
             <button class="btn btn--ghost btn--sm" data-add="${n.id}">${icon('plus')} Услуга</button></div>
           <div class="tbl-wrap calc-svc-wrap" style="margin-top:8px;border:0"><table class="tbl" style="min-width:0">
@@ -8834,6 +8921,7 @@ const cm = root.querySelector('.chat-main');
             <tbody data-extra="${n.id}">${calcExtraRowsHTML(n.id)}</tbody>
           </table></div>
         </div>`).join('')}
+        <p class="small faint" id="calc-svc-empty" hidden style="margin:10px 0 0"></p>
         <button class="btn btn--primary" id="calc-save" style="margin-top:14px">${icon('check-c')} Сохранить услуги</button>
       </div>
       <div class="card card-pad" style="margin-top:14px">
@@ -9519,11 +9607,40 @@ const cm = root.querySelector('.chat-main');
       el.querySelectorAll('[data-svc-export]').forEach(b => {
         b.onclick = () => exportCalcServices(b.dataset.svcExport);
       });
+      const calcSvcFilter = ()=>{
+        const input = el.querySelector('#calc-svc-q');
+        const raw = input ? input.value.trim() : '';
+        const q = norm(raw);
+        let shown = 0;
+        el.querySelectorAll('[data-calc-niche]').forEach(card => {
+          let visible = 0;
+          card.querySelectorAll('tbody[data-niche] tr[data-sid]').forEach(tr => {
+            const name = (tr.querySelector('[data-f="name"]') || {}).value || '';
+            const unit = (tr.querySelector('[data-f="unit"]') || {}).value || '';
+            const ok = !q || norm(name + ' ' + unit).includes(q);
+            tr.hidden = !ok;
+            if (ok) visible++;
+          });
+          card.hidden = !!q && visible === 0;
+          shown += visible;
+        });
+        const found = el.querySelector('#calc-svc-found');
+        if (found) found.textContent = q ? `Найдено: ${shown}` : '';
+        const empty = el.querySelector('#calc-svc-empty');
+        if (empty){
+          empty.hidden = !q || shown > 0;
+          empty.textContent = q && !shown ? `Ничего не найдено по запросу «${raw}»` : '';
+        }
+      };
+      const svcQ = el.querySelector('#calc-svc-q');
+      if (svcQ) svcQ.addEventListener('input', calcSvcFilter);
+      calcSvcFilter();
       const svcImport = el.querySelector('[data-svc-import]');
       if (svcImport) svcImport.onclick = async () => {
         const r = await importCalcServices();
         if (r && r.changed){
           el.querySelectorAll('tbody[data-niche]').forEach(tb => { tb.innerHTML = calcSvcRowsHTML(tb.dataset.niche); });
+          calcSvcFilter();
         }
       };
       const feeSave = el.querySelector('#fee-save');
@@ -9630,14 +9747,16 @@ const cm = root.querySelector('.chat-main');
       const calcRowOut = (tr, after) => {
         if (!tr){ after && after(); return; }
         const reduce = (S.settings && S.settings.noAnim) || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-        if (reduce){ tr.remove(); after && after(); return; }
+        if (reduce){ tr.remove(); after && after(); calcSvcFilter(); return; }
         tr.style.pointerEvents = 'none';
         tr.style.transition = 'opacity .16s var(--ease), transform .16s var(--ease)';
         tr.style.opacity = '0';
         tr.style.transform = 'translateY(-3px)';
-        setTimeout(()=>{ tr.remove(); after && after(); }, 170);
+        setTimeout(()=>{ tr.remove(); after && after(); calcSvcFilter(); }, 170);
       };
       const addRow = nid => {
+        const q = el.querySelector('#calc-svc-q');
+        if (q && q.value){ q.value = ''; calcSvcFilter(); }
         const tb = el.querySelector(`tbody[data-niche="${nid}"]`);
         if (!tb) return;
         const id = 'cs' + uid();

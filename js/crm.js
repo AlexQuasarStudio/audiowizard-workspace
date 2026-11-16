@@ -1744,8 +1744,9 @@ const CRM = (() => {
       /* Дата начала работ по умолчанию — сегодня (для нового заказа) */
       start_date: Date.now()
     };
-    const clients = S.users.filter(x=>x.role==='client' && x.ext.status!=='blacklisted');
-    const executors = S.users.filter(x=>x.role==='executor' && x.ext.status!=='blacklisted' && x.ext.workStatus==='working');
+    const isClient = u.role === 'client';
+    const clients = isClient ? [u] : S.users.filter(x=>x.role==='client' && x.ext.status!=='blacklisted');
+    const executors = isClient ? [] : S.users.filter(x=>x.role==='executor' && x.ext.status!=='blacklisted' && x.ext.workStatus==='working');
     /* Копии, а не ссылки: иначе правка суммы в форме сразу меняет заказ,
        и при сохранении не с чем сравнить прежнюю оплаченную часть. */
     const form = { executors: (o.executors||[]).map(e=>({...e})), files: (o.files||[]).map(f=>({ ...f, volumes: f.volumes ? { ...f.volumes } : undefined })), calcSum: 0, calcRushFee: Number(o.rush_fee)||0 };
@@ -1764,7 +1765,9 @@ const CRM = (() => {
               <div class="row"><input class="input" id="of-id" value="${esc(o.order_id)}" placeholder="AW-0000" style="font-family:var(--mono)">
               <button class="btn btn--ghost btn--icon" id="of-gen" title="Сгенерировать по правилам">${icon('refresh')}</button></div>
               <div class="small" id="of-id-hint" hidden></div></div>
-            <div class="field"><label>Клиент *</label>
+            ${isClient ? `<div class="field"><label>Клиент</label>
+              <div class="input" style="display:flex;align-items:center;background:var(--panel-2);padding-left:12px">${esc(u.full_name)}</div></div>` : ''}
+            <div class="field" ${isClient ? 'hidden' : ''}><label>Клиент *</label>
               <div class="input-wrap" style="position:relative">${icon('clients')}
                 <input class="input" id="of-client-search" placeholder="Начните вводить имя клиента…" autocomplete="off" style="padding-left:36px">
                 <div class="client-live" id="of-client-live" hidden></div>
@@ -1820,7 +1823,7 @@ const CRM = (() => {
           </div>
         </div>
         <div class="stack" style="gap:13px">
-          <div class="field"><label>Исполнители</label>
+          <div class="field" ${isClient ? 'hidden' : ''}><label>Исполнители</label>
             <div class="input-wrap">${icon('search')}<input class="input" id="of-ex-search" placeholder="Живой поиск исполнителя…" style="padding-left:36px"></div>
             <div id="of-recs"></div>
             <div class="executor-pick" id="of-exec-list">
@@ -1828,7 +1831,7 @@ const CRM = (() => {
             </div>
             <div class="small faint" id="of-exec-sum"></div>
           </div>
-          <div id="of-vol-split"></div>
+          <div id="of-vol-split" ${isClient ? 'hidden' : ''}></div>
           <div class="card card-pad" style="background:var(--bg-2)">
             <div class="row row--between"><b style="font-size:13px">${icon('calc','ico-sm')} Калькулятор услуг</b></div>
             <p class="small muted" style="margin:6px 0 10px">Выберите услуги ниши — сумма подставится в «Итого».</p>
@@ -1847,7 +1850,7 @@ const CRM = (() => {
         if (o.start_date) stInp.value = new Date(o.start_date - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
 
         /* Живой мультивыбор клиентов: поиск → чипы */
-        let selClients = Array.isArray(o.client_ids) && o.client_ids.length ? [...o.client_ids] : (o.client_id ? [o.client_id] : []);
+        let selClients = isClient ? [u.id] : (Array.isArray(o.client_ids) && o.client_ids.length ? [...o.client_ids] : (o.client_id ? [o.client_id] : []));
         /* Номер, который сгенерировали мы: при смене клиента меняем в нём
            только инициалы, не трогая дату и суффикс. Ручную правку не
            перетираем — она перестаёт совпадать с autoOrderId. */
@@ -1860,19 +1863,48 @@ const CRM = (() => {
           g('#of-client-chips').innerHTML = selClients.map(id => `<span class="chip on" data-rc="${id}">${esc(clName(id))}${icon('x','ico-sm')}</span>`).join('') || '<span class="tiny faint">Клиент не выбран</span>';
           g('#of-client-chips').querySelectorAll('[data-rc]').forEach(ch => ch.onclick = () => { selClients = selClients.filter(x => x !== ch.dataset.rc); renderChips(); syncPf(); paintDeadlineHint(); paintRecs(); applyDeadline(false); });
         };
+        const hideClientLive = ()=>{
+          const live = g('#of-client-live');
+          if (!live || live.hidden) return;
+          clearTimeout(live._hideT);
+          live.classList.add('is-hiding');
+          live._hideT = setTimeout(()=>{
+            if (!live.classList.contains('is-hiding')) return;
+            live.hidden = true;
+            live.classList.remove('is-hiding');
+          }, 160);
+        };
         const renderLive = (q) => {
           const live = g('#of-client-live');
           const list = clients.filter(c => !q || norm(c.full_name).includes(norm(q)) || norm(c.email).includes(norm(q))).slice(0, 8);
           live.innerHTML = list.length ? list.map(c => `<button type="button" class="client-live__item ${selClients.includes(c.id)?'sel':''}" data-cl="${c.id}">${avatarHTML(c,'avatar--sm')}<span class="cell-main o-ell">${esc(c.full_name)}</span>${selClients.includes(c.id)?icon('check-c','ico-sm'):''}</button>`).join('') : '<div class="tiny faint" style="padding:8px 10px">Никого не найдено</div>';
+          clearTimeout(live._hideT);
           live.hidden = false;
+          live.classList.remove('is-hiding');
           live.querySelectorAll('[data-cl]').forEach(b => b.onclick = () => {
             const id = b.dataset.cl;
             selClients = selClients.includes(id) ? selClients.filter(x => x !== id) : [...selClients, id];
-            g('#of-client-search').value = ''; renderChips(); live.hidden = true; syncPf(); paintDeadlineHint(); paintRecs(); applyDeadline(false);
+            g('#of-client-search').value = ''; renderChips(); hideClientLive(); syncPf(); paintDeadlineHint(); paintRecs(); applyDeadline(false);
           });
         };
-        g('#of-client-search').addEventListener('input', e => renderLive(e.target.value));
-        g('#of-client-search').addEventListener('focus', e => renderLive(e.target.value));
+        const clientSearch = g('#of-client-search');
+        if (clientSearch){
+          clientSearch.addEventListener('input', e => renderLive(e.target.value));
+          clientSearch.addEventListener('focus', e => renderLive(e.target.value));
+          const clientWrap = clientSearch.closest('.input-wrap');
+          const closeIfOutside = ()=>{ setTimeout(()=>{
+            const live = g('#of-client-live');
+            if (!live || live.hidden) return;
+            if (live.matches(':hover') || live.contains(document.activeElement)) return;
+            hideClientLive();
+          }, 120); };
+          clientSearch.addEventListener('focusout', closeIfOutside);
+          if (clientWrap) clientWrap.addEventListener('mouseleave', hideClientLive);
+          mask.addEventListener('mousedown', e=>{
+            if (clientWrap && clientWrap.contains(e.target)) return;
+            hideClientLive();
+          });
+        }
         /* проекты и папки по первому выбранному клиенту */
         const syncPf = () => {
           const cid = selClients[0] || '';
@@ -5374,7 +5406,8 @@ updatePeopleBulk();
       return list.length ? list.map(volOptionHtml).join('') : '<option value="">Нет услуг в этой специализации</option>';
     };
     const volOptions = volOptionsFor(initNiche);
-    const volUnit = firstVol && /страниц|лист/i.test(firstVol.s.unit) ? 'page' : firstVol && /1000.*знак|символ/i.test(firstVol.s.unit) ? 'char' : 'min';
+    const calcUnitForNiche = nid => nid === 'n1' ? 'min' : nid === 'n2' ? 'char' : nid === 'n3' ? 'page' : 'min';
+    const volUnit = calcUnitForNiche(initNiche);
     const m = openWinModal({
       narrow:true, tall:true, title:'Калькулятор услуг', route:'orders', persistKey: onResult ? '' : 'calculator',
       body:`<div class="calc-display">
@@ -5383,8 +5416,11 @@ updatePeopleBulk();
         </div>
         <div class="small faint" style="margin-top:6px">Поддерживаются + − × ÷ ( ) % и запятая как десятичный разделитель · Enter — в результат</div>
         <div class="card card-pad" style="margin-top:10px;background:var(--panel-2)">
-          <b class="small">Объём</b>
-          <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
+          <b class="small">Специализация и объём</b>
+          <div class="field" style="margin-top:8px;max-width:320px"><label>Специализация</label>
+            <select class="input" id="cx-niche">${(S.niches||[]).map(n=>`<option value="${n.id}" ${n.id===initNiche?'selected':''}>${esc(n.name)}</option>`).join('')}</select></div>
+          <div class="tiny faint" style="margin-top:4px">Сначала выберите направление — услуги, ставки и нормы подстроятся.</div>
+          <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
             <div class="field" style="flex:0 0 120px"><label>Количество</label>
               <input class="input" id="cx-volume" type="number" min="0" step="0.1" placeholder="0"></div>
             <div class="field" style="flex:0 0 140px"><label>Считать в</label>
@@ -5419,8 +5455,6 @@ updatePeopleBulk();
         <div class="card card-pad" style="margin-top:12px;background:var(--panel-2)">
           <b class="small">Срок и срочность</b>
           <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
-            <div class="field" style="flex:1;min-width:150px"><label>Специализация</label>
-              <select class="input" id="cx-niche">${(S.niches||[]).map(n=>`<option value="${n.id}" ${n.id===initNiche?'selected':''}>${esc(n.name)}</option>`).join('')}</select></div>
             <div class="field" style="flex:0 0 108px"><label>Срок, дней</label>
               <input class="input" id="cx-days" type="number" min="0" step="1" value="${daysValue}" placeholder="—"></div>
             <div class="field" style="flex:1;min-width:170px"><label>Или дата</label>
@@ -5429,7 +5463,7 @@ updatePeopleBulk();
           <div class="small" id="cx-rush" style="margin-top:8px"></div>
           <div class="small" id="cx-norm-deadline" style="margin-top:6px"></div>
         </div>
-        <div class="small muted" style="margin-top:12px;line-height:1.5"><b>Дополнительные услуги и опции</b> — вычитка, оформление, срочность и другие надбавки. Основную услугу (перевод, транскрибацию) выберите в блоке «Объём» выше: если объём уже указан, не дублируйте её здесь, иначе сумма посчитается дважды.</div>
+        <div class="small muted" style="margin-top:12px;line-height:1.5"><b>Услуги и опции.</b> Основную услугу выберите в блоке «Объём»: система подставит количество и ставку в расчёт. В каталоге ниже отмечайте только дополнительные услуги и опции — вычитку, оформление, сложность, копии. Не дублируйте основную услугу, иначе она посчитается дважды. Срочность добавится автоматически, если срок короче обычного.</div>
         <div class="field" style="margin-top:10px"><label>Поиск услуги</label><input class="input" id="cx-svc-search" placeholder="Название, единица или ниша" autocomplete="off" spellcheck="false"></div>
         <div id="cx-svcs" style="margin-top:8px"></div>
         <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
@@ -5439,7 +5473,13 @@ updatePeopleBulk();
         <div class="card card-pad" style="margin-top:12px;background:var(--panel-2)">
           <b class="small">Скидки</b>
           <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
-            <div class="field" style="flex:1;min-width:110px"><label>Часов стенограмм</label><input class="input" id="cx-hours" type="number" min="0" step="0.5" value="0"></div>
+            <div class="field" style="flex:1;min-width:150px"><label>Объём для скидки</label>
+              <div class="row" style="gap:6px;align-items:center">
+                <input class="input" id="cx-hours" type="number" readonly value="0" tabindex="-1" aria-readonly="true" style="flex:1">
+                <span class="small faint">ч</span>
+              </div>
+              <div class="tiny faint" style="margin-top:4px">Считается автоматически из блока «Объём».</div>
+            </div>
             <div class="field" style="flex:1;min-width:110px"><label>Промокод</label><input class="input" id="cx-promo" placeholder="PROMO10" autocomplete="off" spellcheck="false"></div>
           </div>
           <div class="small" id="cx-disc" style="margin-top:8px"></div>
@@ -5457,13 +5497,15 @@ updatePeopleBulk();
             return (typeof v === 'number' && isFinite(v)) ? v : NaN;
           } catch(e){ return NaN; }
         };
+        const exactNumber = n => {
+          const v = Number(n);
+          if (!isFinite(v)) return '—';
+          return String(v).replace('.', ',');
+        };
         const upd = ()=>{
           const raw = g2('#cx-in').value;
           const v = compute(raw);
           val = v;
-          /* compute('') возвращает null; isNaN(null) === false, из-за этого
-             в подсказке появлялось «= null». Пустое поле — просто пусто. */
-          g2('#cx-live').textContent = v == null ? '' : (Number.isNaN(v) ? 'проверьте выражение' : `= ${v}`);
           paintTotals();
         };
         g2('#cx-in').addEventListener('input', upd);
@@ -5506,6 +5548,22 @@ updatePeopleBulk();
             if (/страниц|лист/.test(u)) rate = s.price;
           }
           return { qty, unit, nid, s, rate };
+        };
+        /* Часы для объёмной скидки берём из уже введённого объёма:
+           минуты ÷ 60, часы как есть, символы ÷ 600 знаков/мин ÷ 60. */
+        const volumeHours = () => {
+          const v = volState();
+          const qty = Number(v.qty) || 0;
+          if (!qty) return 0;
+          if (v.unit === 'hour') return qty;
+          if (v.unit === 'min') return qty / 60;
+          if (v.unit === 'char') return qty / 36000;
+          return 0;
+        };
+        const paintPromoHours = () => {
+          const inp = g2('#cx-hours');
+          if (!inp) return;
+          inp.value = String(Math.round(volumeHours() * 100) / 100);
         };
         const paintVolOptions = nid => {
           const sel = g2('#cx-vsvc'); if (!sel) return;
@@ -5567,11 +5625,16 @@ updatePeopleBulk();
           }
           paintNormDeadline();
         };
+        const syncVolume = ()=>{
+          paintVolume(true);
+          paintPromoHours();
+          paintDiscount();
+        };
         ['#cx-volume','#cx-unit','#cx-vsvc'].forEach(sel => {
           const el = g2(sel);
           if (!el) return;
-          el.addEventListener('input', ()=>paintVolume(true));
-          el.addEventListener('change', ()=>paintVolume(true));
+          el.addEventListener('input', syncVolume);
+          el.addEventListener('change', syncVolume);
         });
         g2('#cx-vsvc').addEventListener('change', ()=>{
           const v = volState();
@@ -5615,7 +5678,7 @@ updatePeopleBulk();
            максимальную подходящую скидку, а не сумму скидок. */
         const promoList = () => (S.settings.promos || []).filter(p => p.active !== false);
         const calcDiscount = () => {
-          const hours = +g2('#cx-hours').value || 0;
+          const hours = volumeHours();
           const code = String(g2('#cx-promo').value || '').trim().toUpperCase();
           const fixed = fixedExtraSum();
           const extraPct = pctSum();
@@ -5652,8 +5715,10 @@ updatePeopleBulk();
           langTo: g2('#cx-lang-to') ? g2('#cx-lang-to').value : '', langPair:langPair() });
         const paintTotals = () => {
           const d = calcDiscount();
-          const empty = (val == null || isNaN(val)) && !svcSum() && !d.deadline;
-          g2('#cx-val').textContent = empty ? (g2('#cx-in').value ? '—' : '0') : fmtMoney(d.sum);
+          const hasExpr = String(g2('#cx-in').value || '').trim() !== '';
+          const exact = (val == null || isNaN(val)) ? null : exactNumber(val);
+          g2('#cx-val').textContent = exact != null ? `= ${exact}` : (hasExpr ? '—' : '= 0');
+          g2('#cx-live').textContent = (d.sum || d.deadline) ? `К оплате: ${exactNumber(d.sum)}` : '';
           return d;
         };
         const paintDiscount = () => {
@@ -5691,7 +5756,6 @@ updatePeopleBulk();
             box.innerHTML = `<span class="badge c-green">Обычный срок</span> <span class="small">${left} ${daysWord(left)} — не короче стандарта (${d.rec.days} ${daysWord(d.rec.days)})</span>`;
           }
         };
-        g2('#cx-hours').addEventListener('input', ()=>{ paintDiscount(); upd(); });
         g2('#cx-promo').addEventListener('input', ()=>{ paintDiscount(); upd(); });
         const filterSvcs = ()=>{
           const q = norm(g2('#cx-svc-search').value);
@@ -5729,9 +5793,17 @@ updatePeopleBulk();
         paintDiscount();
         upd();
         paintVolume(false);
+        paintPromoHours();
+        paintDiscount();
         g2('#cx-niche').addEventListener('change', ()=>{
-          paintVolOptions(g2('#cx-niche').value);
+          const nid = g2('#cx-niche').value;
+          paintVolOptions(nid);
           paintSvcs();
+          const unitSel = g2('#cx-unit');
+          if (unitSel){
+            unitSel.value = calcUnitForNiche(nid);
+            unitSel.dispatchEvent(new Event('change', { bubbles:true }));
+          }
           paintVolume(true);
           paintRush(); paintNormDeadline(); paintDiscount(); upd();
         });

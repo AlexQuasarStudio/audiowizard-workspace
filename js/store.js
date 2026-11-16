@@ -170,13 +170,13 @@ function promosDefault(){ return JSON.parse(JSON.stringify(DEFAULT_PROMOS)); }
 const SITE_CALC_VERSION = 1;
 const SITE_CALC_SERVICES = {
   n1: [
-    { id:'cs-a1',  name:'Стенограмма аудиозаписи', price:1200, unit:'за час аудио', margin:25 },
-    { id:'cs-a2',  name:'Стенограмма с несколькими участниками', price:1380, unit:'за час аудио', margin:25 },
-    { id:'cs-a3',  name:'Стенограмма судебного заседания', price:1800, unit:'за час аудио', margin:25 },
-    { id:'cs-a4',  name:'Стенограмма в прямом эфире', price:4800, unit:'за час аудио', margin:25 },
-    { id:'cs-a5',  name:'ИИ-стенограмма', price:540, unit:'за час аудио', margin:25 },
-    { id:'cs-a6',  name:'ИИ + человек', price:1080, unit:'за час аудио', margin:25 },
-    { id:'cs-a7',  name:'Подготовка диалоговых/субтитровых листов', price:1320, unit:'за час аудио', margin:25 },
+    { id:'cs-a1',  name:'Стенограмма аудиозаписи', price:20, unit:'за минуту', margin:25 },
+    { id:'cs-a2',  name:'Стенограмма с несколькими участниками', price:23, unit:'за минуту', margin:25 },
+    { id:'cs-a3',  name:'Стенограмма судебного заседания', price:30, unit:'за минуту', margin:25 },
+    { id:'cs-a4',  name:'Стенограмма в прямом эфире', price:80, unit:'за минуту', margin:25 },
+    { id:'cs-a5',  name:'ИИ-стенограмма', price:9, unit:'за минуту', margin:25 },
+    { id:'cs-a6',  name:'ИИ + человек', price:18, unit:'за минуту', margin:25 },
+    { id:'cs-a7',  name:'Подготовка диалоговых/субтитровых листов', price:22, unit:'за минуту', margin:25 },
     { id:'cs-a8',  name:'Изготовление субтитров для видео', price:3000, unit:'за час видео', margin:25 },
     { id:'cs-a9',  name:'Подготовка монтажных листов', price:3600, unit:'за час видео', margin:25 },
     { id:'cs-a10', name:'Заверение стенограммы', price:1299, unit:'за шт', margin:25 },
@@ -593,7 +593,7 @@ let S;
 function loadState(){
   try{
     const raw = localStorage.getItem(LS_KEY);
-    if (raw){ S = JSON.parse(raw); if (S && (S._v >= 1 || Array.isArray(S.users))){ S._v = Number(S._v) || 1; migrateSchema(); migrateSiteCatalog(); migrateSmartcatServices(); migrateOrderServices(); migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); migrateKeys(); migrateStaffBalances(); migrateFinance(); saveState(); return; } }
+    if (raw){ S = JSON.parse(raw); if (S && (S._v >= 1 || Array.isArray(S.users))){ S._v = Number(S._v) || 1; migrateSchema(); migrateSiteCatalog(); migrateTranscriptionMinutes(); migrateSmartcatServices(); migrateOrderServices(); migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); migrateKeys(); migrateStaffBalances(); migrateFinance(); saveState(); return; } }
   }catch(e){}
   S = seedState();
   saveState();
@@ -701,6 +701,22 @@ function migrateSiteCatalog(){
     if (def.deadlineDays[n.id] != null) S.calcSettings.deadlineDays[n.id] = def.deadlineDays[n.id];
   });
   S.settings.calcCatalogVersion = SITE_CALC_VERSION;
+}
+/* Стенограммы тарифицируются в минутах, а не в часах. Переводим только
+   нетронутые дефолтные услуги: если админ уже менял цену, не трогаем. */
+function migrateTranscriptionMinutes(){
+  const prices = {
+    'cs-a1':[1200,20], 'cs-a2':[1380,23], 'cs-a3':[1800,30], 'cs-a4':[4800,80],
+    'cs-a5':[540,9], 'cs-a6':[1080,18], 'cs-a7':[1320,22]
+  };
+  ((S.calcServices || {}).n1 || []).forEach(s => {
+    const p = prices[s.id];
+    if (!p) return;
+    if (/^за час/i.test(String(s.unit || '')) && Number(s.price) === p[0]){
+      s.price = p[1];
+      s.unit = 'за минуту';
+    }
+  });
 }
 /* Разовая добавка категорий Smartcat в «Переводы» для уже сохранённых
    профилей. Существующие услуги и цены не трогаем. */
