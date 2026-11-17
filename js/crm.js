@@ -1672,7 +1672,7 @@ const CRM = (() => {
           return num === '' || num == null ? '' : String(num);
         }).filter(Boolean);
         if (!nums.length){ toast('У выбранных людей ещё нет номеров','warn'); return; }
-        const text = nums.map(num => '#' + num).join(', ');
+        const text = nums.map(num => '#' + (role === 'client' ? 'c' : 'e') + num).join(', ');
         copyPlainText(text);
         toast(`Скопировано: ${text}`, 'ok');
       } },

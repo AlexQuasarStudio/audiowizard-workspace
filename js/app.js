@@ -1383,6 +1383,13 @@ const QUICK_BY_ROLE = {
       .map(r => noDemo(S.users).find(u => u.role === r))
       .filter(Boolean);
   }
+  function mascotsHTML(cls=''){
+    return `<div class="mascots ${cls}" aria-hidden="true">
+      <span class="mascot mascot--human mascot--human-l"></span>
+      <span class="mascot mascot--robot"></span>
+      <span class="mascot mascot--human mascot--human-r"></span>
+    </div>`;
+  }
   function renderJoin(inv){
     if (!inv) inv = { token:'', role:'client', limit:0, used:0, revoked:true };
     const st = inviteStatus(inv);
@@ -1396,11 +1403,14 @@ const QUICK_BY_ROLE = {
         <div class="auth">
           <div class="auth__aurora"></div>
           ${S.settings && S.settings.appBg !== 'none' ? `<div class="auth__doodles" aria-hidden="true"></div>` : ''}
-          <div class="auth__card">
-            <div class="auth__logo">${icon('logo-full')}</div>
-            <h1 class="auth__title">Приглашение недоступно</h1>
-            <p class="small muted" style="text-align:center">${stMsg}</p>
-            <button class="btn btn--primary btn--block" style="margin-top:14px" onclick="location.hash=''">${icon('exit')} Ко входу</button>
+          <div class="auth__wrap">
+            ${mascotsHTML()}
+            <div class="auth__card">
+              <div class="auth__logo">${icon('logo-full')}</div>
+              <h1 class="auth__title">Приглашение недоступно</h1>
+              <p class="small muted" style="text-align:center">${stMsg}</p>
+              <button class="btn btn--primary btn--block" style="margin-top:14px" onclick="location.hash=''">${icon('exit')} Ко входу</button>
+            </div>
           </div>
         </div>`;
       return;
@@ -1410,7 +1420,9 @@ const QUICK_BY_ROLE = {
       <div class="auth">
         <div class="auth__aurora"></div>
         ${S.settings && S.settings.appBg !== 'none' ? `<div class="auth__doodles" aria-hidden="true"></div>` : ''}
-        <div class="auth__card auth__card--join">
+        <div class="auth__wrap auth__wrap--join">
+          ${mascotsHTML()}
+          <div class="auth__card auth__card--join">
           <div class="auth__logo">${icon('logo-full')}</div>
           <h1 class="auth__title">Вас пригласили в Audiowizard</h1>
           <p class="auth__sub">${inviter? `Пригласил(а): <b>${esc(inviter.full_name)}</b> · `:''}Роль: <b>${ROLE_LABEL[inv.role]||inv.role}</b>${inv.email? ' · '+esc(inv.email):''}</p>
@@ -1428,6 +1440,7 @@ const QUICK_BY_ROLE = {
             <button class="btn btn--primary btn--block" type="submit" style="margin-top:16px">${icon('user-plus')} Создать аккаунт</button>
           </form>
           <p class="small faint" style="text-align:center;margin-top:12px"><a href="#" id="join-cancel">Отмена — ко входу</a></p>
+          </div>
         </div>
       </div>`;
     const eye = $('#jf-eye'); let shown=false;
@@ -1471,7 +1484,9 @@ const QUICK_BY_ROLE = {
       <div class="auth">
         <div class="auth__aurora"></div>
         ${S.settings && S.settings.appBg !== 'none' ? `<div class="auth__doodles" aria-hidden="true"></div>` : ''}
-        <div class="auth__card">
+        <div class="auth__wrap">
+          ${mascotsHTML()}
+          <div class="auth__card">
           <div class="auth__logo">${icon('logo-full')}</div>
           <h1 class="auth__title">Audiowizard Workspace</h1>
           <p class="auth__sub">Единая платформа для работы с контентом</p>
@@ -1499,6 +1514,7 @@ const QUICK_BY_ROLE = {
             </div>
           </div>
           <p class="small faint" style="text-align:center;margin-top:16px">Входя, вы принимаете <a href="#" data-legal="Пользовательское соглашение">Условия сервиса</a> и <a href="#" data-legal="Политика конфиденциальности">Политику конфиденциальности</a></p>
+          </div>
         </div>
       </div>`;
 
@@ -2076,7 +2092,8 @@ ex.innerHTML = avatarHTML(user(), '');
     const u2 = user();
     openWinModal({
       narrow:true, title:'Добро пожаловать!',
-      body:`<p class="small muted">Настроим профиль за три шага: расскажите о себе, поставьте аватар и выберите оформление.</p>
+      body:`${mascotsHTML('mascots--modal')}
+        <p class="small muted" style="text-align:center">Настроим профиль за три шага: расскажите о себе, поставьте аватар и выберите оформление.</p>
         <div class="stack" style="gap:12px;margin-top:14px">
           <div class="field"><label>Как к вам обращаться</label><input class="input" id="ob-name" value="${esc(u2.full_name)}"></div>
           <div class="field"><label>О себе</label><textarea class="input" id="ob-about" placeholder="Пара слов для коллег" rows="2">${esc(u2.about||'')}</textarea></div>
@@ -2145,8 +2162,31 @@ ex.innerHTML = avatarHTML(user(), '');
         };
       } });
   }
+  function showInstallHint(){
+    if (!S || !S.settings) return;
+    openWinModal({ narrow:true, title:'Приложение на главном экране', icon:'phone', route:'about',
+      body:`<div class="stack" style="gap:12px">
+        <p class="small muted" style="margin:0">Добавьте Audiowizard на экран — приложение откроется без адресной строки и будет работать как обычное.</p>
+        <div class="card card-pad" style="background:var(--bg-2)">
+          <b class="small">iPhone / iPad — Safari</b>
+          <p class="small" style="margin:6px 0 0">Нажмите кнопку <b>«Поделиться»</b> <span class="muted">(квадрат со стрелкой вверх)</span> → <b>«На экран „Домой“»</b> → «Добавить».</p>
+        </div>
+        <div class="card card-pad" style="background:var(--bg-2)">
+          <b class="small">Android — Chrome</b>
+          <p class="small" style="margin:6px 0 0">Откройте меню <b>⋮</b> справа сверху → <b>«Добавить на главный экран»</b> или «Установить приложение» → подтвердите.</p>
+        </div>
+        <div class="card card-pad" style="background:var(--bg-2)">
+          <b class="small">Windows / macOS — Chrome, Edge, Safari</b>
+          <p class="small" style="margin:6px 0 0">Нажмите <b>«Поделиться»</b> в браузере и выберите <b>«Установить приложение»</b> / «Добавить в Dock». В Chrome и Edge также можно нажать иконку установки в адресной строке.</p>
+        </div>
+        <p class="tiny faint" style="margin:0">Если кнопки «Поделиться» нет — откройте меню браузера и найдите пункт «Установить приложение».</p>
+      </div>`,
+      footer:`<button class="btn btn--primary" data-x>Понятно</button>`,
+      onMount:(m2,c2)=>{ const b=m2.querySelector('[data-x]'); if (b) b.onclick=c2; }
+    });
+  }
   function startTour(i){
-    if (i >= TOUR.length){ user().tour_completed = true; saveState(); toast('Тур завершён — отличная работа!','ok'); return; }
+    if (i >= TOUR.length){ user().tour_completed = true; saveState(); toast('Тур завершён — отличная работа!','ok'); setTimeout(showInstallHint, 260); return; }
     const step = TOUR[i];
     const el = $(step.sel);
     if (!el){ startTour(i+1); return; }
@@ -2165,7 +2205,7 @@ ex.innerHTML = avatarHTML(user(), '');
         <button class="btn btn--primary btn--sm" data-next>${i===TOUR.length-1?'Готово':'Далее'} ${icon('arrow-r','ico-sm')}</button>
       </div>`;
     document.body.appendChild(spot); document.body.appendChild(card);
-    card.querySelector('[data-skip]').onclick = ()=>{ spot.remove(); card.remove(); user().tour_completed = true; saveState(); };
+    card.querySelector('[data-skip]').onclick = ()=>{ spot.remove(); card.remove(); user().tour_completed = true; saveState(); setTimeout(showInstallHint, 260); };
     card.querySelector('[data-next]').onclick = ()=>{ spot.remove(); card.remove(); startTour(i+1); };
   }
 
@@ -4681,9 +4721,9 @@ ex.innerHTML = avatarHTML(user(), '');
         h = h.replace(re, mm => `<span class="msg-mention msg-mention--role" data-mention-spec="${esc(t.word)}" role="button">${mm}</span>`);
       });
       h = h.replace(/@([\w.-]+)/g, (m2, un) => `<span class="msg-mention" data-mention="${esc(un)}" role="button">@${esc(un)}</span>`);
-      /* #c5 — клиент, #v6 — исполнитель, #AW-1049 — заказ. Ссылка ставится
+      /* #c5 — клиент, #e6 — исполнитель, #AW-1049 — заказ. Ссылка ставится
          только на существующий и доступный текущей роли объект. */
-      h = h.replace(/#([cv])(\d+)(?![\w-])|#(AW-\d+)/gi, (full, kind, num, orderId) => {
+      h = h.replace(/#([cev])(\d+)(?![\w-])|#(AW-\d+)/gi, (full, kind, num, orderId) => {
         if (orderId){
           const o = S.orders.find(x => String(x.order_id).toUpperCase() === String(orderId).toUpperCase());
           if (!o || !orderVisible(o)) return full;
@@ -5887,12 +5927,12 @@ const cm = root.querySelector('.chat-main');
       const updateHashHints = ()=>{
         if (!hashHints || !chatTa) return;
         const before = chatTa.value.slice(0, chatTa.selectionStart || 0);
-        const m = /(?:^|\s)(#(?:[cv]?\d*|AW-?\d*))$/i.exec(before);
+        const m = /(?:^|\s)(#(?:[cev]?\d*|AW-?\d*))$/i.exec(before);
         if (!m){ hideHashHints(); return; }
         const token = m[1];
         const q = token.slice(1).toLowerCase();
         const list = [];
-        if (canSeeExecutorLinks && (!q || q.startsWith('v'))) S.users.filter(x => x.role === 'executor' && x.ext && x.ext.num && (!q.slice(1) || String(x.ext.num).includes(q.slice(1)))).slice(0, 4).forEach(x => list.push({ insert:'#v' + x.ext.num, label:'#v' + x.ext.num + ' · ' + x.full_name }));
+        if (canSeeExecutorLinks && (!q || q.startsWith('e') || q.startsWith('v'))) S.users.filter(x => x.role === 'executor' && x.ext && x.ext.num && (!q.slice(1) || String(x.ext.num).includes(q.slice(1)))).slice(0, 4).forEach(x => list.push({ insert:'#e' + x.ext.num, label:'#e' + x.ext.num + ' · ' + x.full_name }));
         if (canSeeClientLinks && (!q || q.startsWith('c'))) S.users.filter(x => x.role === 'client' && x.ext && x.ext.num && (!q.slice(1) || String(x.ext.num).includes(q.slice(1)))).slice(0, 4).forEach(x => list.push({ insert:'#c' + x.ext.num, label:'#c' + x.ext.num + ' · ' + x.full_name }));
         if (!q || q.startsWith('aw')) S.orders.filter(o => orderVisible(o) && (!q.slice(2) || String(o.order_id).toLowerCase().includes(q))).slice(0,4).forEach(o => list.push({ insert:'#' + o.order_id, label:'#' + o.order_id + ' · ' + fmtMoney(o.total) }));
         if (!list.length){ hideHashHints(); return; }
@@ -6990,7 +7030,7 @@ const cm = root.querySelector('.chat-main');
           if (kind === 'client' && !canSeeClientLinks){ toast('Нет доступа к клиентам', 'err'); return; }
           if (kind === 'executor' && !canSeeExecutorLinks){ toast('Нет доступа к исполнителям', 'err'); return; }
           const person = S.users.find(x => x.id === id && x.role === kind);
-          if (person && typeof openPersonCard === 'function') openPersonCard(person.id, kind);
+          if (person && typeof CRM !== 'undefined' && CRM.openPersonCard) CRM.openPersonCard(person.id, kind);
         }
         return;
       }
@@ -11259,6 +11299,7 @@ const cm = root.querySelector('.chat-main');
     };
     const [t, d] = texts[code] || texts['404'];
     root.innerHTML = `<div class="err-page">
+      <div class="err-mascot" aria-hidden="true"><span class="mascot mascot--robot"></span></div>
       <div class="err-code">${code==='ddos'?'DDoS':esc(code)}</div>
       <h2>${t}</h2><p>${d}</p>
       ${code==='ddos'?`<div class="progress" style="max-width:260px;margin-top:10px"><span id="ddos-bar" style="width:0%"></span></div><span class="small faint" id="ddos-cnt">3</span>`:''}
