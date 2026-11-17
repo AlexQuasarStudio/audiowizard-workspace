@@ -5724,12 +5724,12 @@ const wrap = root.querySelector('.pl-wrap');
             return (typeof v === 'number' && isFinite(v)) ? v : NaN;
           } catch(e){ return NaN; }
         };
-        const round3 = n => Math.round((Number(n) + Number.EPSILON) * 1000) / 1000;
+        const round2 = n => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
         const calcNum = n => {
-          const v = round3(n);
+          const v = round2(n);
           if (!isFinite(v)) return '—';
           const sign = v < 0 ? '−' : '';
-          const [int, frac] = Math.abs(v).toFixed(3).split('.');
+          const [int, frac] = Math.abs(v).toFixed(2).split('.');
           const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
           const tail = frac.replace(/0+$/, '');
           return sign + grouped + (tail ? ',' + tail : '');
@@ -5739,7 +5739,7 @@ const wrap = root.querySelector('.pl-wrap');
           || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
         const animateCalc = (el, to, render) => {
           if (!el) return;
-          const target = round3(to);
+          const target = round2(to);
           const from = Number(el._calcVal);
           el._calcVal = target;
           if (el._calcRaf){ cancelAnimationFrame(el._calcRaf); el._calcRaf = null; }
@@ -5767,7 +5767,7 @@ const wrap = root.querySelector('.pl-wrap');
         g2('#cx-in').addEventListener('input', ()=>upd(false));
         g2('#cx-in').addEventListener('keydown', e=>{
           if (e.key === 'Enter' && !isNaN(val) && val){
-            S.calcHistory.push({ expression: g2('#cx-in').value, result:round3(val) });
+            S.calcHistory.push({ expression: g2('#cx-in').value, result:round2(val) });
             S.calcHistory = S.calcHistory.slice(-20);
             g2('#cx-hist').insertAdjacentHTML('afterbegin', `<div data-h="${val}">${esc(g2('#cx-in').value)} = ${val}</div>`);
             saveState();
@@ -6103,7 +6103,7 @@ const wrap = root.querySelector('.pl-wrap');
               if (animate) animateCalc(valEl, val, v => { valEl.textContent = `= ${calcNum(v)}`; });
               else {
                 if (valEl._calcRaf){ cancelAnimationFrame(valEl._calcRaf); valEl._calcRaf = null; }
-                valEl._calcVal = round3(val);
+                valEl._calcVal = round2(val);
                 valEl.textContent = `= ${exact}`;
               }
             } else {
@@ -6131,7 +6131,7 @@ const wrap = root.querySelector('.pl-wrap');
               if (animate) animateCalc(live, d.sum, v => { live.innerHTML = html(v); });
               else {
                 if (live._calcRaf){ cancelAnimationFrame(live._calcRaf); live._calcRaf = null; }
-                live._calcVal = round3(d.sum);
+                live._calcVal = round2(d.sum);
                 live.innerHTML = html(d.sum);
               }
             } else {
