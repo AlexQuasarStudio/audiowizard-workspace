@@ -8992,7 +8992,7 @@ const cm = root.querySelector('.chat-main');
           </div>
           <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
             <button class="btn btn--ghost btn--sm" type="button" data-langs-all>Выбрать все</button>
-            <button class="btn btn--ghost btn--sm" type="button" data-langs-none>Снять все</button>
+            <button class="btn btn--ghost btn--sm" type="button" data-langs-none>Оставить один</button>
             <span class="small faint" id="calc-langs-found"></span>
           </div>
         </div>
@@ -9762,7 +9762,13 @@ const cm = root.querySelector('.chat-main');
       const paintLangsCount = ()=>{
         if (langsCount) langsCount.textContent = `Выбрано: ${langCbs.filter(c => c.checked).length} из ${langCbs.length}`;
       };
-      langCbs.forEach(cb => cb.addEventListener('change', paintLangsCount));
+      langCbs.forEach(cb => cb.addEventListener('change', ()=>{
+        if (!langCbs.some(c => c.checked)){
+          cb.checked = true;
+          if (typeof toast === 'function') toast('Оставьте хотя бы один язык', 'warn');
+        }
+        paintLangsCount();
+      }));
       paintLangsCount();
       const langQ = el.querySelector('#calc-lang-q');
       const filterLangs = ()=>{
@@ -9779,7 +9785,11 @@ const cm = root.querySelector('.chat-main');
       const langsAll = el.querySelector('[data-langs-all]');
       if (langsAll) langsAll.onclick = ()=>{ langCbs.forEach(c => { c.checked = true; }); paintLangsCount(); };
       const langsNone = el.querySelector('[data-langs-none]');
-      if (langsNone) langsNone.onclick = ()=>{ langCbs.forEach(c => { c.checked = false; }); paintLangsCount(); };
+      if (langsNone) langsNone.onclick = ()=>{
+        langCbs.forEach((c, i) => { c.checked = i === 0; });
+        paintLangsCount();
+        if (typeof toast === 'function') toast('Оставлен один язык — снимите его и выберите другой', 'info');
+      };
       const svcImport = el.querySelector('[data-svc-import]');
       if (svcImport) svcImport.onclick = async () => {
         const r = await importCalcServices();
@@ -9864,7 +9874,9 @@ const cm = root.querySelector('.chat-main');
         });
         S.calcSettings.clientBufferPct = Math.max(0, Math.min(200, Number((el.querySelector('#calc-buffer')||{}).value) || 0));
         const langsSel = el.querySelector('#calc-langs');
-        S.calcSettings.languages = langsSel ? [...langsSel.querySelectorAll('.calc-lang-cb:checked')].map(o => o.value) : [];
+        const chosenLangs = langsSel ? [...langsSel.querySelectorAll('.calc-lang-cb:checked')].map(o => o.value) : [];
+        if (!chosenLangs.length){ toast('Оставьте хотя бы один язык в калькуляторе', 'warn'); return; }
+        S.calcSettings.languages = chosenLangs;
         const adminMarginEl = el.querySelector('#calc-admin-margin');
         const managerFeeEl = el.querySelector('#calc-manager-fee');
         if (adminMarginEl || managerFeeEl){

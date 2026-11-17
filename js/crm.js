@@ -5641,6 +5641,7 @@ const wrap = root.querySelector('.pl-wrap');
                   <select class="input" id="cx-lang-from" hidden>${langOptions('en')}</select>
                   <div class="calc-combo__list" id="cx-lang-from-live" aria-hidden="true"></div>
                 </div></div>
+              <button type="button" class="iconbtn calc-lang-swap" id="cx-lang-swap" title="Поменять языки местами" aria-label="Поменять языки местами">⇄</button>
               <div class="field" style="flex:1;min-width:150px"><label>Язык перевода</label>
                 <div class="calc-combo">
                   <input class="input" id="cx-lang-to-q" placeholder="Начните вводить язык…" autocomplete="off" spellcheck="false">
@@ -5745,6 +5746,7 @@ const wrap = root.querySelector('.pl-wrap');
           const v = compute(raw);
           val = v;
           paintTotals(animate);
+          paintDiscount();
         };
         g2('#cx-in').addEventListener('input', ()=>upd(false));
         g2('#cx-in').addEventListener('keydown', e=>{
@@ -5835,13 +5837,20 @@ const wrap = root.querySelector('.pl-wrap');
           wrap.classList.toggle('is-collapsed', !show);
           wrap.setAttribute('aria-hidden', show ? 'false' : 'true');
           const from = g2('#cx-lang-from'), to = g2('#cx-lang-to');
+          const swap = g2('#cx-lang-swap');
           if (from) from.disabled = !show;
           if (to) to.disabled = !show;
-          if (!show){
-            if (from) from.value = 'ru';
-            if (to) to.value = 'ru';
-          } else if (from && to && from.value === 'ru' && to.value === 'ru'){
-            from.value = 'en'; to.value = 'ru';
+          if (swap) swap.disabled = !show;
+          if (from && to){
+            const codes = CALC_LANGS.map(([c]) => c);
+            if (!show){
+              from.value = 'ru'; to.value = 'ru';
+            } else if (codes.length){
+              const pick = (preferred, current) => codes.includes(preferred) ? preferred : (codes.includes(current) ? current : codes[0]);
+              let f = pick('en', from.value), t = pick('ru', to.value);
+              if (codes.length > 1 && f === t) t = codes.find(c => c !== f) || t;
+              from.value = f; to.value = t;
+            }
           }
           syncLangInputs();
           paintLang();
@@ -5849,6 +5858,15 @@ const wrap = root.querySelector('.pl-wrap');
         ['#cx-lang-from','#cx-lang-to'].forEach(sel => {
           const el = g2(sel); if (el) el.addEventListener('change', paintLang);
         });
+        const langSwap = g2('#cx-lang-swap');
+        if (langSwap) langSwap.onclick = ()=>{
+          const from = g2('#cx-lang-from'), to = g2('#cx-lang-to');
+          if (!from || !to) return;
+          const t = from.value;
+          from.value = to.value; to.value = t;
+          syncLangInputs();
+          paintLang();
+        };
         /* Комбобоксы с плавной подсказкой: скрытый select хранит значение,
            видимый input — только поиск и выбранную подпись. */
         const bindCalcCombo = ({input, select, list, getItems, onPick}) => {
@@ -5904,7 +5922,7 @@ const wrap = root.querySelector('.pl-wrap');
             const nid = g2('#cx-niche') ? g2('#cx-niche').value : '';
             return volList.filter(v => !nid || v.nid === nid).map(v => ({ value: v.nid + '|' + v.idx, label: volOptionText(v) }));
           },
-          onPick: () => { paintVolume(true); paintPromoHours(); paintDiscount(); upd(true); }
+          onPick: () => { paintVolume(true, true); paintPromoHours(); paintDiscount(); }
         });
         bindCalcCombo({
           input: g2('#cx-lang-from-q'), select: g2('#cx-lang-from'), list: g2('#cx-lang-from-live'),
@@ -5937,7 +5955,7 @@ const wrap = root.querySelector('.pl-wrap');
             days.dispatchEvent(new Event('input', { bubbles: true }));
           }
         };
-        const paintVolume = (auto=true) => {
+        const paintVolume = (auto=true, animate=false) => {
           const v = volState();
           const desc = g2('#cx-svc-desc');
           if (desc) desc.textContent = v.s ? (v.s.desc || '') : '';
@@ -5947,7 +5965,7 @@ const wrap = root.querySelector('.pl-wrap');
           if (!v.qty){ note.textContent = 'Укажите объём — подставим точный расчёт'; return; }
           if (!v.rate){
             const want = /страниц|лист/i.test(v.s.unit) ? 'page' : /1000.*знак|символ/i.test(v.s.unit) ? 'char' : /час|мин/i.test(v.s.unit) ? 'min' : '';
-            if (want && g2('#cx-unit').value !== want){ g2('#cx-unit').value = want; return paintVolume(auto); }
+            if (want && g2('#cx-unit').value !== want){ g2('#cx-unit').value = want; return paintVolume(auto, animate); }
             note.innerHTML = '<span style="color:var(--red)">Для этой услуги выберите другую единицу объёма</span>';
             return;
           }
@@ -5958,7 +5976,7 @@ const wrap = root.querySelector('.pl-wrap');
           note.innerHTML = `${qtyTxt} ${label} × ${(+v.rate.toFixed(2)).toLocaleString('ru-RU')} ₽ = <b>${fmtMoney(Math.round(v.qty * v.rate))}</b>`;
           if (auto){
             g2('#cx-in').value = `${v.qty} × ${rateStr}`;
-            upd();
+            upd(animate);
           }
           paintNormDeadline();
         };
@@ -5984,7 +6002,7 @@ const wrap = root.querySelector('.pl-wrap');
           const box = g2('#cx-char'); if (!box) return;
           box.classList.toggle('is-open', g2('#cx-unit').value === 'char');
         };
-        if (g2('#cx-char-mode')) g2('#cx-char-mode').addEventListener('change', ()=>paintVolume(true));
+        if (g2('#cx-char-mode')) g2('#cx-char-mode').addEventListener('change', ()=>paintVolume(true, true));
         g2('#cx-unit').addEventListener('change', paintChar);
         paintChar();
 
@@ -6094,7 +6112,7 @@ const wrap = root.querySelector('.pl-wrap');
                 if (d.minApplied) out += ` <span class="small faint">· минимум категории</span>`;
                 return out;
               };
-              if (animate) animateCalc(live, d.sum, html);
+              if (animate) animateCalc(live, d.sum, v => { live.innerHTML = html(v); });
               else {
                 if (live._calcRaf){ cancelAnimationFrame(live._calcRaf); live._calcRaf = null; }
                 live._calcVal = round3(d.sum);
@@ -6188,12 +6206,9 @@ const wrap = root.querySelector('.pl-wrap');
           paintLangVisibility(nid);
           paintSvcs();
           const unitSel = g2('#cx-unit');
-          if (unitSel){
-            unitSel.value = calcUnitForNiche(nid);
-            unitSel.dispatchEvent(new Event('change', { bubbles:true }));
-          }
-          paintVolume(true);
-          paintRush(); paintNormDeadline(); paintDiscount(); upd(true);
+          if (unitSel){ unitSel.value = calcUnitForNiche(nid); paintChar(); }
+          paintVolume(true, true);
+          paintRush(); paintNormDeadline(); paintDiscount();
         });
         /* Срок можно задать в днях — точная дата подставляется сама;
            ручная дата так же пересчитывает дни. */
