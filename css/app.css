@@ -263,8 +263,11 @@ body .head__mtools{
  radial-gradient(45% 45% at 68.6% 32.9%,rgba(122,149,196,.09),transparent 100%),
  radial-gradient(55% 55% at 51.4% 73.6%,rgba(143,120,176,.10),transparent 100%);
  pointer-events:none}
+.mascot-art{--mascot-shell-1:color-mix(in srgb,var(--accent) 24%,#fff8ff);--mascot-shell-2:color-mix(in srgb,var(--accent) 74%,#e4d4ff);--mascot-shell-3:var(--accent);--mascot-body-1:color-mix(in srgb,var(--accent) 82%,#d8c8ff);--mascot-body-2:color-mix(in srgb,var(--accent) 98%,#3f2c78);--mascot-face-1:#fffdf5;--mascot-face-2:#ffe9c9;--mascot-line:#3b3155;--mascot-eye:#3b3155;--mascot-pupil:#fff;--mascot-inset:#fff;--mascot-heart-1:#ffadad;--mascot-heart-2:#f06d8f;--mascot-glow:#ffb3c7;--mascot-blush:#ff9fb2;--mascot-spark:#ffd37a}
+html[data-theme^='dark'] .mascot-art{--mascot-shell-1:color-mix(in srgb,var(--accent) 34%,#251c39);--mascot-shell-2:color-mix(in srgb,var(--accent) 82%,#3b2a5c);--mascot-shell-3:var(--accent);--mascot-body-1:color-mix(in srgb,var(--accent) 88%,#3b2d57);--mascot-body-2:color-mix(in srgb,var(--accent) 98%,#241a39);--mascot-face-1:#2b223e;--mascot-face-2:#3a2a52;--mascot-line:#f1e9ff;--mascot-eye:#f1e9ff;--mascot-pupil:#2b223e;--mascot-inset:#d8c9ff;--mascot-heart-1:#ff9fa9;--mascot-heart-2:#e95f80;--mascot-glow:#ff8fb0;--mascot-blush:#ff7e9b;--mascot-spark:#ffd37a}
 .welcome-mascots{display:flex;align-items:flex-end;justify-content:center;pointer-events:none;user-select:none}
 .welcome-mascot{display:block;object-fit:contain;flex:none}
+.mascot-svg{display:block;width:100%;height:100%}
 .welcome-mascot--robot{width:154px;height:172px;filter:drop-shadow(0 12px 18px rgba(45,34,70,.22))}
 .welcome-mascot--human{width:96px;height:140px;filter:drop-shadow(0 8px 13px rgba(45,34,70,.18))}
 .welcome-mascot--left{margin-right:-36px;transform:rotate(-4deg) translateY(4px)}
@@ -2409,7 +2412,7 @@ body.pills-hide .head{pointer-events:none}
 /* ---- Ошибки, логбокс, превью темы, дропзона, эмодзи (HEAD) ---- */
 .err-page{min-height:calc(100vh - var(--head-h) - 80px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px;padding:30px}
 .err-mascot{width:150px;height:170px;margin-bottom:0;animation:errBot 2.8s var(--ease) infinite}
-.err-mascot img{display:block;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 12px 18px rgba(45,34,70,.20))}
+.err-mascot svg{display:block;width:100%;height:100%;fill:none;filter:drop-shadow(0 12px 18px rgba(45,34,70,.20))}
 @keyframes errBot{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-5px) rotate(1.5deg)}}
 .err-code{font-size:88px;font-weight:800;letter-spacing:-.04em;background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1}
 .err-page h2{font-size:20px}

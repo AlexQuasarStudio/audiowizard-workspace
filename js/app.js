@@ -841,7 +841,7 @@ const APP = (() => {
       };
     }
     $('#btn-update-check').onclick = ()=>checkUpdates(true);
-    
+
     /* Драг меню теперь в js/navdrag.js (NavDrag) */
 
     bindNavMenu();
@@ -1383,10 +1383,84 @@ const QUICK_BY_ROLE = {
       .map(r => noDemo(S.users).find(u => u.role === r))
       .filter(Boolean);
   }
-  function mascotsHTML(cls=''){
+  const MASCOT_ROBOT_SVG = `<svg class="mascot-svg" viewBox="0 0 180 200" role="img" aria-label="Робот"><defs>
+  <linearGradient id="nr-shell" x1="35" y1="45" x2="150" y2="160" gradientUnits="userSpaceOnUse"><stop style="stop-color:var(--mascot-shell-1,#efe6ff)"/><stop offset=".52" style="stop-color:var(--mascot-shell-2,#c9b1ff)"/><stop offset="1" style="stop-color:var(--mascot-shell-3,#9678e8)"/></linearGradient>
+  <linearGradient id="nr-screen" x1="55" y1="70" x2="125" y2="135" gradientUnits="userSpaceOnUse"><stop style="stop-color:var(--mascot-face-1,#fffdf5)"/><stop offset="1" style="stop-color:var(--mascot-face-2,#ffe9c9)"/></linearGradient>
+  <linearGradient id="nr-body" x1="55" y1="150" x2="126" y2="188" gradientUnits="userSpaceOnUse"><stop style="stop-color:var(--mascot-body-1,#b7a0ff)"/><stop offset="1" style="stop-color:var(--mascot-body-2,#7558ce)"/></linearGradient>
+  <linearGradient id="nr-heart" x1="76" y1="10" x2="104" y2="38" gradientUnits="userSpaceOnUse"><stop style="stop-color:var(--mascot-heart-1,#ffadad)"/><stop offset="1" style="stop-color:var(--mascot-heart-2,#f06d8f)"/></linearGradient>
+  <filter id="nr-soft" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dx="0" dy="8" stdDeviation="7" flood-color="#2b2147" flood-opacity=".18"/></filter>
+  <filter id="nr-glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="5"/></filter>
+  </defs>
+
+    <ellipse cx="90" cy="188" rx="59" ry="7" fill="#2b2147" opacity=".16"/>
+    <circle cx="90" cy="24" r="20" fill="var(--mascot-glow)" opacity=".22" filter="url(#nr-glow)"/>
+    <g filter="url(#nr-soft)" stroke="var(--mascot-line)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M90 48V30" fill="none"/>
+      <path d="M90 31c-7-9-21-5-21 5 0 10 12 15 21 21 9-6 21-11 21-21 0-10-14-14-21-5Z" fill="url(#nr-heart)"/>
+      <rect x="12" y="83" width="19" height="38" rx="9" fill="var(--mascot-shell-3)"/>
+      <rect x="149" y="83" width="19" height="38" rx="9" fill="var(--mascot-shell-3)"/>
+      <path d="M33 58h114a14 14 0 0 1 14 14v73a14 14 0 0 1-14 14H33a14 14 0 0 1-14-14V72a14 14 0 0 1 14-14Z" fill="url(#nr-shell)"/>
+      <path d="M42 66h96a9 9 0 0 1 9 9v9H33v-9a9 9 0 0 1 9-9Z" fill="var(--mascot-inset)" opacity=".22" stroke="none"/>
+      <rect x="43" y="76" width="94" height="62" rx="25" fill="url(#nr-screen)"/>
+      <ellipse cx="69" cy="101" rx="6.8" ry="9" fill="var(--mascot-eye)"/>
+      <ellipse cx="111" cy="101" rx="6.8" ry="9" fill="var(--mascot-eye)"/>
+      <circle cx="71" cy="98" r="2.2" fill="var(--mascot-pupil)" stroke="none"/>
+      <circle cx="113" cy="98" r="2.2" fill="var(--mascot-pupil)" stroke="none"/>
+      <path d="M77 116c4.6 5.6 8.6 7.8 13 7.8s8.4-2.2 13-7.8" fill="none"/>
+      <ellipse cx="52" cy="117" rx="7.5" ry="4.3" fill="var(--mascot-blush)" opacity=".55" stroke="none"/>
+      <ellipse cx="128" cy="117" rx="7.5" ry="4.3" fill="var(--mascot-blush)" opacity=".55" stroke="none"/>
+      <path d="M48 150h84a16 16 0 0 1 16 16v6a12 12 0 0 1-12 12H44a12 12 0 0 1-12-12v-6a16 16 0 0 1 16-16Z" fill="url(#nr-body)"/>
+      <path d="M56 151c-8 1-14 6-15 13" fill="none"/>
+      <path d="M124 151c8 1 14 6 15 13" fill="none"/>
+      <path d="M72 184v6M108 184v6" fill="none"/>
+      <path d="M90 160c-5-6.6-14-4-14 3 0 6 7 9 14 14 7-5 14-8 14-14 0-7-9-9.6-14-3Z" fill="var(--mascot-inset)" opacity=".88"/>
+      <path d="M63 67c9-4 18-5 27-3" fill="none" opacity=".55"/>
+    </g>
+    <path d="M151 45l2.5 7 7 2.5-7 2.5-2.5 7-2.5-7-7-2.5 7-2.5 2.5-7Z" fill="var(--mascot-spark)" opacity=".9"/>
+    <circle cx="29" cy="45" r="3.5" fill="var(--mascot-glow)" opacity=".8"/>
+  </svg>`;
+  const MASCOT_ROBOT_ERROR_SVG = `<svg class="mascot-svg" viewBox="0 0 180 200" role="img" aria-label="Растерянный робот"><defs>
+  <linearGradient id="er-shell" x1="35" y1="45" x2="150" y2="160" gradientUnits="userSpaceOnUse"><stop style="stop-color:var(--mascot-shell-1,#efe6ff)"/><stop offset=".52" style="stop-color:var(--mascot-shell-2,#c9b1ff)"/><stop offset="1" style="stop-color:var(--mascot-shell-3,#9678e8)"/></linearGradient>
+  <linearGradient id="er-screen" x1="55" y1="70" x2="125" y2="135" gradientUnits="userSpaceOnUse"><stop style="stop-color:var(--mascot-face-1,#fffdf5)"/><stop offset="1" style="stop-color:var(--mascot-face-2,#ffe9c9)"/></linearGradient>
+  <linearGradient id="er-body" x1="55" y1="150" x2="126" y2="188" gradientUnits="userSpaceOnUse"><stop style="stop-color:var(--mascot-body-1,#b7a0ff)"/><stop offset="1" style="stop-color:var(--mascot-body-2,#7558ce)"/></linearGradient>
+  <linearGradient id="er-heart" x1="76" y1="10" x2="104" y2="38" gradientUnits="userSpaceOnUse"><stop style="stop-color:var(--mascot-heart-1,#ffadad)"/><stop offset="1" style="stop-color:var(--mascot-heart-2,#f06d8f)"/></linearGradient>
+  <filter id="er-soft" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dx="0" dy="8" stdDeviation="7" flood-color="#2b2147" flood-opacity=".18"/></filter>
+  <filter id="er-glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="5"/></filter>
+  </defs>
+
+    <ellipse cx="90" cy="188" rx="59" ry="7" fill="#2b2147" opacity=".16"/>
+    <circle cx="90" cy="24" r="20" fill="var(--mascot-glow)" opacity=".22" filter="url(#er-glow)"/>
+    <g filter="url(#er-soft)" stroke="var(--mascot-line)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M90 48V30" fill="none"/>
+      <path d="M90 31c-7-9-21-5-21 5 0 10 12 15 21 21 9-6 21-11 21-21 0-10-14-14-21-5Z" fill="url(#er-heart)"/>
+      <rect x="12" y="83" width="19" height="38" rx="9" fill="var(--mascot-shell-3)"/>
+      <rect x="149" y="83" width="19" height="38" rx="9" fill="var(--mascot-shell-3)"/>
+      <path d="M33 58h114a14 14 0 0 1 14 14v73a14 14 0 0 1-14 14H33a14 14 0 0 1-14-14V72a14 14 0 0 1 14-14Z" fill="url(#er-shell)"/>
+      <path d="M42 66h96a9 9 0 0 1 9 9v9H33v-9a9 9 0 0 1 9-9Z" fill="var(--mascot-inset)" opacity=".22" stroke="none"/>
+      <rect x="43" y="76" width="94" height="62" rx="25" fill="url(#er-screen)"/>
+      <path d="M55 91c5-4 10-3 14 1" fill="none"/>
+      <path d="M101 88c5-1 10 1 13 5" fill="none"/>
+      <ellipse cx="69" cy="102" rx="6.2" ry="8.6" fill="var(--mascot-eye)"/>
+      <circle cx="71" cy="99" r="2.1" fill="var(--mascot-pupil)" stroke="none"/>
+      <path d="M104 102c4-5 9-3 11 2" fill="none"/>
+      <path d="M77 119c4-5 8 4 12 0s8 5 13 0" fill="none"/>
+      <path d="M137 82c-5 7-4 13 1 13 5 0 6-6 1-13Z" fill="#9bd7ff" stroke="var(--mascot-line)" stroke-width="2.2"/>
+      <ellipse cx="52" cy="117" rx="7.5" ry="4.3" fill="var(--mascot-blush)" opacity=".55" stroke="none"/>
+      <ellipse cx="128" cy="117" rx="7.5" ry="4.3" fill="var(--mascot-blush)" opacity=".55" stroke="none"/>
+      <path d="M48 150h84a16 16 0 0 1 16 16v6a12 12 0 0 1-12 12H44a12 12 0 0 1-12-12v-6a16 16 0 0 1 16-16Z" fill="url(#er-body)"/>
+      <path d="M56 151c-8 1-14 6-15 13" fill="none"/>
+      <path d="M124 151c8 1 14 6 15 13" fill="none"/>
+      <path d="M72 184v6M108 184v6" fill="none"/>
+      <path d="M90 160c-5-6.6-14-4-14 3 0 6 7 9 14 14 7-5 14-8 14-14 0-7-9-9.6-14-3Z" fill="var(--mascot-inset)" opacity=".88"/>
+      <path d="M63 67c9-4 18-5 27-3" fill="none" opacity=".55"/>
+    </g>
+    <path d="M151 45l2.5 7 7 2.5-7 2.5-2.5 7-2.5-7-7-2.5 7-2.5 2.5-7Z" fill="var(--mascot-spark)" opacity=".9"/>
+    <circle cx="29" cy="45" r="3.5" fill="var(--mascot-glow)" opacity=".8"/>
+  </svg>`;
+    function mascotsHTML(cls=''){
     return `<div class="welcome-mascots ${cls}" aria-hidden="true">
       <img class="welcome-mascot welcome-mascot--human welcome-mascot--left" src="assets/mascot-human-1.svg" alt="">
-      <img class="welcome-mascot welcome-mascot--robot" src="assets/mascot-robot.svg" alt="">
+      <span class="welcome-mascot welcome-mascot--robot mascot-art">${MASCOT_ROBOT_SVG}</span>
       <img class="welcome-mascot welcome-mascot--human welcome-mascot--right" src="assets/mascot-human-2.svg" alt="">
     </div>`;
   }
@@ -11291,7 +11365,7 @@ const cm = root.querySelector('.chat-main');
     };
     const [t, d] = texts[code] || texts['404'];
     root.innerHTML = `<div class="err-page">
-      <div class="err-mascot" aria-hidden="true"><img src="assets/mascot-robot.svg" alt=""></div>
+      <div class="err-mascot mascot-art" aria-hidden="true">${MASCOT_ROBOT_ERROR_SVG}</div>
       <div class="err-code">${code==='ddos'?'DDoS':esc(code)}</div>
       <h2>${t}</h2><p>${d}</p>
       ${code==='ddos'?`<div class="progress" style="max-width:260px;margin-top:10px"><span id="ddos-bar" style="width:0%"></span></div><span class="small faint" id="ddos-cnt">3</span>`:''}
