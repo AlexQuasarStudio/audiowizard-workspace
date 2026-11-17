@@ -8660,6 +8660,7 @@ const cm = root.querySelector('.chat-main');
     const showMargin = user().role === 'admin';
     return (S.calcServices[nid] || []).map(s => `<tr data-sid="${s.id}">
       <td><input class="input" data-f="name" value="${esc(s.name)}" style="padding:6px 10px"></td>
+      <td><input class="input" data-f="desc" value="${esc(s.desc||'')}" placeholder="Описание для калькулятора" style="padding:6px 10px;min-width:180px"></td>
       <td><input class="input" data-f="price" type="number" min="0" value="${s.price}" style="padding:6px 10px;width:100px"></td>
       <td><input class="input" data-f="unit" value="${esc(s.unit||'')}" style="padding:6px 10px"></td>
       <td ${showMargin?'':'hidden'}><input class="input" data-f="margin" type="number" min="0" max="90" value="${s.margin||0}" style="padding:6px 10px;width:76px"></td>
@@ -8901,6 +8902,8 @@ const cm = root.querySelector('.chat-main');
     }
     function calcHTML(){
       const rows = nid => calcSvcRowsHTML(nid);
+      const enabledLangs = Array.isArray((S.calcSettings || {}).languages) && S.calcSettings.languages.length
+        ? new Set(S.calcSettings.languages) : null;
       const pending = S.settings && S.settings.calcPending;
       const pendingHtml = pending ? `<div class="card card-pad" style="border-color:var(--accent);margin-bottom:12px">
         <b class="small">Изменения на согласовании</b>
@@ -8942,7 +8945,7 @@ const cm = root.querySelector('.chat-main');
           <div class="row row--between"><b class="small">${esc(n.name)}</b>
             <button class="btn btn--ghost btn--sm" data-add="${n.id}">${icon('plus')} Услуга</button></div>
           <div class="tbl-wrap calc-svc-wrap" style="margin-top:8px;border:0"><table class="tbl" style="min-width:0">
-            <thead><tr><th>Услуга</th><th>Цена, ₽</th><th>Единица</th><th ${u.role==='admin'?'':'hidden'}>Маржа в цене, %<input class="input" data-margin-all="${n.id}" type="number" min="0" max="90" placeholder="все" style="width:58px;padding:3px 6px;font-size:11px;margin-left:6px" title="Выставить маржу всем услугам группы"></th><th>Норма, ед./сутки<input class="input" data-norm-all="${n.id}" type="number" min="0" step="0.1" placeholder="все" style="width:58px;padding:3px 6px;font-size:11px;margin-left:6px" title="Выставить норму всем услугам группы"></th><th></th></tr></thead>
+            <thead><tr><th>Услуга</th><th>Описание</th><th>Цена, ₽</th><th>Единица</th><th ${u.role==='admin'?'':'hidden'}>Маржа в цене, %<input class="input" data-margin-all="${n.id}" type="number" min="0" max="90" placeholder="все" style="width:58px;padding:3px 6px;font-size:11px;margin-left:6px" title="Выставить маржу всем услугам группы"></th><th>Норма, ед./сутки<input class="input" data-norm-all="${n.id}" type="number" min="0" step="0.1" placeholder="все" style="width:58px;padding:3px 6px;font-size:11px;margin-left:6px" title="Выставить норму всем услугам группы"></th><th></th></tr></thead>
             <tbody data-niche="${n.id}">${rows(n.id)}</tbody>
           </table></div>
           <div class="row" style="gap:10px;margin-top:10px;flex-wrap:wrap;align-items:flex-end">
@@ -8965,6 +8968,17 @@ const cm = root.querySelector('.chat-main');
             <tbody data-extra="${n.id}">${calcExtraRowsHTML(n.id)}</tbody>
           </table></div>
         </div>`).join('')}
+        <div class="card card-pad" style="background:var(--bg-2);margin-top:10px">
+          <b class="small">Языки переводов</b>
+          <p class="small muted" style="margin:6px 0 8px">Все языки Smartcat. Выберите доступные в калькуляторе: Ctrl/Cmd — несколько, «Все» — весь список.</p>
+          <select class="input" id="calc-langs" multiple size="8" style="height:200px">
+            ${(typeof SMARTCAT_LANGUAGES !== 'undefined' ? SMARTCAT_LANGUAGES : []).map(([code,name]) => `<option value="${esc(code)}" ${!enabledLangs || enabledLangs.has(code) ? 'selected' : ''}>${esc(name)}</option>`).join('')}
+          </select>
+          <div class="row" style="gap:8px;margin-top:8px">
+            <button class="btn btn--ghost btn--sm" type="button" data-langs-all>Выбрать все</button>
+            <span class="small faint" id="calc-langs-count"></span>
+          </div>
+        </div>
         <p class="small faint" id="calc-svc-empty" hidden style="margin:10px 0 0"></p>
         <button class="btn btn--primary" id="calc-save" style="margin-top:14px">${icon('check-c')} Сохранить услуги</button>
       </div>
@@ -9679,6 +9693,20 @@ const cm = root.querySelector('.chat-main');
       const svcQ = el.querySelector('#calc-svc-q');
       if (svcQ) svcQ.addEventListener('input', calcSvcFilter);
       calcSvcFilter();
+      const langsSel = el.querySelector('#calc-langs');
+      const langsCount = el.querySelector('#calc-langs-count');
+      const paintLangsCount = ()=>{
+        if (langsCount && langsSel) langsCount.textContent = `Выбрано языков: ${langsSel.selectedOptions.length}`;
+      };
+      if (langsSel){
+        langsSel.addEventListener('change', paintLangsCount);
+        paintLangsCount();
+      }
+      const langsAll = el.querySelector('[data-langs-all]');
+      if (langsAll && langsSel) langsAll.onclick = ()=>{
+        [...langsSel.options].forEach(o => { o.selected = true; });
+        paintLangsCount();
+      };
       const svcImport = el.querySelector('[data-svc-import]');
       if (svcImport) svcImport.onclick = async () => {
         const r = await importCalcServices();
@@ -9732,7 +9760,7 @@ const cm = root.querySelector('.chat-main');
             const g = f => tr.querySelector(`[data-f="${f}"]`).value.trim();
             const name = g('name');
             if (!name) return;
-            list.push({ id: tr.dataset.sid, name, price: +g('price')||0, unit: g('unit'), margin: Math.min(90, Math.max(0, +g('margin')||0)) });
+            list.push({ id: tr.dataset.sid, name, desc: g('desc'), price: +g('price')||0, unit: g('unit'), margin: Math.min(90, Math.max(0, +g('margin')||0)) });
             const nv = Math.max(0, Number(g('norm')) || 0);
             if (nv) normMap[tr.dataset.sid] = nv;
           });
@@ -9762,6 +9790,8 @@ const cm = root.querySelector('.chat-main');
           S.calcSettings.rushPct[nid] = Math.max(0, Math.min(200, +((rp || {}).value) || 0));
         });
         S.calcSettings.clientBufferPct = Math.max(0, Math.min(200, Number((el.querySelector('#calc-buffer')||{}).value) || 0));
+        const langsSel = el.querySelector('#calc-langs');
+        S.calcSettings.languages = langsSel ? [...langsSel.selectedOptions].map(o => o.value) : [];
         const adminMarginEl = el.querySelector('#calc-admin-margin');
         const managerFeeEl = el.querySelector('#calc-manager-fee');
         if (adminMarginEl || managerFeeEl){
@@ -9809,6 +9839,7 @@ const cm = root.querySelector('.chat-main');
         tr.className = 'calc-new-row';
         tr.innerHTML = `
           <td><input class="input" data-f="name" placeholder="Название услуги" style="padding:6px 10px"></td>
+          <td><input class="input" data-f="desc" placeholder="Описание для калькулятора" style="padding:6px 10px;min-width:180px"></td>
           <td><input class="input" data-f="price" type="number" min="0" value="0" style="padding:6px 10px;width:100px"></td>
           <td><input class="input" data-f="unit" placeholder="за час / за трек" style="padding:6px 10px"></td>
           <td><input class="input" data-f="margin" type="number" min="0" max="90" value="20" style="padding:6px 10px;width:76px"></td>

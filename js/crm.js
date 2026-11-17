@@ -28,9 +28,14 @@ const CRM = (() => {
      строки снова «сами» выделялись при движении мыши. */
   let dragSel = null, dragSelMoved = false;      /* заказы */
   let dragSelPl = null, dragSelPlMoved = false;  /* клиенты/исполнители */
-  const clearDragSel = () => { dragSel = null; dragSelMoved = false; dragSelPl = null; dragSelPlMoved = false; };
-  /* Постоянный сброс на отпускание мыши (без once — иначе работает один раз) */
-  document.addEventListener('mouseup', clearDragSel);
+  const clearDragSel = () => {
+    dragSel = null; dragSelMoved = false; dragSelPl = null; dragSelPlMoved = false;
+    document.querySelectorAll('.o-marquee').forEach(el => el.remove());
+  };
+  /* Постоянный сброс на отпускание мыши (без once — иначе работает один раз).
+     Откладываем на тик: click приходит раньше таймера и ещё видит
+     dragSelMoved, поэтому отпускание рамки не открывает карточку заказа. */
+  document.addEventListener('mouseup', () => setTimeout(clearDragSel, 0));
   document.addEventListener('touchend', clearDragSel, { passive:true });
   document.addEventListener('dragend', clearDragSel);
   window.addEventListener('blur', clearDragSel);
@@ -1382,6 +1387,23 @@ const CRM = (() => {
     function bindTable(){
       const wrap = root.querySelector('.tbl-wrap');
       if (!wrap) return;
+      let marqueeEl = null;
+      const orderNodes = () => [...wrap.querySelectorAll('[data-ctx="order"]')];
+      const setRowSel = (row, on) => {
+        const cb = row && row.querySelector('.row-sel');
+        if (!cb) return;
+        cb.checked = !!on;
+        if (on) sel.add(cb.value); else sel.delete(cb.value);
+      };
+      const selectRange = (a, b, on = true) => {
+        const rows = orderNodes();
+        const lo = Math.min(a, b), hi = Math.max(a, b);
+        rows.slice(lo, hi + 1).forEach(r => setRowSel(r, on));
+        updateBulk();
+      };
+      const dropMarquee = () => {
+        if (marqueeEl){ marqueeEl.remove(); marqueeEl = null; }
+      };
       const memKey = 'ordersScrollTop';
       requestAnimationFrame(() => { wrap.scrollTop = +(localStorage.getItem(memKey) || 0); });
       wrap.addEventListener('scroll', ()=>{ localStorage.setItem(memKey, String(wrap.scrollTop)); }, { passive:true });
@@ -1398,17 +1420,6 @@ const CRM = (() => {
         sync();
         wrap.addEventListener('scroll', sync, { passive:true });
       }
-      wrap.addEventListener('mouseover', e => {
-        if (!dragSel) return;
-        const c = e.target.closest('.row-sel');
-        if (!c) return;
-        /* Выделяем весь диапазон от стартовой строки до текущей — как в табличных редакторах */
-        const boxes = [...wrap.querySelectorAll('.row-sel')];
-        const idx = boxes.indexOf(c);
-        const a = Math.min(dragSel.start, idx), b2 = Math.max(dragSel.start, idx);
-        boxes.slice(a, b2+1).forEach(bx => { bx.checked = true; sel.add(bx.value); });
-        updateBulk();
-      });
       wrap.addEventListener('change', e => {
         const c = e.target.closest('.row-sel');
         if (!c) return;
@@ -1423,34 +1434,54 @@ const CRM = (() => {
         lastSelSel = idx;
         updateBulk();
       });
-      /* Клик по строке (не по интерактивным элементам) — выделение строки */
-      /* Драг-выделение группы: зажали ЛКМ на ЛЮБОЙ части строки/карточки и
-         ведём мышь — область захватывает и выделяет строчки (не только по чекбоксу). */
+      /* Драг-выделение: рамка от точки нажатия; всё, что попало в область,
+         выделяется. Ctrl/Shift сохраняют уже выбранное. */
+      const endDrag = ()=>{
+        if (!dragSel) return;
+        dropMarquee();
+        const moved = dragSelMoved;
+        dragSel = null;
+        /* Панель «Выбрано» появляется только после отпускания: иначе она
+           сдвигает таблицу вниз прямо под курсором и рамка «дрожит». */
+        updateBulk();
+        if (moved) setTimeout(()=>{ dragSelMoved = false; }, 0);
+      };
+      if (!window.__ordersDragBound){
+        window.__ordersDragBound = true;
+        document.addEventListener('mouseup', ()=>{ if (window.__ordersEndDrag) window.__ordersEndDrag(); });
+      }
+      window.__ordersEndDrag = endDrag;
       wrap.addEventListener('mousedown', e => {
         if (e.button !== 0) return;
         const row = e.target.closest('[data-ctx="order"]');
         if (!row) return;
-        if (e.target.closest('button,a,input,select,label,.row-menu,[data-copy],[data-inline]')) return;
+        if (e.target.closest('button,a,input,select,label,.row-menu')) return;
+        const rows = orderNodes();
         dragSelMoved = false;
-        dragSel = { start: [...wrap.querySelectorAll('[data-ctx="order"]')].indexOf(row) };
+        dragSel = { start: rows.indexOf(row), x0:e.clientX, y0:e.clientY, additive:e.ctrlKey||e.metaKey||e.shiftKey };
+        e.preventDefault();
       });
       wrap.addEventListener('mousemove', e => {
         if (!dragSel) return;
-        const dx = e.clientX - (dragSel._x || e.clientX), dy = e.clientY - (dragSel._y || e.clientY);
         if (!dragSel._init){ dragSel._x = e.clientX; dragSel._y = e.clientY; dragSel._init = true; return; }
-        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragSelMoved = true;
-      });
-      wrap.addEventListener('mouseover', e => {
-        if (!dragSel) return;
-        const row = e.target.closest('[data-ctx="order"]');
-        if (!row) return;
-        if (!dragSelMoved) return; /* без движения — не выделяем (клик откроет карточку) */
-        const rows = [...wrap.querySelectorAll('[data-ctx="order"]')];
-        const idx = rows.indexOf(row);
-        if (idx < 0) return;
-        const a = Math.min(dragSel.start, idx), b = Math.max(dragSel.start, idx);
-        rows.slice(a, b+1).forEach(r => { const cb = r.querySelector('.row-sel'); if (cb){ cb.checked = true; sel.add(cb.value); } });
-        updateBulk();
+        const dx = e.clientX - dragSel.x0, dy = e.clientY - dragSel.y0;
+        if (!dragSelMoved && Math.abs(dx) <= 3 && Math.abs(dy) <= 3) return;
+        dragSelMoved = true;
+        if (!marqueeEl || !marqueeEl.isConnected){
+          marqueeEl = document.createElement('div');
+          marqueeEl.className = 'o-marquee';
+          document.body.appendChild(marqueeEl);
+        }
+        const x = Math.min(dragSel.x0, e.clientX), y = Math.min(dragSel.y0, e.clientY);
+        const w = Math.abs(e.clientX - dragSel.x0), h = Math.abs(e.clientY - dragSel.y0);
+        marqueeEl.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${h}px`;
+        const rows = orderNodes();
+        if (!dragSel.additive) rows.forEach(r => setRowSel(r, false));
+        rows.forEach(r => {
+          const b = r.getBoundingClientRect();
+          const hit = b.right >= x && b.left <= x + w && b.bottom >= y && b.top <= y + h;
+          if (hit) setRowSel(r, true);
+        });
       });
       wrap.addEventListener('click', e => {
         /* Сортировка по клику на заголовок (делегирование: thead создаётся
@@ -1460,6 +1491,24 @@ const CRM = (() => {
           const key = sth.dataset.sort;
           if (ofilter.sortKey === key) ofilter.sortDir *= -1; else { ofilter.sortKey = key; ofilter.sortDir = 1; }
           render(false);
+          return;
+        }
+        if (dragSelMoved) return;
+        const modRow = e.target.closest('[data-ctx="order"]');
+        if (modRow && (e.shiftKey || e.ctrlKey || e.metaKey)){
+          if (e.target.closest('button,a,input,select,label,.row-menu,.row-sel')) return;
+          const rows = orderNodes();
+          const idx = rows.indexOf(modRow);
+          if (idx < 0) return;
+          if (e.shiftKey && lastSelSel !== null){
+            selectRange(lastSelSel, idx, true);
+          } else {
+            const cb = modRow.querySelector('.row-sel');
+            setRowSel(modRow, !(cb && cb.checked));
+            lastSelSel = idx;
+          }
+          e.preventDefault(); e.stopPropagation();
+          updateBulk();
           return;
         }
         const copy = e.target.closest('[data-copy]');
@@ -1892,14 +1941,8 @@ const CRM = (() => {
           clientSearch.addEventListener('input', e => renderLive(e.target.value));
           clientSearch.addEventListener('focus', e => renderLive(e.target.value));
           const clientWrap = clientSearch.closest('.input-wrap');
-          const closeIfOutside = ()=>{ setTimeout(()=>{
-            const live = g('#of-client-live');
-            if (!live || live.hidden) return;
-            if (live.matches(':hover') || live.contains(document.activeElement)) return;
-            hideClientLive();
-          }, 120); };
-          clientSearch.addEventListener('focusout', closeIfOutside);
-          if (clientWrap) clientWrap.addEventListener('mouseleave', hideClientLive);
+          /* Плашка живёт, пока фокус в поле или курсор над ней. Прячем
+             только по клику вне — focusout/mouseleave больше не гасят её. */
           mask.addEventListener('mousedown', e=>{
             if (clientWrap && clientWrap.contains(e.target)) return;
             hideClientLive();
@@ -5395,12 +5438,29 @@ updatePeopleBulk();
     const dlValue = dlTs ? new Date(dlTs - new Date(dlTs).getTimezoneOffset()*60000).toISOString().slice(0,16) : '';
     const daysValue = dlTs ? String(Math.max(0, Math.ceil((dlTs - Date.now())/DAY))) : '';
     /* Для объёма: ставка услуги и подходящая единица по умолчанию. */
-    const CALC_LANGS = [['ru','Русский'],['en','Английский'],['de','Немецкий'],['fr','Французский'],['es','Испанский'],['it','Итальянский'],['zh','Китайский'],['tr','Турецкий'],['pl','Польский']];
+    const CALC_LANGS = (() => {
+      const all = (typeof SMARTCAT_LANGUAGES !== 'undefined' && Array.isArray(SMARTCAT_LANGUAGES))
+        ? SMARTCAT_LANGUAGES
+        : [['ru','Русский'],['en','Английский'],['de','Немецкий'],['fr','Французский'],['es','Испанский'],['it','Итальянский'],['zh','Китайский'],['tr','Турецкий'],['pl','Польский']];
+      const enabled = (S.calcSettings || {}).languages;
+      return (Array.isArray(enabled) && enabled.length) ? all.filter(([code]) => enabled.includes(code)) : all;
+    })();
     const langOptions = sel => CALC_LANGS.map(([code,name])=>`<option value="${code}" ${code===sel?'selected':''}>${name}</option>`).join('');
     const volList = [];
-    (S.niches || []).forEach(n => (S.calcServices[n.id] || []).forEach((s,i)=>{ if (+s.price > 0) volList.push({ nid:n.id, idx:i, niche:n.name, s }); }));
+    (S.niches || []).forEach(n => (S.calcServices[n.id] || []).forEach((s,i)=>{
+      /* Апостиль и легализация — локальные услуги без ставки Smartcat:
+         показываем их и с нулевой ценой, чтобы можно было выбрать и
+         поправить ставку в настройках. */
+      const legal = /^(апостиль|легализация)$/i.test(String(s.name || '').trim());
+      if (+s.price > 0 || legal) volList.push({ nid:n.id, idx:i, niche:n.name, s });
+    }));
     const firstVol = volList.find(v => v.nid === initNiche) || volList[0];
-    const volOptionHtml = v => `<option value="${v.nid}|${v.idx}" ${v===firstVol?'selected':''}>${esc(v.niche)} · ${esc(v.s.name)} — ${fmtMoney(v.s.price)} ${esc(v.s.unit||'')}</option>`;
+    const volOptionHtml = v => {
+      const price = +v.s.price > 0
+        ? `${fmtMoney(v.s.price)} ${esc(v.s.unit||'')}`
+        : 'цена по запросу';
+      return `<option value="${v.nid}|${v.idx}" ${v===firstVol?'selected':''}>${esc(v.niche)} · ${esc(v.s.name)} — ${price}</option>`;
+    };
     const volOptionsFor = nid => {
       const list = volList.filter(v => !nid || v.nid === nid);
       return list.length ? list.map(volOptionHtml).join('') : '<option value="">Нет услуг в этой специализации</option>';
@@ -5433,19 +5493,22 @@ updatePeopleBulk();
             <div class="field" style="flex:1;min-width:220px"><label>Услуга</label>
               <select class="input" id="cx-vsvc">${volOptions}</select></div>
           </div>
-          <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
-            <div class="field" style="flex:1;min-width:150px"><label>Язык оригинала</label>
-              <select class="input" id="cx-lang-from">${langOptions('en')}</select></div>
-            <div class="field" style="flex:1;min-width:150px"><label>Язык перевода</label>
-              <select class="input" id="cx-lang-to">${langOptions('ru')}</select></div>
+          <div class="tiny faint" id="cx-svc-desc" style="margin-top:6px"></div>
+          <div id="cx-lang-wrap">
+            <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
+              <div class="field" style="flex:1;min-width:150px"><label>Язык оригинала</label>
+                <select class="input" id="cx-lang-from">${langOptions('en')}</select></div>
+              <div class="field" style="flex:1;min-width:150px"><label>Язык перевода</label>
+                <select class="input" id="cx-lang-to">${langOptions('ru')}</select></div>
+            </div>
+            <div class="tiny faint" id="cx-lang-note" style="margin-top:4px"></div>
           </div>
-          <div class="tiny faint" id="cx-lang-note" style="margin-top:4px"></div>
           <div class="small" id="cx-volume-note" style="margin-top:6px"></div>
           <div class="field calc-char" id="cx-char">
             <label>Считать символы</label>
             <select class="input" id="cx-char-mode">
-              <option value="with">С пробелами</option>
               <option value="without">Без пробелов</option>
+              <option value="with">С пробелами</option>
             </select>
           </div>
           <div class="tiny faint" style="margin-top:4px">Символы для стенограмм — 600 знаков в минуту.</div>
@@ -5463,8 +5526,8 @@ updatePeopleBulk();
           <div class="small" id="cx-rush" style="margin-top:8px"></div>
           <div class="small" id="cx-norm-deadline" style="margin-top:6px"></div>
         </div>
-        <div class="small muted" style="margin-top:12px;line-height:1.5"><b>Услуги и опции.</b> Основную услугу выберите в блоке «Объём»: система подставит количество и ставку в расчёт. В каталоге ниже отмечайте только дополнительные услуги и опции — вычитку, оформление, сложность, копии. Не дублируйте основную услугу, иначе она посчитается дважды. Срочность добавится автоматически, если срок короче обычного.</div>
-        <div class="field" style="margin-top:10px"><label>Поиск услуги</label><input class="input" id="cx-svc-search" placeholder="Название, единица или ниша" autocomplete="off" spellcheck="false"></div>
+        <div class="small muted" style="margin-top:12px;line-height:1.5"><b>Дополнительные опции.</b> Основная услуга уже выбрана в блоке «Объём» — здесь отметьте только вычитку, оформление, сложность, копии и другие надбавки. Срочность добавится автоматически, если срок короче обычного.</div>
+        <div class="field" style="margin-top:10px"><label>Поиск опции</label><input class="input" id="cx-svc-search" placeholder="Название, единица или ниша" autocomplete="off" spellcheck="false"></div>
         <div id="cx-svcs" style="margin-top:8px"></div>
         <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
           <button class="btn btn--ghost btn--sm" type="button" data-cx-export>${icon('export')} Экспорт услуг</button>
@@ -5569,7 +5632,7 @@ updatePeopleBulk();
           const sel = g2('#cx-vsvc'); if (!sel) return;
           const list = volList.filter(v => !nid || v.nid === nid);
           sel.innerHTML = list.length
-            ? list.map(v => `<option value="${v.nid}|${v.idx}">${esc(v.niche)} · ${esc(v.s.name)} — ${fmtMoney(v.s.price)} ${esc(v.s.unit||'')}</option>`).join('')
+            ? list.map(volOptionHtml).join('')
             : '<option value="">Нет услуг в этой специализации</option>';
         };
         const paintLang = () => {
@@ -5579,10 +5642,26 @@ updatePeopleBulk();
           const name = c => ((CALC_LANGS.find(x => x[0] === c) || [])[1]) || c;
           box.textContent = from && to ? `Языковая пара: ${name(from)} → ${name(to)}` : '';
         };
+        const paintLangVisibility = nid => {
+          const wrap = g2('#cx-lang-wrap'); if (!wrap) return;
+          const show = nid === 'n3';
+          wrap.classList.toggle('is-collapsed', !show);
+          wrap.setAttribute('aria-hidden', show ? 'false' : 'true');
+          const from = g2('#cx-lang-from'), to = g2('#cx-lang-to');
+          if (from) from.disabled = !show;
+          if (to) to.disabled = !show;
+          if (!show){
+            if (from) from.value = 'ru';
+            if (to) to.value = 'ru';
+          } else if (from && to && from.value === 'ru' && to.value === 'ru'){
+            from.value = 'en'; to.value = 'ru';
+          }
+          paintLang();
+        };
         ['#cx-lang-from','#cx-lang-to'].forEach(sel => {
           const el = g2(sel); if (el) el.addEventListener('change', paintLang);
         });
-        paintLang();
+        paintLangVisibility(initNiche);
         /* Срок по суточной норме объёма: исполнителю — объём ÷ норма,
            клиенту — тот же срок плюс настраиваемый запас (по умолчанию 30%). */
         const paintNormDeadline = () => {
@@ -5604,6 +5683,8 @@ updatePeopleBulk();
         };
         const paintVolume = (auto=true) => {
           const v = volState();
+          const desc = g2('#cx-svc-desc');
+          if (desc) desc.textContent = v.s ? (v.s.desc || '') : '';
           const note = g2('#cx-volume-note');
           if (!note) return;
           if (!v.s){ note.textContent = 'Выберите услугу'; return; }
@@ -5614,7 +5695,7 @@ updatePeopleBulk();
             note.innerHTML = '<span style="color:var(--red)">Для этой услуги выберите другую единицу объёма</span>';
             return;
           }
-          const charModeVal = g2('#cx-char-mode') ? g2('#cx-char-mode').value : 'with';
+          const charModeVal = g2('#cx-char-mode') ? g2('#cx-char-mode').value : 'without';
           const label = v.unit === 'min' ? 'мин' : v.unit === 'hour' ? 'ч' : v.unit === 'char' ? (charModeVal === 'without' ? 'симв. без пробелов' : 'симв. с пробелами') : 'стр.';
           const rateStr = +v.rate.toFixed(6);
           const qtyTxt = Number(v.qty).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
@@ -5778,11 +5859,11 @@ updatePeopleBulk();
         const paintSvcs = ()=>{
           const onlyNid = g2('#cx-niche') ? g2('#cx-niche').value : '';
           g2('#cx-svcs').innerHTML = S.niches.filter(n => !onlyNid || n.id === onlyNid).map(n=>{
-            const svcs = S.calcServices[n.id] || [];
             const extras = calcExtrasFor(n.id);
+            if (!extras.length) return '';
             return `<div class="small cx-svc-group"><b style="margin-bottom:4px;display:block">${esc(n.name)}</b>
-              ${svcs.map(s=>`<label class="svc-row check" data-search="${esc(norm(n.name+' '+(s.name||'')+' '+(s.unit||'')))}"><input type="checkbox" data-sv="${n.id}|${esc(s.name)}|${s.price}"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(s.name)} <span class="faint">${esc(s.unit||'')}</span></span><b>${s.price ? fmtMoney(s.price) : (s.unit === 'договорная' ? 'договорная' : fmtMoney(0))}</b></label>`).join('')}
-              ${extras.length ? `<div class="tiny faint" data-svc-extra style="margin:6px 0 2px">Доп. опции</div>${extras.map(e=>`<label class="svc-row check" data-search="${esc(norm(n.name+' '+(e.name||'')+' '+(e.unit||'')+(e.pct?' процент':'')))}"><input type="checkbox" data-ex="${n.id}|${esc(e.id)}|${Number(e.price)||0}|${Number(e.pct)||0}"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(e.name)} <span class="faint">${esc(e.unit || (e.pct ? '% от стоимости' : ''))}</span></span><b>${e.pct ? '+' + e.pct + '%' : fmtMoney(e.price)}</b></label>`).join('')}` : ''}
+              <div class="tiny faint" data-svc-extra style="margin:6px 0 2px">Доп. опции</div>
+              ${extras.map(e=>`<label class="svc-row check" data-search="${esc(norm(n.name+' '+(e.name||'')+' '+(e.unit||'')+(e.pct?' процент':'')))}"><input type="checkbox" data-ex="${n.id}|${esc(e.id)}|${Number(e.price)||0}|${Number(e.pct)||0}"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(e.name)} <span class="faint">${esc(e.unit || (e.pct ? '% от стоимости' : ''))}</span></span><b>${e.pct ? '+' + e.pct + '%' : fmtMoney(e.price)}</b></label>`).join('')}
             </div>`;
           }).join('') + '<div id="cx-svc-empty" class="small faint" hidden style="padding:8px 0">Ничего не найдено</div>';
           filterSvcs();
@@ -5798,6 +5879,7 @@ updatePeopleBulk();
         g2('#cx-niche').addEventListener('change', ()=>{
           const nid = g2('#cx-niche').value;
           paintVolOptions(nid);
+          paintLangVisibility(nid);
           paintSvcs();
           const unitSel = g2('#cx-unit');
           if (unitSel){

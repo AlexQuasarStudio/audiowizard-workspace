@@ -977,6 +977,7 @@ body.zen .chat-msgs{
 .tbl th.sortable.sort-on::after{content:"↑";opacity:.9;color:var(--accent)}
 .tbl th.sortable.sort-on.sort-desc::after{content:"↓";opacity:.9;color:var(--accent)}
 .o-wrap{position:relative;min-height:220px;max-height:calc(100dvh - var(--head-h) - 210px);overflow-y:auto;overflow-x:auto;padding-bottom:0;overscroll-behavior:contain}
+.o-marquee{position:fixed;z-index:9999;border:1px dashed var(--accent);border-radius:4px;background:color-mix(in srgb,var(--accent) 8%,transparent);pointer-events:none;box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 18%,transparent)}
 .o-wrap--cards{background:transparent!important;border:none!important;padding:0}
 .o-wrap .o-to-top{position:sticky;bottom:12px;float:right;margin-top:-46px;margin-right:10px;z-index:3;width:36px;height:36px;border-radius:10px;border:1px solid var(--border-2);background:var(--panel);color:var(--text-2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;opacity:.6;transition:opacity .25s var(--ease),transform .25s var(--ease),background .25s var(--ease);box-shadow:var(--sh-1)}
 .o-wrap .o-to-top svg{transform:rotate(180deg)}
@@ -2630,4 +2631,6 @@ svg.ico.wip-ico{width:38px;height:38px}
 /* Калькулятор: длинный каталог услуг не растягивает окно */
 #cx-svcs{max-height:380px;overflow:auto;padding-right:4px;overscroll-behavior:contain}
 .calc-svc-wrap{max-height:420px;overflow:auto}
+#cx-lang-wrap{max-height:150px;overflow:hidden;opacity:1;transition:max-height .22s var(--ease),opacity .18s var(--ease)}
+#cx-lang-wrap.is-collapsed{max-height:0;opacity:0;pointer-events:none}
 .calc-niche-card[hidden]{display:none}
