@@ -8547,12 +8547,28 @@ const cm = root.querySelector('.chat-main');
       : new Date(r.at).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
     return `<span class="td-remind ${r.done?'is-done':''}" title="Напоминание">${icon('clock','ico-sm')}<span>${esc(when)}</span></span>`;
   };
+  const todoSubs = t => {
+    if (!Array.isArray(t.subtasks)) return [];
+    return t.subtasks.map((x, i) => typeof x === 'string'
+      ? { id: (t.id || 't') + '-s' + i, text: x, done: false }
+      : { id: x.id || ((t.id || 't') + '-s' + i), text: String(x.text || ''), done: !!x.done });
+  };
+  const todoSubsHTML = t => {
+    const subs = todoSubs(t);
+    if (!subs.length) return '';
+    return `<span class="td-subs">${subs.map(s => `<span class="td-sub ${s.done?'is-done':''}" data-td-sub-row="${esc(s.id)}">
+      <label class="check" style="gap:5px;margin:0"><input type="checkbox" data-td-sub-toggle="${esc(s.id)}" ${s.done?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span></label>
+      <span class="td-sub__text">${esc(s.text)}</span>
+      <button type="button" class="iconbtn" data-td-sub-edit="${esc(s.id)}" title="Редактировать подпункт">${icon('edit','ico-sm')}</button>
+      <button type="button" class="iconbtn" data-td-sub-del="${esc(s.id)}" title="Удалить подпункт">${icon('x','ico-sm')}</button>
+    </span>`).join('')}<button type="button" class="btn btn--ghost btn--sm td-sub-add" data-td-sub-add="${esc(t.id)}">${icon('plus','ico-sm')} Подпункт</button></span>`;
+  };
   const todoMeta = t => {
     const parts = [...todoLinksOf(t).map(l=>todoLinkChip(t, l.type, l.id)), todoReminderChip(t)].filter(Boolean);
-    if (Array.isArray(t.subtasks) && t.subtasks.length) parts.push(`<span class="td-remind" title="Подпункты">${icon('check-c','ico-sm')}<span>${t.subtasks.length} подп.</span></span>`);
+    const subs = todoSubs(t);
+    if (subs.length) parts.push(`<span class="td-remind" title="Подпункты">${icon('check-c','ico-sm')}<span>${subs.length} подп.</span></span>`);
     if (Array.isArray(t.files) && t.files.length) parts.push(`<span class="td-remind" title="Файлы">${icon('clip','ico-sm')}<span>${t.files.length} файл(ов)</span></span>`);
     const extra = [];
-    if (Array.isArray(t.subtasks) && t.subtasks.length) extra.push(`<span class="small faint">${t.subtasks.map(x=>'• '+esc(x)).join(' ')}</span>`);
     if (Array.isArray(t.files) && t.files.length) extra.push(`<span class="small faint">${t.files.map(f=>`<a href="${esc(f.dataUrl||'')}" download="${esc(f.name||'файл')}">${esc(f.name||'файл')}</a>`).join(' · ')}</span>`);
     return (parts.length || extra.length) ? `<span class="td-meta">${parts.join('')}${extra.join('')}</span>` : '';
   };
@@ -8873,7 +8889,7 @@ const cm = root.querySelector('.chat-main');
       if (section==='profile') el.innerHTML = profileHTML(u);
       if (section==='look') el.innerHTML = lookHTML(u);
       if (section==='notify') el.innerHTML = notifyHTML(u);
-      if (section==='reminders') el.innerHTML = todosHTML(u) + remindersHTML(u);
+      if (section==='reminders') el.innerHTML = todosHTML(u);
       if (section==='security') el.innerHTML = securityHTML(u);
       if (section==='keys') el.innerHTML = keysHTML();
       if (section==='docs') el.innerHTML = docsHTML();
@@ -9225,7 +9241,7 @@ const cm = root.querySelector('.chat-main');
               <button type="button" class="td-partial ${t.partial?'on':''}" data-td-partial="${t.id}" title="В процессе / частично выполнено" aria-pressed="${t.partial?'true':'false'}">${icon('check','ico-sm')}</button>
               ${t.done?'<span class="badge c-green">готово</span>':t.partial?'<span class="badge c-orange">в процессе</span>':`<span class="badge ${t.prio===1?'c-red':(t.prio===2?'c-orange':'c-gray')}" title="Приоритет ${t.prio} из 5">${esc(lbl)}</span>`}
               <span class="badge ${TODO_TYPES[ty].cls}" title="Тип записи">${TODO_TYPES[ty].label}</span>
-              <span style="display:flex;flex-direction:column;gap:2px;min-width:0"><b style="overflow-wrap:anywhere">${esc(t.text)}</b>${todoMeta(t)}</span>
+              <span style="display:flex;flex-direction:column;gap:2px;min-width:0"><b style="overflow-wrap:anywhere">${esc(t.text)}</b>${todoMeta(t)}${todoSubsHTML(t)}</span>
             </span>
             <span style="display:flex;gap:6px;align-items:center">
               <button class="iconbtn" data-td-edit="${t.id}" title="Редактировать">${icon('edit','ico-sm')}</button>
@@ -10530,7 +10546,7 @@ const cm = root.querySelector('.chat-main');
           const remindVal = el.querySelector('#td-remind-at') ? el.querySelector('#td-remind-at').value : '';
           const repeat = (el.querySelector('#td-repeat') || {}).value || 'none';
           const notify = !!(el.querySelector('#td-notify') && el.querySelector('#td-notify').checked);
-          const subtasks = String((el.querySelector('#td-subtasks') || {}).value || '').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0, 40);
+          const subtasks = String((el.querySelector('#td-subtasks') || {}).value || '').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0, 40).map(text => ({ id:uid(), text, done:false }));
           const fileInput = el.querySelector('#td-files');
           const pickedFiles = fileInput && fileInput.files ? [...fileInput.files].slice(0, 6) : [];
           const finish = (files) => {
@@ -10556,6 +10572,69 @@ const cm = root.querySelector('.chat-main');
             fr.readAsDataURL(f);
           }))).then(list => finish(list.filter(Boolean)));
         };
+        /* Подпункты — отдельные вложенные записи с чекбоксом, правкой и удалением. */
+        (S.todos || []).forEach(t => { if (Array.isArray(t.subtasks)) t.subtasks = todoSubs(t); });
+        const findSub = sid => {
+          for (const t of (S.todos || [])){
+            const sub = todoSubs(t).find(x => x.id === sid);
+            if (sub) return { todo:t, sub };
+          }
+          return null;
+        };
+        const editSub = (todo, sub) => {
+          const isNew = !sub;
+          openWinModal({ narrow:true, title: isNew ? 'Новый подпункт' : 'Подпункт',
+            body:`<div class="field"><label>Текст подпункта</label><input class="input" id="td-sub-text" value="${esc(sub ? sub.text : '')}" placeholder="Что сделать?"></div>`,
+            footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-ok>Сохранить</button>`,
+            onMount:(m2,c2)=>{
+              const inp = m2.querySelector('#td-sub-text');
+              const save = ()=>{
+                const text = (inp.value || '').trim();
+                if (!text){ toast('Введите текст подпункта','warn'); return; }
+                todo.subtasks = todoSubs(todo);
+                if (sub){
+                  const x = todo.subtasks.find(v => v.id === sub.id);
+                  if (x) x.text = text;
+                } else {
+                  todo.subtasks.push({ id:uid(), text, done:false });
+                }
+                saveState(); c2(); renderSec(); toast(isNew?'Подпункт добавлен':'Подпункт сохранён','ok');
+              };
+              m2.querySelector('[data-x]').onclick = c2;
+              m2.querySelector('[data-ok]').onclick = save;
+              inp.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); save(); } });
+              setTimeout(()=>inp.focus(), 30);
+            }
+          });
+        };
+        if (!el.__tdSubBound){
+          el.__tdSubBound = 1;
+          el.addEventListener('click', e => {
+            const add = e.target.closest('[data-td-sub-add]');
+            if (add){
+              const todo = (S.todos || []).find(t => t.id === add.dataset.tdSubAdd);
+              if (todo) editSub(todo, null);
+              return;
+            }
+            const rowEl = e.target.closest('[data-td-sub-row]');
+            if (!rowEl) return;
+            const found = findSub(rowEl.dataset.tdSubRow);
+            if (!found) return;
+            if (e.target.closest('[data-td-sub-edit]')) editSub(found.todo, found.sub);
+            if (e.target.closest('[data-td-sub-del]')){
+              found.todo.subtasks = todoSubs(found.todo).filter(x => x.id !== found.sub.id);
+              saveState(); renderSec(); toast('Подпункт удалён','ok');
+            }
+          });
+          el.addEventListener('change', e => {
+            const cb = e.target.closest('[data-td-sub-toggle]');
+            if (!cb) return;
+            const found = findSub(cb.dataset.tdSubToggle);
+            if (!found) return;
+            found.todo.subtasks = todoSubs(found.todo).map(x => x.id === found.sub.id ? { ...x, done: cb.checked } : x);
+            saveState();
+          });
+        }
         const tdText = el.querySelector('#td-text');
         if (tdText) tdText.addEventListener('keydown', e=>{ if (e.key==='Enter') tdAdd && tdAdd.click(); });
         el.querySelectorAll('[data-td-preset]').forEach(ch=>ch.onclick=()=>{
