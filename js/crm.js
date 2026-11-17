@@ -5762,7 +5762,7 @@ const wrap = root.querySelector('.pl-wrap');
           const v = compute(raw);
           val = v;
           paintTotals(animate);
-          paintDiscount();
+          paintDiscount(animate);
         };
         g2('#cx-in').addEventListener('input', ()=>upd(false));
         g2('#cx-in').addEventListener('keydown', e=>{
@@ -5938,17 +5938,17 @@ const wrap = root.querySelector('.pl-wrap');
             const nid = g2('#cx-niche') ? g2('#cx-niche').value : '';
             return volList.filter(v => !nid || v.nid === nid).map(v => ({ value: v.nid + '|' + v.idx, label: volOptionText(v) }));
           },
-          onPick: () => { paintVolume(true, true); paintPromoHours(); paintDiscount(); }
+          onPick: () => { paintVolume(true, true); paintPromoHours(); }
         });
         bindCalcCombo({
           input: g2('#cx-lang-from-q'), select: g2('#cx-lang-from'), list: g2('#cx-lang-from-live'),
           getItems: () => CALC_LANGS.map(([code,name]) => ({ value: code, label: name })),
-          onPick: () => { paintLang(); paintDiscount(); }
+          onPick: () => { paintLang(); }
         });
         bindCalcCombo({
           input: g2('#cx-lang-to-q'), select: g2('#cx-lang-to'), list: g2('#cx-lang-to-live'),
           getItems: () => CALC_LANGS.map(([code,name]) => ({ value: code, label: name })),
-          onPick: () => { paintLang(); paintDiscount(); }
+          onPick: () => { paintLang(); }
         });
         paintLangVisibility(initNiche);
         syncVolInput();
@@ -5997,9 +5997,8 @@ const wrap = root.querySelector('.pl-wrap');
           paintNormDeadline();
         };
         const syncVolume = ()=>{
-          paintVolume(true);
+          paintVolume(true, true);
           paintPromoHours();
-          paintDiscount();
         };
         ['#cx-volume','#cx-unit','#cx-vsvc'].forEach(sel => {
           const el = g2(sel);
@@ -6009,7 +6008,7 @@ const wrap = root.querySelector('.pl-wrap');
         });
         g2('#cx-vsvc').addEventListener('change', ()=>{
           const v = volState();
-          if (v.nid && g2('#cx-niche')){ g2('#cx-niche').value = v.nid; paintRush(); paintDiscount(); }
+          if (v.nid && g2('#cx-niche')){ g2('#cx-niche').value = v.nid; paintRush(); }
           upd(true);
         });
 
@@ -6142,23 +6141,43 @@ const wrap = root.querySelector('.pl-wrap');
           }
           return d;
         };
-        const paintDiscount = () => {
+        const discLast = {};
+        const paintDiscount = (animate=false) => {
           const d = calcDiscount();
           const box = g2('#cx-disc');
           if (!box) return;
-          const money = calcNum(d.base);
+          const prev = {};
+          box.querySelectorAll('[data-disc-run]').forEach(el=>{
+            const v = Number(String(el.textContent || '').replace(/[^\d,.-]/g,'').replace(',', '.'));
+            if (isFinite(v)) prev[el.dataset.discRun] = v;
+          });
+          Object.keys(discLast).forEach(k=>{ if (prev[k] == null) prev[k] = discLast[k]; });
+          const shown = (key, value) => {
+            const from = prev[key];
+            return `<span data-disc-run="${key}">${calcNum(animate && from != null ? from : value)}</span>`;
+          };
           if (d.code && !d.known){
             box.innerHTML = `<span style="color:var(--red)">Код ${esc(d.code)} не найден или не действует</span>`;
             return;
           }
           const parts = [];
-          if (d.extraFee) parts.push(`Надбавки ${d.extraPct}% · <b>${calcNum(d.extraFee)}</b>`);
-          if (d.pct) parts.push(`${discountReason(d) || 'Скидка '+d.pct+'%'} · <s class="faint">${money}</s> <b>${calcNum(d.discounted)}</b>`);
-          if (d.rush) parts.push(`<span class="badge c-orange">Срочно</span> +${d.rushPct}% · <b>${calcNum(d.rushFee)}</b>`);
-          if (d.minApplied) parts.push(`Минимальная стоимость категории · <b>${calcNum(d.minTotal)}</b>`);
+          if (d.extraFee) parts.push(`Надбавки ${d.extraPct}% · <b>${shown('extraFee', d.extraFee)}</b>`);
+          if (d.pct) parts.push(`${discountReason(d) || 'Скидка '+d.pct+'%'} · <s class="faint">${shown('base', d.base)}</s> <b>${shown('discounted', d.discounted)}</b>`);
+          if (d.rush) parts.push(`<span class="badge c-orange">Срочно</span> +${d.rushPct}% · <b>${shown('rushFee', d.rushFee)}</b>`);
+          if (d.minApplied) parts.push(`Минимальная стоимость категории · <b>${shown('minTotal', d.minTotal)}</b>`);
           box.innerHTML = parts.length
-            ? parts.join('<br>') + `<br>К оплате <b>${calcNum(d.sum)}</b>`
-            : `<span class="faint">Скидок и надбавок нет · к оплате ${money}</span>`;
+            ? parts.join('<br>') + `<br>К оплате <b>${shown('sum', d.sum)}</b>`
+            : `<span class="faint">Скидок и надбавок нет · к оплате ${shown('sum', d.sum)}</span>`;
+          box.querySelectorAll('[data-disc-run]').forEach(el=>{
+            const key = el.dataset.discRun;
+            const target = Number(d[key]) || 0;
+            const from = prev[key];
+            el._calcVal = from != null ? from : target;
+            if (animate) animateCalc(el, target, v => { el.textContent = calcNum(v); });
+            else { el._calcVal = target; el.textContent = calcNum(target); }
+            discLast[key] = target;
+          });
+          ['base','discounted','extraFee','rushFee','minTotal','sum'].forEach(k=>{ discLast[k] = Number(d[k]) || 0; });
         };
         const paintRush = () => {
           const box = g2('#cx-rush');
@@ -6177,7 +6196,7 @@ const wrap = root.querySelector('.pl-wrap');
             box.innerHTML = `<span class="badge c-green">Обычный срок</span> <span class="small">${left} ${daysWord(left)} — не короче стандарта (${d.rec.days} ${daysWord(d.rec.days)})</span>`;
           }
         };
-        g2('#cx-promo').addEventListener('input', ()=>{ paintDiscount(); upd(); });
+        g2('#cx-promo').addEventListener('input', ()=>{ upd(true); });
         const filterSvcs = ()=>{
           const q = norm(g2('#cx-svc-search').value);
           let any = false;
@@ -6215,7 +6234,6 @@ const wrap = root.querySelector('.pl-wrap');
         upd();
         paintVolume(false);
         paintPromoHours();
-        paintDiscount();
         g2('#cx-niche').addEventListener('change', ()=>{
           const nid = g2('#cx-niche').value;
           paintVolOptions(nid);
@@ -6224,7 +6242,7 @@ const wrap = root.querySelector('.pl-wrap');
           const unitSel = g2('#cx-unit');
           if (unitSel){ unitSel.value = calcUnitForNiche(nid); paintChar(); }
           paintVolume(true, true);
-          paintRush(); paintNormDeadline(); paintDiscount();
+          paintRush(); paintNormDeadline(); upd(true);
         });
         /* Срок можно задать в днях — точная дата подставляется сама;
            ручная дата так же пересчитывает дни. */
@@ -6240,8 +6258,8 @@ const wrap = root.querySelector('.pl-wrap');
           const ts = v ? new Date(v).getTime() : 0;
           g2('#cx-days').value = ts ? String(Math.max(0, Math.ceil((ts - Date.now())/DAY))) : '';
         };
-        g2('#cx-days').addEventListener('input', ()=>{ syncDaysToDate(); paintRush(); paintDiscount(); upd(); });
-        g2('#cx-deadline').addEventListener('input', ()=>{ syncDateToDays(); paintRush(); paintDiscount(); upd(); });
+        g2('#cx-days').addEventListener('input', ()=>{ syncDaysToDate(); paintRush(); upd(true); });
+        g2('#cx-deadline').addEventListener('input', ()=>{ syncDateToDays(); paintRush(); upd(true); });
         g2('#cx-svcs').addEventListener('change', e=>{
           const inp = e.target.closest('[data-sv],[data-ex]');
           if (inp && inp.checked){
@@ -6249,7 +6267,6 @@ const wrap = root.querySelector('.pl-wrap');
             const sel = g2('#cx-niche');
             if (sel && nid && sel.value !== nid){ sel.value = nid; paintRush(); }
           }
-          paintDiscount();
           upd(true);
         });
         /* Услуги правятся в настройках, но выгрузить и догрузить их можно прямо здесь */
