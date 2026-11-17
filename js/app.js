@@ -7856,7 +7856,7 @@ const cm = root.querySelector('.chat-main');
     const [cls,label] = map[st] || map.none;
     return `<span class="badge ${cls}">${label}</span>`;
   }
-  function payoutProvider(){ return Object.assign({ key:'smartcat', name:'Smartcat', commission:4, enabled:true }, ((S.settings.integrations||{}).payout||{})); }
+  function payoutProvider(){ return Object.assign({ key:'smartcat', name:'Smartcat', commission:4, topupBonus:5, enabled:true }, ((S.settings.integrations||{}).payout||{})); }
   const RESERVE_TYPE_LABELS = {
     manual_in:'Пополнение', manual_out:'Списание', manual:'Корректировка',
     orderLeft:'Остаток заказа', refund:'Возврат', tax:'Налоги',
@@ -7965,6 +7965,8 @@ const cm = root.querySelector('.chat-main');
     const cfg = Finance.cfg();
     const prov = payoutProvider();
     const provName = esc(prov.name || 'Smartcat');
+    const topupBonus = Number(prov.topupBonus ?? 5);
+    const topups = (((S.settings.integrations || {}).payout || {}).topups) || [];
     const pend = Finance.pending();
     const skip = Finance.skipInfo();
     const nextCutTs = Finance.nextCut();
@@ -8102,10 +8104,52 @@ const cm = root.querySelector('.chat-main');
       <input class="input" id="sc-q" placeholder="Поиск по имени или логину" style="margin:8px 0">
       <div class="sc-list" id="sc-list">${scRows}</div>
       <button class="btn btn--ghost btn--sm" id="sc-more" style="margin-top:8px">Показать ещё</button>
-    </div>`;
+    </div>
+
+    ${u.role==='admin' ? `<div class="card card-pad" style="margin-top:14px">
+      <h3 style="margin-bottom:6px">Пополнение ${provName}</h3>
+      <p class="small faint">Пополнение на счёт ${provName}. Админу начисляется ${topupBonus}% от суммы, уведомление приходит в колокольчик.</p>
+      <div class="row" style="gap:8px;flex-wrap:wrap;align-items:flex-end">
+        <div class="field" style="flex:1;min-width:190px"><label>Сумма пополнения, ₽</label><input class="input" id="sc-topup-amount" type="number" min="0" step="1" placeholder="Например, 10000"></div>
+        <button class="btn btn--primary btn--sm" id="sc-topup">Пополнить</button>
+      </div>
+      <div class="small faint" id="sc-topup-info" style="margin-top:8px">Будет начислено 0 ₽ (${topupBonus}%).</div>
+      ${topups.length ? `<div class="small faint" style="margin-top:8px">Последние пополнения:<br>${topups.slice(0,3).map(t => `${fmtDT(t.at)} — ${fmtMoney(t.amount)} · +${fmtMoney(t.bonus)}`).join('<br>')}</div>` : ''}
+    </div>` : ''}`;
   }
   function bindPayouts(el){
     const p = Finance.payoutCfg();
+    const topupAmount = el.querySelector('#sc-topup-amount');
+    const topupInfo = el.querySelector('#sc-topup-info');
+    const topupBtn = el.querySelector('#sc-topup');
+    const topupRate = Number(payoutProvider().topupBonus ?? 5);
+    const paintTopup = ()=>{
+      const amount = Math.max(0, Math.round(Number(topupAmount ? topupAmount.value : 0) || 0));
+      if (topupInfo) topupInfo.textContent = `Будет начислено ${fmtMoney(Math.round(amount * topupRate / 100))} (${topupRate}%).`;
+    };
+    if (topupAmount){
+      topupAmount.addEventListener('input', paintTopup);
+      paintTopup();
+    }
+    if (topupBtn) topupBtn.onclick = ()=>{
+      const amount = Math.max(0, Math.round(Number(topupAmount ? topupAmount.value : 0) || 0));
+      if (!amount){ toast('Укажите сумму пополнения','warn'); return; }
+      const admin = me();
+      const bonus = Math.round(amount * topupRate / 100);
+      S.settings.integrations = S.settings.integrations || {};
+      S.settings.integrations.payout = S.settings.integrations.payout || {};
+      const ip = S.settings.integrations.payout;
+      ip.topups = Array.isArray(ip.topups) ? ip.topups : [];
+      ip.topups.unshift({ id:uid(), at:Date.now(), amount, bonus, by:admin.id });
+      ip.topups = ip.topups.slice(0, 20);
+      Finance.credit(admin.id, bonus);
+      pushNotifTo(admin, `Пополнение ${payoutProvider().name || 'Smartcat'}`,
+        `Пополнение ${fmtMoney(amount)} · начислено ${topupRate}%: ${fmtMoney(bonus)}`,
+        'i-card', { kind:'smartcat_topup', amount, bonus });
+      try { logAudit(`Пополнение ${payoutProvider().name || 'Smartcat'} ${fmtMoney(amount)}; админу ${topupRate}% — ${fmtMoney(bonus)}`, 'Финансы'); } catch(e){}
+      saveState();
+      APP.render();
+    };
     const rAdd = el.querySelector('#reserve-add');
     if (rAdd) rAdd.onclick = ()=>openReserveAdjust(1);
     const rSub = el.querySelector('#reserve-sub');
