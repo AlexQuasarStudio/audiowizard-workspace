@@ -4454,6 +4454,26 @@ ex.innerHTML = avatarHTML(user(), '');
       cm.style.backgroundPosition = '';
     }
     const u = user();
+    const staffPeople = ['admin','top_manager','manager'].includes(u.role);
+    const canSeeClientLinks = staffPeople;
+    const canSeeExecutorLinks = staffPeople || u.role === 'executor';
+    const orderVisible = o => {
+      if (!o) return false;
+      if (['admin','top_manager'].includes(u.role)) return true;
+      return o.client_id === u.id || (o.client_ids||[]).includes(u.id)
+        || (o.executors||[]).some(x => x.uid === u.id) || o.manager_id === u.id;
+    };
+    /* Стабильные номера людей нужны для #c/#v ещё до открытия раздела «Люди». */
+    (()=>{
+      S.settings = S.settings || {};
+      let seq = Math.max(1, S.settings._personSeq || 0);
+      let changed = false;
+      noDemo(S.users).filter(x => x.role === 'client' || x.role === 'executor').forEach(p => {
+        p.ext = p.ext || {};
+        if (p.ext.num == null){ p.ext.num = ++seq; changed = true; }
+      });
+      if (changed){ S.settings._personSeq = seq; try { saveState(); } catch(e){} }
+    })();
     const allChats = chatForUser(u);
     /* Архив чатов (как в ТГ): скрытые чаты лежат в списке архива у пользователя */
     let archMode = false;
@@ -4660,6 +4680,21 @@ ex.innerHTML = avatarHTML(user(), '');
         h = h.replace(re, mm => `<span class="msg-mention msg-mention--role" data-mention-spec="${esc(t.word)}" role="button">${mm}</span>`);
       });
       h = h.replace(/@([\w.-]+)/g, (m2, un) => `<span class="msg-mention" data-mention="${esc(un)}" role="button">@${esc(un)}</span>`);
+      /* #c5 — клиент, #v6 — исполнитель, #AW-1049 — заказ. Ссылка ставится
+         только на существующий и доступный текущей роли объект. */
+      h = h.replace(/#([cv])(\d+)(?![\w-])|#(AW-\d+)/gi, (full, kind, num, orderId) => {
+        if (orderId){
+          const o = S.orders.find(x => String(x.order_id).toUpperCase() === String(orderId).toUpperCase());
+          if (!o || !orderVisible(o)) return full;
+          return `<span class="chat-hash" data-hash-kind="order" data-hash-id="${esc(o.id)}" role="button">${esc(full)}</span>`;
+        }
+        const role = String(kind).toLowerCase() === 'c' ? 'client' : 'executor';
+        if (role === 'client' && !canSeeClientLinks) return full;
+        if (role === 'executor' && !canSeeExecutorLinks) return full;
+        const person = S.users.find(x => x.role === role && String(x.ext && x.ext.num) === String(num));
+        if (!person) return full;
+        return `<span class="chat-hash" data-hash-kind="${role}" data-hash-id="${esc(person.id)}" role="button">${esc(full)}</span>`;
+      });
       return h.replace(/\n/g, '<br>');
     };
 
@@ -5003,9 +5038,19 @@ ex.innerHTML = avatarHTML(user(), '');
         /* Карточки-артефакты: контакт и заказ (как в ТГ) */
         const isArtifact = (m.type === 'contact' || m.type === 'order' || m.type === 'voice');
         const artifactHtml = m.type === 'contact'
-          ? (()=>{ const p2 = userById(m.contact_id); return `<button type="button" class="msg__artifact" data-contact="${esc(m.contact_id||'')}"><span class="avatar avatar--sm avatar--grad" style="${avatarGrad(p2?p2.full_name:'—')}">${initials(p2?p2.full_name:'—')}</span><span class="msg__artifact-txt"><b>${esc(p2?p2.full_name:'—')}</b><span class="small muted">${esc(p2?(ROLE_LABEL[p2.role]||''):'')}</span></span></button>`; })()
+          ? (()=>{
+              const p2 = userById(m.contact_id);
+              const masked = u.role === 'client' ? (p2 && ['client','executor'].includes(p2.role))
+                : (u.role === 'executor' && p2 && p2.role === 'client');
+              if (masked) return `<span class="msg__artifact msg__artifact--masked"><span class="msg__artifact-ico">${icon('eye-off','ico-sm')}</span><span class="msg__artifact-txt"><b>XXXX</b><span class="small muted">контакт скрыт</span></span></span>`;
+              return `<button type="button" class="msg__artifact" data-contact="${esc(m.contact_id||'')}"><span class="avatar avatar--sm avatar--grad" style="${avatarGrad(p2?p2.full_name:'—')}">${initials(p2?p2.full_name:'—')}</span><span class="msg__artifact-txt"><b>${esc(p2?p2.full_name:'—')}</b><span class="small muted">${esc(p2?(ROLE_LABEL[p2.role]||''):'')}</span></span></button>`;
+            })()
           : m.type === 'order'
-          ? (()=>{ const o = S.orders.find(x=>x.order_id===m.order_ref) || S.orders.find(x=>x.id===m.order_ref); return `<button type="button" class="msg__artifact" data-order-ref="${esc(m.order_ref||'')}"><span class="msg__artifact-ico">${icon('orders')}</span><span class="msg__artifact-txt"><b>${esc(m.order_ref||'—')}</b><span class="small muted">${esc((clientById(o&&o.client_id)||{}).full_name||'')}${o?' · '+fmtMoney(o.total):''}</span></span></button>`; })()
+          ? (()=>{
+              const o = S.orders.find(x=>x.order_id===m.order_ref) || S.orders.find(x=>x.id===m.order_ref);
+              if (!orderVisible(o)) return `<span class="msg__artifact msg__artifact--masked"><span class="msg__artifact-ico">${icon('eye-off','ico-sm')}</span><span class="msg__artifact-txt"><b>XXXX</b><span class="small muted">заказ скрыт</span></span></span>`;
+              return `<button type="button" class="msg__artifact" data-order-ref="${esc(m.order_ref||'')}"><span class="msg__artifact-ico">${icon('orders')}</span><span class="msg__artifact-txt"><b>${esc(m.order_ref||'—')}</b><span class="small muted">${esc((clientById(o&&o.client_id)||{}).full_name||'')}${o?' · '+fmtMoney(o.total):''}</span></span></button>`;
+            })()
           : '';
         /* Длинные сообщения обрезаем (как в WhatsApp): превью + «Показать ещё» */
         const LONG_CUT = 340;
@@ -5135,6 +5180,7 @@ const cm = root.querySelector('.chat-main');
           <button class="iconbtn" id="btn-attach" title="Прикрепить файл">${icon('clip')}</button>
           <textarea id="chat-t" rows="1" placeholder="Сообщение…">${editSrc?esc(editSrc.text||''):''}</textarea>
           <div class="chat-emoji-hints" id="chat-emoji-hints" aria-hidden="true"></div>
+          <div class="chat-hash-hints" id="chat-hash-hints" aria-hidden="true"></div>
           <button class="iconbtn" id="btn-emoji" title="Стикеры и эмодзи">${icon('sticker')}</button>
           <button class="btn btn--primary btn--icon chat-send-toggle" id="btn-send" aria-label="Отправить" title="Отправить">
             <span class="chat-send-ic" id="send-ic-mic" title="Голосовое сообщение">${icon('mic')}</span>
@@ -5446,7 +5492,8 @@ const cm = root.querySelector('.chat-main');
         /* Жёсткий потолок высоты: при добавлении вариантов опроса панель
            растёт, а её край уезжал за нижнюю границу экрана */
         dd.style.maxHeight = 'min(560px, calc(100dvh - 24px))';
-        const renderTabs = (tab) => {
+        const renderTabs = (tab, animate=false) => {
+          const oldH = animate ? dd.offsetHeight : 0;
           dd.innerHTML =
             `<div class="emoji-tabs"><button data-tab="emoji" class="${tab==='emoji'?'on':''}">${icon('smile','ico-sm')} Смайлы</button><button data-tab="poll" class="${tab==='poll'?'on':''}">${icon('poll','ico-sm')} Опрос</button><button data-tab="art" class="${tab==='art'?'on':''}">${icon('clip','ico-sm')} Артефакты</button></div>
              <div class="emoji-body">${tab==='emoji'
@@ -5507,6 +5554,20 @@ const cm = root.querySelector('.chat-main');
             dd.querySelector('#pq-add').onclick = addOpt;
             [dd.querySelector('#pq-q'), ...optsBox.querySelectorAll('input')].forEach(el=>el && el.addEventListener('keydown', ev=>{ if (ev.key==='Enter'){ ev.preventDefault(); go(); } }));
           }
+          if (animate && oldH > 0){
+            const next = Math.min(dd.scrollHeight, 560);
+            dd.style.overflow = 'hidden';
+            dd.style.height = oldH + 'px';
+            dd.style.transition = 'height .2s var(--ease)';
+            void dd.offsetHeight;
+            requestAnimationFrame(() => { dd.style.height = next + 'px'; });
+            setTimeout(() => {
+              dd.style.height = '';
+              dd.style.overflow = '';
+              dd.style.transition = '';
+              try { positionDD(); } catch(e){}
+            }, 230);
+          }
         };
         const anchorBtn = e.currentTarget;
         /* Позиция панели пересчитывается заново при каждом переключении вкладки:
@@ -5523,7 +5584,7 @@ const cm = root.querySelector('.chat-main');
         renderTabs('emoji');
         dd.addEventListener('click', ev=>{
           const tb = ev.target.closest('[data-tab]');
-          if (tb){ renderTabs(tb.dataset.tab); positionDD(); ev.stopPropagation(); }
+          if (tb){ renderTabs(tb.dataset.tab, true); positionDD(); ev.stopPropagation(); }
         });
         dd.addEventListener('click', ev=>{
           const art = ev.target.closest('[data-art]');
@@ -5834,7 +5895,40 @@ const cm = root.querySelector('.chat-main');
         emojiHints.setAttribute('aria-hidden','false');
       };
       chatTa.addEventListener('input', updateEmojiHints);
-      chatTa.addEventListener('keydown', ev=>{ if (ev.key === 'Escape') hideEmojiHints(); });
+      /* Подсказки #c5 / #v6 / #AW-1049 с плавным появлением. */
+      const hashHints = $('#chat-hash-hints', root);
+      const hideHashHints = ()=>{ if (hashHints){ hashHints.classList.remove('is-on'); hashHints.setAttribute('aria-hidden','true'); } };
+      const updateHashHints = ()=>{
+        if (!hashHints || !chatTa) return;
+        const before = chatTa.value.slice(0, chatTa.selectionStart || 0);
+        const m = /(?:^|\s)(#(?:[cv]?\d*|AW-?\d*))$/i.exec(before);
+        if (!m){ hideHashHints(); return; }
+        const token = m[1];
+        const q = token.slice(1).toLowerCase();
+        const list = [];
+        if (canSeeExecutorLinks && (!q || q.startsWith('v'))) S.users.filter(x => x.role === 'executor' && x.ext && x.ext.num && (!q.slice(1) || String(x.ext.num).includes(q.slice(1)))).slice(0, 4).forEach(x => list.push({ insert:'#v' + x.ext.num, label:'#v' + x.ext.num + ' · ' + x.full_name }));
+        if (canSeeClientLinks && (!q || q.startsWith('c'))) S.users.filter(x => x.role === 'client' && x.ext && x.ext.num && (!q.slice(1) || String(x.ext.num).includes(q.slice(1)))).slice(0, 4).forEach(x => list.push({ insert:'#c' + x.ext.num, label:'#c' + x.ext.num + ' · ' + x.full_name }));
+        if (!q || q.startsWith('aw')) S.orders.filter(o => orderVisible(o) && (!q.slice(2) || String(o.order_id).toLowerCase().includes(q))).slice(0,4).forEach(o => list.push({ insert:'#' + o.order_id, label:'#' + o.order_id + ' · ' + fmtMoney(o.total) }));
+        if (!list.length){ hideHashHints(); return; }
+        hashHints.innerHTML = list.map((it, i)=>`<button type="button" data-hash-pick="${esc(it.insert)}"><span>${esc(it.label)}</span><small>${i+1}</small></button>`).join('');
+        hashHints.querySelectorAll('[data-hash-pick]').forEach(b=>{
+          b.onmousedown = ev => ev.preventDefault();
+          b.onclick = ()=>{
+            const start = before.length - token.length;
+            const end = chatTa.selectionStart || start + token.length;
+            chatTa.value = chatTa.value.slice(0, start) + b.dataset.hashPick + ' ' + chatTa.value.slice(end);
+            const pos = start + b.dataset.hashPick.length + 1;
+            chatTa.focus();
+            try { chatTa.setSelectionRange(pos, pos); } catch(e){}
+            chatTa.dispatchEvent(new Event('input', { bubbles:true }));
+            hideHashHints();
+          };
+        });
+        hashHints.classList.add('is-on');
+        hashHints.setAttribute('aria-hidden','false');
+      };
+      chatTa.addEventListener('input', updateHashHints);
+      chatTa.addEventListener('keydown', ev=>{ if (ev.key === 'Escape'){ hideEmojiHints(); hideHashHints(); } });
       /* Восстановление фокуса: если пользователь печатал (фокус был в поле),
          после пересоздания DOM возвращаем курсор в текстовую область —
          отправка (кнопка/Enter) не должна выбрасывать из режима набора. */
@@ -6109,6 +6203,7 @@ const cm = root.querySelector('.chat-main');
         }
         renderChat();
         try { refreshDraftPreview(); } catch(e){}
+        try { rerenderChatList(); } catch(e){}
         /* Своё сообщение ВСЕГДА прижимает чат к низу (как в ТГ), даже если
            читали выше — отправка сбрасывает позицию чтения в самый конец. */
         {
@@ -6130,6 +6225,7 @@ const cm = root.querySelector('.chat-main');
               try { typingClear(c.id, who.id); } catch(e){}
               S.messages.push({ id:uid(), chat_id:c.id, user_id:who.id, text:replies[Math.floor(Math.random()*replies.length)], type:'text', created_at:Date.now(), reactions:{} });
               saveState();
+              try { rerenderChatList(); } catch(e){}
               if (curChat===c.id){ renderChat(); const db = root.querySelector('.chat-msgs-down'); if (db && typeof db.__bump==='function') db.__bump(); }
               if (curChat===c.id && chatSoundOn(c)) playMsgSound();
             }, 1100 + Math.random()*900);
@@ -6650,6 +6746,7 @@ const cm = root.querySelector('.chat-main');
           animateMsgsOut([m.id], ()=>{
             S.messages = S.messages.filter(x=>x.id!==m.id);
             logAudit(`Сообщение удалено в «${c.name}»`,'Чат'); saveState(); renderChat();
+            try { refreshDraftPreview(); rerenderChatList(); } catch(e){}
           });
         }});
         const dd = showDropdown(el, items, { x:e.clientX, y:e.clientY, emojis: EMOJI_SET, onEmoji: toggleReaction });
@@ -6896,6 +6993,21 @@ const cm = root.querySelector('.chat-main');
         return;
       }
       /* Карточки-артефакты: контакт открывает ЛС, заказ — карточку заказа */
+      const hashEl = e.target.closest('[data-hash-kind]');
+      if (hashEl){
+        const kind = hashEl.dataset.hashKind, id = hashEl.dataset.hashId;
+        if (kind === 'order'){
+          const o = S.orders.find(x => x.id === id);
+          if (!o || !orderVisible(o)){ toast('Нет доступа к этому заказу', 'err'); return; }
+          if (window.CRM && CRM.openOrderDetail) CRM.openOrderDetail(o.id);
+        } else if (kind === 'client' || kind === 'executor'){
+          if (kind === 'client' && !canSeeClientLinks){ toast('Нет доступа к клиентам', 'err'); return; }
+          if (kind === 'executor' && !canSeeExecutorLinks){ toast('Нет доступа к исполнителям', 'err'); return; }
+          const person = S.users.find(x => x.id === id && x.role === kind);
+          if (person && typeof openPersonCard === 'function') openPersonCard(person.id, kind);
+        }
+        return;
+      }
       const artC = e.target.closest('[data-contact]');
       if (artC){
         const pu = userById(artC.dataset.contact);
@@ -8437,7 +8549,12 @@ const cm = root.querySelector('.chat-main');
   };
   const todoMeta = t => {
     const parts = [...todoLinksOf(t).map(l=>todoLinkChip(t, l.type, l.id)), todoReminderChip(t)].filter(Boolean);
-    return parts.length ? `<span class="td-meta">${parts.join('')}</span>` : '';
+    if (Array.isArray(t.subtasks) && t.subtasks.length) parts.push(`<span class="td-remind" title="Подпункты">${icon('check-c','ico-sm')}<span>${t.subtasks.length} подп.</span></span>`);
+    if (Array.isArray(t.files) && t.files.length) parts.push(`<span class="td-remind" title="Файлы">${icon('clip','ico-sm')}<span>${t.files.length} файл(ов)</span></span>`);
+    const extra = [];
+    if (Array.isArray(t.subtasks) && t.subtasks.length) extra.push(`<span class="small faint">${t.subtasks.map(x=>'• '+esc(x)).join(' ')}</span>`);
+    if (Array.isArray(t.files) && t.files.length) extra.push(`<span class="small faint">${t.files.map(f=>`<a href="${esc(f.dataUrl||'')}" download="${esc(f.name||'файл')}">${esc(f.name||'файл')}</a>`).join(' · ')}</span>`);
+    return (parts.length || extra.length) ? `<span class="td-meta">${parts.join('')}${extra.join('')}</span>` : '';
   };
   const todoCloseReminder = t => {
     const r = todoReminderOf(t);
@@ -9073,7 +9190,16 @@ const cm = root.querySelector('.chat-main');
             <button type="button" class="input td-link-pick" id="td-link-pick" data-td-pick>Без связи</button></div>
           <div class="field" style="flex:none;max-width:230px"><label class="small faint">Напомнить</label>
             <input class="input" type="datetime-local" id="td-remind-at"></div>
+          <div class="field" style="flex:none;max-width:150px"><label class="small faint">Повтор</label>
+            <select class="input" id="td-repeat"><option value="none">Не повторять</option><option value="daily">Ежедневно</option><option value="weekly">Еженедельно</option><option value="monthly">Ежемесячно</option></select></div>
         </div>
+        <div class="row" style="gap:12px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
+          <label class="check" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="td-notify" checked><span class="box"><svg><use href="#i-check-c"/></svg></span><span class="small">Уведомить в колокольчик</span></label>
+          <label class="btn btn--ghost btn--sm" style="cursor:pointer">${icon('clip','ico-sm')} Файл<input type="file" id="td-files" multiple hidden></label>
+          <span class="small faint" id="td-files-list">Файлы не выбраны</span>
+        </div>
+        <div class="field" style="margin-bottom:10px"><label class="small faint">Подпункты — каждый с новой строки</label>
+          <textarea class="input" id="td-subtasks" rows="2" placeholder="Подпункт 1&#10;Подпункт 2"></textarea></div>
         <div class="chips" style="gap:6px;margin-bottom:12px">
           ${PRESETS.map(p=>`<span class="chip" data-td-preset="${esc(p)}" style="cursor:pointer">${esc(p)}</span>`).join('')}
         </div>
@@ -10402,18 +10528,33 @@ const cm = root.querySelector('.chat-main');
           const linkOrder = el.querySelector('#td-link-order');
           const rid = uid();
           const remindVal = el.querySelector('#td-remind-at') ? el.querySelector('#td-remind-at').value : '';
-          let reminder_id = '';
-          if (remindVal){
-            const at = new Date(remindVal).getTime();
-            if (!isFinite(at) || at <= Date.now()){ toast('Время напоминания должно быть в будущем','warn'); return; }
-            S.reminders = S.reminders || [];
-            const r = { id:uid(), owner_id:u.id, text:t, at, repeat:'none', notify:true, done:false, fired:false, created_at:Date.now(), todo_id:rid };
-            S.reminders.push(r); reminder_id = r.id;
-          }
-          S.todos = S.todos || [];
-          S.todos.push({ id:rid, owner_id:u.id, text:t, prio, type, done:false, partial:false, archived:false,
-            reminder_id, link_ticket:(linkTicket && linkTicket.value)||'', link_order:(linkOrder && linkOrder.value)||'', created_at:Date.now() });
-          saveState(); toast(reminder_id?'Задача добавлена, напоминание создано':'Задача добавлена','ok'); renderSec();
+          const repeat = (el.querySelector('#td-repeat') || {}).value || 'none';
+          const notify = !!(el.querySelector('#td-notify') && el.querySelector('#td-notify').checked);
+          const subtasks = String((el.querySelector('#td-subtasks') || {}).value || '').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0, 40);
+          const fileInput = el.querySelector('#td-files');
+          const pickedFiles = fileInput && fileInput.files ? [...fileInput.files].slice(0, 6) : [];
+          const finish = (files) => {
+            let reminder_id = '';
+            if (remindVal){
+              const at = new Date(remindVal).getTime();
+              if (!isFinite(at) || at <= Date.now()){ toast('Время напоминания должно быть в будущем','warn'); return; }
+              S.reminders = S.reminders || [];
+              const r = { id:uid(), owner_id:u.id, text:t, at, repeat, notify, done:false, fired:false, created_at:Date.now(), todo_id:rid };
+              S.reminders.push(r); reminder_id = r.id;
+            }
+            S.todos = S.todos || [];
+            S.todos.push({ id:rid, owner_id:u.id, text:t, prio, type, done:false, partial:false, archived:false,
+              reminder_id, link_ticket:(linkTicket && linkTicket.value)||'', link_order:(linkOrder && linkOrder.value)||'',
+              subtasks, files, created_at:Date.now() });
+            saveState(); toast(reminder_id?'Задача добавлена, напоминание создано':'Задача добавлена','ok'); renderSec();
+          };
+          if (!pickedFiles.length){ finish([]); return; }
+          Promise.all(pickedFiles.map(f => new Promise(resolve => {
+            const fr = new FileReader();
+            fr.onload = () => resolve({ name:f.name, type:f.type, dataUrl:String(fr.result || '') });
+            fr.onerror = () => resolve(null);
+            fr.readAsDataURL(f);
+          }))).then(list => finish(list.filter(Boolean)));
         };
         const tdText = el.querySelector('#td-text');
         if (tdText) tdText.addEventListener('keydown', e=>{ if (e.key==='Enter') tdAdd && tdAdd.click(); });

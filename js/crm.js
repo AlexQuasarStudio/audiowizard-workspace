@@ -5657,7 +5657,7 @@ const wrap = root.querySelector('.pl-wrap');
                   <select class="input" id="cx-lang-from" hidden>${langOptions('en')}</select>
                   <div class="calc-combo__list calc-combo__list--lang" id="cx-lang-from-live" aria-hidden="true"></div>
                 </div></div>
-              <button type="button" class="iconbtn calc-lang-swap" id="cx-lang-swap" title="Поменять языки местами" aria-label="Поменять языки местами">⇄</button>
+              <div class="field calc-lang-swap-field" style="flex:0 0 42px;min-width:42px"><label aria-hidden="true" style="visibility:hidden">↔</label><button type="button" class="iconbtn calc-lang-swap" id="cx-lang-swap" title="Поменять языки местами" aria-label="Поменять языки местами">⇄</button></div>
               <div class="field" style="flex:1;min-width:150px"><label>Язык перевода</label>
                 <div class="calc-combo">
                   <input class="input" id="cx-lang-to-q" placeholder="Начните вводить язык…" autocomplete="off" spellcheck="false">
