@@ -4496,7 +4496,7 @@ ex.innerHTML = avatarHTML(user(), '');
       return o.client_id === u.id || (o.client_ids||[]).includes(u.id)
         || (o.executors||[]).some(x => x.uid === u.id) || o.manager_id === u.id;
     };
-    /* Стабильные номера людей нужны для #c/#v ещё до открытия раздела «Люди». */
+    /* Стабильные номера людей нужны для #c/#e ещё до открытия раздела «Люди». */
     (()=>{
       S.settings = S.settings || {};
       let seq = Math.max(1, S.settings._personSeq || 0);
@@ -4715,7 +4715,7 @@ ex.innerHTML = avatarHTML(user(), '');
       h = h.replace(/@([\w.-]+)/g, (m2, un) => `<span class="msg-mention" data-mention="${esc(un)}" role="button">@${esc(un)}</span>`);
       /* #c5 — клиент, #e6 — исполнитель, #AW-1049 — заказ. Ссылка ставится
          только на существующий и доступный текущей роли объект. */
-      h = h.replace(/#([cev])(\d+)(?![\w-])|#(AW-\d+)/gi, (full, kind, num, orderId) => {
+      h = h.replace(/#([ce])(\d+)(?![\w-])|#(AW-\d+)/gi, (full, kind, num, orderId) => {
         if (orderId){
           const o = S.orders.find(x => String(x.order_id).toUpperCase() === String(orderId).toUpperCase());
           if (!o || !orderVisible(o)) return full;
@@ -5913,18 +5913,18 @@ const cm = root.querySelector('.chat-main');
         emojiHints.setAttribute('aria-hidden','false');
       };
       chatTa.addEventListener('input', updateEmojiHints);
-      /* Подсказки #c5 / #v6 / #AW-1049 с плавным появлением. */
+      /* Подсказки #c5 / #e6 / #AW-1049 с плавным появлением. */
       const hashHints = $('#chat-hash-hints', root);
       const hideHashHints = ()=>{ if (hashHints){ hashHints.classList.remove('is-on'); hashHints.setAttribute('aria-hidden','true'); } };
       const updateHashHints = ()=>{
         if (!hashHints || !chatTa) return;
         const before = chatTa.value.slice(0, chatTa.selectionStart || 0);
-        const m = /(?:^|\s)(#(?:[cev]?\d*|AW-?\d*))$/i.exec(before);
+        const m = /(?:^|\s)(#(?:[ce]?\d*|AW-?\d*))$/i.exec(before);
         if (!m){ hideHashHints(); return; }
         const token = m[1];
         const q = token.slice(1).toLowerCase();
         const list = [];
-        if (canSeeExecutorLinks && (!q || q.startsWith('e') || q.startsWith('v'))) S.users.filter(x => x.role === 'executor' && x.ext && x.ext.num && (!q.slice(1) || String(x.ext.num).includes(q.slice(1)))).slice(0, 4).forEach(x => list.push({ insert:'#e' + x.ext.num, label:'#e' + x.ext.num + ' · ' + x.full_name }));
+        if (canSeeExecutorLinks && (!q || q.startsWith('e'))) S.users.filter(x => x.role === 'executor' && x.ext && x.ext.num && (!q.slice(1) || String(x.ext.num).includes(q.slice(1)))).slice(0, 4).forEach(x => list.push({ insert:'#e' + x.ext.num, label:'#e' + x.ext.num + ' · ' + x.full_name }));
         if (canSeeClientLinks && (!q || q.startsWith('c'))) S.users.filter(x => x.role === 'client' && x.ext && x.ext.num && (!q.slice(1) || String(x.ext.num).includes(q.slice(1)))).slice(0, 4).forEach(x => list.push({ insert:'#c' + x.ext.num, label:'#c' + x.ext.num + ' · ' + x.full_name }));
         if (!q || q.startsWith('aw')) S.orders.filter(o => orderVisible(o) && (!q.slice(2) || String(o.order_id).toLowerCase().includes(q))).slice(0,4).forEach(o => list.push({ insert:'#' + o.order_id, label:'#' + o.order_id + ' · ' + fmtMoney(o.total) }));
         if (!list.length){ hideHashHints(); return; }
