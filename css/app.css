@@ -484,6 +484,7 @@ tr.inl-tr{animation:inlRowIn .2s var(--ease)}
 .calc-combo .input{width:100%}
 .calc-combo__list{position:absolute;z-index:30;left:0;right:0;top:calc(100% + 4px);max-height:240px;overflow:auto;padding:4px;background:var(--panel);border:1px solid var(--border-2);border-radius:12px;box-shadow:0 14px 34px -18px rgba(0,0,0,.55);opacity:0;visibility:hidden;transform:translateY(-4px);transition:opacity .18s var(--ease),transform .18s var(--ease),visibility 0s linear .18s}
 .calc-combo__list.is-on{opacity:1;visibility:visible;transform:none;transition-delay:0s}
+.calc-combo__list--lang{max-height:min(52vh, 420px)}
 .calc-combo__item{display:block;width:100%;padding:7px 9px;border:0;border-radius:8px;background:transparent;color:var(--text);text-align:left;font-size:12.5px;line-height:1.35;cursor:pointer}
 .calc-combo__item:hover,.calc-combo__item.on{background:var(--accent-soft)}
 .calc-combo__empty{padding:8px 9px;font-size:12px;color:var(--muted)}

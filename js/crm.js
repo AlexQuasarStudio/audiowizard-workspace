@@ -5655,14 +5655,14 @@ const wrap = root.querySelector('.pl-wrap');
                 <div class="calc-combo">
                   <input class="input" id="cx-lang-from-q" placeholder="Начните вводить язык…" autocomplete="off" spellcheck="false">
                   <select class="input" id="cx-lang-from" hidden>${langOptions('en')}</select>
-                  <div class="calc-combo__list" id="cx-lang-from-live" aria-hidden="true"></div>
+                  <div class="calc-combo__list calc-combo__list--lang" id="cx-lang-from-live" aria-hidden="true"></div>
                 </div></div>
               <button type="button" class="iconbtn calc-lang-swap" id="cx-lang-swap" title="Поменять языки местами" aria-label="Поменять языки местами">⇄</button>
               <div class="field" style="flex:1;min-width:150px"><label>Язык перевода</label>
                 <div class="calc-combo">
                   <input class="input" id="cx-lang-to-q" placeholder="Начните вводить язык…" autocomplete="off" spellcheck="false">
                   <select class="input" id="cx-lang-to" hidden>${langOptions('ru')}</select>
-                  <div class="calc-combo__list" id="cx-lang-to-live" aria-hidden="true"></div>
+                  <div class="calc-combo__list calc-combo__list--lang" id="cx-lang-to-live" aria-hidden="true"></div>
                 </div></div>
             </div>
             <div class="tiny faint" id="cx-lang-note" style="margin-top:4px"></div>
