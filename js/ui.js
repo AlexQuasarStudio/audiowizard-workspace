@@ -230,7 +230,7 @@ function openAvatarCropper(file, onDone){
 /* Окно в стиле окон меню (aw-win): перетаскивание, ресайз, кнопки окна.
    Используется для виджетов (заказ, калькулятор и т.п.), которым нужен
    такой же хром, как у окон элементов меню. */
-function openWinModal({ title='', icon='app', body='', footer='', wide=false, narrow=false, tall=false, route='', onMount=null, onClose=null, persistKey='' }){
+function openWinModal({ title='', icon='app', body='', footer='', wide=false, narrow=false, tall=false, route='', onMount=null, onClose=null, persistKey='', noFit=false }){
   closeDropdown && closeDropdown();
   if (window.Windows && Windows.spawnCustom){
     /* Модалка должна принадлежать ТЕКУЩЕМУ разделу: без route окно
@@ -252,6 +252,9 @@ function openWinModal({ title='', icon='app', body='', footer='', wide=false, na
       onClose
     });
     if (!win) return openModal({ title, body, footer, wide, onMount, onClose });
+    /* Калькулятор открывается без масштабной анимации: его окно не должно
+       «подпрыгивать» к центру на первом кадре. */
+    if (noFit) win.classList.add('aw-win--calc');
     /* Футер — ОТДЕЛЬНЫЙ элемент окна (ребёнок .aw-win после body), а не часть
        скроллируемого контента: кнопки не выезжают за пределы при малой высоте. */
     if (footer){
@@ -296,10 +299,12 @@ function openWinModal({ title='', icon='app', body='', footer='', wide=false, na
         }
       } catch(e){}
     };
-    fitWin();
-    /* Поздняя проверка: шрифты/картинки могли изменить высоту. Тоже без
-       анимации — окно не «плывёт», а просто встаёт на место. */
-    setTimeout(fitWin, 320);
+    if (!noFit){
+      fitWin();
+      /* Поздняя проверка: шрифты/картинки могли изменить высоту. Тоже без
+         анимации — окно не «плывёт», а просто встаёт на место. */
+      setTimeout(fitWin, 320);
+    }
     /* Модалка переживает жёсткую перезагрузку: сохраняем снимок тела и
        футера вместе с введёнными значениями. Для окон с живым restorer
        (калькулятор) при восстановлении вызывается их функция заново. */

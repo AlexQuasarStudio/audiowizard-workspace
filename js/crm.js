@@ -5620,7 +5620,7 @@ const wrap = root.querySelector('.pl-wrap');
     const calcUnitForNiche = nid => nid === 'n1' ? 'min' : nid === 'n2' ? 'char' : nid === 'n3' ? 'page' : 'min';
     const volUnit = calcUnitForNiche(initNiche);
     const m = openWinModal({
-      narrow:true, tall:true, title:'Калькулятор услуг', route:'orders', persistKey: onResult ? '' : 'calculator',
+      narrow:true, tall:true, noFit:true, title:'Калькулятор услуг', route:'orders', persistKey: onResult ? '' : 'calculator',
       body:`<div class="calc-display">
           <input class="expr" id="cx-in" placeholder="например: 2.5 × 1800 + 5600" autocomplete="off" spellcheck="false" aria-label="Выражение">
           <div class="val" id="cx-val">0</div>
@@ -5649,7 +5649,7 @@ const wrap = root.querySelector('.pl-wrap');
               </div></div>
           </div>
           <div class="tiny faint" id="cx-svc-desc" style="margin-top:6px"></div>
-          <div id="cx-lang-wrap">
+          <div id="cx-lang-wrap"${initNiche==='n3'?' class="is-open"' : ' class="is-collapsed"'}>
             <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
               <div class="field" style="flex:1;min-width:150px"><label>Язык оригинала</label>
                 <div class="calc-combo">
@@ -5668,7 +5668,7 @@ const wrap = root.querySelector('.pl-wrap');
             <div class="tiny faint" id="cx-lang-note" style="margin-top:4px"></div>
           </div>
           <div class="small" id="cx-volume-note" style="margin-top:6px"></div>
-          <div class="field calc-char" id="cx-char">
+          <div class="field calc-char${volUnit==='char'?' is-open':''}" id="cx-char">
             <label>Считать символы</label>
             <select class="input" id="cx-char-mode">
               <option value="without">Без пробелов</option>

@@ -5493,8 +5493,7 @@ const cm = root.querySelector('.chat-main');
         /* Жёсткий потолок высоты: при добавлении вариантов опроса панель
            растёт, а её край уезжал за нижнюю границу экрана */
         dd.style.maxHeight = 'min(560px, calc(100dvh - 24px))';
-        const renderTabs = (tab, animate=false) => {
-          const oldH = animate ? dd.offsetHeight : 0;
+        const renderTabs = (tab) => {
           dd.innerHTML =
             `<div class="emoji-tabs"><button data-tab="emoji" class="${tab==='emoji'?'on':''}">${icon('smile','ico-sm')} Смайлы</button><button data-tab="poll" class="${tab==='poll'?'on':''}">${icon('poll','ico-sm')} Опрос</button><button data-tab="art" class="${tab==='art'?'on':''}">${icon('clip','ico-sm')} Артефакты</button></div>
              <div class="emoji-body">${tab==='emoji'
@@ -5555,20 +5554,6 @@ const cm = root.querySelector('.chat-main');
             dd.querySelector('#pq-add').onclick = addOpt;
             [dd.querySelector('#pq-q'), ...optsBox.querySelectorAll('input')].forEach(el=>el && el.addEventListener('keydown', ev=>{ if (ev.key==='Enter'){ ev.preventDefault(); go(); } }));
           }
-          if (animate && oldH > 0){
-            const next = Math.min(dd.scrollHeight, 560);
-            dd.style.overflow = 'hidden';
-            dd.style.height = oldH + 'px';
-            dd.style.transition = 'height .2s var(--ease)';
-            void dd.offsetHeight;
-            requestAnimationFrame(() => { dd.style.height = next + 'px'; });
-            setTimeout(() => {
-              dd.style.height = '';
-              dd.style.overflow = '';
-              dd.style.transition = '';
-              try { positionDD(); } catch(e){}
-            }, 230);
-          }
         };
         const anchorBtn = e.currentTarget;
         /* Позиция панели пересчитывается заново при каждом переключении вкладки:
@@ -5585,7 +5570,7 @@ const cm = root.querySelector('.chat-main');
         renderTabs('emoji');
         dd.addEventListener('click', ev=>{
           const tb = ev.target.closest('[data-tab]');
-          if (tb){ renderTabs(tb.dataset.tab, true); positionDD(); ev.stopPropagation(); }
+          if (tb){ renderTabs(tb.dataset.tab); positionDD(); ev.stopPropagation(); }
         });
         dd.addEventListener('click', ev=>{
           const art = ev.target.closest('[data-art]');
