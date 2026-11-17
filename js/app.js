@@ -1164,17 +1164,18 @@ const QUICK_BY_ROLE = {
            закрывает панель. Старые записи узнаём по иконке и заголовку. */
         const isReminder = n.kind === 'reminder' || (String(n.icon||'') === 'i-clock' && /^Напоминание\b/.test(String(n.title||'')));
         if (isReminder){
-          const rid = n.reminder_id || '';
+          const reminder = (S.reminders || []).find(r => r.id === n.reminder_id);
+          const todoId = reminder && reminder.todo_id;
           panel.classList.add('closing');
           setTimeout(()=>{
             panel.remove();
             go('settings','reminders');
-            if (rid) setTimeout(()=>{
-              const row = document.querySelector(`[data-rm-id="${rid}"]`);
+            if (todoId) setTimeout(()=>{
+              const row = document.querySelector(`[data-td-id="${todoId}"]`);
               if (!row) return;
               try { row.scrollIntoView({ block:'center', behavior:'smooth' }); } catch(e){}
-              row.classList.add('rm-flash');
-              setTimeout(()=>row.classList.remove('rm-flash'), 1250);
+              row.classList.add('td-flash');
+              setTimeout(()=>row.classList.remove('td-flash'), 1250);
             }, 300);
           }, 170);
           return;
@@ -8883,7 +8884,6 @@ const cm = root.querySelector('.chat-main');
     const docRolesLabel = d => (!d.roles || !d.roles.length)
       ? 'Все'
       : ALL_DOC_ROLES.filter(r => d.roles.includes(r.id)).map(r => r.label).join(', ');
-    const REP_LABEL = { none:'Разовое', daily:'Ежедневно', weekly:'Еженедельно', monthly:'Ежемесячно' };
     const renderSec = ()=>{
       const el = root.querySelector('#set-body');
       if (section==='profile') el.innerHTML = profileHTML(u);
@@ -9383,48 +9383,6 @@ const cm = root.querySelector('.chat-main');
         add(s, prio, isDone);
       });
       return items;
-    }
-
-    function remindersHTML(u2){
-      const mine = (S.reminders||[]).filter(r=>r.owner_id===u2.id)
-        .sort((x,y)=>(x.done?1:0)-(y.done?1:0) || x.at-y.at);
-      const fmt = ts => new Date(ts).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-      return `<div class="card card-pad">
-        <h3 style="margin-bottom:10px">Мои напоминания</h3>
-        <p class="small muted" style="margin:0 0 12px">С уведомлением — придёт в колокольчик. Тихое — просто появится в этом списке, никого не дёргая. Повторяющиеся напоминания сами сдвигаются на следующий срок; «Готово» — останавливает цепочку.</p>
-        <div class="cols-2 grid" style="gap:12px">
-          <div class="field"><label>Текст</label><input class="input" id="rm-text" placeholder="Например: позвонить клиенту"></div>
-          <div class="field"><label>Когда</label><input class="input" type="datetime-local" id="rm-at"></div>
-        </div>
-        <div class="row row--between" style="margin-top:10px">
-          <div class="field" style="flex:1;max-width:230px"><label>Повтор</label>
-            <select class="input" id="rm-repeat">
-              <option value="none">Не повторять</option>
-              <option value="daily">Ежедневно</option>
-              <option value="weekly">Еженедельно</option>
-              <option value="monthly">Ежемесячно</option>
-            </select>
-          </div>
-          <div style="align-self:flex-end"><button class="btn btn--primary btn--sm" id="rm-add">${icon('plus','ico-sm')} Добавить</button></div>
-        </div>
-        <div class="row" style="margin-top:8px">
-          <label class="check" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="rm-notify" checked><span class="box"><svg><use href="#i-check-c"/></svg></span><span class="small">Уведомить в колокольчик</span></label>
-        </div>
-        <hr class="divider">
-        <div class="stack" style="gap:8px">
-          ${mine.length ? mine.map(r=>{
-            const rep = r.repeat || 'none';
-            const whenStr = r.done ? 'выполнено' : (r.at <= Date.now() ? 'наступило' : 'след. ' + fmt(r.at));
-            return `<div class="row row--between" data-rm-id="${r.id}" style="padding:10px 12px;border:1px solid var(--border);border-radius:12px;${r.done?'opacity:.55':''}">
-            <span class="small"><b>${esc(r.text)}</b><br><span class="faint">${REP_LABEL[rep] || rep} · ${whenStr}${r.notify?' · с уведомлением':' · тихо'}</span>${r.todo_id && (S.todos||[]).some(t=>t.id===r.todo_id) ? `<br><button type="button" class="td-link" data-rm-todo="${esc(r.todo_id)}">к задаче</button>` : ''}</span>
-            <span style="display:flex;gap:6px;align-items:center">
-              ${(r.done?'':`<button class="btn btn--ghost btn--sm" data-rm-done="${r.id}">Готово</button>`)}
-              ${(!r.done && rep!=='none')?`<button class="btn btn--ghost btn--sm" data-rm-skip="${r.id}" title="Пропустить ближайший срок">Пропустить</button>`:''}
-              <button class="iconbtn" data-rm-del="${r.id}" title="Удалить">${icon('trash','ico-sm')}</button>
-            </span>
-          </div>`; }).join('') : '<p class="small faint">Пока пусто</p>'}
-        </div>
-      </div>`;
     }
 
     function notifyHTML(u2){
@@ -10950,42 +10908,6 @@ const cm = root.querySelector('.chat-main');
             }
           });
         };
-        /* --- Напоминания --- */
-        const add = el.querySelector('#rm-add');
-        if (add) add.onclick = ()=>{
-          const t = el.querySelector('#rm-text').value.trim();
-          const atVal = el.querySelector('#rm-at').value;
-          if (!t || !atVal){ toast('Заполните текст и время','warn'); return; }
-          const at = new Date(atVal).getTime();
-          if (!isFinite(at)){ toast('Некорректное время','err'); return; }
-          S.reminders = S.reminders || [];
-          const repSel = el.querySelector('#rm-repeat');
-          S.reminders.push({ id:uid(), owner_id:u.id, text:t, at, repeat: repSel ? repSel.value : 'none',
-            notify: el.querySelector('#rm-notify').checked, done:false, fired:false, created_at:Date.now() });
-          saveState(); toast('Напоминание добавлено','ok'); renderSec();
-        };
-        el.querySelectorAll('[data-rm-done]').forEach(b=>b.onclick=()=>{
-          const r = (S.reminders||[]).find(x=>x.id===b.dataset.rmDone);
-          if (r){ r.done = true; saveState(); renderSec(); toast('Отмечено выполненным','ok'); }
-        });
-        el.querySelectorAll('[data-rm-del]').forEach(b=>b.onclick=()=>{
-          S.reminders = (S.reminders||[]).filter(x=>x.id!==b.dataset.rmDel);
-          saveState(); renderSec();
-        });
-        el.querySelectorAll('[data-rm-todo]').forEach(b=>b.onclick=()=>{
-          const row = document.querySelector(`[data-td-id="${b.dataset.rmTodo}"]`);
-          if (!row){ toast('Задача не найдена','warn'); return; }
-          try { row.scrollIntoView({ block:'center', behavior:'smooth' }); } catch(e){}
-          row.classList.add('td-flash');
-          setTimeout(()=>row.classList.remove('td-flash'), 1200);
-        });
-        el.querySelectorAll('[data-rm-skip]').forEach(b=>b.onclick=()=>{
-          const r = (S.reminders||[]).find(x=>x.id===b.dataset.rmSkip);
-          if (r && r.repeat && r.repeat !== 'none'){
-            const nx = nextRepeatAt(r.at, r.repeat);
-            if (nx){ r.at = nx; r.fired = false; saveState(); toast('Срок пропущен, следующий: '+new Date(nx).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}),'ok'); renderSec(); }
-          }
-        });
       }
       if (sec==='notify'){
         $('#nf-marketing', el).onchange = e=>{ u.consent_marketing = e.target.checked; logAudit(`Рассылки: ${e.target.checked?'включены':'отключены'}`,'Рассылки'); saveState(); toast(e.target.checked?'Подписка подтверждена':'Рассылки отключены','ok'); };
