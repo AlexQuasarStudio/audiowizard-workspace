@@ -1665,10 +1665,16 @@ const CRM = (() => {
       { label:'Копировать номер', icon:'copy', onClick:()=>{
         /* В таблице и карточках показывается номер человека (ext.num / строка
            импорта), а не внутренний uid — его и копируем. */
-        const num = personDisplayNum(p, '');
-        if (num === '' || num == null){ toast('У этого человека ещё нет номера','warn'); return; }
-        navigator.clipboard && navigator.clipboard.writeText(String(num));
-        toast(`Номер «${num}» скопирован`, 'ok');
+        const ids = (psel.has(p.id) && psel.size > 1) ? [...psel] : [p.id];
+        const nums = ids.map(id => {
+          const person = S.users.find(x => x.id === id);
+          const num = person ? personDisplayNum(person, '') : '';
+          return num === '' || num == null ? '' : String(num);
+        }).filter(Boolean);
+        if (!nums.length){ toast('У выбранных людей ещё нет номеров','warn'); return; }
+        const text = nums.map(num => '#' + num).join(', ');
+        copyPlainText(text);
+        toast(`Скопировано: ${text}`, 'ok');
       } },
     ];
     if (staff){
@@ -1689,7 +1695,17 @@ const CRM = (() => {
     const staffCanDelete = ['draft','waiting'].includes(o.status);
     const items = [
       { label:'Открыть заказ', icon:'file', onClick:()=>openOrderDetail(oid) },
-      { label:'Копировать ID', icon:'copy', onClick:()=>{ navigator.clipboard&&navigator.clipboard.writeText(o.order_id); toast(`ID «${o.order_id}» скопирован`,'ok'); } },
+      { label:'Копировать номер', icon:'copy', onClick:()=>{
+        const checked = [...document.querySelectorAll('.row-sel:checked')].map(c => c.value);
+        const ids = (checked.includes(o.id) && checked.length > 1) ? checked : [o.id];
+        const text = ids.map(id => {
+          const order = S.orders.find(x => x.id === id);
+          return order ? '#' + order.order_id : '';
+        }).filter(Boolean).join(', ');
+        if (!text) return;
+        copyPlainText(text);
+        toast(`Скопировано: ${text}`, 'ok');
+      } },
       '-',
       { label:'Изменить статус', header:true, label:STATUS_META[o.status].label },
       ...Object.entries(STATUS_META).filter(([st])=>canStatus(o.status,st).ok||st===o.status).map(([st,m])=>({
