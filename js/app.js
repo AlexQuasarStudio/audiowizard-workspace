@@ -1384,10 +1384,10 @@ const QUICK_BY_ROLE = {
       .filter(Boolean);
   }
   function mascotsHTML(cls=''){
-    return `<div class="mascots ${cls}" aria-hidden="true">
-      <span class="mascot mascot--human mascot--human-l"></span>
-      <span class="mascot mascot--robot"></span>
-      <span class="mascot mascot--human mascot--human-r"></span>
+    return `<div class="welcome-mascots ${cls}" aria-hidden="true">
+      <img class="welcome-mascot welcome-mascot--human welcome-mascot--left" src="assets/mascot-human-1.svg" alt="">
+      <img class="welcome-mascot welcome-mascot--robot" src="assets/mascot-robot.svg" alt="">
+      <img class="welcome-mascot welcome-mascot--human welcome-mascot--right" src="assets/mascot-human-2.svg" alt="">
     </div>`;
   }
   function renderJoin(inv){
@@ -1403,14 +1403,11 @@ const QUICK_BY_ROLE = {
         <div class="auth">
           <div class="auth__aurora"></div>
           ${S.settings && S.settings.appBg !== 'none' ? `<div class="auth__doodles" aria-hidden="true"></div>` : ''}
-          <div class="auth__wrap">
-            ${mascotsHTML()}
-            <div class="auth__card">
-              <div class="auth__logo">${icon('logo-full')}</div>
-              <h1 class="auth__title">Приглашение недоступно</h1>
-              <p class="small muted" style="text-align:center">${stMsg}</p>
-              <button class="btn btn--primary btn--block" style="margin-top:14px" onclick="location.hash=''">${icon('exit')} Ко входу</button>
-            </div>
+          <div class="auth__card">
+            <div class="auth__logo">${icon('logo-full')}</div>
+            <h1 class="auth__title">Приглашение недоступно</h1>
+            <p class="small muted" style="text-align:center">${stMsg}</p>
+            <button class="btn btn--primary btn--block" style="margin-top:14px" onclick="location.hash=''">${icon('exit')} Ко входу</button>
           </div>
         </div>`;
       return;
@@ -1420,9 +1417,7 @@ const QUICK_BY_ROLE = {
       <div class="auth">
         <div class="auth__aurora"></div>
         ${S.settings && S.settings.appBg !== 'none' ? `<div class="auth__doodles" aria-hidden="true"></div>` : ''}
-        <div class="auth__wrap auth__wrap--join">
-          ${mascotsHTML()}
-          <div class="auth__card auth__card--join">
+        <div class="auth__card auth__card--join">
           <div class="auth__logo">${icon('logo-full')}</div>
           <h1 class="auth__title">Вас пригласили в Audiowizard</h1>
           <p class="auth__sub">${inviter? `Пригласил(а): <b>${esc(inviter.full_name)}</b> · `:''}Роль: <b>${ROLE_LABEL[inv.role]||inv.role}</b>${inv.email? ' · '+esc(inv.email):''}</p>
@@ -1440,7 +1435,6 @@ const QUICK_BY_ROLE = {
             <button class="btn btn--primary btn--block" type="submit" style="margin-top:16px">${icon('user-plus')} Создать аккаунт</button>
           </form>
           <p class="small faint" style="text-align:center;margin-top:12px"><a href="#" id="join-cancel">Отмена — ко входу</a></p>
-          </div>
         </div>
       </div>`;
     const eye = $('#jf-eye'); let shown=false;
@@ -1484,9 +1478,7 @@ const QUICK_BY_ROLE = {
       <div class="auth">
         <div class="auth__aurora"></div>
         ${S.settings && S.settings.appBg !== 'none' ? `<div class="auth__doodles" aria-hidden="true"></div>` : ''}
-        <div class="auth__wrap">
-          ${mascotsHTML()}
-          <div class="auth__card">
+        <div class="auth__card">
           <div class="auth__logo">${icon('logo-full')}</div>
           <h1 class="auth__title">Audiowizard Workspace</h1>
           <p class="auth__sub">Единая платформа для работы с контентом</p>
@@ -1514,7 +1506,6 @@ const QUICK_BY_ROLE = {
             </div>
           </div>
           <p class="small faint" style="text-align:center;margin-top:16px">Входя, вы принимаете <a href="#" data-legal="Пользовательское соглашение">Условия сервиса</a> и <a href="#" data-legal="Политика конфиденциальности">Политику конфиденциальности</a></p>
-          </div>
         </div>
       </div>`;
 
@@ -2092,7 +2083,7 @@ ex.innerHTML = avatarHTML(user(), '');
     const u2 = user();
     openWinModal({
       narrow:true, title:'Добро пожаловать!',
-      body:`${mascotsHTML('mascots--modal')}
+      body:`${mascotsHTML('welcome-mascots--modal')}
         <p class="small muted" style="text-align:center">Настроим профиль за три шага: расскажите о себе, поставьте аватар и выберите оформление.</p>
         <div class="stack" style="gap:12px;margin-top:14px">
           <div class="field"><label>Как к вам обращаться</label><input class="input" id="ob-name" value="${esc(u2.full_name)}"></div>
@@ -2122,6 +2113,7 @@ ex.innerHTML = avatarHTML(user(), '');
         </div>`,
       footer:`<button class="btn btn--ghost" data-skip>Пропустить</button><button class="btn btn--primary" data-go>Сохранить и начать тур</button>`,
       onMount:(m2,c2)=>{
+        (m2.closest('.aw-win') || m2).classList.add('aw-win--welcome');
         let avatarData = null;
         m2.querySelector('#ob-avatar').onclick = ()=>m2.querySelector('#ob-avatar-file').click();
         m2.querySelector('#ob-avatar-file').onchange = e=>{
@@ -11299,7 +11291,7 @@ const cm = root.querySelector('.chat-main');
     };
     const [t, d] = texts[code] || texts['404'];
     root.innerHTML = `<div class="err-page">
-      <div class="err-mascot" aria-hidden="true"><span class="mascot mascot--robot"></span></div>
+      <div class="err-mascot" aria-hidden="true"><img src="assets/mascot-robot.svg" alt=""></div>
       <div class="err-code">${code==='ddos'?'DDoS':esc(code)}</div>
       <h2>${t}</h2><p>${d}</p>
       ${code==='ddos'?`<div class="progress" style="max-width:260px;margin-top:10px"><span id="ddos-bar" style="width:0%"></span></div><span class="small faint" id="ddos-cnt">3</span>`:''}

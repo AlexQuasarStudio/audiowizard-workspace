@@ -263,23 +263,13 @@ body .head__mtools{
  radial-gradient(45% 45% at 68.6% 32.9%,rgba(122,149,196,.09),transparent 100%),
  radial-gradient(55% 55% at 51.4% 73.6%,rgba(143,120,176,.10),transparent 100%);
  pointer-events:none}
-.auth__wrap{position:relative;width:100%;max-width:430px;display:flex;justify-content:center;animation:popIn .56s var(--ease)}
-.auth__wrap--join{max-width:480px}
-.auth__wrap .auth__card{max-width:100%;animation:none}
-.mascots{position:absolute;left:50%;top:-88px;transform:translateX(-50%);display:flex;align-items:flex-end;justify-content:center;gap:2px;z-index:3;pointer-events:none;filter:drop-shadow(0 8px 18px color-mix(in srgb,var(--accent) 18%,transparent))}
-.mascot{display:block;background:currentColor;-webkit-mask-position:center;mask-position:center;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-size:contain;mask-size:contain}
-.mascot--robot{width:102px;height:102px;color:var(--accent);-webkit-mask-image:url('../assets/mascot-robot.svg');mask-image:url('../assets/mascot-robot.svg')}
-.mascot--human{width:68px;height:88px;color:color-mix(in srgb,var(--accent) 48%,var(--muted));opacity:.9}
-.mascot--human-l{-webkit-mask-image:url('../assets/mascot-human-1.svg');mask-image:url('../assets/mascot-human-1.svg');transform:rotate(-4deg) translateY(2px)}
-.mascot--human-r{-webkit-mask-image:url('../assets/mascot-human-2.svg');mask-image:url('../assets/mascot-human-2.svg');transform:rotate(4deg) translateY(2px)}
-.mascots--modal{position:relative;top:auto;left:auto;transform:none;margin:-40px auto 2px;height:96px}
-@media (max-width:620px),(max-height:900px){
-  .auth__wrap .mascots{top:8px;left:auto;right:8px;transform:none;height:64px;filter:drop-shadow(0 5px 12px color-mix(in srgb,var(--accent) 16%,transparent))}
-  .auth__wrap .mascot--human{display:none}
-  .auth__wrap .mascot--robot{width:64px;height:64px}
-  .auth__card{padding-top:24px}
-  .mascots--modal{position:relative;top:auto!important;left:auto!important;right:auto!important;transform:none!important;margin:-34px auto 2px;height:88px}
-}
+.welcome-mascots{display:flex;align-items:flex-end;justify-content:center;pointer-events:none;user-select:none}
+.welcome-mascot{display:block;object-fit:contain;flex:none}
+.welcome-mascot--robot{width:154px;height:172px;filter:drop-shadow(0 12px 18px rgba(45,34,70,.22))}
+.welcome-mascot--human{width:96px;height:140px;filter:drop-shadow(0 8px 13px rgba(45,34,70,.18))}
+.welcome-mascot--left{margin-right:-36px;transform:rotate(-4deg) translateY(4px)}
+.welcome-mascot--right{margin-left:-36px;transform:rotate(4deg) translateY(4px)}
+.welcome-mascots--modal{position:relative;height:172px;margin:-58px auto -10px}
 .auth__card{position:relative;width:100%;max-width:430px;max-height:calc(100dvh - 40px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;background:color-mix(in srgb,var(--panel) 62%,transparent);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid color-mix(in srgb,var(--border-2) 86%,transparent);border-radius:22px;box-shadow:var(--sh-2);padding:26px;animation:popIn 0.56s var(--ease)}
 /* Тёмная тема: тёмное гало */
 html[data-theme^='dark'] .auth__card{box-shadow:var(--sh-2)}
@@ -1397,6 +1387,8 @@ body.menu-dragging .main .theme-card:hover{box-shadow:none!important;transform:n
 @keyframes winFade{from{opacity:0}to{opacity:1}}
 .aw-win.aw-win--calc{animation:winFade .16s var(--ease)}
 .aw-win{position:fixed;min-width:320px;min-height:220px;background:var(--panel);border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--sh-2);display:flex;flex-direction:column;pointer-events:auto;animation:winIn .22s var(--ease);overflow:hidden;transition:box-shadow .2s var(--ease);touch-action:manipulation}
+.aw-win--welcome{overflow:visible}
+.aw-win--welcome .aw-win__body{overflow:visible}
 .aw-win--dragging{box-shadow:0 30px 90px -12px rgba(0,0,0,.65);opacity:.97}
 
 /* В активном сплите тень между окнами не рисуется (стык без наложения) */
@@ -2416,8 +2408,8 @@ body.pills-hide .head{pointer-events:none}
 
 /* ---- Ошибки, логбокс, превью темы, дропзона, эмодзи (HEAD) ---- */
 .err-page{min-height:calc(100vh - var(--head-h) - 80px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px;padding:30px}
-.err-mascot{width:118px;height:118px;color:var(--accent);margin-bottom:2px;animation:errBot 2.8s var(--ease) infinite}
-.err-mascot .mascot{width:100%;height:100%}
+.err-mascot{width:150px;height:170px;margin-bottom:0;animation:errBot 2.8s var(--ease) infinite}
+.err-mascot img{display:block;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 12px 18px rgba(45,34,70,.20))}
 @keyframes errBot{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-5px) rotate(1.5deg)}}
 .err-code{font-size:88px;font-weight:800;letter-spacing:-.04em;background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1}
 .err-page h2{font-size:20px}
