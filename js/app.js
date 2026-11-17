@@ -8496,6 +8496,8 @@ const cm = root.querySelector('.chat-main');
   }
   function exportCalcServices(kind){
     const k = kind === 'csv' || kind === 'json' ? kind : 'xlsx';
+    if (!dataRequestGate({ kind:'export', entity:'calc-services:'+k, title:'Экспорт услуг калькулятора',
+      details:'Формат: ' + k.toUpperCase() + ' · все услуги и цены' })) return;
     const stamp = new Date().toISOString().slice(0,10);
     if (k === 'csv') calcSvcDownload(`uslugi_${stamp}.csv`, calcSvcCsv(), 'text/csv;charset=utf-8');
     else if (k === 'json') calcSvcDownload(`uslugi_${stamp}.json`, calcSvcJson(), 'application/json');
@@ -8620,6 +8622,8 @@ const cm = root.querySelector('.chat-main');
     });
   }
   async function importCalcServices(file){
+    if (!dataRequestGate({ kind:'import', entity:'calc-services', title:'Импорт услуг калькулятора',
+      details:'Загрузка услуг, цен и единиц из XLSX/CSV/JSON' })) return null;
     const f = file || await calcSvcPickFile();
     if (!f) return null;
     const nm = String(f.name || '').toLowerCase();
@@ -8659,8 +8663,8 @@ const cm = root.querySelector('.chat-main');
   function calcSvcRowsHTML(nid){
     const showMargin = user().role === 'admin';
     return (S.calcServices[nid] || []).map(s => `<tr data-sid="${s.id}">
-      <td><input class="input" data-f="name" value="${esc(s.name)}" style="padding:6px 10px"></td>
-      <td><input class="input" data-f="desc" value="${esc(s.desc||'')}" placeholder="Описание для калькулятора" style="padding:6px 10px;min-width:180px"></td>
+      <td><input class="input" data-f="name" value="${esc(s.name)}" style="padding:6px 10px;min-width:220px"></td>
+      <td><input class="input" data-f="desc" value="${esc(s.desc||'')}" placeholder="Описание для калькулятора" style="padding:6px 10px;min-width:240px"></td>
       <td><input class="input" data-f="price" type="number" min="0" value="${s.price}" style="padding:6px 10px;width:100px"></td>
       <td><input class="input" data-f="unit" value="${esc(s.unit||'')}" style="padding:6px 10px"></td>
       <td ${showMargin?'':'hidden'}><input class="input" data-f="margin" type="number" min="0" max="90" value="${s.margin||0}" style="padding:6px 10px;width:76px"></td>
@@ -8904,10 +8908,14 @@ const cm = root.querySelector('.chat-main');
       const rows = nid => calcSvcRowsHTML(nid);
       const enabledLangs = Array.isArray((S.calcSettings || {}).languages) && S.calcSettings.languages.length
         ? new Set(S.calcSettings.languages) : null;
+      const langList = (typeof SMARTCAT_LANGUAGES !== 'undefined' ? SMARTCAT_LANGUAGES : [])
+        .map(([code, name]) => ({ code, label: smartcatLanguageName(code, name) }))
+        .sort((a, b) => a.label.localeCompare(b.label, 'ru'));
       const pending = S.settings && S.settings.calcPending;
       const pendingHtml = pending ? `<div class="card card-pad" style="border-color:var(--accent);margin-bottom:12px">
         <b class="small">Изменения на согласовании</b>
         <p class="small faint" style="margin-top:4px">${esc((userById(pending.author)||{}).full_name || 'Сотрудник')} · ${fmtDT(pending.at)}</p>
+        ${Array.isArray(pending.changes) && pending.changes.length ? `<div class="small" style="margin-top:6px"><b>Что меняется:</b><ul style="margin:4px 0 0 18px;padding:0">${pending.changes.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
         ${u.role==='admin' ? `<div class="row" style="gap:8px;margin-top:8px"><button class="btn btn--primary btn--sm" data-calc-approve>Принять</button><button class="btn btn--ghost btn--sm" data-calc-reject>Отклонить</button></div>` : `<p class="small" style="margin-top:6px">Ждёт подтверждения администратора.</p>`}
       </div>` : '';
       const financeCard = `<div class="card card-pad" style="margin-bottom:12px"><h3>Доли в заказе</h3>
@@ -8944,7 +8952,7 @@ const cm = root.querySelector('.chat-main');
         ${S.niches.map(n=>`<div class="card card-pad calc-niche-card" data-calc-niche="${n.id}" style="background:var(--bg-2);margin-top:10px">
           <div class="row row--between"><b class="small">${esc(n.name)}</b>
             <button class="btn btn--ghost btn--sm" data-add="${n.id}">${icon('plus')} Услуга</button></div>
-          <div class="tbl-wrap calc-svc-wrap" style="margin-top:8px;border:0"><table class="tbl" style="min-width:0">
+          <div class="tbl-wrap calc-svc-wrap" style="margin-top:8px;border:0"><table class="tbl" style="min-width:940px">
             <thead><tr><th>Услуга</th><th>Описание</th><th>Цена, ₽</th><th>Единица</th><th ${u.role==='admin'?'':'hidden'}>Маржа в цене, %<input class="input" data-margin-all="${n.id}" type="number" min="0" max="90" placeholder="все" style="width:58px;padding:3px 6px;font-size:11px;margin-left:6px" title="Выставить маржу всем услугам группы"></th><th>Норма, ед./сутки<input class="input" data-norm-all="${n.id}" type="number" min="0" step="0.1" placeholder="все" style="width:58px;padding:3px 6px;font-size:11px;margin-left:6px" title="Выставить норму всем услугам группы"></th><th></th></tr></thead>
             <tbody data-niche="${n.id}">${rows(n.id)}</tbody>
           </table></div>
@@ -8968,15 +8976,24 @@ const cm = root.querySelector('.chat-main');
             <tbody data-extra="${n.id}">${calcExtraRowsHTML(n.id)}</tbody>
           </table></div>
         </div>`).join('')}
-        <div class="card card-pad" style="background:var(--bg-2);margin-top:10px">
-          <b class="small">Языки переводов</b>
-          <p class="small muted" style="margin:6px 0 8px">Все языки Smartcat. Выберите доступные в калькуляторе: Ctrl/Cmd — несколько, «Все» — весь список.</p>
-          <select class="input" id="calc-langs" multiple size="8" style="height:200px">
-            ${(typeof SMARTCAT_LANGUAGES !== 'undefined' ? SMARTCAT_LANGUAGES : []).map(([code,name]) => `<option value="${esc(code)}" ${!enabledLangs || enabledLangs.has(code) ? 'selected' : ''}>${esc(name)}</option>`).join('')}
-          </select>
-          <div class="row" style="gap:8px;margin-top:8px">
-            <button class="btn btn--ghost btn--sm" type="button" data-langs-all>Выбрать все</button>
+        <div class="card card-pad calc-lang-card" style="background:var(--bg-2);margin-top:10px">
+          <div class="row row--between" style="gap:10px;flex-wrap:wrap">
+            <b class="small">Языки переводов</b>
             <span class="small faint" id="calc-langs-count"></span>
+          </div>
+          <p class="small muted" style="margin:6px 0 8px">Все языки Smartcat по-русски. Найдите нужные и отметьте доступные в калькуляторе.</p>
+          <div class="input-wrap">${icon('search')}<input class="input" id="calc-lang-q" type="search" placeholder="Поиск языка: немецкий, китайский…" autocomplete="off" spellcheck="false" aria-label="Поиск языка" style="padding-left:36px"></div>
+          <div class="calc-lang-list" id="calc-langs">
+            ${langList.map(l => `<label class="check calc-lang-item" data-lang-row data-search="${esc(norm(l.label + ' ' + l.code))}">
+              <input type="checkbox" class="calc-lang-cb" value="${esc(l.code)}" ${!enabledLangs || enabledLangs.has(l.code) ? 'checked' : ''}>
+              <span class="box"><svg><use href="#i-check-c"/></svg></span>
+              <span class="calc-lang-name">${esc(l.label)}</span><span class="calc-lang-code">${esc(l.code)}</span>
+            </label>`).join('')}
+          </div>
+          <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
+            <button class="btn btn--ghost btn--sm" type="button" data-langs-all>Выбрать все</button>
+            <button class="btn btn--ghost btn--sm" type="button" data-langs-none>Снять все</button>
+            <span class="small faint" id="calc-langs-found"></span>
           </div>
         </div>
         <p class="small faint" id="calc-svc-empty" hidden style="margin:10px 0 0"></p>
@@ -9643,6 +9660,51 @@ const cm = root.querySelector('.chat-main');
         <button class="btn btn--ghost btn--sm" id="dt-menu-reset">${icon('refresh')} Сбросить меню</button></div>`;
     }
 
+    function describeCalcChanges(beforeServices, afterServices, beforeSettings, afterSettings, beforeFinance, afterFinance){
+      const out = [];
+      const nicheName = nid => ((S.niches || []).find(n => n.id === nid) || {}).name || nid;
+      const flat = obj => Object.entries(obj || {}).flatMap(([nid, list]) => (Array.isArray(list) ? list : []).map(x => ({ nid, ...x })));
+      const key = x => x.nid + '|' + (x.id || x.name);
+      const before = flat(beforeServices), after = flat(afterServices);
+      const bm = new Map(before.map(x => [key(x), x])), am = new Map(after.map(x => [key(x), x]));
+      after.forEach(x => {
+        const old = bm.get(key(x));
+        if (!old){ out.push(`Добавлена услуга «${x.name}» (${nicheName(x.nid)})`); return; }
+        if (old.name !== x.name) out.push(`Услуга «${old.name}» → «${x.name}» (${nicheName(x.nid)})`);
+        if (+old.price !== +x.price) out.push(`«${x.name}»: цена ${old.price || 0} → ${x.price || 0} ₽`);
+        if ((old.unit || '') !== (x.unit || '')) out.push(`«${x.name}»: единица «${old.unit || '—'}» → «${x.unit || '—'}»`);
+        if (+old.margin !== +x.margin) out.push(`«${x.name}»: маржа ${old.margin || 0}% → ${x.margin || 0}%`);
+        if ((old.desc || '') !== (x.desc || '')) out.push(`«${x.name}»: изменено описание`);
+      });
+      before.forEach(x => { if (!am.has(key(x))) out.push(`Удалена услуга «${x.name}» (${nicheName(x.nid)})`); });
+      const num = v => Number(v) || 0;
+      const cmpMap = (label, keyName, b, a) => {
+        const keys = new Set([...Object.keys(b || {}), ...Object.keys(a || {})]);
+        keys.forEach(k => { const bv = num((b || {})[k]), av = num((a || {})[k]); if (bv !== av) out.push(`${label} «${nicheName(k)}»: ${bv} → ${av}`); });
+      };
+      const bs = beforeSettings || {}, as = afterSettings || {};
+      cmpMap('Мин. цена', 'minPrice', bs.minPrice, as.minPrice);
+      cmpMap('Мин. оплата исполнителю', 'minExecPrice', bs.minExecPrice, as.minExecPrice);
+      cmpMap('Срок, дней', 'deadlineDays', bs.deadlineDays, as.deadlineDays);
+      cmpMap('Надбавка за срочность, %', 'rushPct', bs.rushPct, as.rushPct);
+      if (num(bs.clientBufferPct) !== num(as.clientBufferPct)) out.push(`Запас клиенту: ${num(bs.clientBufferPct)}% → ${num(as.clientBufferPct)}%`);
+      const lb = Array.isArray(bs.languages) ? bs.languages.length : 0;
+      const la = Array.isArray(as.languages) ? as.languages.length : 0;
+      const langSig = x => (Array.isArray(x) ? x.slice().sort().join(',') : '');
+      if (langSig(bs.languages) !== langSig(as.languages)) out.push(`Языки переводов: ${lb || 'все'} → ${la || 'все'}`);
+      const bf = beforeFinance || {}, af = afterFinance || {};
+      if (num(bf.adminMargin) !== num(af.adminMargin)) out.push(`Доля админа: ${num(bf.adminMargin)}% → ${num(af.adminMargin)}%`);
+      if (num(bf.managerFee) !== num(af.managerFee)) out.push(`Доля менеджера: ${num(bf.managerFee)}% → ${num(af.managerFee)}%`);
+      const extras = o => Object.entries(o || {}).flatMap(([nid, list]) => (Array.isArray(list) ? list : []).map(e => ({ nid, ...e })));
+      const be = extras(bs.extras), ae = extras(as.extras);
+      const eb = new Map(be.map(x => [x.nid + '|' + x.name, x])), ea = new Map(ae.map(x => [x.nid + '|' + x.name, x]));
+      ae.forEach(x => { const old = eb.get(x.nid + '|' + x.name); if (!old) out.push(`Добавлена опция «${x.name}»`); else if (+old.price !== +x.price || +old.pct !== +x.pct) out.push(`Опция «${x.name}»: ${old.price || 0} ₽ / ${old.pct || 0}% → ${x.price || 0} ₽ / ${x.pct || 0}%`); });
+      be.forEach(x => { if (!ea.has(x.nid + '|' + x.name)) out.push(`Удалена опция «${x.name}»`); });
+      const uniq = [...new Set(out)];
+      if (uniq.length > 12) return [...uniq.slice(0, 12), `…и ещё ${uniq.length - 12} изменений`];
+      return uniq.length ? uniq : ['Без изменений'];
+    }
+
     function bindCalc(el){
       if (el.dataset.calcBound){ return; }
       el.dataset.calcBound = '1';
@@ -9693,20 +9755,31 @@ const cm = root.querySelector('.chat-main');
       const svcQ = el.querySelector('#calc-svc-q');
       if (svcQ) svcQ.addEventListener('input', calcSvcFilter);
       calcSvcFilter();
-      const langsSel = el.querySelector('#calc-langs');
+      const langBox = el.querySelector('#calc-langs');
+      const langCbs = langBox ? [...langBox.querySelectorAll('.calc-lang-cb')] : [];
       const langsCount = el.querySelector('#calc-langs-count');
+      const langsFound = el.querySelector('#calc-langs-found');
       const paintLangsCount = ()=>{
-        if (langsCount && langsSel) langsCount.textContent = `Выбрано языков: ${langsSel.selectedOptions.length}`;
+        if (langsCount) langsCount.textContent = `Выбрано: ${langCbs.filter(c => c.checked).length} из ${langCbs.length}`;
       };
-      if (langsSel){
-        langsSel.addEventListener('change', paintLangsCount);
-        paintLangsCount();
-      }
+      langCbs.forEach(cb => cb.addEventListener('change', paintLangsCount));
+      paintLangsCount();
+      const langQ = el.querySelector('#calc-lang-q');
+      const filterLangs = ()=>{
+        const q = norm(langQ ? langQ.value : '');
+        let shown = 0;
+        el.querySelectorAll('[data-lang-row]').forEach(row => {
+          const ok = !q || row.dataset.search.includes(q);
+          row.hidden = !ok;
+          if (ok) shown++;
+        });
+        if (langsFound) langsFound.textContent = q ? `Найдено: ${shown}` : '';
+      };
+      if (langQ) langQ.addEventListener('input', filterLangs);
       const langsAll = el.querySelector('[data-langs-all]');
-      if (langsAll && langsSel) langsAll.onclick = ()=>{
-        [...langsSel.options].forEach(o => { o.selected = true; });
-        paintLangsCount();
-      };
+      if (langsAll) langsAll.onclick = ()=>{ langCbs.forEach(c => { c.checked = true; }); paintLangsCount(); };
+      const langsNone = el.querySelector('[data-langs-none]');
+      if (langsNone) langsNone.onclick = ()=>{ langCbs.forEach(c => { c.checked = false; }); paintLangsCount(); };
       const svcImport = el.querySelector('[data-svc-import]');
       if (svcImport) svcImport.onclick = async () => {
         const r = await importCalcServices();
@@ -9791,7 +9864,7 @@ const cm = root.querySelector('.chat-main');
         });
         S.calcSettings.clientBufferPct = Math.max(0, Math.min(200, Number((el.querySelector('#calc-buffer')||{}).value) || 0));
         const langsSel = el.querySelector('#calc-langs');
-        S.calcSettings.languages = langsSel ? [...langsSel.selectedOptions].map(o => o.value) : [];
+        S.calcSettings.languages = langsSel ? [...langsSel.querySelectorAll('.calc-lang-cb:checked')].map(o => o.value) : [];
         const adminMarginEl = el.querySelector('#calc-admin-margin');
         const managerFeeEl = el.querySelector('#calc-manager-fee');
         if (adminMarginEl || managerFeeEl){
@@ -9804,10 +9877,11 @@ const cm = root.querySelector('.chat-main');
           const proposedServices = JSON.parse(JSON.stringify(S.calcServices || {}));
           const proposedSettings = JSON.parse(JSON.stringify(S.calcSettings || {}));
           const proposedFinance = JSON.parse(JSON.stringify(S.settings.finance || {}));
+          const changes = describeCalcChanges(beforeServices, proposedServices, beforeSettings, proposedSettings, beforeFinance, proposedFinance);
           S.calcServices = beforeServices;
           S.calcSettings = beforeSettings;
           S.settings.finance = beforeFinance;
-          S.settings.calcPending = { author: user().id, at: Date.now(), services: proposedServices, settings: proposedSettings, finance: proposedFinance };
+          S.settings.calcPending = { author: user().id, at: Date.now(), services: proposedServices, settings: proposedSettings, finance: proposedFinance, changes };
           saveState();
           toast('Отправлено администратору на согласование','ok');
           renderSec();
@@ -9838,8 +9912,8 @@ const cm = root.querySelector('.chat-main');
         tr.dataset.sid = id;
         tr.className = 'calc-new-row';
         tr.innerHTML = `
-          <td><input class="input" data-f="name" placeholder="Название услуги" style="padding:6px 10px"></td>
-          <td><input class="input" data-f="desc" placeholder="Описание для калькулятора" style="padding:6px 10px;min-width:180px"></td>
+          <td><input class="input" data-f="name" placeholder="Название услуги" style="padding:6px 10px;min-width:220px"></td>
+          <td><input class="input" data-f="desc" placeholder="Описание для калькулятора" style="padding:6px 10px;min-width:240px"></td>
           <td><input class="input" data-f="price" type="number" min="0" value="0" style="padding:6px 10px;width:100px"></td>
           <td><input class="input" data-f="unit" placeholder="за час / за трек" style="padding:6px 10px"></td>
           <td><input class="input" data-f="margin" type="number" min="0" max="90" value="20" style="padding:6px 10px;width:76px"></td>

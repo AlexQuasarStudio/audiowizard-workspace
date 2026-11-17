@@ -815,14 +815,14 @@ const CRM = (() => {
       return `<tr class="${STATUS_META[o.status].row}" data-oid="${o.id}" data-ctx="order">
         <td data-l="✓">${staff||u.role==='client'?`<input type="checkbox" class="row-sel" value="${o.id}" ${sel.has(o.id)?'checked':''} aria-label="Выбрать ${o.order_id}">`:''}</td>
         <td class="o-head" data-l="">
-          <span class="order-id" data-copy="${o.order_id}" title="Скопировать ID">${o.order_id}</span>
+          <span class="order-id" data-copy="#${o.order_id}" title="Скопировать номер #${o.order_id}">${o.order_id}</span>
           ${rushMark(o)}
           <span class="cell-main o-ell" title="${esc(clList.map(x=>x.full_name).join(', '))}">${esc(clList.map(x=>x.full_name).join(', ')||'—')}</span>
           <span class="o-head-total">${fmtMoney(o.total)}</span>
           <svg class="ico ico-sm o-head-arrow"><use href="#i-chev-r"/></svg>
         </td>
         <td data-l="Заказ" class="o-main">
-          <span class="order-id" data-copy="${o.order_id}" title="Скопировать ID">${o.order_id}</span>
+          <span class="order-id" data-copy="#${o.order_id}" title="Скопировать номер #${o.order_id}">${o.order_id}</span>
           ${rushMark(o)}
           <div class="cell-sub o-ell"><span data-inline="niche">${nicheChip(o.nish_id)}</span>${o.project_id ? ' · <span data-inline="project">' + esc((S.projects.find(p=>p.id===o.project_id)||{}).name || '') + '</span>' : ' · <span data-inline="project" class="faint">+ проект</span>'}</div>
         </td>
@@ -977,7 +977,7 @@ const CRM = (() => {
       return `<div class="o-card ${STATUS_META[o.status].row}" data-oid="${o.id}" data-ctx="order">
         <div class="o-card__top">
           ${staff||u.role==='client'?`<input type="checkbox" class="row-sel" value="${o.id}" ${sel.has(o.id)?'checked':''} aria-label="Выбрать ${o.order_id}">`:''}
-          <span class="order-id" data-copy="${o.order_id}" title="Скопировать ID">${o.order_id}</span>
+          <span class="order-id" data-copy="#${o.order_id}" title="Скопировать номер #${o.order_id}">${o.order_id}</span>
           ${rushMark(o)}
           <span class="spacer"></span>
           <span data-inline="status">${statusChip(o.status)}</span>
@@ -1105,6 +1105,7 @@ const CRM = (() => {
       const osum = [...sel].reduce((acc,id) => { const o = S.orders.find(x => x.id === id); return acc + (o ? o.total : 0); }, 0);
       setBulk(host, `<div class="card card-pad row wrap" style="padding:10px 14px;margin-bottom:12px;border-color:var(--accent)">
           <b>Выбрано: ${n} · на сумму ${fmtMoney(osum)}</b><span class="spacer"></span>
+          <button class="btn btn--ghost btn--sm" data-bulk="copy">${icon('copy')} Номера</button>
           <button class="btn btn--ghost btn--sm" data-bulk="status">${icon('refresh')} Статус</button>
           ${staff?'<button class="btn btn--ghost btn--sm" data-bulk="pay">'+icon('card')+' Оплатить</button>':''}
           <button class="btn btn--danger btn--sm" data-bulk="del">${icon('trash')} Удалить</button>
@@ -1115,6 +1116,11 @@ const CRM = (() => {
     async function bulkAction(act){
       const ids = [...sel];
       if (!ids.length) return;
+      if (act === 'copy'){
+        const text = ids.map(id => { const o = S.orders.find(x => x.id === id); return o ? '#' + o.order_id : ''; }).filter(Boolean).join(', ');
+        if (text){ copyPlainText(text); toast(`Скопировано: ${text}`, 'ok'); }
+        return;
+      }
       if (act === 'del'){
         const targets = ids.map(id => S.orders.find(o => o.id === id)).filter(Boolean);
         const allowed = targets.every(o => ['draft','waiting'].includes(o.status));
@@ -1420,16 +1426,19 @@ const CRM = (() => {
         sync();
         wrap.addEventListener('scroll', sync, { passive:true });
       }
-      wrap.addEventListener('change', e => {
+      /* change не содержит shiftKey — диапазон считаем по click. */
+      wrap.addEventListener('click', e => {
         const c = e.target.closest('.row-sel');
         if (!c) return;
+        e.stopPropagation();
         const boxes = [...wrap.querySelectorAll('.row-sel')];
         const idx = boxes.indexOf(c);
+        const on = c.checked;
         if (e.shiftKey && lastSelSel !== null && lastSelSel !== idx){
           const [a,b] = [Math.min(lastSelSel,idx), Math.max(lastSelSel,idx)];
-          boxes.slice(a,b+1).forEach(bx => { bx.checked = c.checked; c.checked ? sel.add(bx.value) : sel.delete(bx.value); });
+          boxes.slice(a,b+1).forEach(bx => { bx.checked = on; on ? sel.add(bx.value) : sel.delete(bx.value); });
         } else {
-          c.checked ? sel.add(c.value) : sel.delete(c.value);
+          on ? sel.add(c.value) : sel.delete(c.value);
         }
         lastSelSel = idx;
         updateBulk();
@@ -1457,6 +1466,7 @@ const CRM = (() => {
         if (!row) return;
         if (e.target.closest('button,a,input,select,label,.row-menu')) return;
         const rows = orderNodes();
+        if (!e.shiftKey && !e.ctrlKey && !e.metaKey) lastSelSel = rows.indexOf(row);
         dragSelMoved = false;
         dragSel = { start: rows.indexOf(row), x0:e.clientX, y0:e.clientY, additive:e.ctrlKey||e.metaKey||e.shiftKey };
         e.preventDefault();
@@ -1512,7 +1522,15 @@ const CRM = (() => {
           return;
         }
         const copy = e.target.closest('[data-copy]');
-        if (copy){ e.stopPropagation(); navigator.clipboard && navigator.clipboard.writeText(copy.dataset.copy); toast(`ID «${copy.dataset.copy}» скопирован`, 'ok'); return; }
+        if (copy){
+          e.stopPropagation();
+          const oid = copy.closest('[data-oid]') ? copy.closest('[data-oid]').dataset.oid : '';
+          const ids = (oid && sel.has(oid) && sel.size > 1) ? [...sel] : (oid ? [oid] : []);
+          const text = ids.map(id => { const o = S.orders.find(x => x.id === id); return o ? '#' + o.order_id : ''; }).filter(Boolean).join(', ') || copy.dataset.copy;
+          copyPlainText(text);
+          toast(`Скопировано: ${text}`, 'ok');
+          return;
+        }
         const menu = e.target.closest('.row-menu');
         if (menu){ const r = menu.getBoundingClientRect(); orderContextMenu(menu.dataset.oid, r.left, r.bottom + 4, menu); return; }
         /* Значок долга — только подсказка, в инлайн правки суммы не ведёт. */
@@ -3373,6 +3391,26 @@ const CRM = (() => {
     }
 
     function bindPeople(){
+      if (!root.__peopleCopyBound){
+        root.__peopleCopyBound = 1;
+        root.addEventListener('click', e => {
+          const cp = e.target.closest('[data-copy]');
+          if (!cp) return;
+          const row = cp.closest('[data-uid]');
+          const pid = row && row.dataset.uid;
+          let text = cp.dataset.copy;
+          if (pid && psel.has(pid) && psel.size > 1){
+            const vals = [...psel].map(id => {
+              const node = root.querySelector(`[data-uid="${id}"] [data-copy]`);
+              return node ? node.dataset.copy : '';
+            }).filter(Boolean);
+            if (vals.length) text = vals.join(', ');
+          }
+          copyPlainText(text);
+          toast(`Скопировано: ${text}`, 'ok');
+          e.preventDefault(); e.stopPropagation();
+        }, true);
+      }
       const pv = $('#pl-view', root);
       if (pv) pv.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
         S.settings[viewKey] = b.dataset.view; saveState();
@@ -3503,52 +3541,95 @@ const CRM = (() => {
 const wrap = root.querySelector('.pl-wrap');
       if (wrap){
         let lastSelPl = null;
-        const applyRange = (boxes, a, b, checked) => {
-          boxes.slice(a, b+1).forEach(bx => { bx.checked = checked; checked ? psel.add(bx.value) : psel.delete(bx.value); });
+        let marqueeElPl = null;
+        const personRows = () => [...wrap.querySelectorAll('.person-card, tr[data-uid]')];
+        const setPersonSel = (row, on) => {
+          const cb = row && row.querySelector('.row-sel');
+          if (!cb) return;
+          cb.checked = !!on;
+          if (on) psel.add(cb.value); else psel.delete(cb.value);
         };
-        wrap.addEventListener('change', e => {
+        const applyRange = (rows, a, b, checked) => {
+          rows.slice(a, b+1).forEach(r => setPersonSel(r, checked));
+        };
+        const dropPl = () => { if (marqueeElPl){ marqueeElPl.remove(); marqueeElPl = null; } };
+        const endPl = () => {
+          if (!dragSelPl) return;
+          dropPl();
+          const moved = dragSelPlMoved;
+          dragSelPl = null;
+          updatePeopleBulk();
+          if (moved) setTimeout(()=>{ dragSelPlMoved = false; }, 0);
+        };
+        if (!window.__peopleDragBound){
+          window.__peopleDragBound = true;
+          document.addEventListener('mouseup', ()=>{ if (window.__peopleEndDrag) window.__peopleEndDrag(); });
+        }
+        window.__peopleEndDrag = endPl;
+        /* change не содержит shiftKey — диапазон и Ctrl считаем по click. */
+        wrap.addEventListener('click', e => {
           const c = e.target.closest('.row-sel');
-          if (!c) return;
-          const boxes = [...wrap.querySelectorAll('.row-sel')];
-          const idx = boxes.indexOf(c);
-          if (e.shiftKey && lastSelPl !== null && lastSelPl !== idx){
-            applyRange(boxes, Math.min(lastSelPl,idx), Math.max(lastSelPl,idx), c.checked);
-          } else {
-            c.checked ? psel.add(c.value) : psel.delete(c.value);
+          if (c){
+            e.stopPropagation();
+            const boxes = [...wrap.querySelectorAll('.row-sel')];
+            const idx = boxes.indexOf(c);
+            if (e.shiftKey && lastSelPl !== null && lastSelPl !== idx){
+              applyRange(personRows(), Math.min(lastSelPl, idx), Math.max(lastSelPl, idx), c.checked);
+            } else {
+              c.checked ? psel.add(c.value) : psel.delete(c.value);
+            }
+            lastSelPl = idx;
+            updatePeopleBulk();
+            return;
           }
-          lastSelPl = idx;
-updatePeopleBulk();
+          const row = e.target.closest('.person-card') || e.target.closest('tr[data-uid]');
+          if (!row || !(e.shiftKey || e.ctrlKey || e.metaKey)) return;
+          if (e.target.closest('button,a,input,select,label,.row-menu')) return;
+          const rows = personRows();
+          const idx = rows.indexOf(row);
+          if (idx < 0) return;
+          if (e.shiftKey && lastSelPl !== null){
+            applyRange(rows, Math.min(lastSelPl, idx), Math.max(lastSelPl, idx), true);
+          } else {
+            setPersonSel(row, !row.querySelector('.row-sel').checked);
+            lastSelPl = idx;
+          }
+          e.preventDefault(); e.stopPropagation();
+          updatePeopleBulk();
         });
         wrap.addEventListener('mousedown', e => {
           if (e.button !== 0) return;
-          /* Старт drag-выделения от ЛЮБОЙ части строки/карточки человека,
-             но не от интерактивных элементов. */
           const row = e.target.closest('.person-card') || e.target.closest('tr[data-uid]');
           if (!row) return;
-          if (e.target.closest('button,a,input,select,label,[data-copy],[data-inline]')) return;
+          if (e.target.closest('button,a,input,select,label,.row-menu')) return;
+          const rows = personRows();
+          if (!e.shiftKey && !e.ctrlKey && !e.metaKey) lastSelPl = rows.indexOf(row);
           dragSelPlMoved = false;
-          dragSelPl = { start: [...wrap.querySelectorAll('.person-card, tr[data-uid]')].indexOf(row) };
-        });
-        wrap.addEventListener('mouseover', e => {
-          if (!dragSelPl) return;
-          const row = e.target.closest('.person-card') || e.target.closest('tr[data-uid]');
-          if (!row || !dragSelPlMoved) return;
-          const rows = [...wrap.querySelectorAll('.person-card, tr[data-uid]')];
-          const idx = rows.indexOf(row);
-          if (idx < 0) return;
-          const a = Math.min(dragSelPl.start, idx), b = Math.max(dragSelPl.start, idx);
-          rows.slice(a, b+1).forEach(r => { const cb = r.querySelector('.row-sel'); if (cb){ cb.checked = true; psel.add(cb.value); } });
-          updatePeopleBulk();
+          dragSelPl = { start: rows.indexOf(row), x0:e.clientX, y0:e.clientY, additive:e.ctrlKey||e.metaKey||e.shiftKey };
+          e.preventDefault();
         });
         wrap.addEventListener('mousemove', e => {
           if (!dragSelPl) return;
           if (!dragSelPl._init){ dragSelPl._x = e.clientX; dragSelPl._y = e.clientY; dragSelPl._init = true; return; }
-          if (Math.abs(e.clientX - dragSelPl._x) > 3 || Math.abs(e.clientY - dragSelPl._y) > 3) dragSelPlMoved = true;
-        });
-        wrap.addEventListener('click', e => {
-          const c = e.target.closest('.row-sel');
-          if (!c) return;
-          e.stopPropagation(); /* не открывать карточку персоны по клику в чекбокс */
+          const dx = e.clientX - dragSelPl.x0, dy = e.clientY - dragSelPl.y0;
+          if (!dragSelPlMoved && Math.abs(dx) <= 3 && Math.abs(dy) <= 3) return;
+          dragSelPlMoved = true;
+          if (!marqueeElPl || !marqueeElPl.isConnected){
+            marqueeElPl = document.createElement('div');
+            marqueeElPl.className = 'o-marquee';
+            document.body.appendChild(marqueeElPl);
+          }
+          const x = Math.min(dragSelPl.x0, e.clientX), y = Math.min(dragSelPl.y0, e.clientY);
+          const w = Math.abs(e.clientX - dragSelPl.x0), h = Math.abs(e.clientY - dragSelPl.y0);
+          marqueeElPl.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${h}px`;
+          const rows = personRows();
+          if (!dragSelPl.additive) rows.forEach(r => setPersonSel(r, false));
+          let lastHit = -1;
+          rows.forEach((r, i) => {
+            const b = r.getBoundingClientRect();
+            if (b.right >= x && b.left <= x + w && b.bottom >= y && b.top <= y + h){ setPersonSel(r, true); lastHit = i; }
+          });
+          if (lastHit >= 0) lastSelPl = lastHit;
         });
       }
       $$('[data-pbulk]', root).forEach(b=>b.addEventListener('click', () => peopleBulkAction(b.dataset.pbulk)));
@@ -3567,6 +3648,7 @@ updatePeopleBulk();
       }, 0);
       setBulk(host, `<div class="card card-pad row wrap" style="padding:10px 14px;margin-bottom:12px;border-color:var(--accent)">
           <b>Выбрано: ${n} · на сумму ${fmtMoney(sum)}</b><span class="spacer"></span>
+          <button class="btn btn--ghost btn--sm" data-pbulk="copy">${icon('copy')} Номера</button>
           <button class="btn btn--ghost btn--sm" data-pbulk="status">${icon('refresh')} Статус</button>
           <button class="btn btn--ghost btn--sm" data-pbulk="manager">${icon('user-plus')} Менеджер</button>
           ${role==='executor'?`<button class="btn btn--ghost btn--sm" data-pbulk="work">${icon('refresh')} Рабочий статус</button>`:''}
@@ -3579,6 +3661,11 @@ updatePeopleBulk();
       const ids = [...psel];
       if (!ids.length) return;
       const people = ids.map(id => list.find(x => x.id === id)).filter(Boolean);
+      if (act === 'copy'){
+        const text = people.map(p => p.ext && p.ext.num ? '#' + p.ext.num : (p.ext && p.ext.xlsxRow ? '#' + p.ext.xlsxRow : '')).filter(Boolean).join(', ');
+        if (text){ copyPlainText(text); toast(`Скопировано: ${text}`, 'ok'); }
+        return;
+      }
       if (act === 'del'){
         confirmModal({ title:`Удалить ${people.length} ${role==='executor'?'исполнителя(ей)':'клиента(ов)'}?`, okText:'Удалить', danger:true, text:'Записи будут удалены. Заказы не удаляются.' }).then(ok => {
           if (!ok) return;
@@ -3780,7 +3867,7 @@ updatePeopleBulk();
       const mt = role==='executor' ? executorMetrics(p) : clientMetrics(p);
       return `<tr class="${bl?'c-row--bl':''}" data-uid="${p.id}">
         <td><input type="checkbox" class="row-sel" value="${p.id}" ${psel.has(p.id)?'checked':''} aria-label="Выбрать ${esc(p.full_name)}"></td>
-        <td class="pl-num" title="${p.ext&&p.ext.num?'№ '+p.ext.num:(p.ext.xlsxRow?'Строка '+p.ext.xlsxRow+' из таблицы':'№ '+num)}">${personDisplayNum(p, num)}</td>
+        <td class="pl-num" data-copy="#${personDisplayNum(p, num)}" title="Скопировать номер #${personDisplayNum(p, num)}">${personDisplayNum(p, num)}</td>
         <td data-inline="name"><span class="row row--start" style="gap:10px">${avatarHTML(p)}<span style="min-width:0"><b class="small" style="display:inline-block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.full_name)}</b><span class="small faint" style="display:block">${esc(p.username||'')}</span></span></span></td>
         ${role==='executor'
           ? `<td class="small muted" data-inline="specs">${p.ext.qualification && Object.keys(p.ext.qualification).length ? esc(Object.keys(p.ext.qualification).join(', ')) : '—'}</td>
@@ -3800,7 +3887,7 @@ updatePeopleBulk();
     return `<div class="person-card ${bl?'bl':''} ${psel.has(p.id)?'sel':''}" data-uid="${p.id}">
       <div class="row" style="gap:12px">
         <input type="checkbox" class="row-sel" value="${p.id}" ${psel.has(p.id)?'checked':''} aria-label="Выбрать ${esc(p.full_name)}">
-        <span class="x-num" title="${p.ext&&p.ext.num?'№ '+p.ext.num:(p.ext.xlsxRow?'Строка '+p.ext.xlsxRow+' из таблицы':'№ '+num)}">${personDisplayNum(p, num)}</span>
+        <span class="x-num" data-copy="#${personDisplayNum(p, num)}" title="Скопировать номер #${personDisplayNum(p, num)}">${personDisplayNum(p, num)}</span>
         ${avatarHTML(p)}
         <div style="flex:1;min-width:0">
           <b class="small" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" data-inline="name">${esc(p.full_name)}</b>
@@ -4580,8 +4667,25 @@ updatePeopleBulk();
         <button class="iconbtn" style="width:30px;height:30px" data-delrule="${r.id}" title="Удалить">${icon('trash')}</button>`:''}
       </div></div>`;
     let bindRuleRows = () => {};
+    const allReqs = dataRequestsList();
+    const pendingReqs = allReqs.filter(r => r.status === 'pending');
+    const myReqs = allReqs.filter(r => r.author === u.id && r.status !== 'used').slice(0, 5);
+    const reqStatus = { pending:['c-yellow','На согласовании'], approved:['c-green','Согласовано'], rejected:['c-red','Отклонено'] };
+    const dataReqCard = admin && pendingReqs.length ? `<div class="card card-pad" style="margin-bottom:12px;border-color:var(--accent)">
+        <h3 style="margin-bottom:8px">Заявки на импорт и экспорт <span class="badge c-yellow">${pendingReqs.length}</span></h3>
+        ${pendingReqs.map(r => `<div class="session-row" style="gap:8px;align-items:flex-start;flex-wrap:wrap">
+          <span class="badge ${r.kind==='import'?'c-blue':'c-violet'}">${r.kind==='import'?'Импорт':'Экспорт'}</span>
+          <span style="flex:1;min-width:180px"><b class="small">${esc(r.title)}</b><div class="cell-sub">${esc((userById(r.author)||{}).full_name||'Сотрудник')} · ${fmtDT(r.at)} · ${esc(r.details||'')}</div></span>
+          <button class="btn btn--primary btn--sm" data-dreq-ok="${r.id}">Согласовать</button>
+          <button class="btn btn--ghost btn--sm" data-dreq-no="${r.id}">Отклонить</button>
+        </div>`).join('')}
+      </div>` : (!admin && myReqs.length ? `<div class="docs-note" style="border-color:var(--yellow)">
+        ${icon('clock','ico-sm')} Импорт и экспорт согласуется с администратором:
+        ${myReqs.map(r => `<b>${esc(r.title)}</b> — ${esc((reqStatus[r.status]||['',''])[1]||r.status)}`).join(' · ')}
+      </div>` : '');
     root.innerHTML = `
       <div class="page-head"><div><h2>Импорт и экспорт</h2><div class="sub">${window.__lastImport ? 'Добавлено '+(window.__lastImport.added||0)+' · пропущено '+(window.__lastImport.skipped||0)+' · ошибок '+(window.__lastImport.errs||0) : 'Нет импортов за эту сессию'}</div></div>${me().role==='admin'?`<div class="page-actions"><button class="btn btn--ghost btn--sm" id="il-exp">${icon('export')} Экспорт журнала</button></div>`:''}</div>
+      ${dataReqCard}
       <div class="cols-2 grid">
         <div class="card"><div class="card-h"><h3>${icon('import')} Импорт</h3><span class="badge c-blue">XLSX → CSV автоматически</span></div>
           <div class="card-b stack" style="gap:12px">
@@ -4623,6 +4727,22 @@ updatePeopleBulk();
           </div>
         </div></div>`;
 
+    const refreshTools = () => { try { if (window.APP && APP.go) APP.go('tools'); else location.hash = '#/tools'; } catch(e){} };
+    root.querySelectorAll('[data-dreq-ok],[data-dreq-no]').forEach(b => b.onclick = () => {
+      const ok = b.hasAttribute('data-dreq-ok');
+      const r = dataRequestsList().find(x => x.id === (b.dataset.dreqOk || b.dataset.dreqNo));
+      if (!r || r.status !== 'pending') return;
+      r.status = ok ? 'approved' : 'rejected';
+      r.approvedBy = u.id; r.approvedAt = Date.now();
+      S.notifs = S.notifs || [];
+      S.notifs.unshift({ id:'n'+Date.now()+Math.floor(Math.random()*1000), icon:'i-file',
+        title:'Согласование: ' + r.title,
+        text: ok ? 'Согласовано. Можно повторить действие: ' + (r.details||'') : 'Отклонено администратором: ' + (r.details||''),
+        t:Date.now(), read:{} });
+      logAudit((ok?'Согласован':'Отклонён')+' запрос: '+r.title, 'Согласование');
+      saveState(); toast(ok?'Согласовано — сотрудник может повторить действие':'Запрос отклонён','ok');
+      refreshTools();
+    });
     /* импорт */
     const dz = $('#dz', root), fi = $('#imp-file', root);
     dz.onclick = ()=>fi.click();
@@ -4847,6 +4967,9 @@ updatePeopleBulk();
     };
     async function startImport(file){
       if (!file) return;
+      const gateEntity = 'import:' + ($('#imp-entity', root).value || 'auto');
+      if (!dataRequestGate({ kind:'import', entity:gateEntity, title:'Импорт таблиц',
+        details:`Файл ${file.name} · тип: ${$('#imp-entity', root).value || 'auto'}` })) return;
       const _t0 = performance.now();
       $('#imp-file', root).value = ''; /* сброс: повторный выбор того же файла снова сработает */
       const prog = $('#imp-prog', root);
@@ -5108,6 +5231,8 @@ updatePeopleBulk();
     };
     $('#exp-go', root).onclick = ()=>{
       const ent = $('#exp-entity', root).value, nid = $('#exp-niche', root).value;
+      if (!dataRequestGate({ kind:'export', entity:'export:'+ent+':'+expFmt, title:'Экспорт таблиц',
+        details:`Что: ${ent} · формат: ${expFmt.toUpperCase()} · ниша: ${nid || 'все'}` })) return;
       if (ent === 'all'){
         if (expFmt === 'xlsx'){ emitXlsxAll(nid); }
         else { emitCsv('clients', nid); setTimeout(()=>emitCsv('executors', nid), 350); setTimeout(()=>emitCsv('orders', nid), 700); }
@@ -5416,6 +5541,8 @@ updatePeopleBulk();
     setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
   }
   function exportPeople(role){
+    if (!dataRequestGate({ kind:'export', entity:'people:'+role, title:'Экспорт ' + (role==='client'?'клиентов':'исполнителей'),
+      details:'Выгрузка XLSX/CSV из раздела «' + (role==='client'?'Клиенты':'Исполнители') + '»' })) return;
     if (role === 'client'){
       downloadXlsxBook(clientSheets(), 'clients-by-managers.xlsx');
       toast('XLSX по менеджерам выгружен','ok');
@@ -5440,7 +5567,7 @@ updatePeopleBulk();
     /* Для объёма: ставка услуги и подходящая единица по умолчанию. */
     const CALC_LANGS = (() => {
       const all = (typeof SMARTCAT_LANGUAGES !== 'undefined' && Array.isArray(SMARTCAT_LANGUAGES))
-        ? SMARTCAT_LANGUAGES
+        ? SMARTCAT_LANGUAGES.map(([code, name]) => [code, smartcatLanguageName(code, name)])
         : [['ru','Русский'],['en','Английский'],['de','Немецкий'],['fr','Французский'],['es','Испанский'],['it','Итальянский'],['zh','Китайский'],['tr','Турецкий'],['pl','Польский']];
       const enabled = (S.calcSettings || {}).languages;
       return (Array.isArray(enabled) && enabled.length) ? all.filter(([code]) => enabled.includes(code)) : all;
@@ -5455,11 +5582,19 @@ updatePeopleBulk();
       if (+s.price > 0 || legal) volList.push({ nid:n.id, idx:i, niche:n.name, s });
     }));
     const firstVol = volList.find(v => v.nid === initNiche) || volList[0];
-    const volOptionHtml = v => {
+    const volOptionText = v => {
       const price = +v.s.price > 0
-        ? `${fmtMoney(v.s.price)} ${esc(v.s.unit||'')}`
+        ? `${fmtMoney(v.s.price)} ${v.s.unit||''}`
         : 'цена по запросу';
-      return `<option value="${v.nid}|${v.idx}" ${v===firstVol?'selected':''}>${esc(v.niche)} · ${esc(v.s.name)} — ${price}</option>`;
+      return `${v.niche} · ${v.s.name} — ${price}`;
+    };
+    const volOptionHtml = v => `<option value="${v.nid}|${v.idx}" ${v===firstVol?'selected':''}>${esc(volOptionText(v))}</option>`;
+    const syncVolInput = () => {
+      const sel = document.querySelector('#cx-vsvc');
+      const q = document.querySelector('#cx-vsvc-q');
+      if (!sel || !q) return;
+      const opt = sel.options[sel.selectedIndex];
+      q.value = opt ? opt.textContent : '';
     };
     const volOptionsFor = nid => {
       const list = volList.filter(v => !nid || v.nid === nid);
@@ -5491,15 +5626,27 @@ updatePeopleBulk();
                 <option value="page" ${volUnit==='page'?'selected':''}>страницах</option>
               </select></div>
             <div class="field" style="flex:1;min-width:220px"><label>Услуга</label>
-              <select class="input" id="cx-vsvc">${volOptions}</select></div>
+              <div class="calc-combo">
+                <input class="input" id="cx-vsvc-q" placeholder="Начните вводить услугу…" autocomplete="off" spellcheck="false">
+                <select class="input" id="cx-vsvc" hidden>${volOptions}</select>
+                <div class="calc-combo__list" id="cx-vsvc-live" aria-hidden="true"></div>
+              </div></div>
           </div>
           <div class="tiny faint" id="cx-svc-desc" style="margin-top:6px"></div>
           <div id="cx-lang-wrap">
             <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
               <div class="field" style="flex:1;min-width:150px"><label>Язык оригинала</label>
-                <select class="input" id="cx-lang-from">${langOptions('en')}</select></div>
+                <div class="calc-combo">
+                  <input class="input" id="cx-lang-from-q" placeholder="Начните вводить язык…" autocomplete="off" spellcheck="false">
+                  <select class="input" id="cx-lang-from" hidden>${langOptions('en')}</select>
+                  <div class="calc-combo__list" id="cx-lang-from-live" aria-hidden="true"></div>
+                </div></div>
               <div class="field" style="flex:1;min-width:150px"><label>Язык перевода</label>
-                <select class="input" id="cx-lang-to">${langOptions('ru')}</select></div>
+                <div class="calc-combo">
+                  <input class="input" id="cx-lang-to-q" placeholder="Начните вводить язык…" autocomplete="off" spellcheck="false">
+                  <select class="input" id="cx-lang-to" hidden>${langOptions('ru')}</select>
+                  <div class="calc-combo__list" id="cx-lang-to-live" aria-hidden="true"></div>
+                </div></div>
             </div>
             <div class="tiny faint" id="cx-lang-note" style="margin-top:4px"></div>
           </div>
@@ -5535,15 +5682,15 @@ updatePeopleBulk();
         </div>
         <div class="card card-pad" style="margin-top:12px;background:var(--panel-2)">
           <b class="small">Скидки</b>
-          <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
-            <div class="field" style="flex:1;min-width:150px"><label>Объём для скидки</label>
-              <div class="row" style="gap:6px;align-items:center">
-                <input class="input" id="cx-hours" type="number" readonly value="0" tabindex="-1" aria-readonly="true" style="flex:1">
+          <div class="calc-disc-row">
+            <div class="field calc-disc-hours"><label>Объём для скидки</label>
+              <div class="calc-suffix">
+                <input class="input" id="cx-hours" type="number" readonly value="0" tabindex="-1" aria-readonly="true">
                 <span class="small faint">ч</span>
               </div>
               <div class="tiny faint" style="margin-top:4px">Считается автоматически из блока «Объём».</div>
             </div>
-            <div class="field" style="flex:1;min-width:110px"><label>Промокод</label><input class="input" id="cx-promo" placeholder="PROMO10" autocomplete="off" spellcheck="false"></div>
+            <div class="field calc-disc-promo"><label>Промокод</label><input class="input" id="cx-promo" placeholder="PROMO10" autocomplete="off" spellcheck="false"></div>
           </div>
           <div class="small" id="cx-disc" style="margin-top:8px"></div>
         </div>`,
@@ -5560,21 +5707,49 @@ updatePeopleBulk();
             return (typeof v === 'number' && isFinite(v)) ? v : NaN;
           } catch(e){ return NaN; }
         };
-        const exactNumber = n => {
-          const v = Number(n);
+        const round3 = n => Math.round((Number(n) + Number.EPSILON) * 1000) / 1000;
+        const calcNum = n => {
+          const v = round3(n);
           if (!isFinite(v)) return '—';
-          return String(v).replace('.', ',');
+          const sign = v < 0 ? '−' : '';
+          const [int, frac] = Math.abs(v).toFixed(3).split('.');
+          const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+          const tail = frac.replace(/0+$/, '');
+          return sign + grouped + (tail ? ',' + tail : '');
         };
-        const upd = ()=>{
+        const exactNumber = calcNum;
+        const noCalcAnim = () => (S.settings && S.settings.noAnim)
+          || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        const animateCalc = (el, to, render) => {
+          if (!el) return;
+          const target = round3(to);
+          const from = Number(el._calcVal);
+          el._calcVal = target;
+          if (el._calcRaf){ cancelAnimationFrame(el._calcRaf); el._calcRaf = null; }
+          if (!isFinite(from) || from === target || noCalcAnim()){
+            render(target);
+            return;
+          }
+          const t0 = performance.now(), dur = 420;
+          const step = now => {
+            const p = Math.min(1, (now - t0) / dur);
+            const e = 1 - Math.pow(1 - p, 3);
+            render(from + (target - from) * e);
+            if (p < 1) el._calcRaf = requestAnimationFrame(step);
+            else { el._calcRaf = null; render(target); }
+          };
+          el._calcRaf = requestAnimationFrame(step);
+        };
+        const upd = (animate=false)=>{
           const raw = g2('#cx-in').value;
           const v = compute(raw);
           val = v;
-          paintTotals();
+          paintTotals(animate);
         };
-        g2('#cx-in').addEventListener('input', upd);
+        g2('#cx-in').addEventListener('input', ()=>upd(false));
         g2('#cx-in').addEventListener('keydown', e=>{
           if (e.key === 'Enter' && !isNaN(val) && val){
-            S.calcHistory.push({ expression: g2('#cx-in').value, result:+val.toFixed(4) });
+            S.calcHistory.push({ expression: g2('#cx-in').value, result:round3(val) });
             S.calcHistory = S.calcHistory.slice(-20);
             g2('#cx-hist').insertAdjacentHTML('afterbegin', `<div data-h="${val}">${esc(g2('#cx-in').value)} = ${val}</div>`);
             saveState();
@@ -5634,6 +5809,17 @@ updatePeopleBulk();
           sel.innerHTML = list.length
             ? list.map(volOptionHtml).join('')
             : '<option value="">Нет услуг в этой специализации</option>';
+          syncVolInput();
+        };
+        const syncLangInputs = () => {
+          const pair = [['#cx-lang-from','#cx-lang-from-q'],['#cx-lang-to','#cx-lang-to-q']];
+          pair.forEach(([sel,q]) => {
+            const s = g2(sel), input = g2(q);
+            if (!s || !input) return;
+            const opt = s.options[s.selectedIndex];
+            input.value = opt ? opt.textContent : '';
+            input.disabled = !!s.disabled;
+          });
         };
         const paintLang = () => {
           const box = g2('#cx-lang-note'); if (!box) return;
@@ -5641,6 +5827,7 @@ updatePeopleBulk();
           const to = g2('#cx-lang-to') ? g2('#cx-lang-to').value : '';
           const name = c => ((CALC_LANGS.find(x => x[0] === c) || [])[1]) || c;
           box.textContent = from && to ? `Языковая пара: ${name(from)} → ${name(to)}` : '';
+          syncLangInputs();
         };
         const paintLangVisibility = nid => {
           const wrap = g2('#cx-lang-wrap'); if (!wrap) return;
@@ -5656,12 +5843,81 @@ updatePeopleBulk();
           } else if (from && to && from.value === 'ru' && to.value === 'ru'){
             from.value = 'en'; to.value = 'ru';
           }
+          syncLangInputs();
           paintLang();
         };
         ['#cx-lang-from','#cx-lang-to'].forEach(sel => {
           const el = g2(sel); if (el) el.addEventListener('change', paintLang);
         });
+        /* Комбобоксы с плавной подсказкой: скрытый select хранит значение,
+           видимый input — только поиск и выбранную подпись. */
+        const bindCalcCombo = ({input, select, list, getItems, onPick}) => {
+          if (!input || !select || !list) return;
+          let items = [], active = -1;
+          const close = () => {
+            list.classList.remove('is-on');
+            list.setAttribute('aria-hidden', 'true');
+            active = -1;
+          };
+          const paint = (q='') => {
+            const needle = norm(q);
+            items = getItems().filter(it => !needle || norm(it.label).includes(needle)).slice(0, 60);
+            active = items.length ? 0 : -1;
+            list.innerHTML = items.length
+              ? items.map((it, i) => `<button type="button" class="calc-combo__item${i===active?' on':''}" data-ci="${i}">${esc(it.label)}</button>`).join('')
+              : '<div class="calc-combo__empty">Ничего не найдено</div>';
+            list.classList.toggle('is-on', !!items.length);
+            list.setAttribute('aria-hidden', items.length ? 'false' : 'true');
+          };
+          const pick = idx => {
+            const it = items[idx];
+            if (!it) return;
+            select.value = it.value;
+            input.value = it.label;
+            close();
+            onPick && onPick(it);
+          };
+          input.addEventListener('input', () => paint(input.value));
+          input.addEventListener('focus', () => paint(''));
+          input.addEventListener('keydown', e => {
+            if (e.key === 'Escape'){ e.preventDefault(); close(); input.blur(); return; }
+            if (e.key === 'ArrowDown' && items.length){ e.preventDefault(); active = (active + 1) % items.length; paint(input.value === items[active].label ? '' : input.value); }
+            if (e.key === 'ArrowUp' && items.length){ e.preventDefault(); active = (active - 1 + items.length) % items.length; paint(input.value === items[active].label ? '' : input.value); }
+            if (e.key === 'Enter' && items.length){ e.preventDefault(); pick(active); }
+          });
+          list.addEventListener('mousedown', e => {
+            const b = e.target.closest('[data-ci]');
+            if (!b) return;
+            e.preventDefault();
+            pick(+b.dataset.ci);
+          });
+          input.addEventListener('blur', () => setTimeout(() => {
+            if (list.contains(document.activeElement)) return;
+            close();
+            const opt = select.options[select.selectedIndex];
+            input.value = opt ? opt.textContent : '';
+          }, 120));
+        };
+        bindCalcCombo({
+          input: g2('#cx-vsvc-q'), select: g2('#cx-vsvc'), list: g2('#cx-vsvc-live'),
+          getItems: () => {
+            const nid = g2('#cx-niche') ? g2('#cx-niche').value : '';
+            return volList.filter(v => !nid || v.nid === nid).map(v => ({ value: v.nid + '|' + v.idx, label: volOptionText(v) }));
+          },
+          onPick: () => { paintVolume(true); paintPromoHours(); paintDiscount(); upd(true); }
+        });
+        bindCalcCombo({
+          input: g2('#cx-lang-from-q'), select: g2('#cx-lang-from'), list: g2('#cx-lang-from-live'),
+          getItems: () => CALC_LANGS.map(([code,name]) => ({ value: code, label: name })),
+          onPick: () => { paintLang(); paintDiscount(); }
+        });
+        bindCalcCombo({
+          input: g2('#cx-lang-to-q'), select: g2('#cx-lang-to'), list: g2('#cx-lang-to-live'),
+          getItems: () => CALC_LANGS.map(([code,name]) => ({ value: code, label: name })),
+          onPick: () => { paintLang(); paintDiscount(); }
+        });
         paintLangVisibility(initNiche);
+        syncVolInput();
         /* Срок по суточной норме объёма: исполнителю — объём ÷ норма,
            клиенту — тот же срок плюс настраиваемый запас (по умолчанию 30%). */
         const paintNormDeadline = () => {
@@ -5720,6 +5976,7 @@ updatePeopleBulk();
         g2('#cx-vsvc').addEventListener('change', ()=>{
           const v = volState();
           if (v.nid && g2('#cx-niche')){ g2('#cx-niche').value = v.nid; paintRush(); paintDiscount(); }
+          upd(true);
         });
 
         /* Символы: только выбор «с пробелами/без» — вставлять текст не нужно. */
@@ -5794,30 +6051,79 @@ updatePeopleBulk();
           service: (volState().s || {}).name || '',
           langFrom: g2('#cx-lang-from') ? g2('#cx-lang-from').value : '',
           langTo: g2('#cx-lang-to') ? g2('#cx-lang-to').value : '', langPair:langPair() });
-        const paintTotals = () => {
+        const discountReason = d => {
+          if (!d.best) return '';
+          if (d.best.kind === 'volume'){
+            const from = +d.best.minHours || 0;
+            return `скидка ${d.pct}% за объём${from ? ` от ${from} ч` : ''}`;
+          }
+          return `скидка ${d.pct}% по коду ${esc(d.code || d.best.code || '')}`;
+        };
+        const paintTotals = (animate=false) => {
           const d = calcDiscount();
           const hasExpr = String(g2('#cx-in').value || '').trim() !== '';
           const exact = (val == null || isNaN(val)) ? null : exactNumber(val);
-          g2('#cx-val').textContent = exact != null ? `= ${exact}` : (hasExpr ? '—' : '= 0');
-          g2('#cx-live').textContent = (d.sum || d.deadline) ? `К оплате: ${exactNumber(d.sum)}` : '';
+          const valEl = g2('#cx-val');
+          if (valEl){
+            if (exact != null){
+              if (animate) animateCalc(valEl, val, v => { valEl.textContent = `= ${calcNum(v)}`; });
+              else {
+                if (valEl._calcRaf){ cancelAnimationFrame(valEl._calcRaf); valEl._calcRaf = null; }
+                valEl._calcVal = round3(val);
+                valEl.textContent = `= ${exact}`;
+              }
+            } else {
+              if (valEl._calcRaf){ cancelAnimationFrame(valEl._calcRaf); valEl._calcRaf = null; }
+              valEl._calcVal = 0;
+              valEl.textContent = hasExpr ? '—' : '= 0';
+            }
+          }
+          const live = g2('#cx-live');
+          if (live){
+            if (d.sum || d.deadline){
+              const html = amount => {
+                let out = `К оплате: `;
+                if (d.pct){
+                  out += `<s class="faint">${calcNum(d.base)}</s> <b>${calcNum(amount)}</b>`;
+                  const why = discountReason(d);
+                  if (why) out += ` <span class="small faint">· ${why}</span>`;
+                } else {
+                  out += `<b>${calcNum(amount)}</b>`;
+                }
+                if (d.rush) out += ` <span class="small faint">· срочно +${d.rushPct}%</span>`;
+                if (d.minApplied) out += ` <span class="small faint">· минимум категории</span>`;
+                return out;
+              };
+              if (animate) animateCalc(live, d.sum, html);
+              else {
+                if (live._calcRaf){ cancelAnimationFrame(live._calcRaf); live._calcRaf = null; }
+                live._calcVal = round3(d.sum);
+                live.innerHTML = html(d.sum);
+              }
+            } else {
+              if (live._calcRaf){ cancelAnimationFrame(live._calcRaf); live._calcRaf = null; }
+              live._calcVal = 0;
+              live.textContent = '';
+            }
+          }
           return d;
         };
         const paintDiscount = () => {
           const d = calcDiscount();
           const box = g2('#cx-disc');
           if (!box) return;
-          const money = fmtMoney(d.base);
+          const money = calcNum(d.base);
           if (d.code && !d.known){
             box.innerHTML = `<span style="color:var(--red)">Код ${esc(d.code)} не найден или не действует</span>`;
             return;
           }
           const parts = [];
-          if (d.extraFee) parts.push(`Надбавки ${d.extraPct}% · <b>${fmtMoney(d.extraFee)}</b>`);
-          if (d.pct) parts.push(`Скидка ${d.pct}%${d.best && d.best.kind === 'volume' ? ' за объём' : ''} · <s class="faint">${money}</s> <b>${fmtMoney(d.discounted)}</b>`);
-          if (d.rush) parts.push(`<span class="badge c-orange">Срочно</span> +${d.rushPct}% · <b>${fmtMoney(d.rushFee)}</b>`);
-          if (d.minApplied) parts.push(`Минимальная стоимость категории · <b>${fmtMoney(d.minTotal)}</b>`);
+          if (d.extraFee) parts.push(`Надбавки ${d.extraPct}% · <b>${calcNum(d.extraFee)}</b>`);
+          if (d.pct) parts.push(`${discountReason(d) || 'Скидка '+d.pct+'%'} · <s class="faint">${money}</s> <b>${calcNum(d.discounted)}</b>`);
+          if (d.rush) parts.push(`<span class="badge c-orange">Срочно</span> +${d.rushPct}% · <b>${calcNum(d.rushFee)}</b>`);
+          if (d.minApplied) parts.push(`Минимальная стоимость категории · <b>${calcNum(d.minTotal)}</b>`);
           box.innerHTML = parts.length
-            ? parts.join('<br>') + `<br>К оплате <b>${fmtMoney(d.sum)}</b>`
+            ? parts.join('<br>') + `<br>К оплате <b>${calcNum(d.sum)}</b>`
             : `<span class="faint">Скидок и надбавок нет · к оплате ${money}</span>`;
         };
         const paintRush = () => {
@@ -5887,7 +6193,7 @@ updatePeopleBulk();
             unitSel.dispatchEvent(new Event('change', { bubbles:true }));
           }
           paintVolume(true);
-          paintRush(); paintNormDeadline(); paintDiscount(); upd();
+          paintRush(); paintNormDeadline(); paintDiscount(); upd(true);
         });
         /* Срок можно задать в днях — точная дата подставляется сама;
            ручная дата так же пересчитывает дни. */
@@ -5913,7 +6219,7 @@ updatePeopleBulk();
             if (sel && nid && sel.value !== nid){ sel.value = nid; paintRush(); }
           }
           paintDiscount();
-          upd();
+          upd(true);
         });
         /* Услуги правятся в настройках, но выгрузить и догрузить их можно прямо здесь */
         const svcExportBtn = mask.querySelector('[data-cx-export]');
@@ -5926,7 +6232,7 @@ updatePeopleBulk();
             paintSvcs();
             paintRush();
             paintDiscount();
-            upd();
+            upd(true);
           }
         };
         g2('#cx-hist').querySelectorAll('[data-h]').forEach(h=>h.onclick = ()=>{ g2('#cx-in').value = h.dataset.h; upd(); });
