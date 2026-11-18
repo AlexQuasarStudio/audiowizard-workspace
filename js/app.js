@@ -5619,7 +5619,7 @@ const cm = root.querySelector('.chat-main');
         emojiOpen = !emojiOpen;
         if (!emojiOpen) return;
         hideEmojiHints();
-        const dd = showDropdown(e.currentTarget, [], {});
+        const dd = showDropdown(e.currentTarget, [], { force:true });
         if (!dd) return;
         dd.className = 'dd emoji-panel';
         dd.style.width = 'min(360px, calc(100vw - 24px))';
@@ -5701,6 +5701,9 @@ const cm = root.querySelector('.chat-main');
           dd.style.top = y + 'px';
         };
         renderTabs('emoji');
+        const emojiObs = new MutationObserver(()=>{ if (!document.body.contains(dd)){ emojiOpen = false; emojiObs.disconnect(); } });
+        emojiObs.observe(document.body, { childList:true, subtree:true });
+        dd.addEventListener('pointerdown', ev=>{ if (ev.target.closest('[data-tab]')) ev.stopPropagation(); });
         dd.addEventListener('click', ev=>{
           const tb = ev.target.closest('[data-tab]');
           if (tb){ renderTabs(tb.dataset.tab); positionDD(); ev.stopPropagation(); }

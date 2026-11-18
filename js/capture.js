@@ -253,7 +253,7 @@
   }
 
   function openMenu() {
-    openWinModal({ title:'Снимок экрана', icon:'app', narrow:true, locked:true, backdrop:true,
+    openWinModal({ title:'Снимок экрана', icon:'app', narrow:true, locked:true, backdrop:true, backdropBlur:false,
       body:`<div class="stack" style="gap:10px">
         <p class="small muted" style="margin:0">Снимок приложения с автоматической маской баланса, заказов, людей и переписок. Маску можно отключить в профиле.</p>
         <button class="btn btn--soft" data-cap="shot">Сделать снимок</button>
@@ -289,7 +289,7 @@
   }
 
   function openRecord() {
-    openWinModal({ title:'Запись экрана', icon:'app', narrow:true, locked:true, backdrop:true,
+    openWinModal({ title:'Запись экрана', icon:'app', narrow:true, locked:true, backdrop:true, backdropBlur:false,
       body:`<div class="stack" style="gap:10px"><p class="small muted" style="margin:0">Приложение записывает собственный интерфейс без выбора источника браузером. Конфиденциальные данные маскируются.</p><label class="check"><input type="checkbox" id="self-mic"><span class="box"></span><span>Записывать микрофон</span></label><p class="tiny faint" style="margin:0">Микрофон — единственное, на что система может попросить разрешение.</p></div>`,
       footer:'<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-start>Начать запись</button>',
       onMount:(m,c)=>{ m.querySelector('[data-x]').onclick=c; m.querySelector('[data-start]').onclick=()=>{ const mic=!!m.querySelector('#self-mic').checked; c(); setTimeout(()=>startSelfRecording(mic),120); }; }

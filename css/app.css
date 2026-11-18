@@ -1403,6 +1403,7 @@ body.menu-dragging .main .theme-card:hover{box-shadow:none!important;transform:n
 .sys-ico svg{width:20px;height:20px}
 .aw-win--locked .aw-win__corner,.aw-win--locked .aw-win__max,.aw-win--locked .aw-win__min{display:none!important}
 .aw-win-scrim{position:fixed;inset:0;z-index:1;background:rgba(16,14,26,.48);-webkit-backdrop-filter:blur(14px) saturate(.92);backdrop-filter:blur(14px) saturate(.92);animation:scrimIn .24s var(--ease)}
+.aw-win-scrim--plain{-webkit-backdrop-filter:none!important;backdrop-filter:none!important;background:rgba(16,14,26,.38)}
 .aw-win--locked{z-index:2}
 @keyframes scrimIn{from{opacity:0}to{opacity:1}}
 .welcome-hero{text-align:center;position:relative;padding:0 10px 8px}
@@ -1880,7 +1881,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1486");mask-image:url("../bg/pattern-ai.svg?v=1486");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1487");mask-image:url("../bg/pattern-ai.svg?v=1487");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -1966,7 +1967,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1486");mask-image:url("../bg/pattern-ai.svg?v=1486");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1487");mask-image:url("../bg/pattern-ai.svg?v=1487");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
