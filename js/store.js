@@ -215,9 +215,7 @@ const SITE_CALC_SERVICES = {
     { id:'cs-r4', name:'Перевод с украинского', price:200, unit:'за страницу', margin:25 },
     { id:'cs-r5', name:'Перевод на украинский', price:300, unit:'за страницу', margin:25 },
     { id:'cs-r6', name:'Стенограмма на украинском', price:200, unit:'за страницу', margin:25 },
-    { id:'cs-r7', name:'Перевод презентаций', price:200, unit:'за страницу', margin:25 },
-    { id:'cs-r8', name:'Апостиль', price:0, unit:'за документ', margin:25 },
-    { id:'cs-r9', name:'Легализация', price:0, unit:'за документ', margin:25 }
+    { id:'cs-r7', name:'Перевод презентаций', price:200, unit:'за страницу', margin:25 }
   ]
 };
 /* Надбавки за срочность и доп. опции. Проценты взяты с сайта
@@ -229,6 +227,7 @@ const DEFAULT_CALC_SETTINGS = {
   minPrice: { n1:1000, n2:1000, n3:1000 },
   minExecPrice: { n1:200, n2:200, n3:200 },
   deadlineDays: { n1:0, n2:0, n3:0 },
+  langPct: 10,
   extras: {
     n1: [
       { id:'ce-a1', name:'Плохое качество записи', price:0, pct:30, unit:'% от стоимости', active:true },
@@ -240,7 +239,8 @@ const DEFAULT_CALC_SETTINGS = {
     ],
     n2: [],
     n3: [
-      { id:'ce-r1', name:'Перевод слайда', price:100, pct:0, unit:'за слайд', active:true }
+      { id:'ce-r2', name:'Апостиль', price:0, pct:0, unit:'за документ', active:true },
+      { id:'ce-r3', name:'Легализация', price:0, pct:0, unit:'за документ', active:true }
     ]
   }
 };
@@ -755,6 +755,7 @@ function migrateSiteCatalog(){
   if (!S.calcSettings.extras) S.calcSettings.extras = {};
   if (!S.calcSettings.minPrice) S.calcSettings.minPrice = {};
   if (!S.calcSettings.minExecPrice) S.calcSettings.minExecPrice = {};
+  if (S.calcSettings.langPct == null) S.calcSettings.langPct = 10;
   if (!S.calcSettings.deadlineDays) S.calcSettings.deadlineDays = {};
   const services = siteCalcServices();
   const def = defaultCalcSettings();
@@ -798,14 +799,18 @@ function migrateSmartcatServices(){
 /* Апостиль и легализация — локальные услуги, их нет в Smartcat. */
 function migrateLegalServices(){
   if (!S || !S.settings) return;
-  if (S.settings.legalServicesVersion >= 1) return;
+  if (S.settings.legalServicesVersion >= 2) return;
   S.calcServices = S.calcServices || {};
   const list = S.calcServices.n3 = Array.isArray(S.calcServices.n3) ? S.calcServices.n3 : [];
-  const have = new Set(list.map(x => String(x.name || '').toLowerCase()));
-  [['cs-r8','Апостиль'], ['cs-r9','Легализация']].forEach(([id,name]) => {
-    if (!have.has(name.toLowerCase())) list.push({ id, name, price:0, unit:'за документ', margin:25 });
+  S.calcServices.n3 = list.filter(x => !['cs-r8','cs-r9','ce-r1'].includes(x.id));
+  S.calcSettings = S.calcSettings || {};
+  S.calcSettings.extras = S.calcSettings.extras || {};
+  const ex = S.calcSettings.extras.n3 = Array.isArray(S.calcSettings.extras.n3) ? S.calcSettings.extras.n3 : [];
+  [['ce-r2','Апостиль'],['ce-r3','Легализация']].forEach(([id,name]) => {
+    if (!ex.some(x => x.id === id)) ex.push({ id, name, price:0, pct:0, unit:'за документ', active:true });
   });
-  S.settings.legalServicesVersion = 1;
+  S.calcSettings.extras.n3 = ex.filter(x => x.id !== 'ce-r1');
+  S.settings.legalServicesVersion = 2;
 }
 function migrateServiceDescriptions(){
   Object.values(S.calcServices || {}).forEach(list => {

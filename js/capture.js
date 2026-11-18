@@ -126,6 +126,7 @@
 
 
   async function startShot(mode = 'shot', onAttach = null) {
+    if (shot) { notice('Сначала завершите текущий снимок','warn'); return; }
     try {
       privacyOn();
       await waitFrame();
@@ -148,7 +149,7 @@
   function openEditor(base, onAttach, guides={xs:[],ys:[],scale:1}) {
     if (shot) shot.root.remove();
     const root = el('div', 'cap-editor');
-    root.innerHTML = `<div class="cap-editor__bar"><b>Снимок экрана</b><span class="cap-editor__hint">Рисуйте поверх снимка</span><span class="spacer"></span><button class="btn btn--ghost btn--sm" data-cap-crop>Кроп</button><button class="btn btn--primary btn--sm" data-cap-save>Скачать</button>${onAttach ? '<button class="btn btn--soft btn--sm" data-cap-attach>Вложить</button>' : ''}<button class="iconbtn" data-cap-x title="Закрыть">×</button></div><div class="cap-editor__stage"><canvas></canvas></div><div class="cap-tools"><button data-tool="cursor" title="Курсор — взаимодействие с приложением"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 3l14 8-6 1-3 7L5 3Z" fill="currentColor"/></svg></button><button data-tool="hand" class="on" title="Рука">✋</button><button data-tool="select" title="Выделить">⬚</button><button data-tool="rect" title="Прямоугольник">▭</button><button data-tool="ellipse" title="Эллипс">◯</button><button data-tool="arrow" title="Стрелка">↗</button><button data-tool="pen" title="Маркер">✎</button><button data-tool="text" title="Текст">T</button><span class="spacer"></span><button data-color="#ff5c5c" class="on" style="color:#ff5c5c">●</button><button data-color="#ffd166" style="color:#ffd166">●</button><button data-color="#4cc9f0" style="color:#4cc9f0">●</button><button data-color="#ffffff" style="color:#fff">●</button><button data-cap-undo title="Отменить">↶</button><button data-cap-redo title="Повторить">↷</button></div>`;
+    root.innerHTML = `<div class="cap-editor__bar"><b>Снимок экрана</b><span class="cap-editor__hint">Рисуйте поверх снимка</span><span class="spacer"></span><button class="btn btn--ghost btn--sm" data-cap-crop title="Обрезать">✂</button><button class="btn btn--danger btn--sm" data-cap-save>Готово</button>${onAttach ? '<button class="btn btn--soft btn--sm" data-cap-attach>Вложить</button>' : ''}<button class="iconbtn" data-cap-x title="Закрыть">×</button></div><div class="cap-editor__stage"><canvas></canvas></div><div class="cap-tools"><button data-tool="cursor" title="Курсор — взаимодействие с приложением"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 3l14 8-6 1-3 7L5 3Z" fill="currentColor"/></svg></button><button data-tool="hand" class="on" title="Рука">✋</button><button data-tool="select" title="Выделить">⬚</button><button data-tool="rect" title="Прямоугольник">▭</button><button data-tool="ellipse" title="Эллипс">◯</button><button data-tool="arrow" title="Стрелка">↗</button><button data-tool="pen" title="Маркер">✎</button><button data-tool="text" title="Текст">T</button><span class="spacer"></span><button data-color="#ff5c5c" class="on" style="color:#ff5c5c">●</button><button data-color="#ffd166" style="color:#ffd166">●</button><button data-color="#4cc9f0" style="color:#4cc9f0">●</button><button data-color="#ffffff" style="color:#fff">●</button><button data-cap-undo title="Отменить">↶</button><button data-cap-redo title="Повторить">↷</button></div>`;
     document.body.appendChild(root);
     const canvas = $('canvas', root), ctx = canvas.getContext('2d');
     shot = { root, base, tool:'hand', crop: null, shapes: [], redo: [], sel:null, color:'#ff5c5c', line: 4, onAttach, canvas, guides };
@@ -196,13 +197,13 @@
     const hit = p => [...shot.shapes].reverse().find(sh=>{const b=bbox(sh);return p.x>=b.x-6&&p.x<=b.x+b.w+6&&p.y>=b.y-6&&p.y<=b.y+b.h+6;});
     const handleAt = p => { if(!shot.sel)return null; const b=bbox(shot.sel); const hs={nw:[b.x,b.y],ne:[b.x+b.w,b.y],sw:[b.x,b.y+b.h],se:[b.x+b.w,b.y+b.h],rot:[b.x+b.w/2,b.y-22]}; return Object.keys(hs).find(k=>Math.hypot(p.x-hs[k][0],p.y-hs[k][1])<10)||null; };
     canvas.addEventListener('pointerdown', e => {
-      const p = snap(pt(e));
+      const raw = pt(e); const p = (mode || drag) ? raw : snap(raw);
       if (shot.tool === 'text'){ inlineText(p); return; }
       if (shot.tool === 'hand' || shot.tool === 'select'){ const h=handleAt(p); if(h){ mode=h; last=p; shot._orig=JSON.parse(JSON.stringify(shot.sel)); canvas.setPointerCapture(e.pointerId); return; } const s=hit(p); shot.sel=s||null; if(s){mode='move';last=p;shot._orig=JSON.parse(JSON.stringify(s));} draw(); return; }
       drag = p; const sh = startShape(p); shot.shapes.push(sh); shot.sel=null; canvas.setPointerCapture(e.pointerId); draw();
     });
     canvas.addEventListener('pointermove', e => {
-      const p=snap(pt(e));
+      const raw=pt(e); const p=(mode||drag)?raw:snap(raw);
       if (mode && shot.sel){ const s=shot.sel,o=shot._orig; if(mode==='move'){ s.x=o.x+(p.x-last.x); s.y=o.y+(p.y-last.y); if(s.points) s.points=s.points.map(q=>({x:q.x+(p.x-last.x),y:q.y+(p.y-last.y)})); }
         else if(mode==='rot'){ const b=bbox(s); s.rot=Math.atan2(p.y-(b.y+b.h/2),p.x-(b.x+b.w/2))+Math.PI/2; }
         else { const b=bbox(o); if(mode==='se'){s.w=p.x-b.x;s.h=p.y-b.y;} if(mode==='nw'){s.x=p.x;s.y=p.y;s.w=b.x+b.w-p.x;s.h=b.y+b.h-p.y;} if(mode==='ne'){s.y=p.y;s.w=p.x-b.x;s.h=b.y+b.h-p.y;} if(mode==='sw'){s.x=p.x;s.w=b.x+b.w-p.x;s.h=p.y-b.y;} }
@@ -289,6 +290,10 @@
   }
 
   function openRecord() {
+    if (rec && rec.stop){
+      confirmModal({ title:'Запись уже идёт', text:'Остановить и сохранить текущую запись, затем начать новую?', okText:'Сохранить и начать новую', danger:true }).then(ok=>{ if(!ok) return; rec.stop(); setTimeout(openRecord, 700); });
+      return;
+    }
     openWinModal({ title:'Запись экрана', icon:'app', narrow:true, locked:true, backdrop:true, backdropBlur:false,
       body:`<div class="stack" style="gap:10px"><p class="small muted" style="margin:0">Приложение записывает собственный интерфейс без выбора источника браузером. Конфиденциальные данные маскируются.</p><label class="check"><input type="checkbox" id="self-mic"><span class="box"></span><span>Записывать микрофон</span></label><p class="tiny faint" style="margin:0">Микрофон — единственное, на что система может попросить разрешение.</p></div>`,
       footer:'<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-start>Начать запись</button>',
@@ -296,6 +301,7 @@
     });
   }
   async function startSelfRecording(mic){
+    if (rec) { notice('Запись уже идёт','warn'); return; }
     try {
       privacyOn(); document.body.classList.add('is-recording');
       const root=el('div','cap-rec-live'); root.innerHTML='<canvas class="cap-anno"></canvas><div class="cap-tools cap-rec-tools"><button data-rtool="cursor" class="on" title="Курсор"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 3l14 8-6 1-3 7L5 3Z" fill="currentColor"/></svg></button><button data-rtool="pen" title="Маркер">✎</button><button data-rtool="arrow" title="Стрелка">↗</button><button data-rtool="rect" title="Рамка">▭</button><button data-rtool="text" title="Текст">T</button><span class="spacer"></span><button data-rclear title="Очистить">⌫</button></div>';

@@ -5563,7 +5563,7 @@ const wrap = root.querySelector('.pl-wrap');
 
   /* ==================== КАЛЬКУЛЯТОР ==================== */
   function openCalculator({ onResult=null, nishId='', deadline=null } = {}){
-    const LANG_SURCHARGE_PCT = 10;
+    const LANG_SURCHARGE_PCT = Math.max(0, Math.min(100, Number((S.calcSettings || {}).langPct ?? 10)));
     if (!onResult){
       window.__modalRestorers = window.__modalRestorers || {};
       window.__modalRestorers.calculator = () => openCalculator();
@@ -6077,7 +6077,7 @@ const wrap = root.querySelector('.pl-wrap');
           const hours = volumeHours();
           const code = String(g2('#cx-promo').value || '').trim().toUpperCase();
           const fixed = fixedExtraSum();
-          const extraPct = pctSum();
+          const extraPct = pctApplied() ? 0 : pctSum();
           const priced = (isNaN(val) ? 0 : val) + svcOnlySum();
           const extraFee = Math.round(priced * extraPct / 100);
           const langFee = langPair() ? Math.round((priced + fixed + extraFee) * LANG_SURCHARGE_PCT / 100) : 0;

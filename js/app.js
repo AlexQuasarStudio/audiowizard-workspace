@@ -884,7 +884,7 @@ const QA = {
   team:       { id:'team',       label:'Исполнители',           icon:'executor',  run:()=>go('executors') }
 };
 const QUICK_BY_ROLE = {
-  admin:       ['order','calc','client','executor','-','chats','transcribe','texts','translate','-','planner','shot','invite','report'],
+  admin:       ['order','calc','client','executor','-','chats','transcribe','texts','translate','-','shot','planner','invite','report'],
   top_manager: ['order','calc','client','executor','-','chats','transcribe','texts','translate','-','shot','invite','report'],
   manager:     ['order','calc','client','-','chats','texts','kanban','-','shot','invite','report'],
   client:      ['order','-','chats','-','shot','report'],
@@ -1404,7 +1404,6 @@ const QUICK_BY_ROLE = {
     <circle cx="90" cy="24" r="20" fill="var(--mascot-glow)" opacity=".22" filter="url(#nr-glow)"/>
     <g filter="url(#nr-soft)" stroke="var(--mascot-line)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
       <path d="M90 48V30" fill="none"/>
-      <path d="M90 31c-7-9-21-5-21 5 0 10 12 15 21 21 9-6 21-11 21-21 0-10-14-14-21-5Z" fill="var(--mascot-heart-2)"/>
       <rect x="12" y="83" width="19" height="38" rx="9" fill="var(--mascot-shell-3)"/>
       <rect x="149" y="83" width="19" height="38" rx="9" fill="var(--mascot-shell-3)"/>
       <path d="M33 58h114a14 14 0 0 1 14 14v73a14 14 0 0 1-14 14H33a14 14 0 0 1-14-14V72a14 14 0 0 1 14-14Z" fill="var(--mascot-shell-2)"/>
@@ -1421,7 +1420,6 @@ const QUICK_BY_ROLE = {
       <path d="M56 151c-8 1-14 6-15 13" fill="none"/>
       <path d="M124 151c8 1 14 6 15 13" fill="none"/>
       <path d="M72 184v6M108 184v6" fill="none"/>
-      <path d="M90 160c-5-6.6-14-4-14 3 0 6 7 9 14 14 7-5 14-8 14-14 0-7-9-9.6-14-3Z" fill="var(--mascot-inset)" opacity=".88"/>
       <path d="M63 67c9-4 18-5 27-3" fill="none" opacity=".55"/>
     </g>
     <path d="M151 45l2.5 7 7 2.5-7 2.5-2.5 7-2.5-7-7-2.5 7-2.5 2.5-7Z" fill="var(--mascot-spark)" opacity=".9"/>
@@ -1440,7 +1438,6 @@ const QUICK_BY_ROLE = {
     <circle cx="90" cy="24" r="20" fill="var(--mascot-glow)" opacity=".22" filter="url(#er-glow)"/>
     <g filter="url(#er-soft)" stroke="var(--mascot-line)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
       <path d="M90 48V30" fill="none"/>
-      <path d="M90 31c-7-9-21-5-21 5 0 10 12 15 21 21 9-6 21-11 21-21 0-10-14-14-21-5Z" fill="var(--mascot-heart-2)"/>
       <rect x="12" y="83" width="19" height="38" rx="9" fill="var(--mascot-shell-3)"/>
       <rect x="149" y="83" width="19" height="38" rx="9" fill="var(--mascot-shell-3)"/>
       <path d="M33 58h114a14 14 0 0 1 14 14v73a14 14 0 0 1-14 14H33a14 14 0 0 1-14-14V72a14 14 0 0 1 14-14Z" fill="var(--mascot-shell-2)"/>
@@ -1459,7 +1456,6 @@ const QUICK_BY_ROLE = {
       <path d="M56 151c-8 1-14 6-15 13" fill="none"/>
       <path d="M124 151c8 1 14 6 15 13" fill="none"/>
       <path d="M72 184v6M108 184v6" fill="none"/>
-      <path d="M90 160c-5-6.6-14-4-14 3 0 6 7 9 14 14 7-5 14-8 14-14 0-7-9-9.6-14-3Z" fill="var(--mascot-inset)" opacity=".88"/>
       <path d="M63 67c9-4 18-5 27-3" fill="none" opacity=".55"/>
     </g>
     <path d="M151 45l2.5 7 7 2.5-7 2.5-2.5 7-2.5-7-7-2.5 7-2.5 2.5-7Z" fill="var(--mascot-spark)" opacity=".9"/>
@@ -9187,6 +9183,7 @@ const cm = root.querySelector('.chat-main');
         <div class="cols-2 grid" style="gap:12px">
           ${u.role==='admin'?`<div class="field"><label>Доля админа в заказе, %</label><input class="input" id="calc-admin-margin" type="number" min="0" max="100" step="1" value="${Finance.cfg().adminMargin}"></div>`:''}
           <div class="field"><label>Доля менеджера по умолчанию, %</label><input class="input" id="calc-manager-fee" type="number" min="0" max="100" step="1" value="${Finance.cfg().managerFee}"></div>
+          <div class="field"><label>Надбавка за языковую пару, %</label><input class="input" id="calc-lang-pct" type="number" min="0" max="100" step="1" value="${Number(S.calcSettings.langPct ?? 10)}"></div>
         </div>
       </div>`;
       return `${pendingHtml}${financeCard}<div class="card card-pad" style="margin-bottom:12px"><h3 style="margin-bottom:6px">Гонорары менеджеров</h3>
@@ -10104,6 +10101,8 @@ const cm = root.querySelector('.chat-main');
           S.calcSettings.rushPct[nid] = Math.max(0, Math.min(200, +((rp || {}).value) || 0));
         });
         S.calcSettings.clientBufferPct = Math.max(0, Math.min(200, Number((el.querySelector('#calc-buffer')||{}).value) || 0));
+        const lpEl = el.querySelector('#calc-lang-pct');
+        if (lpEl) S.calcSettings.langPct = Math.max(0, Math.min(100, Number(lpEl.value) || 0));
         const langsSel = el.querySelector('#calc-langs');
         const chosenLangs = langsSel ? [...langsSel.querySelectorAll('.calc-lang-cb:checked')].map(o => o.value) : [];
         if (!chosenLangs.length){ toast('Оставьте хотя бы один язык в калькуляторе', 'warn'); return; }
