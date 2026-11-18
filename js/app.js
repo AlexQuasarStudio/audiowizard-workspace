@@ -1275,8 +1275,8 @@ const QUICK_BY_ROLE = {
         ? top.map(op => `<div class="bal-item ${op.kind}"><span class="bal-ico">${icon(op.kind==='out'?'minus':'plus','ico-sm')}</span>
             <span class="bal-main"><span class="t">${esc(op.text)}</span><span class="d">${esc(op.user||'')}${op.user?' · ':''}${fmtDT(op.t)}</span></span></div>`).join('')
         : `<div class="empty">${icon('card')}<span>Операций пока нет</span></div>`}</div>
-      <div class="bal-foot"><span>${totalLabel}</span><b>${fmtMoney(total)}</b></div>
-      ${staff ? `<div class="bal-foot bal-foot--sub"><span>Баланс платформы</span><b>${fmtMoney(platformBalance())}</b></div>` : ''}`;
+      <div class="bal-foot"><span>${totalLabel}</span><b>${hideBalance() ? '••••' : fmtMoney(total)}</b></div>
+      ${staff ? `<div class="bal-foot bal-foot--sub"><span>Баланс платформы</span><b>${hideBalance() ? '••••' : fmtMoney(platformBalance())}</b></div>` : ''}`;
     document.body.appendChild(panel);
     /* Позиция задаётся в CSS — та же, что у панели уведомлений
        (top от --head-h, right 14px), чтобы плашки стояли ровно друг под другом. */
@@ -11668,7 +11668,7 @@ function initPWA(){
        делала из той же картинки второй сетевой запрос — браузер видел
        другой ключ кэша. Свежесть узора обеспечивает service worker:
        PRECACHE обновляется вместе со сборкой. */
-    const maskUrl = 'url("bg/pattern-ai.svg?v=1492")';
+    const maskUrl = 'url("bg/pattern-ai.svg?v=1493")';
     const cacheKey = cur + '|' + t + '|bg11';
     /* Единая отрисовка: маску ставим ВСЕГДА. После перерисовки разметки
        (#bg-doodles пересоздаётся при навигации) слой терял маску и узор «отваливался». */
