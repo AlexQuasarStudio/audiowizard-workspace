@@ -109,12 +109,21 @@
       await waitFrame();
       const src = await grabFrame();
       privacyOff();
-      const guides = [...document.querySelectorAll('.card,.btn,.chat-list,.msg__bubble,.side,.head,.panel')].map(el=>{const r=el.getBoundingClientRect();return {x:r.left, y:r.top, w:r.width, h:r.height};});
-      openEditor(src, onAttach, guides);
+      const k = src.width / Math.max(1, innerWidth);
+      const xs = new Set(), ys = new Set();
+      [...document.querySelectorAll('body *')].forEach(el=>{
+        if (el.closest('.cap-editor,.cap-tools,.cap-rec-live,.cap-rec-bar,.cap-picker')) return;
+        const r=el.getBoundingClientRect(), cs=getComputedStyle(el);
+        if (r.width<6 || r.height<6 || r.bottom<0 || r.right<0 || r.top>innerHeight || r.left>innerWidth) return;
+        if (cs.visibility==='hidden' || cs.display==='none' || +cs.opacity===0) return;
+        [r.left,r.right,r.left+r.width/2].forEach(v=>xs.add(Math.round(v*k)));
+        [r.top,r.bottom,r.top+r.height/2].forEach(v=>ys.add(Math.round(v*k)));
+      });
+      openEditor(src, onAttach, {xs:[...xs], ys:[...ys], scale:k});
     } catch (e) { captureError(e); }
   }
 
-  function openEditor(base, onAttach, guides=[]) {
+  function openEditor(base, onAttach, guides={xs:[],ys:[],scale:1}) {
     if (shot) shot.root.remove();
     const root = el('div', 'cap-editor');
     root.innerHTML = `<div class="cap-editor__bar"><b>Снимок экрана</b><span class="cap-editor__hint">Рисуйте поверх снимка</span><span class="spacer"></span><button class="btn btn--ghost btn--sm" data-cap-crop>Кроп</button><button class="btn btn--primary btn--sm" data-cap-save>Скачать</button>${onAttach ? '<button class="btn btn--soft btn--sm" data-cap-attach>Вложить</button>' : ''}<button class="iconbtn" data-cap-x title="Закрыть">×</button></div><div class="cap-editor__stage"><canvas></canvas></div><div class="cap-tools"><button data-tool="hand" class="on" title="Рука">✋</button><button data-tool="select" title="Выделить">⬚</button><button data-tool="rect" title="Прямоугольник">▭</button><button data-tool="ellipse" title="Эллипс">◯</button><button data-tool="arrow" title="Стрелка">↗</button><button data-tool="pen" title="Маркер">✎</button><button data-tool="text" title="Текст">T</button><button data-tool="cursor" title="Курсор — взаимодействие с приложением">↖</button><span class="spacer"></span><button data-color="#ff5c5c" class="on" style="color:#ff5c5c">●</button><button data-color="#ffd166" style="color:#ffd166">●</button><button data-color="#4cc9f0" style="color:#4cc9f0">●</button><button data-color="#ffffff" style="color:#fff">●</button><button data-cap-undo title="Отменить">↶</button><button data-cap-redo title="Повторить">↷</button></div>`;
@@ -154,10 +163,11 @@
         ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.setLineDash([7,4]); ctx.strokeRect(c.x,c.y,c.w,c.h); ctx.restore();
       }
       shot.shapes.forEach(sh=>drawShape(ctx,sh));
+      if (shot.snapLines){ ctx.save(); ctx.strokeStyle='#ff4fa3'; ctx.lineWidth=1.5; ctx.setLineDash([6,4]); shot.snapLines.forEach(l=>{ctx.beginPath(); if(l.axis==='x'){ctx.moveTo(l.v,0);ctx.lineTo(l.v,canvas.height);} else {ctx.moveTo(0,l.v);ctx.lineTo(canvas.width,l.v);} ctx.stroke();}); ctx.restore(); }
       if (shot.sel){ const bb=bbox(shot.sel); ctx.save(); ctx.strokeStyle='#4cc9f0'; ctx.lineWidth=2; ctx.setLineDash([5,4]); ctx.strokeRect(bb.x,bb.y,bb.w,bb.h); ctx.setLineDash([]); [[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x,bb.y+bb.h],[bb.x+bb.w,bb.y+bb.h]].forEach(p=>{ctx.fillStyle='#fff';ctx.fillRect(p[0]-4,p[1]-4,8,8);ctx.strokeRect(p[0]-4,p[1]-4,8,8);}); const rx=bb.x+bb.w/2, ry=bb.y-22; ctx.beginPath(); ctx.arc(rx,ry,5,0,Math.PI*2); ctx.fillStyle='#4cc9f0'; ctx.fill(); ctx.restore(); }
     };
     let drag = null;
-    const snap = p => { let bestX=null,bestY=null,dx=10,dy=10; for(const r of shot.guides){ [r.x,r.x+r.w,r.x+r.w/2].forEach(v=>{if(Math.abs(p.x-v)<dx){dx=Math.abs(p.x-v);bestX=v;}}); [r.y,r.y+r.h,r.y+r.h/2].forEach(v=>{if(Math.abs(p.y-v)<dy){dy=Math.abs(p.y-v);bestY=v;}}); } return {x:bestX??p.x,y:bestY??p.y}; };
+    const snap = p => { const th=9*shot.guides.scale; let bestX=null,bestY=null,dx=th,dy=th; (shot.guides.xs||[]).forEach(v=>{if(Math.abs(p.x-v)<dx){dx=Math.abs(p.x-v);bestX=v;}}); (shot.guides.ys||[]).forEach(v=>{if(Math.abs(p.y-v)<dy){dy=Math.abs(p.y-v);bestY=v;}}); shot.snapLines=[]; if(bestX!=null)shot.snapLines.push({axis:'x',v:bestX}); if(bestY!=null)shot.snapLines.push({axis:'y',v:bestY}); return {x:bestX??p.x,y:bestY??p.y}; };
     const pt = e => { const r = canvas.getBoundingClientRect(); return { x:(e.clientX-r.left)*canvas.width/r.width, y:(e.clientY-r.top)*canvas.height/r.height }; };
     const startShape = p => ({ tool:shot.tool, x:p.x, y:p.y, w:0, h:0, color:shot.color, width:shot.line, points:[p] });
     let mode=null, last=null;
@@ -181,7 +191,7 @@
       else { sh.w=p.x-drag.x; sh.h=p.y-drag.y; }
       draw();
     });
-    const end = () => { drag = null; mode=null; last=null; };
+    const end = () => { drag = null; mode=null; last=null; shot.snapLines=null; draw(); };
     canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end);
     root.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{ shot.tool=b.dataset.tool; root.querySelectorAll('[data-tool]').forEach(x=>x.classList.toggle('on',x===b)); root.classList.toggle('is-cursor', shot.tool==='cursor'); canvas.style.cursor=shot.tool==='hand'?'grab':'crosshair'; });
     root.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{ shot.color=b.dataset.color; root.querySelectorAll('[data-color]').forEach(x=>x.classList.toggle('on',x===b)); });
@@ -189,7 +199,7 @@
     $('[data-cap-redo]',root).onclick=()=>{ if(shot.redo.length){ shot.shapes.push(shot.redo.pop()); draw(); } };
     const keys=e=>{ if(!e.ctrlKey&&!e.metaKey)return; if(e.key==='z'||e.key==='Z'){e.preventDefault();e.stopPropagation(); if(e.shiftKey)$('[data-cap-redo]',root).click(); else $('[data-cap-undo]',root).click();} else if(e.key==='y'||e.key==='Y'){e.preventDefault();e.stopPropagation();$('[data-cap-redo]',root).click();} };
     document.addEventListener('keydown',keys,true);
-    const inlineText = p => { const inp=document.createElement('input'); inp.className='cap-text-input'; inp.placeholder='Текст'; Object.assign(inp.style,{position:'fixed',left:p.x+'px',top:p.y+'px',zIndex:9000,background:'var(--panel)',color:shot.color,border:'1px solid var(--accent)',borderRadius:'6px',padding:'3px 6px',font:'700 14px system-ui'}); document.body.appendChild(inp); const done=()=>{const t=inp.value.trim();if(t){shot.shapes.push({tool:'text',x:p.x,y:p.y,text:t,color:shot.color,width:shot.line});}inp.remove();draw();}; inp.onblur=done; inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();done();}if(e.key==='Escape'){inp.value='';done();}}; setTimeout(()=>inp.focus(),0); };
+    const inlineText = p => { const inp=document.createElement('input'); inp.className='cap-text-input'; inp.placeholder='Текст'; const cr=canvas.getBoundingClientRect(); const sx=cr.left+p.x/canvas.width*cr.width, sy=cr.top+p.y/canvas.height*cr.height; Object.assign(inp.style,{position:'fixed',left:sx+'px',top:sy+'px',zIndex:9000,background:'var(--panel)',color:shot.color,border:'1px solid var(--accent)',borderRadius:'6px',padding:'3px 6px',font:'700 14px system-ui'}); document.body.appendChild(inp); const done=()=>{const t=inp.value.trim();if(t){shot.shapes.push({tool:'text',x:p.x,y:p.y,text:t,color:shot.color,width:shot.line});}inp.remove();draw();}; inp.onblur=done; inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();done();}if(e.key==='Escape'){inp.value='';done();}}; setTimeout(()=>inp.focus(),0); };
     $('[data-cap-x]',root).onclick = close;
     $('[data-cap-save]',root).onclick = ()=>{ download(compose(), 'audiowizard-shot-'+Date.now()+'.jpg'); close(); };
     const attach = $('[data-cap-attach]',root); if (attach) attach.onclick = ()=>{ onAttach(dataUrlToFile(compose(), 'screenshot.jpg')); close(); };
@@ -273,14 +283,14 @@
       const canvas=document.createElement('canvas'); canvas.width=Math.round(innerWidth*devicePixelRatio); canvas.height=Math.round(innerHeight*devicePixelRatio); const ctx=canvas.getContext('2d');
       const out=canvas.captureStream(24); let micStream=null;
       if (mic){ try { micStream=await navigator.mediaDevices.getUserMedia({audio:true}); micStream.getAudioTracks().forEach(t=>out.addTrack(t)); } catch(e){ notice('Микрофон недоступен — запись без звука','warn'); } }
-      const chunks=[]; const mr=new MediaRecorder(out,{mimeType:MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm',videoBitsPerSecond:1800000,audioBitsPerSecond:96000});
+      const mp4='video/mp4;codecs=avc1.42E01E'; const webm=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm'; const mime=MediaRecorder.isTypeSupported(mp4)?mp4:webm; const ext=mime.includes('mp4')?'mp4':'webm'; const chunks=[]; const mr=new MediaRecorder(out,{mimeType:mime,videoBitsPerSecond:3500000,audioBitsPerSecond:128000});
       mr.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
       const bar=el('div','cap-rec-bar','<b>● Запись</b><span class="cap-rec-time">00:00</span><button class="btn btn--danger btn--sm" data-stop>Остановить</button>'); document.body.appendChild(bar);
       const drawShapes=(c,scale=1)=>{ shapes.forEach(sh=>{ c.save(); c.strokeStyle=sh.color;c.fillStyle=sh.color;c.lineWidth=4*scale;c.lineCap='round';c.lineJoin='round'; if(sh.tool==='rect'){c.strokeRect(sh.x*scale,sh.y*scale,sh.w*scale,sh.h*scale);} else if(sh.tool==='arrow'){const ex=(sh.x+sh.w)*scale,ey=(sh.y+sh.h)*scale;c.beginPath();c.moveTo(sh.x*scale,sh.y*scale);c.lineTo(ex,ey);c.stroke();const a=Math.atan2(sh.h,sh.w),l=16*scale;c.beginPath();c.moveTo(ex,ey);c.lineTo(ex-l*Math.cos(a-.5),ey-l*Math.sin(a-.5));c.moveTo(ex,ey);c.lineTo(ex-l*Math.cos(a+.5),ey-l*Math.sin(a+.5));c.stroke();} else if(sh.tool==='pen'){c.beginPath();sh.points.forEach((p,i)=>i?c.lineTo(p.x*scale,p.y*scale):c.moveTo(p.x*scale,p.y*scale));c.stroke();} else if(sh.tool==='text'){c.font=`700 ${22*scale}px system-ui`;c.fillText(sh.text,sh.x*scale,sh.y*scale);} c.restore(); }); };
       const redraw=()=>{ actx.clearRect(0,0,anno.width,anno.height); actx.save(); actx.scale(devicePixelRatio,devicePixelRatio); drawShapes(actx,1); actx.restore(); };
       let busy=false;
       const pump=async()=>{ if(busy||!mr||mr.state==='inactive')return; busy=true; try{ const shot=await selfCanvas(); if(shot){ ctx.drawImage(shot,0,0,canvas.width,canvas.height); drawShapes(ctx,canvas.width/innerWidth); } }finally{busy=false;} };
-      mr.start(500); const tick=setInterval(pump,280); pump();
+      mr.start(500); const tick=setInterval(pump,140); pump();
       const t0=Date.now(); const timer=setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000); const tm=$('.cap-rec-time',bar); if(tm)tm.textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');},500);
       const stop=()=>{ if(!rec) return; clearInterval(tick); clearInterval(timer); mr.stop(); };
       $('[data-stop]',bar).onclick=stop;
@@ -291,7 +301,7 @@
       anno.addEventListener('pointermove',e=>{if(!drawing)return;const p=pt(e);drawing.w=p.x-drawing.x;drawing.h=p.y-drawing.y;drawing.points.push(p);redraw();});
       anno.addEventListener('pointerup',()=>{drawing=null;});
       const finalStop=()=>{ clearInterval(tick); clearInterval(timer); if(mr.state!=='inactive') mr.stop(); };
-      mr.onstop=()=>{ const blob=new Blob(chunks,{type:'video/webm'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='audiowizard-recording-'+Date.now()+'.webm'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); if(micStream)micStream.getTracks().forEach(t=>t.stop()); if(!mr){} privacyOff(); document.body.classList.remove('is-recording'); bar.remove(); root.remove(); rec=null; notice('Запись сохранена','ok'); };
+      mr.onstop=()=>{ const blob=new Blob(chunks,{type:'video/webm'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='audiowizard-recording-'+Date.now()+'.'+ext; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); if(micStream)micStream.getTracks().forEach(t=>t.stop()); if(!mr){} privacyOff(); document.body.classList.remove('is-recording'); bar.remove(); root.remove(); rec=null; notice('Запись сохранена','ok'); };
       rec={mr};
       // Keep a reliable stop that doesn't depend on the closure's rec check.
       $('[data-stop]',bar).onclick=finalStop;
