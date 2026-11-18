@@ -1388,11 +1388,19 @@ body.menu-dragging .main .theme-card:hover{box-shadow:none!important;transform:n
    «окно подплывает к центру». Геометрия и центр — сразу конечные. */
 @keyframes winIn{from{opacity:0;transform:scale(.975)}to{opacity:1;transform:none}}
 @keyframes winFade{from{opacity:0}to{opacity:1}}
-.aw-win.aw-win--calc{animation:winFade .16s var(--ease)}
+.aw-win.aw-win--calc{animation:calcIn .28s cubic-bezier(.2,.8,.2,1)}
+@keyframes calcIn{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
+.aw-win.aw-win--calc.aw-win--closing{animation:calcOut .22s var(--ease) forwards}
+@keyframes calcOut{to{opacity:0;transform:translateY(6px) scale(.988)}}
 .aw-win{position:fixed;min-width:320px;min-height:220px;background:var(--panel);border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--sh-2);display:flex;flex-direction:column;pointer-events:auto;animation:winIn .22s var(--ease);overflow:hidden;transition:box-shadow .2s var(--ease);touch-action:manipulation}
 .aw-win--welcome{overflow:visible}
-.aw-win--welcome .aw-win__body{overflow:visible}
+.aw-win--welcome .aw-win__body{overflow-y:auto;overflow-x:hidden;padding-top:116px}
 .aw-win--locked .aw-win__head{cursor:default}
+.aw-win--welcome .welcome-mascots--float{position:absolute;left:-52px;right:-52px;top:-48px;width:auto;height:190px;margin:0;z-index:2;pointer-events:none}
+.aw-win--welcome .welcome-hero{padding-top:28px}
+.aw-win--install .aw-win__body{overflow-y:auto}
+.install-row{display:flex;gap:10px;align-items:flex-start}.install-row .sys-ico{flex:none;width:34px;height:34px;border-radius:10px;background:var(--bg-2);display:flex;align-items:center;justify-content:center;color:var(--accent)}
+.sys-ico svg{width:20px;height:20px}
 .aw-win--locked .aw-win__corner,.aw-win--locked .aw-win__max,.aw-win--locked .aw-win__min{display:none!important}
 .aw-win-scrim{position:fixed;inset:0;z-index:1;background:rgba(16,14,26,.48);-webkit-backdrop-filter:blur(14px) saturate(.92);backdrop-filter:blur(14px) saturate(.92);animation:scrimIn .24s var(--ease)}
 .aw-win--locked{z-index:2}
@@ -1774,8 +1782,9 @@ body.win-dragging *{user-select:none!important}
 /* Вторичные подписи внутри своего пузыря — не теряются на плотной подложке */
 .msg--own .msg__bubble .msg__edited{color:var(--muted)}
 .msg__bubble .txt:after{content:"";display:block;clear:both}
-.msg__bubble .txt--time-inline{padding-right:58px}
-.msg__bubble .txt .time{position:absolute;right:14px;bottom:6px;margin:0;float:none}
+.msg__bubble .txt--time-inline{padding-right:0}
+.msg__bubble .txt .time{position:absolute;right:14px;bottom:6px;margin:0;float:none;background:var(--panel);box-shadow:0 0 0 4px var(--panel);border-radius:4px}
+.msg--own .msg__bubble .txt .time{background:var(--own-bubble,var(--panel));box-shadow:0 0 0 4px var(--own-bubble,var(--panel))}
 /* Текст сообщения — отдельный блочный слой под ником, переносы сохранены */
 .msg__bubble .txt{display:block;white-space:pre-wrap;word-wrap:break-word;line-height:1.45;font-size:13.5px}
 .ticks{display:inline-flex;gap:0;align-items:center;vertical-align:middle;color:rgba(255,255,255,.65)}
@@ -2115,7 +2124,7 @@ html.splash-hold #splash{visibility:hidden}
    галочками и счётчиком ответов — справа. Строка не переносится
    (nowrap), пилюли переносятся только внутри своей левой зоны; при
    нехватке ширины время остаётся справа, прокрутки нет. */
-.msg__reactions{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:4px;min-width:0;max-width:100%;margin-right:auto;overflow:visible}
+.msg__reactions{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:4px;width:0;min-width:100%;max-width:100%;margin-right:auto;overflow:visible}
 .msg__reactions .react-pill{flex:none}
 
 /* --- Кнопка быстрой реакции 👍 --- */
@@ -2712,7 +2721,12 @@ svg.ico.wip-ico{width:38px;height:38px}
 /* Снимки и запись экрана */
 body.capture-privacy .head__pill--balance,
 body.capture-privacy #side-balance,
+body.capture-privacy .msg,
 body.capture-privacy .msg__bubble,
+body.capture-privacy .chat-list,
+body.capture-privacy .chat-list__row,
+body.capture-privacy .order-card,
+body.capture-privacy .profile-card,
 body.capture-privacy .order-row,
 body.capture-privacy .person-row,
 body.capture-privacy .person-card,
@@ -2734,3 +2748,8 @@ body.capture-privacy::after{content:'Конфиденциальные данны
 .cap-rec-bar{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:9000;display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:14px;background:rgba(18,14,26,.94);color:#fff;box-shadow:0 12px 40px rgba(0,0,0,.4);font-size:12px}
 .cap-rec-bar b{color:#ff8b8b}.cap-rec-time{font-variant-numeric:tabular-nums;min-width:38px}
 .cap-rec-bar .btn--danger{background:#d9534f;border-color:#d9534f;color:#fff}
+
+.cap-tools{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:8100;display:flex;align-items:center;gap:2px;padding:6px 8px;border-radius:16px;background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--border-2);box-shadow:0 12px 40px rgba(0,0,0,.32);backdrop-filter:blur(18px)}
+.cap-tools button{width:34px;height:34px;border:0;border-radius:9px;background:none;color:var(--text);font-size:17px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.cap-tools button:hover,.cap-tools button.on{background:var(--accent-soft);color:var(--accent)}
+.cap-tools .spacer{width:8px}

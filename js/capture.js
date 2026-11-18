@@ -112,51 +112,87 @@
   function openEditor(base, onAttach) {
     if (shot) shot.root.remove();
     const root = el('div', 'cap-editor');
-    root.innerHTML = `<div class="cap-editor__bar"><b>Снимок экрана</b><span class="cap-editor__hint">Выделите область или поставьте метку</span><span class="spacer"></span><button class="btn btn--ghost btn--sm" data-cap-crop>Кроп</button><button class="btn btn--ghost btn--sm" data-cap-cursor>Курсор</button><button class="btn btn--primary btn--sm" data-cap-save>Скачать</button>${onAttach ? '<button class="btn btn--soft btn--sm" data-cap-attach>Вложить</button>' : ''}<button class="iconbtn" data-cap-x title="Закрыть">×</button></div><div class="cap-editor__stage"><canvas></canvas></div>`;
+    root.innerHTML = `<div class="cap-editor__bar"><b>Снимок экрана</b><span class="cap-editor__hint">Рисуйте поверх снимка</span><span class="spacer"></span><button class="btn btn--ghost btn--sm" data-cap-crop>Кроп</button><button class="btn btn--primary btn--sm" data-cap-save>Скачать</button>${onAttach ? '<button class="btn btn--soft btn--sm" data-cap-attach>Вложить</button>' : ''}<button class="iconbtn" data-cap-x title="Закрыть">×</button></div><div class="cap-editor__stage"><canvas></canvas></div><div class="cap-tools"><button data-tool="hand" class="on" title="Рука">✋</button><button data-tool="select" title="Выделить">⬚</button><button data-tool="rect" title="Прямоугольник">▭</button><button data-tool="ellipse" title="Эллипс">◯</button><button data-tool="arrow" title="Стрелка">↗</button><button data-tool="pen" title="Маркер">✎</button><button data-tool="text" title="Текст">T</button><span class="spacer"></span><button data-color="#ff5c5c" class="on" style="color:#ff5c5c">●</button><button data-color="#ffd166" style="color:#ffd166">●</button><button data-color="#4cc9f0" style="color:#4cc9f0">●</button><button data-color="#ffffff" style="color:#fff">●</button><button data-cap-undo title="Отменить">↶</button></div>`;
     document.body.appendChild(root);
     const canvas = $('canvas', root), ctx = canvas.getContext('2d');
-    shot = { root, base, mode: 'crop', crop: null, marks: [], onAttach, canvas };
-    const fit = () => { canvas.width = base.width; canvas.height = base.height; draw(); };
+    shot = { root, base, tool:'hand', crop: null, shapes: [], color:'#ff5c5c', line: 4, onAttach, canvas };
+    const drawShape = (x, sh) => {
+      if (!sh) return;
+      x.save(); x.strokeStyle = sh.color || '#ff5c5c'; x.fillStyle = x.strokeStyle; x.lineWidth = sh.width || 4; x.lineCap='round'; x.lineJoin='round';
+      if (sh.tool === 'rect' || sh.tool === 'select'){
+        if (sh.tool === 'select') x.setLineDash([7,4]);
+        x.strokeRect(sh.x, sh.y, sh.w, sh.h);
+      } else if (sh.tool === 'ellipse'){
+        x.beginPath(); x.ellipse(sh.x+sh.w/2, sh.y+sh.h/2, Math.abs(sh.w)/2, Math.abs(sh.h)/2, 0, 0, Math.PI*2); x.stroke();
+      } else if (sh.tool === 'arrow'){
+        const ex=sh.x+sh.w, ey=sh.y+sh.h; x.beginPath(); x.moveTo(sh.x,sh.y); x.lineTo(ex,ey); x.stroke();
+        const a=Math.atan2(ey-sh.y,ex-sh.x), l=14+sh.width*3;
+        x.beginPath(); x.moveTo(ex,ey); x.lineTo(ex-l*Math.cos(a-.5),ey-l*Math.sin(a-.5)); x.moveTo(ex,ey); x.lineTo(ex-l*Math.cos(a+.5),ey-l*Math.sin(a+.5)); x.stroke();
+      } else if (sh.tool === 'pen'){
+        if (!sh.points.length) return; x.beginPath(); x.moveTo(sh.points[0].x, sh.points[0].y);
+        sh.points.slice(1).forEach(p=>x.lineTo(p.x,p.y)); x.stroke();
+      } else if (sh.tool === 'text'){
+        x.font = `700 ${Math.max(16, sh.width*4)}px system-ui, sans-serif`; x.fillText(sh.text || '', sh.x, sh.y);
+      }
+      x.restore();
+    };
     const draw = () => {
       ctx.drawImage(shot.base, 0, 0);
       if (shot.crop) {
         const c = shot.crop; ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.42)'; ctx.fillRect(0,0,canvas.width,canvas.height);
         ctx.clearRect(c.x,c.y,c.w,c.h); ctx.drawImage(shot.base,c.x,c.y,c.w,c.h,c.x,c.y,c.w,c.h);
-        ctx.strokeStyle = 'var(--accent)'; ctx.lineWidth = Math.max(2, canvas.width/800); ctx.strokeRect(c.x,c.y,c.w,c.h); ctx.restore();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.setLineDash([7,4]); ctx.strokeRect(c.x,c.y,c.w,c.h); ctx.restore();
       }
-      shot.marks.forEach(m => { ctx.fillStyle = '#ff6b6b'; ctx.beginPath(); ctx.arc(m.x,m.y,Math.max(5,canvas.width/150),0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke(); });
+      shot.shapes.forEach(sh=>drawShape(ctx,sh));
     };
     let drag = null;
     const pt = e => { const r = canvas.getBoundingClientRect(); return { x:(e.clientX-r.left)*canvas.width/r.width, y:(e.clientY-r.top)*canvas.height/r.height }; };
+    const startShape = p => ({ tool:shot.tool, x:p.x, y:p.y, w:0, h:0, color:shot.color, width:shot.line, points:[p] });
     canvas.addEventListener('pointerdown', e => {
       const p = pt(e);
-      if (shot.mode === 'cursor') { shot.marks.push(p); draw(); return; }
-      drag = p; shot.crop = { x:p.x, y:p.y, w:0, h:0 }; canvas.setPointerCapture(e.pointerId);
+      if (shot.tool === 'text'){ const text=prompt('Текст на снимке'); if(text){ shot.shapes.push({tool:'text',x:p.x,y:p.y,text,color:shot.color,width:shot.line}); draw(); } return; }
+      if (shot.tool === 'hand') return;
+      drag = p; const sh = startShape(p); shot.shapes.push(sh); canvas.setPointerCapture(e.pointerId); draw();
     });
-    canvas.addEventListener('pointermove', e => { if (!drag) return; const p=pt(e); shot.crop={x:Math.min(drag.x,p.x),y:Math.min(drag.y,p.y),w:Math.abs(p.x-drag.x),h:Math.abs(p.y-drag.y)}; draw(); });
+    canvas.addEventListener('pointermove', e => {
+      if (!drag) return; const p=pt(e); const sh=shot.shapes[shot.shapes.length-1]; if(!sh)return;
+      if (sh.tool==='pen'){ sh.points.push(p); }
+      else { sh.w=p.x-drag.x; sh.h=p.y-drag.y; if(sh.tool==='text'||sh.tool==='arrow'||sh.tool==='rect'||sh.tool==='ellipse'||sh.tool==='select'){ sh.w=p.x-drag.x; sh.h=p.y-drag.y; } }
+      draw();
+    });
     const end = () => { drag = null; };
     canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end);
-    $('[data-cap-crop]',root).onclick = ()=>{ shot.mode='crop'; };
-    $('[data-cap-cursor]',root).onclick = ()=>{ shot.mode='cursor'; };
+    root.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{ shot.tool=b.dataset.tool; root.querySelectorAll('[data-tool]').forEach(x=>x.classList.toggle('on',x===b)); canvas.style.cursor=b.dataset.tool==='hand'?'grab':'crosshair'; });
+    root.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{ shot.color=b.dataset.color; root.querySelectorAll('[data-color]').forEach(x=>x.classList.toggle('on',x===b)); });
+    $('[data-cap-undo]',root).onclick=()=>{ shot.shapes.pop(); draw(); };
     $('[data-cap-x]',root).onclick = close;
-    $('[data-cap-save]',root).onclick = ()=>{ download(compose(), 'audiowizard-shot-'+Date.now()+'.png'); close(); };
-    const attach = $('[data-cap-attach]',root); if (attach) attach.onclick = ()=>{ onAttach(dataUrlToFile(compose())); close(); };
-    $('[data-cap-crop-apply]',root);
-    root.addEventListener('click', e => { if (e.target.closest('[data-cap-apply]')) applyCrop(); });
-    // Кроп применяем по кнопке в тулбаре: добавляем её отдельно, чтобы не усложнять разметку.
+    $('[data-cap-save]',root).onclick = ()=>{ download(compose(), 'audiowizard-shot-'+Date.now()+'.jpg'); close(); };
+    const attach = $('[data-cap-attach]',root); if (attach) attach.onclick = ()=>{ onAttach(dataUrlToFile(compose(), 'screenshot.jpg')); close(); };
     const cropBtn = $('[data-cap-crop]',root);
-    cropBtn.textContent = 'Применить кроп';
     cropBtn.onclick = () => {
-      if (!shot.crop || shot.crop.w < 4 || shot.crop.h < 4) { shot.mode='crop'; notice('Выделите область на снимке','info'); return; }
-      applyCrop();
+      if (shot.tool === 'crop' && shot.crop){ applyCrop(); return; }
+      shot.tool='crop'; shot.crop=null; canvas.style.cursor='crosshair';
+      toast('Выделите область для кропа и нажмите «Кроп» ещё раз','info');
     };
+    canvas.addEventListener('pointerdown', e => {
+      if (shot.tool !== 'crop') return;
+      const p=pt(e); drag=p; shot.crop={x:p.x,y:p.y,w:0,h:0}; canvas.setPointerCapture(e.pointerId);
+    }, true);
+    canvas.addEventListener('pointermove', e => {
+      if (shot.tool !== 'crop' || !drag) return; const p=pt(e); shot.crop={x:Math.min(drag.x,p.x),y:Math.min(drag.y,p.y),w:Math.abs(p.x-drag.x),h:Math.abs(p.y-drag.y)}; draw();
+    }, true);
+    canvas.addEventListener('pointerup', ()=>{ if(shot.tool==='crop') drag=null; }, true);
     function applyCrop(){
-      const c=shot.crop; const out=document.createElement('canvas'); out.width=Math.max(1,Math.round(c.w)); out.height=Math.max(1,Math.round(c.h)); out.getContext('2d').drawImage(shot.base,c.x,c.y,c.w,c.h,0,0,out.width,out.height);
-      shot.base=out; shot.crop=null; canvas.width=out.width; canvas.height=out.height; draw(); toast('Кроп применён','ok');
+      const c=shot.crop; if(!c||c.w<4||c.h<4){toast('Сначала выделите область','warn');return;}
+      const out=document.createElement('canvas'); out.width=Math.max(1,Math.round(c.w)); out.height=Math.max(1,Math.round(c.h)); out.getContext('2d').drawImage(shot.base,c.x,c.y,c.w,c.h,0,0,out.width,out.height);
+      shot.base=out; shot.crop=null; shot.shapes=[]; canvas.width=out.width; canvas.height=out.height; draw(); toast('Кроп применён','ok'); shot.tool='hand';
     }
-    function compose(){ const out=document.createElement('canvas'); out.width=shot.base.width; out.height=shot.base.height; const x=out.getContext('2d'); x.drawImage(shot.base,0,0); shot.marks.forEach(m=>{x.fillStyle='#ff6b6b';x.beginPath();x.arc(m.x,m.y,Math.max(6,out.width/150),0,Math.PI*2);x.fill();x.strokeStyle='#fff';x.lineWidth=3;x.stroke();}); return out.toDataURL('image/png'); }
+    function compose(){
+      const out=document.createElement('canvas'); out.width=shot.base.width; out.height=shot.base.height; const x=out.getContext('2d'); x.drawImage(shot.base,0,0); shot.shapes.forEach(sh=>drawShape(x,sh));
+      return out.toDataURL('image/jpeg', .86);
+    }
     function close(){ root.remove(); shot=null; }
-    fit();
+    canvas.width=base.width; canvas.height=base.height; draw();
   }
 
   function openMenu() {
@@ -209,6 +245,7 @@
       const vw=video.videoWidth||innerWidth, vh=video.videoHeight||innerHeight;
       const rw=crop.w>4?crop.w:vw, rh=crop.h>4?crop.h:vh;
       const sx=crop.w>4?crop.x:0, sy=crop.h>4?crop.y:0;
+      if (!video.isConnected){ video.style.cssText='position:fixed;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none'; document.body.appendChild(video); }
       const canvas=document.createElement('canvas'); canvas.width=Math.max(2,Math.round(rw)); canvas.height=Math.max(2,Math.round(rh));
       const ctx=canvas.getContext('2d');
       const draw=()=>{ ctx.drawImage(video,sx,sy,rw,rh,0,0,canvas.width,canvas.height); if(rec) rec.raf=requestAnimationFrame(draw); };
@@ -216,9 +253,9 @@
       if (mic){
         try { const ms=await navigator.mediaDevices.getUserMedia({audio:true}); ms.getAudioTracks().forEach(t=>out.addTrack(t)); } catch(e){ notice('Микрофон недоступен — запись без звука','warn'); }
       }
-      const chunks=[]; const mr=new MediaRecorder(out,{mimeType:MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm'});
+      const chunks=[]; const mr=new MediaRecorder(out,{mimeType:MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm', videoBitsPerSecond: 2200000, audioBitsPerSecond: 128000});
       mr.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
-      mr.onstop=()=>{ const blob=new Blob(chunks,{type:'video/webm'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='audiowizard-recording-'+Date.now()+'.webm'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); privacyOff(); stream.getTracks().forEach(t=>t.stop()); slot.remove(); rec=null; notice('Запись сохранена','ok'); };
+      mr.onstop=()=>{ const blob=new Blob(chunks,{type:'video/webm'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='audiowizard-recording-'+Date.now()+'.webm'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); privacyOff(); stream.getTracks().forEach(t=>t.stop()); video.remove(); slot.remove(); rec=null; notice('Запись сохранена','ok'); };
       rec={stream,mr,raf:0};
       const bar=el('div','cap-rec-bar','<b>● Запись</b><span class="cap-rec-time">00:00</span><button class="btn btn--danger btn--sm" data-stop>Остановить</button>');
       document.body.appendChild(bar); const slot=bar;

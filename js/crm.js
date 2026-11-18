@@ -6036,8 +6036,25 @@ const wrap = root.querySelector('.pl-wrap');
         const svcOnlySum = () => picked().filter(x => x.kind === 'sv').reduce((s,x)=>s+x.price, 0);
         const fixedExtraSum = () => picked().filter(x => x.kind === 'ex' && !x.pct).reduce((s,x)=>s+x.price, 0);
         const pctSum = () => picked().filter(x => x.kind === 'ex' && x.pct > 0).reduce((s,x)=>s+x.pct, 0);
+        const pctApplied = () => {
+          const inp = g2('#cx-in');
+          return !!(inp && inp.dataset.pctApplied && Number(inp.dataset.pctApplied) === pctSum());
+        };
+        const syncPctExpr = () => {
+          const inp = g2('#cx-in'); if (!inp) return;
+          const pct = pctSum();
+          if (!pct){
+            if (inp.dataset.pctBase != null) inp.value = inp.dataset.pctBase;
+            delete inp.dataset.pctBase; delete inp.dataset.pctApplied;
+            return;
+          }
+          if (inp.dataset.pctBase == null) inp.dataset.pctBase = inp.value;
+          const mult = 1 + pct / 100;
+          inp.value = `${inp.dataset.pctBase} × ${+mult.toFixed(3)}`;
+          inp.dataset.pctApplied = String(pct);
+        };
         const preExtra = () => (isNaN(val) ? 0 : val) + svcOnlySum();
-        const pctFee = () => Math.round(preExtra() * pctSum() / 100);
+        const pctFee = () => pctApplied() ? 0 : Math.round(preExtra() * pctSum() / 100);
         const svcSum = () => preExtra() + fixedExtraSum() + pctFee();
         /* Свой срок: если он короче обычного срока ниши, заказ считается
            срочным и к сумме применяется надбавка из настроек. */
@@ -6286,6 +6303,8 @@ const wrap = root.querySelector('.pl-wrap');
             const sel = g2('#cx-niche');
             if (sel && nid && sel.value !== nid){ sel.value = nid; paintRush(); }
           }
+          syncPctExpr();
+          val = compute(g2('#cx-in').value);
           upd(true);
           setTimeout(paintNormDeadline, 0);
         });

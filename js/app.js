@@ -2199,6 +2199,8 @@ ex.innerHTML = avatarHTML(user(), '');
       footer:`<button class="btn btn--ghost" data-skip>Пропустить</button><button class="btn btn--primary" data-go>Сохранить и начать тур</button>`,
       onMount:(m2,c2)=>{
         (m2.closest('.aw-win') || m2).classList.add('aw-win--welcome');
+        const mrow = m2.querySelector('.welcome-mascots--modal');
+        if (mrow){ mrow.classList.add('welcome-mascots--float'); m2.appendChild(mrow); }
         let avatarData = null;
         m2.querySelector('#ob-avatar').onclick = ()=>m2.querySelector('#ob-avatar-file').click();
         m2.querySelector('#ob-avatar-file').onchange = e=>{
@@ -2244,22 +2246,22 @@ ex.innerHTML = avatarHTML(user(), '');
     openWinModal({ narrow:true, title:'Приложение на главном экране', icon:'phone', route:'about', locked:true, backdrop:true,
       body:`<div class="welcome-hero" style="padding-bottom:4px"><span class="welcome-kicker">Быстрый доступ</span><h2>Всегда под рукой</h2><p>Добавьте Audiowizard на экран — приложение откроется без адресной строки и будет работать как обычное.</p></div>
       <div class="stack" style="gap:12px">
-        <div class="card card-pad" style="background:var(--bg-2)">
+        <div class="card card-pad install-row" style="background:var(--bg-2)"><span class="sys-ico">${icon('phone')}</span><div>
           <b class="small">iPhone / iPad — Safari</b>
           <p class="small" style="margin:6px 0 0">Нажмите кнопку <b>«Поделиться»</b> <span class="muted">(квадрат со стрелкой вверх)</span> → <b>«На экран „Домой“»</b> → «Добавить».</p>
-        </div>
-        <div class="card card-pad" style="background:var(--bg-2)">
+        </div></div>
+        <div class="card card-pad install-row" style="background:var(--bg-2)"><span class="sys-ico">${icon('app')}</span><div>
           <b class="small">Android — Chrome</b>
           <p class="small" style="margin:6px 0 0">Откройте меню <b>⋮</b> справа сверху → <b>«Добавить на главный экран»</b> или «Установить приложение» → подтвердите.</p>
-        </div>
-        <div class="card card-pad" style="background:var(--bg-2)">
+        </div></div>
+        <div class="card card-pad install-row" style="background:var(--bg-2)"><span class="sys-ico">${icon('device')}</span><div>
           <b class="small">Windows / macOS — Chrome, Edge, Safari</b>
           <p class="small" style="margin:6px 0 0">Нажмите <b>«Поделиться»</b> в браузере и выберите <b>«Установить приложение»</b> / «Добавить в Dock». В Chrome и Edge также можно нажать иконку установки в адресной строке.</p>
-        </div>
+        </div></div>
         <p class="tiny faint" style="margin:0">Если кнопки «Поделиться» нет — откройте меню браузера и найдите пункт «Установить приложение».</p>
       </div>`,
       footer:`<button class="btn btn--primary" data-x>Понятно</button>`,
-      onMount:(m2,c2)=>{ const b=m2.querySelector('[data-x]'); if (b) b.onclick=c2; }
+      onMount:(m2,c2)=>{ const b=m2.querySelector('[data-x]'); if (b) b.onclick=c2; const w=m2.closest('.aw-win'); if(w) w.classList.add('aw-win--install'); }
     });
   }
   function startTour(i){
