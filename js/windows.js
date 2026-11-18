@@ -677,6 +677,7 @@ const Windows = (() => {
       const dir = c.dataset.dir;
       c.addEventListener('mousemove', e => { e.stopPropagation(); win.style.cursor = CURSORS[dir]; win._resizeDir = dir; });
       c.addEventListener('mousedown', e => {
+        if (win._locked) return;
         if (active) return;
         e.preventDefault(); e.stopPropagation();
         const r = win.getBoundingClientRect();
@@ -688,6 +689,7 @@ const Windows = (() => {
     });
     win.addEventListener('mouseleave', () => { if (!win._resizing) { win.style.cursor = ''; win._resizeDir = null; } });
     win.addEventListener('mousedown', e => {
+      if (win._locked) return;
       if (active) return;
       /* Во время активного ресайза/драга — не начинать новый; чистый нейтральный
          клик по соседу не должен отменять уже идущий ресайз стыка */
@@ -906,6 +908,7 @@ const Windows = (() => {
 
     /* --- Drag за заголовок (общий слой) --- */
     head.addEventListener('mousedown', e => {
+      if (win._locked) return;
       if (e.button !== 0) return; /* ПКМ — только контекстное меню, не drag */
       if (e.target.closest('.aw-win__close') || e.target.closest('.aw-win__max')) return;
       if (e.target.closest('.aw-win__min')) return;
@@ -926,6 +929,7 @@ const Windows = (() => {
     /* Двойной клик по заголовку — разворот на весь экран / восстановление.
        Подавляем, если только что был именно драг (второй «клик» после дропа). */
     head.addEventListener('dblclick', e => {
+      if (win._locked) return;
       if (e.target.closest('.aw-win__close') || e.target.closest('.aw-win__max') || e.target.closest('.aw-win__min')) return;
       /* При активном зуме двойной тап не разворачивает окно: иначе геометрия
          окна и масштаб страницы конфликтуют и рендер дёргается. */

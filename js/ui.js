@@ -230,7 +230,7 @@ function openAvatarCropper(file, onDone){
 /* Окно в стиле окон меню (aw-win): перетаскивание, ресайз, кнопки окна.
    Используется для виджетов (заказ, калькулятор и т.п.), которым нужен
    такой же хром, как у окон элементов меню. */
-function openWinModal({ title='', icon='app', body='', footer='', wide=false, narrow=false, tall=false, route='', onMount=null, onClose=null, persistKey='', noFit=false }){
+function openWinModal({ title='', icon='app', body='', footer='', wide=false, narrow=false, tall=false, route='', onMount=null, onClose=null, persistKey='', noFit=false, locked=false, backdrop=false }){
   closeDropdown && closeDropdown();
   if (window.Windows && Windows.spawnCustom){
     /* Модалка должна принадлежать ТЕКУЩЕМУ разделу: без route окно
@@ -255,6 +255,17 @@ function openWinModal({ title='', icon='app', body='', footer='', wide=false, na
     /* Калькулятор открывается без масштабной анимации: его окно не должно
        «подпрыгивать» к центру на первом кадре. */
     if (noFit) win.classList.add('aw-win--calc');
+    if (locked) win.classList.add('aw-win--locked');
+    win._locked = !!locked;
+    if (backdrop && win.parentNode){
+      const scrim = document.createElement('div');
+      scrim.className = 'aw-win-scrim';
+      scrim.addEventListener('mousedown', e => { e.preventDefault(); });
+      win.parentNode.insertBefore(scrim, win);
+      win._scrim = scrim;
+      const obs = new MutationObserver(() => { if (!win.isConnected){ scrim.remove(); obs.disconnect(); } });
+      obs.observe(win.parentNode, { childList:true });
+    }
     /* Футер — ОТДЕЛЬНЫЙ элемент окна (ребёнок .aw-win после body), а не часть
        скроллируемого контента: кнопки не выезжают за пределы при малой высоте. */
     if (footer){

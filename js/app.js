@@ -287,6 +287,13 @@ const APP = (() => {
   function balanceVisible(){
     return !!user();
   }
+  function hideBalance(){
+    const u = user();
+    return !!(u && u.ext && u.ext.hideBalance);
+  }
+  function balanceText(){
+    return hideBalance() ? '••••' : fmtMoney(myBalance());
+  }
   /* У каждого профиля — только его личный баланс. Платформенный итог
      (сумма всех балансов) показываем отдельно в панели баланса, иначе
      в демо админ, топ-менеджер и менеджер видели одну и ту же цифру. */
@@ -301,7 +308,7 @@ const APP = (() => {
   /* Обновляем плашки без полного рендера оболочки: штраф или выплата
      должны менять цифру сразу. */
   function refreshSideBalance(){
-    const txt = fmtMoney(myBalance());
+    const txt = balanceText();
     document.querySelectorAll('#side-balance .side__balance-meta b, #net-pill b').forEach(b => { b.textContent = txt; });
     const cap = balanceCaption();
     const lbl = document.querySelector('#side-balance .side__balance-meta > span');
@@ -410,7 +417,7 @@ const APP = (() => {
           <div class="side__foot">
             ${balanceVisible()?`<button class="side__balance" id="side-balance" type="button" title="История баланса">
               <span class="side__balance-ico">${icon('card','ico-sm')}</span>
-              <span class="side__balance-meta"><span>${balanceCaption()}</span><b>${fmtMoney(myBalance())}</b></span>
+              <span class="side__balance-meta"><span>${balanceCaption()}</span><b>${balanceText()}</b></span>
               <span class="side__balance-chev">${icon('chev-r','ico-sm')}</span>
             </button>`:''}
             <div class="side__user" id="side-user" data-tour="user">
@@ -434,7 +441,7 @@ const APP = (() => {
               <button class="iconbtn head-actions__arrow" id="btn-actions-arrow" title="Выбрать действие" aria-label="Выбрать действие" aria-haspopup="true">${icon('chev-d','ico-sm')}</button>
             </div>
             <div class="head__pill head__pill--balance">
-              ${balanceVisible()?`<span class="head-balance" id="net-pill" title="${balanceCaption()}">${icon('card','ico-sm')}<b>${fmtMoney(myBalance())}</b></span>`:''}
+              ${balanceVisible()?`<span class="head-balance" id="net-pill" title="${balanceCaption()}">${icon('card','ico-sm')}<b>${balanceText()}</b></span>`:''}
 
               <span class="sep" aria-hidden="true"></span>
               <button class="iconbtn" id="btn-bell" data-tour="bell" aria-label="Уведомления"><span class="bell-ico">${icon('bell')}${unread?`<span class="bell-cnt">${unread>99?'99+':unread}</span>`:''}</span></button>
@@ -869,6 +876,7 @@ const QA = {
   translate:  { id:'translate',  label:'ИИ-переводы',           icon:'globe',     run:()=>go('ai-translate') },
   myorders:   { id:'myorders',   label:'Мои заказы',            icon:'orders',    run:()=>go('orders') },
   ticket:     { id:'ticket',     label:'Обращение в поддержку', icon:'tickets',   run:()=>CRM.openTicket() },
+  shot:       { id:'shot',       label:'Снимок экрана',          icon:'clip',      run:()=>window.CaptureStudio && CaptureStudio.open() },
   report:     { id:'report',     label:'Сообщить о проблеме',   icon:'alert',     run:()=>reportProblem() },
   invite:     { id:'invite',     label:'Пригласить в приложение', icon:'user-plus', run:()=>{ if (window.openInvites) window.openInvites(); else toast('Приглашения — в разделе «Люди»','info'); } },
   kanban:     { id:'kanban',     label:'Канбан задач',          icon:'kanban',    run:()=>go('kanban') },
@@ -876,11 +884,11 @@ const QA = {
   team:       { id:'team',       label:'Исполнители',           icon:'executor',  run:()=>go('executors') }
 };
 const QUICK_BY_ROLE = {
-  admin:       ['order','calc','client','executor','-','chats','transcribe','texts','translate','-','invite','planner'],
-  top_manager: ['order','calc','client','executor','-','chats','transcribe','texts','translate','-','invite','report'],
-  manager:     ['order','calc','client','-','chats','texts','kanban','-','invite','report'],
-  client:      ['order','-','chats','ticket','-','report'],
-  executor:    ['myorders','-','chats','transcribe','translate','-','report','invite']
+  admin:       ['order','calc','client','executor','-','chats','transcribe','texts','translate','-','invite','shot','planner'],
+  top_manager: ['order','calc','client','executor','-','chats','transcribe','texts','translate','-','invite','shot','report'],
+  manager:     ['order','calc','client','-','chats','texts','kanban','-','invite','shot','report'],
+  client:      ['order','-','chats','ticket','-','shot','report'],
+  executor:    ['myorders','-','chats','transcribe','translate','-','report','shot','invite']
 };
 
   function userMenu(anchor){
@@ -1731,6 +1739,7 @@ const QUICK_BY_ROLE = {
         <div class="field">
           <label>Скриншот или файл</label>
           <label class="file-btn" for="rp-file">${icon('clip')} <span>Выбрать файл</span></label>
+          <button type="button" class="btn btn--ghost btn--sm" id="rp-shot" style="margin-left:6px">${icon('clip')} Сделать снимок</button>
           <input class="input" type="file" id="rp-file" accept="image/*,.pdf,.zip,.doc,.docx,.xls,.xlsx,.txt" multiple hidden>
           <div id="rp-files" class="stack" style="gap:4px;margin-top:6px"></div>
           <p class="small faint">Файлы добавляются в тикет локально (до ~4 МБ каждый).</p>
@@ -1760,6 +1769,8 @@ const QUICK_BY_ROLE = {
           });
           fInp.value = '';
         });
+        const shotBtn = m2.querySelector('#rp-shot');
+        if (shotBtn) shotBtn.onclick = ()=>{ if (!window.CaptureStudio) return; CaptureStudio.shotToFile(file=>{ const dt=new DataTransfer(); dt.items.add(file); fInp.files=dt.files; fInp.dispatchEvent(new Event('change')); }); };
         m2.querySelector('[data-send]').onclick = ()=>{
           const sub = m2.querySelector('#rp-subject').value.trim();
           const msg = m2.querySelector('#rp-msg').value.trim();
@@ -2156,9 +2167,9 @@ ex.innerHTML = avatarHTML(user(), '');
   function offerOnboarding(){
     const u2 = user();
     openWinModal({
-      narrow:true, title:'Добро пожаловать!',
+      narrow:true, title:'Добро пожаловать!', locked:true, backdrop:true,
       body:`${mascotsHTML('welcome-mascots--modal')}
-        <p class="small muted" style="text-align:center">Настроим профиль за три шага: расскажите о себе, поставьте аватар и выберите оформление.</p>
+        <div class="welcome-hero"><span class="welcome-kicker">Audiowizard Workspace</span><h2>Добро пожаловать в свою мастерскую</h2><p>Настроим профиль за три шага: расскажите о себе, поставьте аватар и выберите оформление. Всё остальное уже готово к работе.</p></div>
         <div class="stack" style="gap:12px;margin-top:14px">
           <div class="field"><label>Как к вам обращаться</label><input class="input" id="ob-name" value="${esc(u2.full_name)}"></div>
           <div class="field"><label>О себе</label><textarea class="input" id="ob-about" placeholder="Пара слов для коллег" rows="2">${esc(u2.about||'')}</textarea></div>
@@ -2230,9 +2241,9 @@ ex.innerHTML = avatarHTML(user(), '');
   }
   function showInstallHint(){
     if (!S || !S.settings) return;
-    openWinModal({ narrow:true, title:'Приложение на главном экране', icon:'phone', route:'about',
-      body:`<div class="stack" style="gap:12px">
-        <p class="small muted" style="margin:0">Добавьте Audiowizard на экран — приложение откроется без адресной строки и будет работать как обычное.</p>
+    openWinModal({ narrow:true, title:'Приложение на главном экране', icon:'phone', route:'about', locked:true, backdrop:true,
+      body:`<div class="welcome-hero" style="padding-bottom:4px"><span class="welcome-kicker">Быстрый доступ</span><h2>Всегда под рукой</h2><p>Добавьте Audiowizard на экран — приложение откроется без адресной строки и будет работать как обычное.</p></div>
+      <div class="stack" style="gap:12px">
         <div class="card card-pad" style="background:var(--bg-2)">
           <b class="small">iPhone / iPad — Safari</b>
           <p class="small" style="margin:6px 0 0">Нажмите кнопку <b>«Поделиться»</b> <span class="muted">(квадрат со стрелкой вверх)</span> → <b>«На экран „Домой“»</b> → «Добавить».</p>
@@ -9095,6 +9106,16 @@ const cm = root.querySelector('.chat-main');
         <div class="row row--between" style="margin-top:12px"><b class="small">Рабочий статус</b>
           <div class="seg" id="pf-ws"><button data-w="working" class="${u2.ext&&u2.ext.workStatus==='not_working'?'':'on'}">Работаю</button><button data-w="not_working" class="${u2.ext&&u2.ext.workStatus==='not_working'?'on':''}">Не работаю</button></div></div>
         <div class="row row--between" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+          <div><b class="small">Скрывать баланс</b>
+            <div class="small faint">Показывать суммы как •••• в шапке, меню и снимках экрана.</div></div>
+          <label class="switch" title="Скрывать баланс"><input type="checkbox" id="pf-hide-balance" ${u2.ext&&u2.ext.hideBalance?'checked':''}><span class="tr"></span></label>
+        </div>
+        <div class="row row--between" style="margin-top:12px">
+          <div><b class="small">Маскировать чувствительные данные</b>
+            <div class="small faint">На снимках и записи экрана скрывать баланс, заказы, людей и переписки.</div></div>
+          <label class="switch" title="Маскировать на снимках"><input type="checkbox" id="pf-capture-privacy" ${S.settings.capturePrivacy!==false?'checked':''}><span class="tr"></span></label>
+        </div>
+        <div class="row row--between" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
           <div><b class="small">Черновики заказов</b>
             <div class="small faint">Незаполненная форма заказа сохраняется локально и предлагается при следующем открытии.</div></div>
           <label class="check" title="Автосохранять черновик"><input type="checkbox" id="draft-auto" ${prefsFor().autoDraft!==false?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span></label>
@@ -10478,6 +10499,26 @@ const cm = root.querySelector('.chat-main');
           });
         }
         /* Черновики заказов: автосохранение, вопрос при закрытии, очистка */
+        const hideBal = $('#pf-hide-balance', el);
+        if (hideBal){
+          hideBal.addEventListener('change', ()=>{
+            u.ext = u.ext || {};
+            u.ext.hideBalance = hideBal.checked;
+            document.body.classList.toggle('hide-balance', hideBal.checked);
+            logAudit('Баланс: '+(hideBal.checked?'скрыт':'показан'), 'Профиль');
+            saveState(); refreshSideBalance();
+            toast(hideBal.checked ? 'Баланс скрыт' : 'Баланс снова виден', 'ok');
+          });
+        }
+        const capPriv = $('#pf-capture-privacy', el);
+        if (capPriv){
+          capPriv.addEventListener('change', ()=>{
+            S.settings.capturePrivacy = capPriv.checked;
+            saveState();
+            if (!capPriv.checked) toast('Внимание: при снимках и записи чувствительные данные не будут скрываться','warn');
+            else toast('Маскирование снимков включено','ok');
+          });
+        }
         const draftAuto = $('#draft-auto', el);
         if (draftAuto){
           draftAuto.addEventListener('change', ()=>{
