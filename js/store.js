@@ -228,6 +228,7 @@ const DEFAULT_CALC_SETTINGS = {
   minExecPrice: { n1:200, n2:200, n3:200 },
   deadlineDays: { n1:0, n2:0, n3:0 },
   langPct: 10,
+  langPctByCode: {},
   extras: {
     n1: [
       { id:'ce-a1', name:'Плохое качество записи', price:0, pct:30, unit:'% от стоимости', active:true },
@@ -756,6 +757,7 @@ function migrateSiteCatalog(){
   if (!S.calcSettings.minPrice) S.calcSettings.minPrice = {};
   if (!S.calcSettings.minExecPrice) S.calcSettings.minExecPrice = {};
   if (S.calcSettings.langPct == null) S.calcSettings.langPct = 10;
+  if (!S.calcSettings.langPctByCode || typeof S.calcSettings.langPctByCode !== 'object') S.calcSettings.langPctByCode = {};
   if (!S.calcSettings.deadlineDays) S.calcSettings.deadlineDays = {};
   const services = siteCalcServices();
   const def = defaultCalcSettings();

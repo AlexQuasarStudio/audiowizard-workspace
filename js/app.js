@@ -9249,6 +9249,7 @@ const cm = root.querySelector('.chat-main');
               <input type="checkbox" class="calc-lang-cb" value="${esc(l.code)}" ${!enabledLangs || enabledLangs.has(l.code) ? 'checked' : ''}>
               <span class="box"><svg><use href="#i-check-c"/></svg></span>
               <span class="calc-lang-name">${esc(l.label)}</span><span class="calc-lang-code">${esc(l.code)}</span>
+              <input class="input calc-lang-rate" data-lang-pct="${esc(l.code)}" type="number" min="0" max="100" step="1" title="Надбавка за язык, %" value="${Number((S.calcSettings.langPctByCode||{})[l.code] ?? S.calcSettings.langPct ?? 10)}">
             </label>`).join('')}
           </div>
           <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
@@ -10103,6 +10104,9 @@ const cm = root.querySelector('.chat-main');
         S.calcSettings.clientBufferPct = Math.max(0, Math.min(200, Number((el.querySelector('#calc-buffer')||{}).value) || 0));
         const lpEl = el.querySelector('#calc-lang-pct');
         if (lpEl) S.calcSettings.langPct = Math.max(0, Math.min(100, Number(lpEl.value) || 0));
+        const langRateMap = {};
+        el.querySelectorAll('[data-lang-pct]').forEach(inp=>{ langRateMap[inp.dataset.langPct] = Math.max(0, Math.min(100, Number(inp.value) || 0)); });
+        S.calcSettings.langPctByCode = langRateMap;
         const langsSel = el.querySelector('#calc-langs');
         const chosenLangs = langsSel ? [...langsSel.querySelectorAll('.calc-lang-cb:checked')].map(o => o.value) : [];
         if (!chosenLangs.length){ toast('Оставьте хотя бы один язык в калькуляторе', 'warn'); return; }

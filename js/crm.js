@@ -5563,7 +5563,8 @@ const wrap = root.querySelector('.pl-wrap');
 
   /* ==================== КАЛЬКУЛЯТОР ==================== */
   function openCalculator({ onResult=null, nishId='', deadline=null } = {}){
-    const LANG_SURCHARGE_PCT = Math.max(0, Math.min(100, Number((S.calcSettings || {}).langPct ?? 10)));
+    const langRateFor = code => Math.max(0, Math.min(100, Number((((S.calcSettings || {}).langPctByCode || {})[code]) ?? (S.calcSettings || {}).langPct ?? 10)));
+    const langSurcharge = () => { const f = document.querySelector('#cx-lang-from'); const t = document.querySelector('#cx-lang-to'); return Math.max(langRateFor(f ? f.value : ''), langRateFor(t ? t.value : '')); };
     if (!onResult){
       window.__modalRestorers = window.__modalRestorers || {};
       window.__modalRestorers.calculator = () => openCalculator();
@@ -5839,7 +5840,7 @@ const wrap = root.querySelector('.pl-wrap');
           const from = g2('#cx-lang-from') ? g2('#cx-lang-from').value : '';
           const to = g2('#cx-lang-to') ? g2('#cx-lang-to').value : '';
           const name = c => ((CALC_LANGS.find(x => x[0] === c) || [])[1]) || c;
-          box.textContent = from && to ? `Языковая пара: ${name(from)} → ${name(to)} · +${LANG_SURCHARGE_PCT}% к стоимости и сроку` : '';
+          box.textContent = from && to ? `Языковая пара: ${name(from)} → ${name(to)} · +${langSurcharge()}% к стоимости и сроку` : '';
           syncLangInputs();
         };
         const paintLangVisibility = nid => {
@@ -5955,7 +5956,7 @@ const wrap = root.querySelector('.pl-wrap');
           const nid = g2('#cx-niche') ? g2('#cx-niche').value : '';
           const from = g2('#cx-lang-from') ? g2('#cx-lang-from').value : '';
           const to = g2('#cx-lang-to') ? g2('#cx-lang-to').value : '';
-          if (nid === 'n3' && from && to) pct += LANG_SURCHARGE_PCT;
+          if (nid === 'n3' && from && to) pct += langSurcharge();
           return pct;
         };
         const paintNormDeadline = () => {
@@ -6080,7 +6081,7 @@ const wrap = root.querySelector('.pl-wrap');
           const extraPct = pctApplied() ? 0 : pctSum();
           const priced = (isNaN(val) ? 0 : val) + svcOnlySum();
           const extraFee = Math.round(priced * extraPct / 100);
-          const langFee = langPair() ? Math.round((priced + fixed + extraFee) * LANG_SURCHARGE_PCT / 100) : 0;
+          const langFee = langPair() ? Math.round((priced + fixed + extraFee) * langSurcharge() / 100) : 0;
           const base = priced + fixed + extraFee + langFee;
           let best = null;
           promoList().filter(p => p.kind === 'volume' && hours >= (+p.minHours || 0)).forEach(p => {
@@ -6123,14 +6124,14 @@ const wrap = root.querySelector('.pl-wrap');
         const paintTotals = (animate=false) => {
           const d = calcDiscount();
           const hasExpr = String(g2('#cx-in').value || '').trim() !== '';
-          const exact = (val == null || isNaN(val)) ? null : exactNumber(val);
+          const exact = (val == null || isNaN(val)) ? null : exactNumber(d.sum);
           const valEl = g2('#cx-val');
           if (valEl){
             if (exact != null){
-              if (animate) animateCalc(valEl, val, v => { valEl.textContent = `= ${calcNum(v)}`; });
+              if (animate) animateCalc(valEl, d.sum, v => { valEl.textContent = `= ${calcNum(v)}`; });
               else {
                 if (valEl._calcRaf){ cancelAnimationFrame(valEl._calcRaf); valEl._calcRaf = null; }
-                valEl._calcVal = round2(val);
+                valEl._calcVal = round2(d.sum);
                 valEl.textContent = `= ${exact}`;
               }
             } else {

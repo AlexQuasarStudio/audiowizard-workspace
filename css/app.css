@@ -510,6 +510,7 @@ tr.inl-tr{animation:inlRowIn .2s var(--ease)}
 .calc-lang-item:hover{background:var(--panel-2)}
 .calc-lang-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .calc-lang-code{margin-left:auto;color:var(--faint);font-size:10.5px;font-family:var(--mono);flex:none}
+.calc-lang-rate{width:52px!important;min-height:26px!important;padding:2px 4px!important;font-size:11px!important;text-align:right;flex:none}
 .calc-lang-item[hidden]{display:none}
 @media (max-width:640px){.calc-lang-list{grid-template-columns:1fr}}
 @media (max-width:520px){.calc-disc-row{grid-template-columns:1fr}}
@@ -1881,7 +1882,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1488");mask-image:url("../bg/pattern-ai.svg?v=1488");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1489");mask-image:url("../bg/pattern-ai.svg?v=1489");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -1967,7 +1968,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1488");mask-image:url("../bg/pattern-ai.svg?v=1488");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1489");mask-image:url("../bg/pattern-ai.svg?v=1489");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
