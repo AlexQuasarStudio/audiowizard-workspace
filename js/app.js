@@ -884,11 +884,11 @@ const QA = {
   team:       { id:'team',       label:'Исполнители',           icon:'executor',  run:()=>go('executors') }
 };
 const QUICK_BY_ROLE = {
-  admin:       ['order','calc','client','executor','-','chats','transcribe','texts','translate','-','invite','shot','planner'],
-  top_manager: ['order','calc','client','executor','-','chats','transcribe','texts','translate','-','invite','shot','report'],
-  manager:     ['order','calc','client','-','chats','texts','kanban','-','invite','shot','report'],
-  client:      ['order','-','chats','ticket','-','shot','report'],
-  executor:    ['myorders','-','chats','transcribe','translate','-','report','shot','invite']
+  admin:       ['order','calc','client','executor','-','chats','transcribe','texts','translate','-','planner','shot','invite','report'],
+  top_manager: ['order','calc','client','executor','-','chats','transcribe','texts','translate','-','shot','invite','report'],
+  manager:     ['order','calc','client','-','chats','texts','kanban','-','shot','invite','report'],
+  client:      ['order','-','chats','-','shot','report'],
+  executor:    ['myorders','-','chats','transcribe','translate','-','shot','invite','report']
 };
 
   function userMenu(anchor){
@@ -1404,12 +1404,12 @@ const QUICK_BY_ROLE = {
     <circle cx="90" cy="24" r="20" fill="var(--mascot-glow)" opacity=".22" filter="url(#nr-glow)"/>
     <g filter="url(#nr-soft)" stroke="var(--mascot-line)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
       <path d="M90 48V30" fill="none"/>
-      <path d="M90 31c-7-9-21-5-21 5 0 10 12 15 21 21 9-6 21-11 21-21 0-10-14-14-21-5Z" fill="url(#nr-heart)"/>
+      <path d="M90 31c-7-9-21-5-21 5 0 10 12 15 21 21 9-6 21-11 21-21 0-10-14-14-21-5Z" fill="var(--mascot-heart-2)"/>
       <rect x="12" y="83" width="19" height="38" rx="9" fill="var(--mascot-shell-3)"/>
       <rect x="149" y="83" width="19" height="38" rx="9" fill="var(--mascot-shell-3)"/>
-      <path d="M33 58h114a14 14 0 0 1 14 14v73a14 14 0 0 1-14 14H33a14 14 0 0 1-14-14V72a14 14 0 0 1 14-14Z" fill="url(#nr-shell)"/>
+      <path d="M33 58h114a14 14 0 0 1 14 14v73a14 14 0 0 1-14 14H33a14 14 0 0 1-14-14V72a14 14 0 0 1 14-14Z" fill="var(--mascot-shell-2)"/>
       <path d="M42 66h96a9 9 0 0 1 9 9v9H33v-9a9 9 0 0 1 9-9Z" fill="var(--mascot-inset)" opacity=".22" stroke="none"/>
-      <rect x="43" y="76" width="94" height="62" rx="25" fill="url(#nr-screen)"/>
+      <rect x="43" y="76" width="94" height="62" rx="25" fill="var(--mascot-face-1)"/>
       <ellipse cx="69" cy="101" rx="6.8" ry="9" fill="var(--mascot-eye)"/>
       <ellipse cx="111" cy="101" rx="6.8" ry="9" fill="var(--mascot-eye)"/>
       <circle cx="71" cy="98" r="2.2" fill="var(--mascot-pupil)" stroke="none"/>
@@ -1417,7 +1417,7 @@ const QUICK_BY_ROLE = {
       <path d="M77 116c4.6 5.6 8.6 7.8 13 7.8s8.4-2.2 13-7.8" fill="none"/>
       <ellipse cx="52" cy="117" rx="7.5" ry="4.3" fill="var(--mascot-blush)" opacity=".55" stroke="none"/>
       <ellipse cx="128" cy="117" rx="7.5" ry="4.3" fill="var(--mascot-blush)" opacity=".55" stroke="none"/>
-      <path d="M48 150h84a16 16 0 0 1 16 16v6a12 12 0 0 1-12 12H44a12 12 0 0 1-12-12v-6a16 16 0 0 1 16-16Z" fill="url(#nr-body)"/>
+      <path d="M48 150h84a16 16 0 0 1 16 16v6a12 12 0 0 1-12 12H44a12 12 0 0 1-12-12v-6a16 16 0 0 1 16-16Z" fill="var(--mascot-body-1)"/>
       <path d="M56 151c-8 1-14 6-15 13" fill="none"/>
       <path d="M124 151c8 1 14 6 15 13" fill="none"/>
       <path d="M72 184v6M108 184v6" fill="none"/>
@@ -1440,12 +1440,12 @@ const QUICK_BY_ROLE = {
     <circle cx="90" cy="24" r="20" fill="var(--mascot-glow)" opacity=".22" filter="url(#er-glow)"/>
     <g filter="url(#er-soft)" stroke="var(--mascot-line)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
       <path d="M90 48V30" fill="none"/>
-      <path d="M90 31c-7-9-21-5-21 5 0 10 12 15 21 21 9-6 21-11 21-21 0-10-14-14-21-5Z" fill="url(#er-heart)"/>
+      <path d="M90 31c-7-9-21-5-21 5 0 10 12 15 21 21 9-6 21-11 21-21 0-10-14-14-21-5Z" fill="var(--mascot-heart-2)"/>
       <rect x="12" y="83" width="19" height="38" rx="9" fill="var(--mascot-shell-3)"/>
       <rect x="149" y="83" width="19" height="38" rx="9" fill="var(--mascot-shell-3)"/>
-      <path d="M33 58h114a14 14 0 0 1 14 14v73a14 14 0 0 1-14 14H33a14 14 0 0 1-14-14V72a14 14 0 0 1 14-14Z" fill="url(#er-shell)"/>
+      <path d="M33 58h114a14 14 0 0 1 14 14v73a14 14 0 0 1-14 14H33a14 14 0 0 1-14-14V72a14 14 0 0 1 14-14Z" fill="var(--mascot-shell-2)"/>
       <path d="M42 66h96a9 9 0 0 1 9 9v9H33v-9a9 9 0 0 1 9-9Z" fill="var(--mascot-inset)" opacity=".22" stroke="none"/>
-      <rect x="43" y="76" width="94" height="62" rx="25" fill="url(#er-screen)"/>
+      <rect x="43" y="76" width="94" height="62" rx="25" fill="var(--mascot-face-1)"/>
       <path d="M55 91c5-4 10-3 14 1" fill="none"/>
       <path d="M101 88c5-1 10 1 13 5" fill="none"/>
       <ellipse cx="69" cy="102" rx="6.2" ry="8.6" fill="var(--mascot-eye)"/>
@@ -1455,7 +1455,7 @@ const QUICK_BY_ROLE = {
       <path d="M137 82c-5 7-4 13 1 13 5 0 6-6 1-13Z" fill="#9bd7ff" stroke="var(--mascot-line)" stroke-width="2.2"/>
       <ellipse cx="52" cy="117" rx="7.5" ry="4.3" fill="var(--mascot-blush)" opacity=".55" stroke="none"/>
       <ellipse cx="128" cy="117" rx="7.5" ry="4.3" fill="var(--mascot-blush)" opacity=".55" stroke="none"/>
-      <path d="M48 150h84a16 16 0 0 1 16 16v6a12 12 0 0 1-12 12H44a12 12 0 0 1-12-12v-6a16 16 0 0 1 16-16Z" fill="url(#er-body)"/>
+      <path d="M48 150h84a16 16 0 0 1 16 16v6a12 12 0 0 1-12 12H44a12 12 0 0 1-12-12v-6a16 16 0 0 1 16-16Z" fill="var(--mascot-body-1)"/>
       <path d="M56 151c-8 1-14 6-15 13" fill="none"/>
       <path d="M124 151c8 1 14 6 15 13" fill="none"/>
       <path d="M72 184v6M108 184v6" fill="none"/>
