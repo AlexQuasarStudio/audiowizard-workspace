@@ -2201,6 +2201,7 @@ ex.innerHTML = avatarHTML(user(), '');
         const wm = m2.querySelector('.modal');
         const mrow = m2.querySelector('.welcome-mascots--modal');
         if (mrow && wm){ mrow.classList.add('welcome-mascots--float'); wm.appendChild(mrow); }
+        if (wm){ const cx=document.createElement('button'); cx.className='modal-float-x'; cx.type='button'; cx.setAttribute('aria-label','Закрыть'); cx.textContent='×'; cx.onclick=c2; wm.appendChild(cx); }
         let avatarData = null;
         m2.querySelector('#ob-avatar').onclick = ()=>m2.querySelector('#ob-avatar-file').click();
         m2.querySelector('#ob-avatar-file').onchange = e=>{
@@ -2267,7 +2268,7 @@ ex.innerHTML = avatarHTML(user(), '');
         <p class="tiny faint" style="margin:0">Если кнопки «Поделиться» нет — откройте меню браузера и найдите пункт «Установить приложение».</p>
       </div>`,
       footer:`<button class="btn btn--primary" data-x>Понятно</button>`,
-      onMount:(m2,c2)=>{ const b=m2.querySelector('[data-x]'); if (b) b.onclick=c2; }
+      onMount:(m2,c2)=>{ const b=m2.querySelector('[data-x]'); if (b) b.onclick=c2; const wm=m2.querySelector('.modal'); if(wm){ const cx=document.createElement('button'); cx.className='modal-float-x'; cx.type='button'; cx.setAttribute('aria-label','Закрыть'); cx.textContent='×'; cx.onclick=c2; wm.appendChild(cx); } }
     });
   }
   function startTour(i){
@@ -10521,11 +10522,14 @@ const cm = root.querySelector('.chat-main');
         }
         const capPriv = $('#pf-capture-privacy', el);
         if (capPriv){
-          capPriv.addEventListener('change', ()=>{
+          capPriv.addEventListener('change', async ()=>{
+            if (!capPriv.checked){
+              const ok = await confirmModal({ title:'Отключить скрытие данных?', text:'На снимках и записи будут видны баланс, заказы, профили, переписки и содержимое артефактов. Включайте только если действительно нужно.', okText:'Отключить', danger:true });
+              if (!ok){ capPriv.checked = true; return; }
+            }
             S.settings.capturePrivacy = capPriv.checked;
             saveState();
-            if (!capPriv.checked) toast('Внимание: при снимках и записи чувствительные данные не будут скрываться','warn');
-            else toast('Маскирование снимков включено','ok');
+            toast(capPriv.checked ? 'Маскирование снимков включено' : 'Внимание: чувствительные данные больше не скрываются', capPriv.checked?'ok':'warn');
           });
         }
         const draftAuto = $('#draft-auto', el);
@@ -11674,7 +11678,7 @@ function initPWA(){
        делала из той же картинки второй сетевой запрос — браузер видел
        другой ключ кэша. Свежесть узора обеспечивает service worker:
        PRECACHE обновляется вместе со сборкой. */
-    const maskUrl = 'url("bg/pattern-ai.svg")';
+    const maskUrl = 'url("bg/pattern-ai.svg?v=1485")';
     const cacheKey = cur + '|' + t + '|bg11';
     /* Единая отрисовка: маску ставим ВСЕГДА. После перерисовки разметки
        (#bg-doodles пересоздаётся при навигации) слой терял маску и узор «отваливался». */

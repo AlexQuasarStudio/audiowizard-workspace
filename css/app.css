@@ -1880,7 +1880,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg");mask-image:url("../bg/pattern-ai.svg");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1485");mask-image:url("../bg/pattern-ai.svg?v=1485");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -1966,7 +1966,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg");mask-image:url("../bg/pattern-ai.svg");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1485");mask-image:url("../bg/pattern-ai.svg?v=1485");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2741,7 +2741,9 @@ body.capture-privacy::after{content:'Конфиденциальные данны
 .cap-editor__bar b{font-size:13px}.cap-editor__hint{font-size:12px;color:var(--muted)}
 .cap-editor__bar .spacer{flex:1}
 .cap-editor.is-cursor .cap-editor__stage{opacity:0;pointer-events:none}
-.cap-editor.is-cursor{background:transparent;backdrop-filter:none}
+.cap-editor.is-cursor .cap-editor__bar{display:none}
+.cap-editor.is-cursor{background:transparent;backdrop-filter:none;pointer-events:none}
+.cap-editor.is-cursor .cap-tools{pointer-events:auto}
 .cap-editor__stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto;position:relative}
 .cap-editor__stage canvas{max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.45);cursor:crosshair;background:#111}
 .cap-picker{position:fixed;inset:0;z-index:8500;cursor:crosshair;background:rgba(10,8,16,.22)}
@@ -2767,10 +2769,14 @@ body.capture-privacy::after{content:'Конфиденциальные данны
 
 /* Welcome/install modal: как «О приложении» — blur, скролл, без хрома окна */
 .modal--welcome{overflow:visible;max-height:min(88vh,760px)}
-.modal--welcome .modal__h{padding:8px 10px 0;border:0;min-height:38px;justify-content:flex-end}
+.modal--welcome .modal__h,.modal--install .modal__h{display:none}
 .modal--welcome .modal__h h3{display:none}
 .modal--welcome .modal__b{padding:246px 20px 18px;overflow-y:auto;overscroll-behavior:contain}
-.modal--welcome .welcome-mascots--float{position:absolute;left:-54px;right:-54px;top:42px;width:auto;height:188px;margin:0;z-index:2;pointer-events:none}
+.modal--welcome .welcome-mascots--float{position:absolute;left:-54px;right:-54px;top:14px;width:auto;height:188px;margin:0;z-index:2;pointer-events:none}
+.modal-float-x{position:absolute;right:10px;top:10px;z-index:8;width:30px;height:30px;border:0;border-radius:9px;background:color-mix(in srgb,var(--panel) 75%,transparent);color:var(--faint);font-size:19px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.modal-float-x:hover{background:var(--red-soft);color:var(--red)}
+.modal--welcome .modal__b{padding-top:212px}
+.modal--install .modal__b{padding-top:52px}
 .modal--welcome .welcome-hero{padding-top:0}
 .modal--install .modal__b{overflow-y:auto;overscroll-behavior:contain}
 .modal--install .modal__b .card{max-width:none}

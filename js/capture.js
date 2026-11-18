@@ -24,6 +24,28 @@
 
   async function selfCanvas() {
     try {
+      if (window.html2canvas) {
+        try { return await window.html2canvas(document.body, {
+          backgroundColor: null, scale: 1, useCORS: true, logging: false, foreignObjectRendering: true,
+          width: innerWidth, height: innerHeight,
+          windowWidth: innerWidth, windowHeight: innerHeight,
+          scrollX: 0, scrollY: 0,
+          ignoreElements: node => !!(node.matches && node.matches('.cap-editor,.cap-tools,.cap-rec-bar,.cap-picker,.cap-rec-live,.cookie-bar,.dd,.tour-card,.tour-spot')),
+          onclone: doc => {
+            doc.querySelectorAll('.cap-editor,.cap-tools,.cap-rec-bar,.cap-picker,.cap-rec-live,.cookie-bar,.dd,.tour-card,.tour-spot').forEach(n=>n.remove());
+            if (!(typeof S !== 'undefined' && S.settings && S.settings.capturePrivacy === false)) doc.body.classList.add('capture-privacy');
+            const cv=document.createElement('canvas'), cx=cv.getContext('2d');
+            const norm=v=>{ if(!v||!/color\(/i.test(v)) return v; try{ cx.fillStyle='#000'; cx.fillStyle=v; return cx.fillStyle; }catch(e){ return v; } };
+            const props=['color','background-color','border-top-color','border-right-color','border-bottom-color','border-left-color','outline-color','text-decoration-color','caret-color','column-rule-color'];
+            doc.querySelectorAll('*').forEach(el=>{
+              const cs=doc.defaultView.getComputedStyle(el);
+              props.forEach(p=>{ const v=cs.getPropertyValue(p); if(/color\(/i.test(v)) el.style.setProperty(p,norm(v),'important'); });
+              if(/color\(/i.test(cs.backgroundImage)) el.style.setProperty('background-image','none','important');
+              if(/color\(/i.test(cs.boxShadow)) el.style.setProperty('box-shadow','none','important');
+            });
+          }
+        }); } catch(e) { console.warn('html2canvas', e); }
+      }
       const css = [];
       for (const sh of document.styleSheets) {
         try { css.push([...sh.cssRules].map(r=>r.cssText).join('\n')); }
@@ -126,7 +148,7 @@
   function openEditor(base, onAttach, guides={xs:[],ys:[],scale:1}) {
     if (shot) shot.root.remove();
     const root = el('div', 'cap-editor');
-    root.innerHTML = `<div class="cap-editor__bar"><b>Снимок экрана</b><span class="cap-editor__hint">Рисуйте поверх снимка</span><span class="spacer"></span><button class="btn btn--ghost btn--sm" data-cap-crop>Кроп</button><button class="btn btn--primary btn--sm" data-cap-save>Скачать</button>${onAttach ? '<button class="btn btn--soft btn--sm" data-cap-attach>Вложить</button>' : ''}<button class="iconbtn" data-cap-x title="Закрыть">×</button></div><div class="cap-editor__stage"><canvas></canvas></div><div class="cap-tools"><button data-tool="hand" class="on" title="Рука">✋</button><button data-tool="select" title="Выделить">⬚</button><button data-tool="rect" title="Прямоугольник">▭</button><button data-tool="ellipse" title="Эллипс">◯</button><button data-tool="arrow" title="Стрелка">↗</button><button data-tool="pen" title="Маркер">✎</button><button data-tool="text" title="Текст">T</button><button data-tool="cursor" title="Курсор — взаимодействие с приложением">↖</button><span class="spacer"></span><button data-color="#ff5c5c" class="on" style="color:#ff5c5c">●</button><button data-color="#ffd166" style="color:#ffd166">●</button><button data-color="#4cc9f0" style="color:#4cc9f0">●</button><button data-color="#ffffff" style="color:#fff">●</button><button data-cap-undo title="Отменить">↶</button><button data-cap-redo title="Повторить">↷</button></div>`;
+    root.innerHTML = `<div class="cap-editor__bar"><b>Снимок экрана</b><span class="cap-editor__hint">Рисуйте поверх снимка</span><span class="spacer"></span><button class="btn btn--ghost btn--sm" data-cap-crop>Кроп</button><button class="btn btn--primary btn--sm" data-cap-save>Скачать</button>${onAttach ? '<button class="btn btn--soft btn--sm" data-cap-attach>Вложить</button>' : ''}<button class="iconbtn" data-cap-x title="Закрыть">×</button></div><div class="cap-editor__stage"><canvas></canvas></div><div class="cap-tools"><button data-tool="cursor" title="Курсор — взаимодействие с приложением"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 3l14 8-6 1-3 7L5 3Z" fill="currentColor"/></svg></button><button data-tool="hand" class="on" title="Рука">✋</button><button data-tool="select" title="Выделить">⬚</button><button data-tool="rect" title="Прямоугольник">▭</button><button data-tool="ellipse" title="Эллипс">◯</button><button data-tool="arrow" title="Стрелка">↗</button><button data-tool="pen" title="Маркер">✎</button><button data-tool="text" title="Текст">T</button><span class="spacer"></span><button data-color="#ff5c5c" class="on" style="color:#ff5c5c">●</button><button data-color="#ffd166" style="color:#ffd166">●</button><button data-color="#4cc9f0" style="color:#4cc9f0">●</button><button data-color="#ffffff" style="color:#fff">●</button><button data-cap-undo title="Отменить">↶</button><button data-cap-redo title="Повторить">↷</button></div>`;
     document.body.appendChild(root);
     const canvas = $('canvas', root), ctx = canvas.getContext('2d');
     shot = { root, base, tool:'hand', crop: null, shapes: [], redo: [], sel:null, color:'#ff5c5c', line: 4, onAttach, canvas, guides };
@@ -177,7 +199,7 @@
       const p = snap(pt(e));
       if (shot.tool === 'text'){ inlineText(p); return; }
       if (shot.tool === 'hand' || shot.tool === 'select'){ const h=handleAt(p); if(h){ mode=h; last=p; shot._orig=JSON.parse(JSON.stringify(shot.sel)); canvas.setPointerCapture(e.pointerId); return; } const s=hit(p); shot.sel=s||null; if(s){mode='move';last=p;shot._orig=JSON.parse(JSON.stringify(s));} draw(); return; }
-      drag = p; const sh = startShape(p); shot.shapes.push(sh); shot.sel=sh; canvas.setPointerCapture(e.pointerId); draw();
+      drag = p; const sh = startShape(p); shot.shapes.push(sh); shot.sel=null; canvas.setPointerCapture(e.pointerId); draw();
     });
     canvas.addEventListener('pointermove', e => {
       const p=snap(pt(e));
@@ -276,7 +298,7 @@
   async function startSelfRecording(mic){
     try {
       privacyOn(); document.body.classList.add('is-recording');
-      const root=el('div','cap-rec-live'); root.innerHTML='<canvas class="cap-anno"></canvas><div class="cap-tools cap-rec-tools"><button data-rtool="cursor" class="on" title="Курсор">↖</button><button data-rtool="pen" title="Маркер">✎</button><button data-rtool="arrow" title="Стрелка">↗</button><button data-rtool="rect" title="Рамка">▭</button><button data-rtool="text" title="Текст">T</button><span class="spacer"></span><button data-rclear title="Очистить">⌫</button></div>';
+      const root=el('div','cap-rec-live'); root.innerHTML='<canvas class="cap-anno"></canvas><div class="cap-tools cap-rec-tools"><button data-rtool="cursor" class="on" title="Курсор"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 3l14 8-6 1-3 7L5 3Z" fill="currentColor"/></svg></button><button data-rtool="pen" title="Маркер">✎</button><button data-rtool="arrow" title="Стрелка">↗</button><button data-rtool="rect" title="Рамка">▭</button><button data-rtool="text" title="Текст">T</button><span class="spacer"></span><button data-rclear title="Очистить">⌫</button></div>';
       document.body.appendChild(root);
       const anno=$('.cap-anno',root); anno.width=innerWidth*devicePixelRatio; anno.height=innerHeight*devicePixelRatio; anno.style.width=innerWidth+'px'; anno.style.height=innerHeight+'px';
       const actx=anno.getContext('2d'); let tool='cursor', shapes=[], drawing=null;
