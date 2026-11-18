@@ -2294,8 +2294,13 @@ ex.innerHTML = avatarHTML(user(), '');
       <p class="small muted" style="margin:4px 0 10px">Локальное хранение черновиков, темы и сессии. Данные не покидают ваш браузер.</p>
       <div class="row"><button class="btn btn--primary btn--sm" data-ok>Хорошо</button><button class="btn btn--ghost btn--sm" data-detail>Подробнее</button></div></div>`;
     document.body.appendChild(el);
-    el.querySelector('[data-ok]').onclick = ()=>{ S.cookiesAccepted = true; saveState(); el.remove(); };
-    el.querySelector('[data-detail]').onclick = ()=>go('docs');
+    el.querySelector('[data-ok]').onclick = ()=>{ S.cookiesAccepted = true; saveState(); el.classList.add('is-hiding'); setTimeout(()=>el.remove(), 240); };
+    el.querySelector('[data-detail]').onclick = ()=>openModal({
+      title:'Cookies и локальное хранение', narrow:true,
+      body:`<div class="small" style="line-height:1.65;color:var(--text-2)">Мы храним в браузере черновики, тему, настройки интерфейса и сессию. Эти данные не отправляются на сервер и не используются для рекламы. Очистить их можно в настройках браузера; после очистки потребуется войти снова.</div>`,
+      footer:'<button class="btn btn--primary" data-x>Понятно</button>',
+      onMount:(m,c)=>{ const b=m.querySelector('[data-x]'); if(b) b.onclick=c; }
+    });
   }
 
   /* ==================== ВИТРИНЫ ==================== */
@@ -5191,7 +5196,7 @@ ex.innerHTML = avatarHTML(user(), '');
               ${own?'':`<div class="who" data-av-uid="${esc(m.user_id||'')}" title="Открыть профиль" style="cursor:pointer;${whoColor?`color:${whoColor};`:''}"><span class="who__name">${esc(author.full_name)}</span>${isStaff(author.role)?`<span class="role-mark role-mark--${author.role}" title="${esc(ROLE_LABEL[author.role])}">${icon('shield','ico-sm')}</span>`:''}${c.owner_id===m.user_id?'<span class="chat-role-tag chat-role-tag--owner">владелец</span>':''}${canModerate&&ghost?' <span class="ghost-mode-note">'+icon('eye-off','ico-sm')+' невидимка</span>':''}</div>`}
               ${fwdHtml}
               ${quoteHtml}
-              <div class="txt">${m.pinned?`<span class="msg__pin-ico" title="Закреплено">${icon('pin','ico-sm')}</span>`:''}${m.type==='poll'?`<span class="msg__poll-ico">${icon('poll','ico-sm')}</span>`:''}${isArtifact ? '' : txtRender}${inlineTime?timeHtml:''}</div>
+              <div class="txt${inlineTime?' txt--time-inline':''}">${m.pinned?`<span class="msg__pin-ico" title="Закреплено">${icon('pin','ico-sm')}</span>`:''}${m.type==='poll'?`<span class="msg__poll-ico">${icon('poll','ico-sm')}</span>`:''}${isArtifact ? '' : txtRender}${inlineTime?timeHtml:''}</div>
               ${fileHtml}
               ${artifactHtml}
               ${pollHtml}
@@ -5596,6 +5601,7 @@ const cm = root.querySelector('.chat-main');
         const dd = showDropdown(e.currentTarget, [], {});
         if (!dd) return;
         dd.className = 'dd emoji-panel';
+        dd.style.width = 'min(360px, calc(100vw - 24px))';
         /* Жёсткий потолок высоты: при добавлении вариантов опроса панель
            растёт, а её край уезжал за нижнюю границу экрана */
         dd.style.maxHeight = 'min(560px, calc(100dvh - 24px))';

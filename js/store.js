@@ -227,7 +227,7 @@ const DEFAULT_CALC_SETTINGS = {
   /* Минимумы и стандартный срок по категории: 0 = взять общий минимум
      из «Выплат» / считать срок по истории. */
   minPrice: { n1:1000, n2:1000, n3:1000 },
-  minExecPrice: { n1:100, n2:100, n3:100 },
+  minExecPrice: { n1:200, n2:200, n3:200 },
   deadlineDays: { n1:0, n2:0, n3:0 },
   extras: {
     n1: [
@@ -336,7 +336,7 @@ function minPriceFor(nid){
 }
 function minExecPriceFor(nid){
   const v = (((S || {}).calcSettings || {}).minExecPrice || {})[nid];
-  return Math.max(0, Math.round(Number(v) || 0));
+  return Math.max(200, Math.round(Number(v) || 0));
 }
 function deadlineDaysFor(nid){
   const v = (((S || {}).calcSettings || {}).deadlineDays || {})[nid];

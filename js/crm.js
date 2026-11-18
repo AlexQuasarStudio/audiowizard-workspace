@@ -1891,13 +1891,7 @@ const CRM = (() => {
             <input type="number" class="input" id="of-prepay-custom" min="0" max="100" placeholder="% предоплаты" style="display:none;margin-top:6px">
             <input type="hidden" id="of-prepay" value="50">
             <div class="small" id="of-prepay-hint" style="color:var(--muted)"></div></div>
-          <div class="cols-2 grid" style="gap:13px">
-            <div class="field"><label>Заверение, ₽</label>
-              <div class="row">
-              <label class="check" style="margin-top:4px" title="Заверить у нотариуса"><input type="checkbox" id="of-need-cert" ${o.need_cert?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span></label>
-              <input type="number" class="input" id="of-cert" min="0" value="${o.certification_amount||''}" placeholder="Сумма заверения" ${o.need_cert?'':'disabled'}></div></div>
-            <div class="field"><label>Предложенная цена заказчиком</label><input type="number" class="input" id="of-proposed" min="0" value="${o.proposed_price||''}" placeholder="Для текстов и переводов"></div>
-          </div>
+          <div class="field"><label>${me().role==='client'?'Предложенная вами цена':'Предложенная цена заказчиком'}</label><input type="number" class="input" id="of-proposed" min="0" value="${o.proposed_price||''}" placeholder="Для текстов и переводов"></div>
           <div class="field"><label>Комментарий</label><textarea class="input" id="of-comment" placeholder="Заметки по заказу… Служебные маркеры (например PROMO10) применяют правила импорта">${esc(o.comment)}</textarea></div>
           <div class="field"><label>Файлы и аудио</label>
             <div id="of-files">${form.files.map(f=>fileRowHTML(f)).join('')}</div>
@@ -2036,7 +2030,6 @@ const CRM = (() => {
           if (checkFormId) checkFormId();
         });
         g('#of-gen').addEventListener('click', ()=>{ setTimeout(()=>checkFormId && checkFormId(), 0); });
-        g('#of-need-cert').addEventListener('change', e=>{ g('#of-cert').disabled = !e.target.checked; });
         const prepayHint = ()=> {
           const v = +g('#of-prepay').value;
           g('#of-prepay-val').textContent = v;
@@ -2448,7 +2441,7 @@ const CRM = (() => {
             status:g('#of-status').value, deadline:g('#of-deadline').value||null, start:g('#of-start').value||null, total:+g('#of-total').value||0, is_test:!!(g('#of-test')||{}).checked,
             rush: rush.urgent, rush_pct: rush.urgent ? rush.pct : 0, rush_fee: rush.urgent ? (Number(form.calcRushFee)||0) : 0,
             managerFee: Math.max(0, Math.min(100, +g('#of-mgrfee').value || 10)),
-            prepay:+g('#of-prepay').value, cert:g('#of-cert').value, need_cert:g('#of-need-cert').checked,
+            prepay:+g('#of-prepay').value, cert:0, need_cert:false,
             comment:g('#of-comment').value, project_id:g('#of-project').value, folder_id:g('#of-folder').value,
             proposed:+g('#of-proposed').value||0, forbid:g('#of-forbid').checked,
             executors:form.executors, files:form.files
@@ -2630,8 +2623,7 @@ const CRM = (() => {
       set('#of-id', v.order_id||''); set('#of-client', v.client_id||''); set('#of-niche', v.nish_id||'');
       set('#of-service', v.service||'');
       set('#of-status', v.status||'draft'); set('#of-total', v.total||''); set('#of-prepay', v.prepay??50);
-      set('#of-cert', v.cert||''); set('#of-comment', v.comment||''); set('#of-proposed', v.proposed||'');
-      const nc = $('#of-need-cert'); if (nc){ nc.checked=!!v.need_cert; nc.dispatchEvent(new Event('change')); }
+      set('#of-comment', v.comment||''); set('#of-proposed', v.proposed||'');
       const fb = $('#of-forbid'); if (fb) fb.checked = !!v.forbid;
       toast('Черновик восстановлен','ok');
     }
@@ -5571,6 +5563,7 @@ const wrap = root.querySelector('.pl-wrap');
 
   /* ==================== КАЛЬКУЛЯТОР ==================== */
   function openCalculator({ onResult=null, nishId='', deadline=null } = {}){
+    const LANG_SURCHARGE_PCT = 10;
     if (!onResult){
       window.__modalRestorers = window.__modalRestorers || {};
       window.__modalRestorers.calculator = () => openCalculator();
@@ -5748,10 +5741,12 @@ const wrap = root.querySelector('.pl-wrap');
             return;
           }
           const t0 = performance.now(), dur = 420;
+          const whole = Math.abs(target - Math.round(target)) < 0.005;
           const step = now => {
             const p = Math.min(1, (now - t0) / dur);
             const e = 1 - Math.pow(1 - p, 3);
-            render(from + (target - from) * e);
+            const v = from + (target - from) * e;
+            render(whole ? Math.round(v) : v);
             if (p < 1) el._calcRaf = requestAnimationFrame(step);
             else { el._calcRaf = null; render(target); }
           };
@@ -5844,7 +5839,7 @@ const wrap = root.querySelector('.pl-wrap');
           const from = g2('#cx-lang-from') ? g2('#cx-lang-from').value : '';
           const to = g2('#cx-lang-to') ? g2('#cx-lang-to').value : '';
           const name = c => ((CALC_LANGS.find(x => x[0] === c) || [])[1]) || c;
-          box.textContent = from && to ? `Языковая пара: ${name(from)} → ${name(to)}` : '';
+          box.textContent = from && to ? `Языковая пара: ${name(from)} → ${name(to)} · +${LANG_SURCHARGE_PCT}% к стоимости и сроку` : '';
           syncLangInputs();
         };
         const paintLangVisibility = nid => {
@@ -5954,17 +5949,27 @@ const wrap = root.querySelector('.pl-wrap');
         syncVolInput();
         /* Срок по суточной норме объёма: исполнителю — объём ÷ норма,
            клиенту — тот же срок плюс настраиваемый запас (по умолчанию 30%). */
+        const timeSurchargePct = () => {
+          let pct = 0;
+          mask.querySelectorAll('[data-ex]:checked').forEach(i => { pct += +String(i.dataset.ex || '').split('|')[3] || 0; });
+          const nid = g2('#cx-niche') ? g2('#cx-niche').value : '';
+          const from = g2('#cx-lang-from') ? g2('#cx-lang-from').value : '';
+          const to = g2('#cx-lang-to') ? g2('#cx-lang-to').value : '';
+          if (nid === 'n3' && from && to) pct += LANG_SURCHARGE_PCT;
+          return pct;
+        };
         const paintNormDeadline = () => {
           const box = g2('#cx-norm-deadline'); if (!box) return;
           const v = volState();
           const nid = g2('#cx-niche') ? g2('#cx-niche').value : '';
           const norm = v.s ? dailyNormForSvc(v.nid, v.s.id) : dailyNormFor(nid);
           if (!v.qty || !norm){ box.innerHTML = '<span class="faint">Норма объёма в сутки не задана — срок можно указать вручную.</span>'; return; }
-          const exec = v.qty / norm;
+          const extra = timeSurchargePct();
+          const exec = (v.qty / norm) * (1 + extra / 100);
           const pct = clientBufferPct();
           const client = exec * (1 + pct / 100);
           const fmtD = n => n.toLocaleString('ru-RU', { maximumFractionDigits: 1 });
-          box.innerHTML = `Срок исполнителя: <b>${fmtD(exec)} дн.</b> · клиенту с запасом ${pct}%: <b>${fmtD(client)} дн.</b>`;
+          box.innerHTML = `Срок исполнителя: <b>${fmtD(exec)} дн.</b>${extra ? ` <span class="faint">· опции/язык +${extra}%</span>` : ''} · клиенту с запасом ${pct}%: <b>${fmtD(client)} дн.</b>`;
           const days = g2('#cx-days');
           if (days && !days.value){
             days.value = String(Math.max(1, Math.ceil(client)));
@@ -6025,7 +6030,8 @@ const wrap = root.querySelector('.pl-wrap');
            процентные надбавки считаются от суммы «выражение + фикс. услуги». */
         const picked = () => [...mask.querySelectorAll('[data-sv]:checked,[data-ex]:checked')].map(i => {
           const p = (i.dataset.sv || i.dataset.ex || '').split('|');
-          return { kind: i.dataset.sv ? 'sv' : 'ex', nid:p[0], name:p[1], price:+p[2] || 0, pct:+p[3] || 0 };
+          const qty = i.dataset.sv ? 1 : Math.max(1, Math.round(+i.dataset.qty || 1));
+          return { kind: i.dataset.sv ? 'sv' : 'ex', nid:p[0], name:p[1], price:(+p[2] || 0) * qty, pct:+p[3] || 0, qty };
         });
         const svcOnlySum = () => picked().filter(x => x.kind === 'sv').reduce((s,x)=>s+x.price, 0);
         const fixedExtraSum = () => picked().filter(x => x.kind === 'ex' && !x.pct).reduce((s,x)=>s+x.price, 0);
@@ -6039,10 +6045,12 @@ const wrap = root.querySelector('.pl-wrap');
           const nid = g2('#cx-niche') ? g2('#cx-niche').value : '';
           const raw = g2('#cx-deadline') ? g2('#cx-deadline').value : '';
           const dl = raw ? new Date(raw).getTime() : null;
-          const rec = nid ? recommendDeadline({ nishId:nid }) : null;
+          const recBase = nid ? recommendDeadline({ nishId:nid }) : null;
+          const extra = timeSurchargePct();
+          const rec = recBase ? { ...recBase, days: Math.max(1, Math.ceil(recBase.days * (1 + extra / 100))) } : null;
           const urgent = !!(dl && rec && dl < Date.now() + rec.days*DAY);
           const pct = urgent ? rushPctFor(nid) : 0;
-          return { nid, dl, rec, urgent, pct };
+          return { nid, dl, rec, urgent, pct, extra };
         };
         /* Скидки считаются из настроек: список промокодов не захардкожен.
            «За объём» срабатывает сам по часам, разовый — по коду. Берём
@@ -6055,7 +6063,8 @@ const wrap = root.querySelector('.pl-wrap');
           const extraPct = pctSum();
           const priced = (isNaN(val) ? 0 : val) + svcOnlySum();
           const extraFee = Math.round(priced * extraPct / 100);
-          const base = priced + fixed + extraFee;
+          const langFee = langPair() ? Math.round((priced + fixed + extraFee) * LANG_SURCHARGE_PCT / 100) : 0;
+          const base = priced + fixed + extraFee + langFee;
           let best = null;
           promoList().filter(p => p.kind === 'volume' && hours >= (+p.minHours || 0)).forEach(p => {
             if (!best || +p.percent > +best.percent) best = { ...p, by: 'volume' };
@@ -6073,9 +6082,11 @@ const wrap = root.querySelector('.pl-wrap');
           const minTotal = minPriceFor(dl.nid);
           const sum = (base > 0 && minTotal > 0) ? Math.max(minTotal, rawSum) : rawSum;
           return { base, pct: discountPct, discounted, rushFee, sum, minTotal, minApplied: sum > rawSum, rush: dl.urgent,
-            rushPct: dl.pct, deadline: dl.dl, nid: dl.nid, best, code, hours, known, extraPct, extraFee };
+            rushPct: dl.pct, deadline: dl.dl, nid: dl.nid, best, code, hours, known, extraPct, extraFee, langFee };
         };
         const langPair = () => {
+          const nid = g2('#cx-niche') ? g2('#cx-niche').value : '';
+          if (nid !== 'n3') return '';
           const from = g2('#cx-lang-from') ? g2('#cx-lang-from').value : '';
           const to = g2('#cx-lang-to') ? g2('#cx-lang-to').value : '';
           return from && to ? from+'→'+to : '';
@@ -6222,7 +6233,7 @@ const wrap = root.querySelector('.pl-wrap');
             if (!extras.length) return '';
             return `<div class="small cx-svc-group"><b style="margin-bottom:4px;display:block">${esc(n.name)}</b>
               <div class="tiny faint" data-svc-extra style="margin:6px 0 2px">Доп. опции</div>
-              ${extras.map(e=>`<label class="svc-row check" data-search="${esc(norm(n.name+' '+(e.name||'')+' '+(e.unit||'')+(e.pct?' процент':'')))}"><input type="checkbox" data-ex="${n.id}|${esc(e.id)}|${Number(e.price)||0}|${Number(e.pct)||0}"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(e.name)} <span class="faint">${esc(e.unit || (e.pct ? '% от стоимости' : ''))}</span></span><b>${e.pct ? '+' + e.pct + '%' : fmtMoney(e.price)}</b></label>`).join('')}
+              ${extras.map(e=>{const perCopy=!e.pct&&/копи/i.test(e.unit||'');return `<label class="svc-row check" data-search="${esc(norm(n.name+' '+(e.name||'')+' '+(e.unit||'')+(e.pct?' процент':'')))}"><input type="checkbox" data-ex="${n.id}|${esc(e.id)}|${Number(e.price)||0}|${Number(e.pct)||0}" data-qty="1"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(e.name)} <span class="faint">${esc(e.unit || (e.pct ? '% от стоимости' : ''))}</span></span>${perCopy?`<select class="input" data-exq="${n.id}|${esc(e.id)}|${Number(e.price)||0}|${Number(e.pct)||0}" style="width:58px;min-height:30px;padding:3px 6px;margin-right:6px" aria-label="Количество копий">${[1,2,3,4,5,6,7,8,9,10].map(q=>`<option value="${q}">${q}</option>`).join('')}</select>`:''}<b>${e.pct ? '+' + e.pct + '%' : fmtMoney(e.price)}</b></label>`}).join('')}
             </div>`;
           }).join('') + '<div id="cx-svc-empty" class="small faint" hidden style="padding:8px 0">Ничего не найдено</div>';
           filterSvcs();
@@ -6261,6 +6272,14 @@ const wrap = root.querySelector('.pl-wrap');
         g2('#cx-days').addEventListener('input', ()=>{ syncDaysToDate(); paintRush(); upd(true); });
         g2('#cx-deadline').addEventListener('input', ()=>{ syncDateToDays(); paintRush(); upd(true); });
         g2('#cx-svcs').addEventListener('change', e=>{
+          const qsel = e.target.closest('[data-exq]');
+          if (qsel){
+            const inp = mask.querySelector(`[data-ex="${qsel.dataset.exq}"]`);
+            if (inp) inp.dataset.qty = qsel.value;
+            upd(true);
+            setTimeout(paintNormDeadline, 0);
+            return;
+          }
           const inp = e.target.closest('[data-sv],[data-ex]');
           if (inp && inp.checked){
             const nid = (inp.dataset.sv || inp.dataset.ex || '').split('|')[0];
@@ -6268,6 +6287,7 @@ const wrap = root.querySelector('.pl-wrap');
             if (sel && nid && sel.value !== nid){ sel.value = nid; paintRush(); }
           }
           upd(true);
+          setTimeout(paintNormDeadline, 0);
         });
         /* Услуги правятся в настройках, но выгрузить и догрузить их можно прямо здесь */
         const svcExportBtn = mask.querySelector('[data-cx-export]');

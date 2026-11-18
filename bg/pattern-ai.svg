@@ -10780,34 +10780,24 @@ m72 -49 c-14 -26 -41 -48 -41 -33 0 11 35 51 45 51 3 0 1 -8 -4 -18z m-270
 <path d="M15246 131 c-4 -5 -2 -12 3 -15 5 -4 12 -2 15 3 4 5 2 12 -3 15 -5 4
 -12 2 -15 -3z"/>
 </g>
-<g transform="translate(1235.46 1812.66) scale(1.8047 1.9619)" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M60 25V16"/>
-  <path d="M60 16c-3.4-4.8-10.2-3.1-10.2 2.1 0 4.4 5.5 7.3 10.2 10.1 4.7-2.8 10.2-5.7 10.2-10.1 0-5.2-6.8-6.9-10.2-2.1Z"/>
-  <rect x="25" y="28" width="70" height="50" rx="17"/>
-  <rect x="14" y="43" width="11" height="21" rx="5.5"/>
-  <rect x="95" y="43" width="11" height="21" rx="5.5"/>
-  <circle cx="46" cy="49" r="5.5" fill="#fff"/>
-  <circle cx="74" cy="49" r="5.5" fill="#fff"/>
-  <path d="M52 61c2.8 3.4 5.5 5 8 5s5.2-1.6 8-5"/>
-  <path d="M43 88h34a8 8 0 0 1 8 8v8a8 8 0 0 1-8 8H43a8 8 0 0 1-8-8v-8a8 8 0 0 1 8-8Z"/>
-  <path d="M35 91c-7 0-12 4-12 11"/>
-  <path d="M85 91c7 0 12 4 12 11"/>
-  <path d="M50 112v4M70 112v4"/>
-  <path d="M60 96c-2.2-3-6.3-1.9-6.3 1.2 0 2.5 3.2 4.2 6.3 6 3.1-1.8 6.3-3.5 6.3-6 0-3.1-4.1-4.2-6.3-1.2Z"/>
-</g>
-<g transform="translate(768.78 2696.41) scale(0.2364 0.3175)" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M60 25V16"/>
-  <path d="M60 16c-3.4-4.8-10.2-3.1-10.2 2.1 0 4.4 5.5 7.3 10.2 10.1 4.7-2.8 10.2-5.7 10.2-10.1 0-5.2-6.8-6.9-10.2-2.1Z"/>
-  <rect x="25" y="28" width="70" height="50" rx="17"/>
-  <rect x="14" y="43" width="11" height="21" rx="5.5"/>
-  <rect x="95" y="43" width="11" height="21" rx="5.5"/>
-  <circle cx="46" cy="49" r="5.5" fill="#fff"/>
-  <circle cx="74" cy="49" r="5.5" fill="#fff"/>
-  <path d="M52 61c2.8 3.4 5.5 5 8 5s5.2-1.6 8-5"/>
-  <path d="M43 88h34a8 8 0 0 1 8 8v8a8 8 0 0 1-8 8H43a8 8 0 0 1-8-8v-8a8 8 0 0 1 8-8Z"/>
-  <path d="M35 91c-7 0-12 4-12 11"/>
-  <path d="M85 91c7 0 12 4 12 11"/>
-  <path d="M50 112v4M70 112v4"/>
-  <path d="M60 96c-2.2-3-6.3-1.9-6.3 1.2 0 2.5 3.2 4.2 6.3 6 3.1-1.8 6.3-3.5 6.3-6 0-3.1-4.1-4.2-6.3-1.2Z"/>
-</g>
+<g transform="translate(1235.46 1812.66) scale(1.8047 1.9619)" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M61 31c-4-5-2-12 4-13 6-1 10 5 7 10-2 3-6 4-9 2"/>
+<path d="M74 11l2.2 5.1 5.3 2.2-5.3 2.2L74 26l-2.2-5.5-5.3-2.2 5.3-2.2L74 11Z" fill="#fff" stroke="none"/>
+<path d="M27 40c0-10 8-18 18-18h32c10 0 18 8 18 18v27c0 10-8 18-18 18H45c-10 0-18-8-18-18V40Z"/>
+<rect x="15" y="47" width="11" height="23" rx="5.5"/><rect x="96" y="47" width="11" height="23" rx="5.5"/>
+<path d="M43 53c1-4 5-7 9-7s8 3 9 7v5c0 4-4 7-9 7s-9-3-9-7v-5Z"/><circle cx="52" cy="56" r="2.6" fill="#fff" stroke="none"/>
+<path d="M76 49c4-2 8 0 9 4"/><path d="M48 73c5 5 12 6 18 3"/>
+<path d="M38 94h44a13 13 0 0 1 13 13v9H25v-9a13 13 0 0 1 13-13Z"/>
+<path d="M35 98c-8 0-15 5-17 13"/><path d="M85 98c8 0 15 5 17 13"/><path d="M50 116v6M71 116v6"/>
+<path d="M60 103c-3-4-9-2-9 2 0 4 5 6 9 9 4-3 9-5 9-9 0-4-6-6-9-2Z" fill="#fff" stroke="none"/>
+<circle cx="99" cy="31" r="1.8" fill="#fff" stroke="none"/><path d="M20 25l1.5 3.5L25 30l-3.5 1.5L20 35l-1.5-3.5L15 30l3.5-1.5L20 25Z" fill="#fff" stroke="none"/>
+<path d="M24 98l1 2.4 2.4 1-2.4 1-1 2.4-1-2.4-2.4-1 2.4-1 1-2.4Z" fill="#fff" stroke="none"/><circle cx="105" cy="80" r="1.4" fill="#fff" stroke="none"/></g>
+<g transform="translate(768.78 2696.41) scale(0.2364 0.3175)" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"><path d="M62 29c-3-5 0-11 5-11 5 0 8 5 5 9"/>
+<path d="M70 10l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5Z" fill="#fff" stroke="none"/>
+<path d="M31 44c0-9 7-16 16-16h22c9 0 16 7 16 16v20c0 9-7 16-16 16H47c-9 0-16-7-16-16V44Z"/>
+<circle cx="51" cy="55" r="6"/><circle cx="73" cy="55" r="6"/><circle cx="51" cy="55" r="1.8" fill="#fff" stroke="none"/><circle cx="73" cy="55" r="1.8" fill="#fff" stroke="none"/>
+<path d="M52 70c4 3 8 3 12 0"/>
+<path d="M42 88h32c7 0 12 5 12 12v8H30v-8c0-7 5-12 12-12Z"/>
+<path d="M36 93c-10-3-14 2-15 9M86 93c10-3 14 2 15 9"/>
+<path d="M45 108v7M70 108v7"/><path d="M58 96c-3-4-8-2-8 2 0 3 4 5 8 8 4-3 8-5 8-8 0-4-5-6-8-2Z" fill="#fff" stroke="none"/>
+<circle cx="99" cy="31" r="2" fill="#fff" stroke="none"/><circle cx="21" cy="84" r="1.6" fill="#fff" stroke="none"/></g>
 </svg>
