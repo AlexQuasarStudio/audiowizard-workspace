@@ -335,13 +335,13 @@ function openWinModal({ title='', icon='app', body='', footer='', wide=false, na
   return openModal({ title, body, footer, wide, onMount, onClose });
 }
 
-function openModal({ title='', body='', footer='', wide=false, narrow=false, onClose=null, onMount=null }){
+function openModal({ title='', body='', footer='', wide=false, narrow=false, onClose=null, onMount=null, modalClass='', hideTitle=false }){
   const mask = document.createElement('div');
   mask.className = 'modal-mask';
   mask.innerHTML = `
-    <div class="modal ${wide?'modal--wide':''} ${narrow?'modal--narrow':''}" role="dialog" aria-modal="true">
+    <div class="modal ${wide?'modal--wide':''} ${narrow?'modal--narrow':''} ${modalClass}" role="dialog" aria-modal="true">
       <div class="modal__h">
-        <h3>${title}</h3>
+        <h3${hideTitle?' style="display:none"':''}>${title}</h3>
         <button class="iconbtn modal__x" aria-label="Закрыть">${icon('x')}</button>
       </div>
       <div class="modal__b">${body}</div>

@@ -2753,3 +2753,24 @@ body.capture-privacy::after{content:'Конфиденциальные данны
 .cap-tools button{width:34px;height:34px;border:0;border-radius:9px;background:none;color:var(--text);font-size:17px;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .cap-tools button:hover,.cap-tools button.on{background:var(--accent-soft);color:var(--accent)}
 .cap-tools .spacer{width:8px}
+
+/* Welcome/install modal: как «О приложении» — blur, скролл, без хрома окна */
+.modal--welcome{overflow:visible;max-height:min(88vh,760px)}
+.modal--welcome .modal__h{padding:8px 10px 0;border:0;min-height:38px;justify-content:flex-end}
+.modal--welcome .modal__h h3{display:none}
+.modal--welcome .modal__b{padding:202px 20px 18px;overflow-y:auto;overscroll-behavior:contain}
+.modal--welcome .welcome-mascots--float{position:absolute;left:-54px;right:-54px;top:42px;width:auto;height:188px;margin:0;z-index:2;pointer-events:none}
+.modal--welcome .welcome-hero{padding-top:0}
+.modal--install .modal__b{overflow-y:auto;overscroll-behavior:contain}
+.modal--install .modal__b .card{max-width:none}
+.share-ico{display:inline-flex;vertical-align:-4px;margin-left:4px;color:var(--accent)}
+.share-ico svg{width:16px;height:16px;display:block}
+.sys-ico svg{width:21px;height:21px;display:block}
+@media (max-width:520px){.modal--welcome .welcome-mascots--float{left:-28px;right:-28px;top:34px;height:158px}.modal--welcome .modal__b{padding-top:150px}}
+/* Пузыри: время float в конце текста, реакции не меняют ширину */
+.msg__bubble .txt{display:flow-root}
+.msg__bubble .txt .time{position:static;float:right;margin:2px 0 0 8px;background:none;box-shadow:none;border-radius:0}
+.msg__bubble .txt--time-inline{padding-right:0}
+.msg__foot{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px;width:0;min-width:100%;margin-top:4px}
+.msg__reactions{width:auto;min-width:0;max-width:100%;margin-right:0;flex-wrap:wrap}
+.msg--own .msg__bubble .txt .time{background:none;box-shadow:none}

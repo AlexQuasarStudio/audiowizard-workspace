@@ -22,9 +22,11 @@
   }
 
   async function grabFrame() {
-    if (window.pywebview?.api?.capture_app) {
-      const r = await window.pywebview.api.capture_app();
-      if (r?.data) return loadCanvas(r.data);
+    const native = window.electronAPI || window.multitool || window.pywebview?.api;
+    const nativeCap = native && (native.captureApp || native.capture_app);
+    if (nativeCap) {
+      const r = await nativeCap.call(native);
+      if (r?.data || r?.dataUrl) return loadCanvas(r.data || r.dataUrl);
       if (r?.error) throw new Error(r.error);
     }
     if (!navigator.mediaDevices?.getDisplayMedia) throw new Error('браузер не поддерживает захват экрана');
@@ -235,7 +237,10 @@
   async function openRecord() {
     try {
       privacyOn();
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video:{frameRate:30,displaySurface:'browser'}, audio:false, preferCurrentTab:true });
+      let stream = null;
+      const native = window.electronAPI || window.multitool;
+      if (native && native.captureScreenStream) stream = await native.captureScreenStream();
+      if (!stream) stream = await navigator.mediaDevices.getDisplayMedia({ video:{frameRate:30,displaySurface:'browser'}, audio:false, preferCurrentTab:true });
       openRecordSetup(stream);
     } catch(e){ captureError(e); }
   }

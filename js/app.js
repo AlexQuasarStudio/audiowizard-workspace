@@ -2167,7 +2167,7 @@ ex.innerHTML = avatarHTML(user(), '');
   function offerOnboarding(){
     const u2 = user();
     openWinModal({
-      narrow:true, title:'Добро пожаловать!', locked:true, backdrop:true,
+      narrow:true, title:'Добро пожаловать!', modalClass:'modal--welcome', hideTitle:true,
       body:`${mascotsHTML('welcome-mascots--modal')}
         <div class="welcome-hero"><span class="welcome-kicker">Audiowizard Workspace</span><h2>Добро пожаловать в свою мастерскую</h2><p>Настроим профиль за три шага: расскажите о себе, поставьте аватар и выберите оформление. Всё остальное уже готово к работе.</p></div>
         <div class="stack" style="gap:12px;margin-top:14px">
@@ -2198,9 +2198,9 @@ ex.innerHTML = avatarHTML(user(), '');
         </div>`,
       footer:`<button class="btn btn--ghost" data-skip>Пропустить</button><button class="btn btn--primary" data-go>Сохранить и начать тур</button>`,
       onMount:(m2,c2)=>{
-        (m2.closest('.aw-win') || m2).classList.add('aw-win--welcome');
+        const wm = m2.querySelector('.modal');
         const mrow = m2.querySelector('.welcome-mascots--modal');
-        if (mrow){ mrow.classList.add('welcome-mascots--float'); m2.appendChild(mrow); }
+        if (mrow && wm){ mrow.classList.add('welcome-mascots--float'); wm.appendChild(mrow); }
         let avatarData = null;
         m2.querySelector('#ob-avatar').onclick = ()=>m2.querySelector('#ob-avatar-file').click();
         m2.querySelector('#ob-avatar-file').onchange = e=>{
@@ -2243,25 +2243,31 @@ ex.innerHTML = avatarHTML(user(), '');
   }
   function showInstallHint(){
     if (!S || !S.settings) return;
-    openWinModal({ narrow:true, title:'Приложение на главном экране', icon:'phone', route:'about', locked:true, backdrop:true,
+    const sys = {
+      share:'<svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4 4 4M5 14v5h14v-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      apple:'<svg viewBox="0 0 24 24"><path d="M16.7 12.6c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-1.9-1.5-.1-3 1-3.7 1-.7 0-2-.9-3.3-.9-1.7 0-3.2 1-4.1 2.5-1.8 3.1-.5 7.7 1.3 10.2.9 1.3 1.9 2.7 3.3 2.6 1.3-.1 1.8-.8 3.4-.8s2 .8 3.4.8c1.4 0 2.3-1.3 3.1-2.6.9-1.3 1.3-2.6 1.3-2.7-.1 0-2.9-1.1-2.9-4.4ZM14.2 5.3c.7-.9 1.2-2.1 1.1-3.3-1.1 0-2.3.7-3 1.6-.6.7-1.2 1.9-1 3 1.2.1 2.3-.6 2.9-1.3Z" fill="currentColor"/></svg>',
+      android:'<svg viewBox="0 0 24 24"><path d="M7 9h10v8a2 2 0 0 1-2 2h-1v2h-2v-2h-2v2H8v-2H7a2 2 0 0 1-2-2V9Zm-3 0a1 1 0 0 1 1 1v6a1 1 0 0 1-2 0v-6a1 1 0 0 1 1-1Zm16 0a1 1 0 0 1 1 1v6a1 1 0 0 1-2 0v-6a1 1 0 0 1 1-1ZM8 4.5l-1-1M16 4.5l1-1M7 7h10a5 5 0 0 0-10 0Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="9" cy="5.5" r=".8" fill="currentColor"/><circle cx="15" cy="5.5" r=".8" fill="currentColor"/></svg>',
+      windows:'<svg viewBox="0 0 24 24"><path d="M3 5.5 10.5 4v7H3V5.5Zm8.5-1.7L21 2v9h-9.5V3.8ZM3 12h7.5v7L3 17.5V12Zm8.5 0H21v9l-9.5-1.8V12Z" fill="currentColor"/></svg>'
+    };
+    openModal({ narrow:true, title:'Приложение на главном экране', modalClass:'modal--install',
       body:`<div class="welcome-hero" style="padding-bottom:4px"><span class="welcome-kicker">Быстрый доступ</span><h2>Всегда под рукой</h2><p>Добавьте Audiowizard на экран — приложение откроется без адресной строки и будет работать как обычное.</p></div>
       <div class="stack" style="gap:12px">
-        <div class="card card-pad install-row" style="background:var(--bg-2)"><span class="sys-ico">${icon('phone')}</span><div>
-          <b class="small">iPhone / iPad — Safari</b>
+        <div class="card card-pad install-row" style="background:var(--bg-2)"><span class="sys-ico">${sys.apple}</span><div>
+          <b class="small">iPhone / iPad — Safari</b> <span class="share-ico" title="Поделиться">${sys.share}</span>
           <p class="small" style="margin:6px 0 0">Нажмите кнопку <b>«Поделиться»</b> <span class="muted">(квадрат со стрелкой вверх)</span> → <b>«На экран „Домой“»</b> → «Добавить».</p>
         </div></div>
-        <div class="card card-pad install-row" style="background:var(--bg-2)"><span class="sys-ico">${icon('app')}</span><div>
-          <b class="small">Android — Chrome</b>
+        <div class="card card-pad install-row" style="background:var(--bg-2)"><span class="sys-ico">${sys.android}</span><div>
+          <b class="small">Android — Chrome</b> <span class="share-ico" title="Поделиться">${sys.share}</span>
           <p class="small" style="margin:6px 0 0">Откройте меню <b>⋮</b> справа сверху → <b>«Добавить на главный экран»</b> или «Установить приложение» → подтвердите.</p>
         </div></div>
-        <div class="card card-pad install-row" style="background:var(--bg-2)"><span class="sys-ico">${icon('device')}</span><div>
-          <b class="small">Windows / macOS — Chrome, Edge, Safari</b>
+        <div class="card card-pad install-row" style="background:var(--bg-2)"><span class="sys-ico">${sys.windows}</span><div>
+          <b class="small">Windows / macOS — Chrome, Edge, Safari</b> <span class="share-ico" title="Поделиться">${sys.share}</span>
           <p class="small" style="margin:6px 0 0">Нажмите <b>«Поделиться»</b> в браузере и выберите <b>«Установить приложение»</b> / «Добавить в Dock». В Chrome и Edge также можно нажать иконку установки в адресной строке.</p>
         </div></div>
         <p class="tiny faint" style="margin:0">Если кнопки «Поделиться» нет — откройте меню браузера и найдите пункт «Установить приложение».</p>
       </div>`,
       footer:`<button class="btn btn--primary" data-x>Понятно</button>`,
-      onMount:(m2,c2)=>{ const b=m2.querySelector('[data-x]'); if (b) b.onclick=c2; const w=m2.closest('.aw-win'); if(w) w.classList.add('aw-win--install'); }
+      onMount:(m2,c2)=>{ const b=m2.querySelector('[data-x]'); if (b) b.onclick=c2; }
     });
   }
   function startTour(i){
@@ -4243,6 +4249,7 @@ ex.innerHTML = avatarHTML(user(), '');
     return el ? el.offsetWidth : 0;
   }
   function animateBubbleWidth(mid, prevW){
+    return; /* ширина пузыря не анимируется: реакции не должны «плыть» */
     if (!prevW) return;
     const el = document.querySelector('.msg[data-msg="' + mid + '"] .msg__bubble');
     if (!el) return;
