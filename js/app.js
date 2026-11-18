@@ -1417,7 +1417,7 @@ const QUICK_BY_ROLE = {
       <path d="M77 116c4.6 5.6 8.6 7.8 13 7.8s8.4-2.2 13-7.8" fill="none"/>
       <ellipse cx="52" cy="117" rx="7.5" ry="4.3" fill="var(--mascot-blush)" opacity=".55" stroke="none"/>
       <ellipse cx="128" cy="117" rx="7.5" ry="4.3" fill="var(--mascot-blush)" opacity=".55" stroke="none"/>
-      <path d="M48 150h84a16 16 0 0 1 16 16v6a12 12 0 0 1-12 12H44a12 12 0 0 1-12-12v-6a16 16 0 0 1 16-16Z" fill="var(--mascot-body-1)"/>
+      <path d="M48 150h84a16 16 0 0 1 16 16v6a12 12 0 0 1-12 12H44a12 12 0 0 1-12-12v-6a16 16 0 0 1 16-16Z" fill="var(--mascot-body-1)"/><path d="M90 150l7 6-7 26-7-26 7-6Z" fill="var(--mascot-heart-2)" stroke="var(--mascot-line)" stroke-width="2"/>
       <path d="M56 151c-8 1-14 6-15 13" fill="none"/>
       <path d="M124 151c8 1 14 6 15 13" fill="none"/>
       <path d="M72 184v6M108 184v6" fill="none"/>
@@ -1455,7 +1455,7 @@ const QUICK_BY_ROLE = {
       <path d="M137 82c-5 7-4 13 1 13 5 0 6-6 1-13Z" fill="#9bd7ff" stroke="var(--mascot-line)" stroke-width="2.2"/>
       <ellipse cx="52" cy="117" rx="7.5" ry="4.3" fill="var(--mascot-blush)" opacity=".55" stroke="none"/>
       <ellipse cx="128" cy="117" rx="7.5" ry="4.3" fill="var(--mascot-blush)" opacity=".55" stroke="none"/>
-      <path d="M48 150h84a16 16 0 0 1 16 16v6a12 12 0 0 1-12 12H44a12 12 0 0 1-12-12v-6a16 16 0 0 1 16-16Z" fill="var(--mascot-body-1)"/>
+      <path d="M48 150h84a16 16 0 0 1 16 16v6a12 12 0 0 1-12 12H44a12 12 0 0 1-12-12v-6a16 16 0 0 1 16-16Z" fill="var(--mascot-body-1)"/><path d="M90 150l7 6-7 26-7-26 7-6Z" fill="var(--mascot-heart-2)" stroke="var(--mascot-line)" stroke-width="2"/>
       <path d="M56 151c-8 1-14 6-15 13" fill="none"/>
       <path d="M124 151c8 1 14 6 15 13" fill="none"/>
       <path d="M72 184v6M108 184v6" fill="none"/>
@@ -2249,7 +2249,7 @@ ex.innerHTML = avatarHTML(user(), '');
       android:'<svg viewBox="0 0 24 24"><path d="M7 9h10v8a2 2 0 0 1-2 2h-1v2h-2v-2h-2v2H8v-2H7a2 2 0 0 1-2-2V9Zm-3 0a1 1 0 0 1 1 1v6a1 1 0 0 1-2 0v-6a1 1 0 0 1 1-1Zm16 0a1 1 0 0 1 1 1v6a1 1 0 0 1-2 0v-6a1 1 0 0 1 1-1ZM8 4.5l-1-1M16 4.5l1-1M7 7h10a5 5 0 0 0-10 0Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="9" cy="5.5" r=".8" fill="currentColor"/><circle cx="15" cy="5.5" r=".8" fill="currentColor"/></svg>',
       windows:'<svg viewBox="0 0 24 24"><path d="M3 5.5 10.5 4v7H3V5.5Zm8.5-1.7L21 2v9h-9.5V3.8ZM3 12h7.5v7L3 17.5V12Zm8.5 0H21v9l-9.5-1.8V12Z" fill="currentColor"/></svg>'
     };
-    openModal({ narrow:true, title:'Приложение на главном экране', modalClass:'modal--install',
+    openModal({ narrow:true, title:'Приложение на главном экране', modalClass:'modal--install', hideTitle:true,
       body:`<div class="welcome-hero" style="padding-bottom:4px"><span class="welcome-kicker">Быстрый доступ</span><h2>Всегда под рукой</h2><p>Добавьте Audiowizard на экран — приложение откроется без адресной строки и будет работать как обычное.</p></div>
       <div class="stack" style="gap:12px">
         <div class="card card-pad install-row" style="background:var(--bg-2)"><span class="sys-ico">${sys.apple}</span><div>

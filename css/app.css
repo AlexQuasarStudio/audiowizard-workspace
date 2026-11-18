@@ -2751,7 +2751,14 @@ body.capture-privacy::after{content:'Конфиденциальные данны
 .cap-rec-setup video{max-width:100%;max-height:100%;border-radius:10px;cursor:crosshair}
 .cap-rec-bar{position:fixed;left:50%;top:18px;bottom:auto;transform:translateX(-50%);z-index:9000;display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:14px;background:rgba(18,14,26,.94);color:#fff;box-shadow:0 12px 40px rgba(0,0,0,.4);font-size:12px}
 .cap-rec-bar b{color:#ff8b8b}.cap-rec-time{font-variant-numeric:tabular-nums;min-width:38px}
-.cap-rec-bar .btn--danger{background:#d9534f;border-color:#d9534f;color:#fff}
+.cap-rec-bar .btn--danger{background:#d9534f;border-color:#d9534f;color:#fff!important}
+.cap-rec-bar .btn--danger:hover{color:#fff!important}
+.cap-rec-live{position:fixed;inset:0;z-index:8200;pointer-events:none}
+.cap-rec-live .cap-anno{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
+.cap-rec-live .cap-rec-tools{pointer-events:auto;z-index:2}
+.cap-rec-live .cap-anno[style*="pointer-events: auto"]{pointer-events:auto!important}
+.modal--install .modal__h h3{display:none}
+.modal--install .modal__h{justify-content:flex-end;border:0;padding:8px 10px 0;min-height:38px}
 
 .cap-tools{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:8100;display:flex;align-items:center;gap:2px;padding:6px 8px;border-radius:16px;background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--border-2);box-shadow:0 12px 40px rgba(0,0,0,.32);backdrop-filter:blur(18px)}
 .cap-tools button{width:34px;height:34px;border:0;border-radius:9px;background:none;color:var(--text);font-size:17px;display:flex;align-items:center;justify-content:center;cursor:pointer}
@@ -2762,7 +2769,7 @@ body.capture-privacy::after{content:'Конфиденциальные данны
 .modal--welcome{overflow:visible;max-height:min(88vh,760px)}
 .modal--welcome .modal__h{padding:8px 10px 0;border:0;min-height:38px;justify-content:flex-end}
 .modal--welcome .modal__h h3{display:none}
-.modal--welcome .modal__b{padding:202px 20px 18px;overflow-y:auto;overscroll-behavior:contain}
+.modal--welcome .modal__b{padding:246px 20px 18px;overflow-y:auto;overscroll-behavior:contain}
 .modal--welcome .welcome-mascots--float{position:absolute;left:-54px;right:-54px;top:42px;width:auto;height:188px;margin:0;z-index:2;pointer-events:none}
 .modal--welcome .welcome-hero{padding-top:0}
 .modal--install .modal__b{overflow-y:auto;overscroll-behavior:contain}
@@ -2770,7 +2777,7 @@ body.capture-privacy::after{content:'Конфиденциальные данны
 .share-ico{display:inline-flex;vertical-align:-4px;margin-left:4px;color:var(--accent)}
 .share-ico svg{width:16px;height:16px;display:block}
 .sys-ico svg{width:21px;height:21px;display:block}
-@media (max-width:520px){.modal--welcome .welcome-mascots--float{left:-28px;right:-28px;top:34px;height:158px}.modal--welcome .modal__b{padding-top:150px}}
+@media (max-width:520px){.modal--welcome .welcome-mascots--float{left:-28px;right:-28px;top:34px;height:158px}.modal--welcome .modal__b{padding-top:184px}}
 /* Пузыри: время float в конце текста, реакции не меняют ширину */
 .msg__bubble .txt{display:flow-root}
 .msg__bubble .txt .time{position:static;float:right;margin:2px 0 0 8px;background:none;box-shadow:none;border-radius:0}
