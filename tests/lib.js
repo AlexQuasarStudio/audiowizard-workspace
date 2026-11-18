@@ -47,11 +47,15 @@ async function openPage(browser, { width = 1440, height = 1000 } = {}){
 async function login(page, uid = 'u-admin'){
   await page.click(`.demo-chip[data-demo="${uid}"]`);
   await page.waitForTimeout(1000);
+  /* Cookie-плашка перекрывает онбординг на телефоне — закрываем её первой. */
   await page.evaluate(() => {
     const b = document.querySelector('.cookie-bar [data-ok]');
     if (b) b.click();
-    if (window.Windows) Windows.closeAll();
   });
+  /* Онбординг показывается не всем, но тестам он мешает: закрываем «Пропустить». */
+  const skip = await page.$('.modal--welcome [data-skip]');
+  if (skip){ await skip.click(); await page.waitForTimeout(350); }
+  await page.evaluate(() => { if (window.Windows) Windows.closeAll(); });
   await page.waitForTimeout(250);
 }
 

@@ -1391,75 +1391,57 @@ const QUICK_BY_ROLE = {
       .map(r => noDemo(S.users).find(u => u.role === r))
       .filter(Boolean);
   }
-  const MASCOT_ROBOT_SVG = `<svg class="mascot-svg" viewBox="0 0 180 200" role="img" aria-label="Робот"><defs>
-  <linearGradient id="nr-shell" x1="35" y1="45" x2="150" y2="160" gradientUnits="userSpaceOnUse"><stop style="stop-color:var(--mascot-shell-1,#efe6ff)"/><stop offset=".52" style="stop-color:var(--mascot-shell-2,#c9b1ff)"/><stop offset="1" style="stop-color:var(--mascot-shell-3,#9678e8)"/></linearGradient>
-  <linearGradient id="nr-screen" x1="55" y1="70" x2="125" y2="135" gradientUnits="userSpaceOnUse"><stop style="stop-color:var(--mascot-face-1,#fffdf5)"/><stop offset="1" style="stop-color:var(--mascot-face-2,#ffe9c9)"/></linearGradient>
-  <linearGradient id="nr-body" x1="55" y1="150" x2="126" y2="188" gradientUnits="userSpaceOnUse"><stop style="stop-color:var(--mascot-body-1,#b7a0ff)"/><stop offset="1" style="stop-color:var(--mascot-body-2,#7558ce)"/></linearGradient>
-  <linearGradient id="nr-heart" x1="76" y1="10" x2="104" y2="38" gradientUnits="userSpaceOnUse"><stop style="stop-color:var(--mascot-heart-1,#ffadad)"/><stop offset="1" style="stop-color:var(--mascot-heart-2,#f06d8f)"/></linearGradient>
-  <filter id="nr-soft" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dx="0" dy="8" stdDeviation="7" flood-color="#2b2147" flood-opacity=".18"/></filter>
-  <filter id="nr-glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="5"/></filter>
-  </defs>
-
-    <ellipse cx="90" cy="188" rx="59" ry="7" fill="#2b2147" opacity=".16"/>
-    <circle cx="90" cy="24" r="20" fill="var(--mascot-glow)" opacity=".22" filter="url(#nr-glow)"/>
-    <g filter="url(#nr-soft)" stroke="var(--mascot-line)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M90 48V30" fill="none"/>
-      <rect x="12" y="83" width="19" height="38" rx="9" fill="var(--mascot-shell-3)"/>
-      <rect x="149" y="83" width="19" height="38" rx="9" fill="var(--mascot-shell-3)"/>
-      <path d="M33 58h114a14 14 0 0 1 14 14v73a14 14 0 0 1-14 14H33a14 14 0 0 1-14-14V72a14 14 0 0 1 14-14Z" fill="var(--mascot-shell-2)"/>
-      <path d="M42 66h96a9 9 0 0 1 9 9v9H33v-9a9 9 0 0 1 9-9Z" fill="var(--mascot-inset)" opacity=".22" stroke="none"/>
-      <rect x="43" y="76" width="94" height="62" rx="25" fill="var(--mascot-face-1)"/>
-      <ellipse cx="69" cy="101" rx="6.8" ry="9" fill="var(--mascot-eye)"/>
-      <ellipse cx="111" cy="101" rx="6.8" ry="9" fill="var(--mascot-eye)"/>
-      <circle cx="71" cy="98" r="2.2" fill="var(--mascot-pupil)" stroke="none"/>
-      <circle cx="113" cy="98" r="2.2" fill="var(--mascot-pupil)" stroke="none"/>
-      <path d="M77 116c4.6 5.6 8.6 7.8 13 7.8s8.4-2.2 13-7.8" fill="none"/>
-      <ellipse cx="52" cy="117" rx="7.5" ry="4.3" fill="var(--mascot-blush)" opacity=".55" stroke="none"/>
-      <ellipse cx="128" cy="117" rx="7.5" ry="4.3" fill="var(--mascot-blush)" opacity=".55" stroke="none"/>
-      <path d="M48 150h84a16 16 0 0 1 16 16v6a12 12 0 0 1-12 12H44a12 12 0 0 1-12-12v-6a16 16 0 0 1 16-16Z" fill="var(--mascot-body-1)"/><path d="M90 150l7 6-7 26-7-26 7-6Z" fill="var(--mascot-heart-2)" stroke="var(--mascot-line)" stroke-width="2"/>
-      <path d="M56 151c-8 1-14 6-15 13" fill="none"/>
-      <path d="M124 151c8 1 14 6 15 13" fill="none"/>
-      <path d="M72 184v6M108 184v6" fill="none"/>
-      <path d="M63 67c9-4 18-5 27-3" fill="none" opacity=".55"/>
-    </g>
-    <path d="M151 45l2.5 7 7 2.5-7 2.5-2.5 7-2.5-7-7-2.5 7-2.5 2.5-7Z" fill="var(--mascot-spark)" opacity=".9"/>
-    <circle cx="29" cy="45" r="3.5" fill="var(--mascot-glow)" opacity=".8"/>
+  const MASCOT_ROBOT_SVG = `<svg class="mascot-svg" viewBox="0 0 180 200" role="img" aria-label="Робот"><ellipse cx="90" cy="190" rx="50" ry="6" fill="#202124" opacity=".12"/>
+  <g stroke="none">
+    <circle cx="90" cy="22" r="5" fill="#4285F4"/><circle cx="99" cy="25" r="5" fill="#EA4335"/>
+    <circle cx="90" cy="32" r="5" fill="#FBBC05"/><circle cx="81" cy="25" r="5" fill="#34A853"/>
+  </g>
+  <g stroke="#5F6368" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M90 50V31" fill="none"/>
+    <rect x="14" y="82" width="15" height="40" rx="7.5" fill="#4285F4"/>
+    <rect x="151" y="82" width="15" height="40" rx="7.5" fill="#34A853"/>
+    <rect x="30" y="56" width="120" height="88" rx="30" fill="#fff"/>
+    <rect x="46" y="73" width="88" height="54" rx="21" fill="#F1F3F4" stroke="none"/>
+    <circle cx="70" cy="97" r="7" fill="#202124" stroke="none"/>
+    <circle cx="110" cy="97" r="7" fill="#202124" stroke="none"/>
+    <circle cx="72" cy="94" r="2.2" fill="#fff" stroke="none"/>
+    <circle cx="112" cy="94" r="2.2" fill="#fff" stroke="none"/>
+    <path d="M78 112c4 5 8 6.5 12 6.5s8-1.5 12-6.5" fill="none"/>
+    <rect x="44" y="146" width="92" height="44" rx="20" fill="#fff"/>
+    <circle cx="66" cy="168" r="5" fill="#4285F4" stroke="none"/>
+    <circle cx="82" cy="168" r="5" fill="#EA4335" stroke="none"/>
+    <circle cx="98" cy="168" r="5" fill="#FBBC05" stroke="none"/>
+    <circle cx="114" cy="168" r="5" fill="#34A853" stroke="none"/>
+    <path d="M59 150c-8 2-13 8-14 16M121 150c8 2 13 8 14 16" fill="none"/>
+    <path d="M72 190v4M108 190v4" fill="none"/>
+  </g>
   </svg>`;
-  const MASCOT_ROBOT_ERROR_SVG = `<svg class="mascot-svg" viewBox="0 0 180 200" role="img" aria-label="Растерянный робот"><defs>
-  <linearGradient id="er-shell" x1="35" y1="45" x2="150" y2="160" gradientUnits="userSpaceOnUse"><stop style="stop-color:var(--mascot-shell-1,#efe6ff)"/><stop offset=".52" style="stop-color:var(--mascot-shell-2,#c9b1ff)"/><stop offset="1" style="stop-color:var(--mascot-shell-3,#9678e8)"/></linearGradient>
-  <linearGradient id="er-screen" x1="55" y1="70" x2="125" y2="135" gradientUnits="userSpaceOnUse"><stop style="stop-color:var(--mascot-face-1,#fffdf5)"/><stop offset="1" style="stop-color:var(--mascot-face-2,#ffe9c9)"/></linearGradient>
-  <linearGradient id="er-body" x1="55" y1="150" x2="126" y2="188" gradientUnits="userSpaceOnUse"><stop style="stop-color:var(--mascot-body-1,#b7a0ff)"/><stop offset="1" style="stop-color:var(--mascot-body-2,#7558ce)"/></linearGradient>
-  <linearGradient id="er-heart" x1="76" y1="10" x2="104" y2="38" gradientUnits="userSpaceOnUse"><stop style="stop-color:var(--mascot-heart-1,#ffadad)"/><stop offset="1" style="stop-color:var(--mascot-heart-2,#f06d8f)"/></linearGradient>
-  <filter id="er-soft" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dx="0" dy="8" stdDeviation="7" flood-color="#2b2147" flood-opacity=".18"/></filter>
-  <filter id="er-glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="5"/></filter>
-  </defs>
-
-    <ellipse cx="90" cy="188" rx="59" ry="7" fill="#2b2147" opacity=".16"/>
-    <circle cx="90" cy="24" r="20" fill="var(--mascot-glow)" opacity=".22" filter="url(#er-glow)"/>
-    <g filter="url(#er-soft)" stroke="var(--mascot-line)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M90 48V30" fill="none"/>
-      <rect x="12" y="83" width="19" height="38" rx="9" fill="var(--mascot-shell-3)"/>
-      <rect x="149" y="83" width="19" height="38" rx="9" fill="var(--mascot-shell-3)"/>
-      <path d="M33 58h114a14 14 0 0 1 14 14v73a14 14 0 0 1-14 14H33a14 14 0 0 1-14-14V72a14 14 0 0 1 14-14Z" fill="var(--mascot-shell-2)"/>
-      <path d="M42 66h96a9 9 0 0 1 9 9v9H33v-9a9 9 0 0 1 9-9Z" fill="var(--mascot-inset)" opacity=".22" stroke="none"/>
-      <rect x="43" y="76" width="94" height="62" rx="25" fill="var(--mascot-face-1)"/>
-      <path d="M55 91c5-4 10-3 14 1" fill="none"/>
-      <path d="M101 88c5-1 10 1 13 5" fill="none"/>
-      <ellipse cx="69" cy="102" rx="6.2" ry="8.6" fill="var(--mascot-eye)"/>
-      <circle cx="71" cy="99" r="2.1" fill="var(--mascot-pupil)" stroke="none"/>
-      <path d="M104 102c4-5 9-3 11 2" fill="none"/>
-      <path d="M77 119c4-5 8 4 12 0s8 5 13 0" fill="none"/>
-      <path d="M137 82c-5 7-4 13 1 13 5 0 6-6 1-13Z" fill="#9bd7ff" stroke="var(--mascot-line)" stroke-width="2.2"/>
-      <ellipse cx="52" cy="117" rx="7.5" ry="4.3" fill="var(--mascot-blush)" opacity=".55" stroke="none"/>
-      <ellipse cx="128" cy="117" rx="7.5" ry="4.3" fill="var(--mascot-blush)" opacity=".55" stroke="none"/>
-      <path d="M48 150h84a16 16 0 0 1 16 16v6a12 12 0 0 1-12 12H44a12 12 0 0 1-12-12v-6a16 16 0 0 1 16-16Z" fill="var(--mascot-body-1)"/><path d="M90 150l7 6-7 26-7-26 7-6Z" fill="var(--mascot-heart-2)" stroke="var(--mascot-line)" stroke-width="2"/>
-      <path d="M56 151c-8 1-14 6-15 13" fill="none"/>
-      <path d="M124 151c8 1 14 6 15 13" fill="none"/>
-      <path d="M72 184v6M108 184v6" fill="none"/>
-      <path d="M63 67c9-4 18-5 27-3" fill="none" opacity=".55"/>
-    </g>
-    <path d="M151 45l2.5 7 7 2.5-7 2.5-2.5 7-2.5-7-7-2.5 7-2.5 2.5-7Z" fill="var(--mascot-spark)" opacity=".9"/>
-    <circle cx="29" cy="45" r="3.5" fill="var(--mascot-glow)" opacity=".8"/>
+  const MASCOT_ROBOT_ERROR_SVG = `<svg class="mascot-svg" viewBox="0 0 180 200" role="img" aria-label="Растерянный робот"><ellipse cx="90" cy="190" rx="50" ry="6" fill="#202124" opacity=".12"/>
+  <g stroke="none">
+    <circle cx="90" cy="22" r="5" fill="#4285F4"/><circle cx="99" cy="25" r="5" fill="#EA4335"/>
+    <circle cx="90" cy="32" r="5" fill="#FBBC05"/><circle cx="81" cy="25" r="5" fill="#34A853"/>
+  </g>
+  <g stroke="#5F6368" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M90 50V31" fill="none"/>
+    <rect x="14" y="82" width="15" height="40" rx="7.5" fill="#4285F4"/>
+    <rect x="151" y="82" width="15" height="40" rx="7.5" fill="#34A853"/>
+    <rect x="30" y="56" width="120" height="88" rx="30" fill="#fff"/>
+    <rect x="46" y="73" width="88" height="54" rx="21" fill="#F1F3F4" stroke="none"/>
+    <path d="M58 91c5-5 10-4 14 0M108 91c4-4 9-5 14 0" fill="none"/>
+    <circle cx="70" cy="99" r="6.4" fill="#202124" stroke="none"/>
+    <circle cx="110" cy="99" r="6.4" fill="#202124" stroke="none"/>
+    <circle cx="72" cy="96" r="2" fill="#fff" stroke="none"/>
+    <circle cx="112" cy="96" r="2" fill="#fff" stroke="none"/>
+    <path d="M78 116c4-4 8 4 12 0s8 4 12 0" fill="none"/>
+    <path d="M128 82c-4 6-3 12 1 12 4 0 5-6 1-12Z" fill="#8AB4F8" stroke="#5F6368" stroke-width="2"/>
+    <rect x="44" y="146" width="92" height="44" rx="20" fill="#fff"/>
+    <circle cx="66" cy="168" r="5" fill="#4285F4" stroke="none"/>
+    <circle cx="82" cy="168" r="5" fill="#EA4335" stroke="none"/>
+    <circle cx="98" cy="168" r="5" fill="#FBBC05" stroke="none"/>
+    <circle cx="114" cy="168" r="5" fill="#34A853" stroke="none"/>
+    <path d="M59 150c-8 2-13 8-14 16M121 150c8 2 13 8 14 16" fill="none"/>
+    <path d="M72 190v4M108 190v4" fill="none"/>
+  </g>
   </svg>`;
     function mascotsHTML(cls=''){
     return `<div class="welcome-mascots ${cls}" aria-hidden="true">
@@ -2162,8 +2144,8 @@ ex.innerHTML = avatarHTML(user(), '');
   ];
   function offerOnboarding(){
     const u2 = user();
-    openWinModal({
-      narrow:true, title:'Добро пожаловать!', modalClass:'modal--welcome', hideTitle:true,
+    openModal({
+      narrow:true, title:'Добро пожаловать!', modalClass:'modal--welcome', hideTitle:true, dismissible:false,
       body:`${mascotsHTML('welcome-mascots--modal')}
         <div class="welcome-hero"><span class="welcome-kicker">Audiowizard Workspace</span><h2>Добро пожаловать в свою мастерскую</h2><p>Настроим профиль за три шага: расскажите о себе, поставьте аватар и выберите оформление. Всё остальное уже готово к работе.</p></div>
         <div class="stack" style="gap:12px;margin-top:14px">
@@ -2246,7 +2228,7 @@ ex.innerHTML = avatarHTML(user(), '');
       android:'<svg viewBox="0 0 24 24"><path d="M7 9h10v8a2 2 0 0 1-2 2h-1v2h-2v-2h-2v2H8v-2H7a2 2 0 0 1-2-2V9Zm-3 0a1 1 0 0 1 1 1v6a1 1 0 0 1-2 0v-6a1 1 0 0 1 1-1Zm16 0a1 1 0 0 1 1 1v6a1 1 0 0 1-2 0v-6a1 1 0 0 1 1-1ZM8 4.5l-1-1M16 4.5l1-1M7 7h10a5 5 0 0 0-10 0Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="9" cy="5.5" r=".8" fill="currentColor"/><circle cx="15" cy="5.5" r=".8" fill="currentColor"/></svg>',
       windows:'<svg viewBox="0 0 24 24"><path d="M3 5.5 10.5 4v7H3V5.5Zm8.5-1.7L21 2v9h-9.5V3.8ZM3 12h7.5v7L3 17.5V12Zm8.5 0H21v9l-9.5-1.8V12Z" fill="currentColor"/></svg>'
     };
-    openModal({ narrow:true, title:'Приложение на главном экране', modalClass:'modal--install', hideTitle:true,
+    openModal({ narrow:true, title:'Приложение на главном экране', modalClass:'modal--install', hideTitle:true, dismissible:false,
       body:`<div class="welcome-hero" style="padding-bottom:4px"><span class="welcome-kicker">Быстрый доступ</span><h2>Всегда под рукой</h2><p>Добавьте Audiowizard на экран — приложение откроется без адресной строки и будет работать как обычное.</p></div>
       <div class="stack" style="gap:12px">
         <div class="card card-pad install-row" style="background:var(--bg-2)"><span class="sys-ico">${sys.apple}</span><div>
@@ -4389,11 +4371,13 @@ ex.innerHTML = avatarHTML(user(), '');
       if (!lay) return;
       if (!isMobileChats()){
         lay.classList.remove('chats-layout--withlist');
+        root.classList.remove('chats-chat-open');
         if (list) list.classList.remove('open');
         if (back) back.style.display = 'none';
         return;
       }
       lay.classList.toggle('chats-layout--withlist', showList);
+      root.classList.toggle('chats-chat-open', !showList);
       if (list) list.classList.toggle('open', showList);
       if (back) back.style.display = showList ? 'none' : 'flex';
     };
@@ -11684,7 +11668,7 @@ function initPWA(){
        делала из той же картинки второй сетевой запрос — браузер видел
        другой ключ кэша. Свежесть узора обеспечивает service worker:
        PRECACHE обновляется вместе со сборкой. */
-    const maskUrl = 'url("bg/pattern-ai.svg?v=1485")';
+    const maskUrl = 'url("bg/pattern-ai.svg?v=1492")';
     const cacheKey = cur + '|' + t + '|bg11';
     /* Единая отрисовка: маску ставим ВСЕГДА. После перерисовки разметки
        (#bg-doodles пересоздаётся при навигации) слой терял маску и узор «отваливался». */
@@ -11704,9 +11688,9 @@ function initPWA(){
       /* Ровный узор по всему экрану: затухание к центру нужно только заставке. */
       el.style.webkitMaskImage = mask;
       el.style.maskImage = mask;
-      /* Фиксированный тайл (холст 1600×3200 → 1:2): масштаб не зависит от высоты экрана */
-      el.style.webkitMaskSize = '440px 880px';
-      el.style.maskSize = '440px 880px';
+      /* Фиксированный тайл (холст 600×600 → 1:1): масштаб не зависит от высоты экрана */
+      el.style.webkitMaskSize = '440px 440px';
+      el.style.maskSize = '440px 440px';
       el.style.webkitMaskRepeat = 'repeat';
       el.style.maskRepeat = 'repeat';
       el.style.webkitMaskPosition = 'top left';

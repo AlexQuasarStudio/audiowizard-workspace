@@ -5709,6 +5709,10 @@ const wrap = root.querySelector('.pl-wrap');
       onMount:(mask, close)=>{
         const g2 = s=>mask.querySelector(s);
         let val = 0;
+        /* Выражение до автоматических множителей (проценты, промокод):
+           в поле показываем «1000 × 1,3 × 0,9», а считаем от 1000. */
+        let autoBase = null;
+        let userTyping = false;
         const compute = raw => {
           const js = String(raw).replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-').replace(/,/g,'.').replace(/\s+/g,'');
           if (!js) return null;
@@ -5754,13 +5758,26 @@ const wrap = root.querySelector('.pl-wrap');
           el._calcRaf = requestAnimationFrame(step);
         };
         const upd = (animate=false)=>{
-          const raw = g2('#cx-in').value;
-          const v = compute(raw);
-          val = v;
+          const raw = autoBase != null ? autoBase : g2('#cx-in').value;
+          val = compute(raw);
+          const d = calcDiscount();
+          syncExpr(d.pct);
           paintTotals(animate);
           paintDiscount(animate);
         };
-        g2('#cx-in').addEventListener('input', ()=>upd(false));
+        g2('#cx-in').addEventListener('input', e=>{
+          if (autoBase != null){
+            /* Пользователь правит поле вручную — новый текст становится базой. */
+            autoBase = e.isTrusted ? g2('#cx-in').value : autoBase;
+          }
+          userTyping = true;
+          upd(false);
+          userTyping = false;
+        });
+        g2('#cx-in').addEventListener('focus', ()=>{
+          const inp = g2('#cx-in');
+          if (autoBase != null && inp.value !== autoBase) inp.select();
+        });
         g2('#cx-in').addEventListener('keydown', e=>{
           if (e.key === 'Enter' && !isNaN(val) && val){
             S.calcHistory.push({ expression: g2('#cx-in').value, result:round2(val) });
@@ -5772,6 +5789,7 @@ const wrap = root.querySelector('.pl-wrap');
               onResult(d.sum, metaOf(d));
               toast(`Подставлено: ${fmtMoney(d.sum)}${d.rush ? ` · срочно +${d.rushPct}%` : ''}`, 'ok');
             }
+            autoBase = null;
             g2('#cx-in').value = ''; upd();
           }
         });
@@ -5997,6 +6015,7 @@ const wrap = root.querySelector('.pl-wrap');
           const qtyTxt = Number(v.qty).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
           note.innerHTML = `${qtyTxt} ${label} × ${(+v.rate.toFixed(2)).toLocaleString('ru-RU')} ₽ = <b>${fmtMoney(Math.round(v.qty * v.rate))}</b>`;
           if (auto){
+            autoBase = null;
             g2('#cx-in').value = `${v.qty} × ${rateStr}`;
             upd(animate);
           }
@@ -6037,26 +6056,25 @@ const wrap = root.querySelector('.pl-wrap');
         const svcOnlySum = () => picked().filter(x => x.kind === 'sv').reduce((s,x)=>s+x.price, 0);
         const fixedExtraSum = () => picked().filter(x => x.kind === 'ex' && !x.pct).reduce((s,x)=>s+x.price, 0);
         const pctSum = () => picked().filter(x => x.kind === 'ex' && x.pct > 0).reduce((s,x)=>s+x.pct, 0);
-        const pctApplied = () => {
-          const inp = g2('#cx-in');
-          return !!(inp && inp.dataset.pctApplied && Number(inp.dataset.pctApplied) === pctSum());
-        };
-        const syncPctExpr = () => {
+        const preExtra = () => (isNaN(val) ? 0 : val) + svcOnlySum();
+        /* Показываем в поле множители надбавок и промокода. База хранится
+           отдельно: иначе скидка и надбавка посчитались бы дважды. */
+        const syncExpr = (promoPct = 0) => {
           const inp = g2('#cx-in'); if (!inp) return;
+          if (userTyping) return;
+          if (autoBase == null) autoBase = inp.value;
           const pct = pctSum();
-          if (!pct){
-            if (inp.dataset.pctBase != null) inp.value = inp.dataset.pctBase;
-            delete inp.dataset.pctBase; delete inp.dataset.pctApplied;
+          const mults = [];
+          if (pct) mults.push(1 + pct / 100);
+          if (promoPct) mults.push(1 - promoPct / 100);
+          if (!mults.length){
+            if (autoBase != null) inp.value = autoBase;
+            autoBase = null;
             return;
           }
-          if (inp.dataset.pctBase == null) inp.dataset.pctBase = inp.value;
-          const mult = 1 + pct / 100;
-          inp.value = `${inp.dataset.pctBase} × ${+mult.toFixed(3)}`;
-          inp.dataset.pctApplied = String(pct);
+          if (!String(autoBase).trim()) return;
+          inp.value = `${autoBase}${mults.map(m => ` × ${+m.toFixed(3)}`).join('')}`;
         };
-        const preExtra = () => (isNaN(val) ? 0 : val) + svcOnlySum();
-        const pctFee = () => pctApplied() ? 0 : Math.round(preExtra() * pctSum() / 100);
-        const svcSum = () => preExtra() + fixedExtraSum() + pctFee();
         /* Свой срок: если он короче обычного срока ниши, заказ считается
            срочным и к сумме применяется надбавка из настроек. */
         const deadlineState = () => {
@@ -6078,7 +6096,7 @@ const wrap = root.querySelector('.pl-wrap');
           const hours = volumeHours();
           const code = String(g2('#cx-promo').value || '').trim().toUpperCase();
           const fixed = fixedExtraSum();
-          const extraPct = pctApplied() ? 0 : pctSum();
+          const extraPct = pctSum();
           const priced = (isNaN(val) ? 0 : val) + svcOnlySum();
           const extraFee = Math.round(priced * extraPct / 100);
           const langFee = langPair() ? Math.round((priced + fixed + extraFee) * langSurcharge() / 100) : 0;
@@ -6251,7 +6269,7 @@ const wrap = root.querySelector('.pl-wrap');
             if (!extras.length) return '';
             return `<div class="small cx-svc-group"><b style="margin-bottom:4px;display:block">${esc(n.name)}</b>
               <div class="tiny faint" data-svc-extra style="margin:6px 0 2px">Доп. опции</div>
-              ${extras.map(e=>{const perCopy=!e.pct&&/копи/i.test(e.unit||'');return `<label class="svc-row check" data-search="${esc(norm(n.name+' '+(e.name||'')+' '+(e.unit||'')+(e.pct?' процент':'')))}"><input type="checkbox" data-ex="${n.id}|${esc(e.id)}|${Number(e.price)||0}|${Number(e.pct)||0}" data-qty="1"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(e.name)} <span class="faint">${esc(e.unit || (e.pct ? '% от стоимости' : ''))}</span></span>${perCopy?`<select class="input" data-exq="${n.id}|${esc(e.id)}|${Number(e.price)||0}|${Number(e.pct)||0}" style="width:58px;min-height:30px;padding:3px 6px;margin-right:6px" aria-label="Количество копий">${[1,2,3,4,5,6,7,8,9,10].map(q=>`<option value="${q}">${q}</option>`).join('')}</select>`:''}<b>${e.pct ? '+' + e.pct + '%' : fmtMoney(e.price)}</b></label>`}).join('')}
+              ${extras.map(e=>{const perCopy=!e.pct&&/копи|распечат|экземпляр/i.test(e.unit||'');return `<label class="svc-row check" data-search="${esc(norm(n.name+' '+(e.name||'')+' '+(e.unit||'')+(e.pct?' процент':'')))}"><input type="checkbox" data-ex="${n.id}|${esc(e.id)}|${Number(e.price)||0}|${Number(e.pct)||0}" data-qty="1"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(e.name)} <span class="faint">${esc(e.unit || (e.pct ? '% от стоимости' : ''))}</span></span>${perCopy?`<span class="calc-qty"><input class="input" data-exq="${n.id}|${esc(e.id)}|${Number(e.price)||0}|${Number(e.pct)||0}" type="number" min="1" max="999" step="1" value="1" inputmode="numeric" aria-label="Количество копий или распечаток"><span class="faint">×</span></span>`:''}<b>${e.pct ? '+' + e.pct + '%' : fmtMoney(e.price)}</b></label>`}).join('')}
             </div>`;
           }).join('') + '<div id="cx-svc-empty" class="small faint" hidden style="padding:8px 0">Ничего не найдено</div>';
           filterSvcs();
@@ -6293,7 +6311,7 @@ const wrap = root.querySelector('.pl-wrap');
           const qsel = e.target.closest('[data-exq]');
           if (qsel){
             const inp = mask.querySelector(`[data-ex="${qsel.dataset.exq}"]`);
-            if (inp) inp.dataset.qty = qsel.value;
+            if (inp){ inp.dataset.qty = qsel.value; inp.checked = true; }
             upd(true);
             setTimeout(paintNormDeadline, 0);
             return;
@@ -6304,8 +6322,15 @@ const wrap = root.querySelector('.pl-wrap');
             const sel = g2('#cx-niche');
             if (sel && nid && sel.value !== nid){ sel.value = nid; paintRush(); }
           }
-          syncPctExpr();
-          val = compute(g2('#cx-in').value);
+          upd(true);
+          setTimeout(paintNormDeadline, 0);
+        });
+        /* Количество распечаток/копий — числом, без ограничения списком 1–10. */
+        g2('#cx-svcs').addEventListener('input', e=>{
+          const qsel = e.target.closest('[data-exq]');
+          if (!qsel) return;
+          const inp = mask.querySelector(`[data-ex="${qsel.dataset.exq}"]`);
+          if (inp){ inp.dataset.qty = qsel.value; inp.checked = true; }
           upd(true);
           setTimeout(paintNormDeadline, 0);
         });
@@ -6323,7 +6348,7 @@ const wrap = root.querySelector('.pl-wrap');
             upd(true);
           }
         };
-        g2('#cx-hist').querySelectorAll('[data-h]').forEach(h=>h.onclick = ()=>{ g2('#cx-in').value = h.dataset.h; upd(); });
+        g2('#cx-hist').querySelectorAll('[data-h]').forEach(h=>h.onclick = ()=>{ autoBase = null; g2('#cx-in').value = h.dataset.h; upd(); });
         mask.querySelector('[data-x]').onclick = close;
         const applyResult = ()=>{
           const d = calcDiscount();

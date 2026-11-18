@@ -335,7 +335,7 @@ function openWinModal({ title='', icon='app', body='', footer='', wide=false, na
   return openModal({ title, body, footer, wide, onMount, onClose });
 }
 
-function openModal({ title='', body='', footer='', wide=false, narrow=false, onClose=null, onMount=null, modalClass='', hideTitle=false }){
+function openModal({ title='', body='', footer='', wide=false, narrow=false, onClose=null, onMount=null, modalClass='', hideTitle=false, dismissible=true }){
   const mask = document.createElement('div');
   mask.className = 'modal-mask';
   mask.innerHTML = `
@@ -352,9 +352,9 @@ function openModal({ title='', body='', footer='', wide=false, narrow=false, onC
     mask.classList.add('closing');
     setTimeout(() => { mask.remove(); document.removeEventListener('keydown', onKey); onClose && onClose(); }, 200);
   };
-  const onKey = e => { if (e.key==='Escape') close(); };
+  const onKey = e => { if (dismissible && e.key==='Escape') close(); };
   document.addEventListener('keydown', onKey);
-  mask.addEventListener('mousedown', e => { if (e.target === mask) close(); });
+  mask.addEventListener('mousedown', e => { if (dismissible && e.target === mask) close(); });
   mask.querySelector('.modal__x').onclick = close;
   onMount && onMount(mask, close);
   return { el:mask, close };
@@ -579,13 +579,13 @@ function buildPaletteItems(q){
     return String(combo).split('+').filter(Boolean).map(p => p === 'space' ? 'SPACE' : p.toUpperCase()).join(' ');
   };
   const kHint = id => fmtKeyLocal(keys[id] || (typeof DEFAULT_KEYS!=='undefined' ? DEFAULT_KEYS[id] : ''));
+  const isMobile = !!(window.matchMedia && window.matchMedia('(max-width:960px)').matches);
   const acts = [
     { label:'Создать заказ', icon:'plus', hint:kHint('newOrder'), run:()=>APP.go('orders') && CRM.openOrderForm() },
     { label:'Переключить тему', icon:'palette', hint:kHint('theme'), run:()=>APP.cycleTheme() },
     { label:'Настройки', icon:'settings', hint:kHint('settings'), run:()=>APP.go('settings') },
-    { label:'Полноэкранный режим', icon:'expand', hint:kHint('zen'), run:()=>{ try{ APP.toggleZen && APP.toggleZen(); }catch(e){} } },
+    ...(!isMobile ? [{ label:'Полноэкранный режим', icon:'expand', hint:kHint('zen'), run:()=>{ try{ APP.toggleZen && APP.toggleZen(); }catch(e){} } }] : []),
     { label:'Калькулятор услуг', icon:'calc', run:()=>CRM.openCalculator() },
-    { label:'Демо: страницы ошибок', icon:'alert', run:()=>APP.go('err/404') },
     { label:'Проверить обновления', icon:'refresh', run:()=>APP.checkUpdates(true) }
   ];
   add('Действия', acts.filter(i=>!q||match(i.label)));

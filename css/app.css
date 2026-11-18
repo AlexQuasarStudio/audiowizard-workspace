@@ -494,7 +494,7 @@ tr.inl-tr{animation:inlRowIn .2s var(--ease)}
 .calc-combo .input{width:100%}
 .calc-combo__list{position:absolute;z-index:30;left:0;right:0;top:calc(100% + 4px);max-height:240px;overflow:auto;padding:4px;background:var(--panel);border:1px solid var(--border-2);border-radius:12px;box-shadow:0 14px 34px -18px rgba(0,0,0,.55);opacity:0;visibility:hidden;transform:translateY(-4px);transition:opacity .18s var(--ease),transform .18s var(--ease),visibility 0s linear .18s}
 .calc-combo__list.is-on{opacity:1;visibility:visible;transform:none;transition-delay:0s}
-.calc-combo__list--lang{max-height:min(64vh, 540px)}
+.calc-combo__list--lang{max-height:min(72vh, 640px)}
 .calc-combo__item{display:block;width:100%;padding:7px 9px;border:0;border-radius:8px;background:transparent;color:var(--text);text-align:left;font-size:12.5px;line-height:1.35;cursor:pointer}
 .calc-combo__item:hover,.calc-combo__item.on{background:var(--accent-soft)}
 .calc-combo__empty{padding:8px 9px;font-size:12px;color:var(--muted)}
@@ -505,12 +505,14 @@ tr.inl-tr{animation:inlRowIn .2s var(--ease)}
 .calc-suffix{display:flex;align-items:center;gap:6px}
 .calc-suffix .input{min-width:0;height:38px}
 .calc-disc-row .input{height:38px}
-.calc-lang-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 12px;max-height:270px;overflow:auto;margin-top:8px;padding:6px;border:1px solid var(--border);border-radius:10px;background:var(--panel)}
+.calc-lang-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 12px;max-height:min(68vh,620px);overflow:auto;margin-top:8px;padding:6px;border:1px solid var(--border);border-radius:10px;background:var(--panel)}
 .calc-lang-item{display:flex;align-items:center;gap:7px;min-width:0;padding:4px 6px;border-radius:7px;font-size:12.5px}
 .calc-lang-item:hover{background:var(--panel-2)}
 .calc-lang-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .calc-lang-code{margin-left:auto;color:var(--faint);font-size:10.5px;font-family:var(--mono);flex:none}
 .calc-lang-rate{width:52px!important;min-height:26px!important;padding:2px 4px!important;font-size:11px!important;text-align:right;flex:none}
+.calc-qty{display:inline-flex;align-items:center;gap:4px;flex:none;margin-right:4px}
+.calc-qty .input{width:58px!important;min-height:30px!important;padding:3px 6px!important;text-align:right}
 .calc-lang-item[hidden]{display:none}
 @media (max-width:640px){.calc-lang-list{grid-template-columns:1fr}}
 @media (max-width:520px){.calc-disc-row{grid-template-columns:1fr}}
@@ -730,12 +732,12 @@ body.app-bg--none::before{content:'';display:none}
      фон между линиями остаётся фоном приложения. */
   background-repeat:no-repeat;
   background-size:100% 100%;
-  /* Масштаб узора ФИКСИРОВАННЫЙ (1:2, холст 1600×3200) и не зависит от высоты
+  /* Масштаб узора ФИКСИРОВАННЫЙ (1:1, холст 600×600) и не зависит от высоты
      экрана: тайл всегда 440×880, повтор по обеим осям. */
-  -webkit-mask-size:440px 880px;
+  -webkit-mask-size:440px 440px;
   -webkit-mask-mode:alpha;
   mask-mode:alpha;
-  mask-size:440px 880px;
+  mask-size:440px 440px;
   -webkit-mask-repeat:repeat;
   mask-repeat:repeat;
   -webkit-mask-position:top left;
@@ -1235,6 +1237,12 @@ body:not(.zen) .side{position:fixed;top:7px;left:12px;bottom:7px;height:auto;tra
   .chats-layout--withlist .chat-main{display:none}
   .chats-layout--withlist .chat-list{display:flex}
   .chats-layout .chat-main .chat-msgs{max-width:none;margin:0}
+  /* Открытый чат на телефоне — на всю высоту экрана: список/футер остаются
+     на своих местах, а лента занимает всё пространство под шапкой. */
+  .view--chats.chats-chat-open{position:fixed;left:0;right:0;top:var(--head-h);bottom:0;z-index:80;display:flex;flex-direction:column;padding:0 12px 10px;background:var(--bg)}
+  .view--chats.chats-chat-open > .page-head{display:none}
+  .view--chats.chats-chat-open > .chats-layout{flex:1 1 auto;height:100%!important;min-height:0;display:block}
+  .view--chats.chats-chat-open .chat-main{height:100%}
 .head__burger{display:inline-flex;flex:none}
   .side__burger{display:none}
   .side__close{display:inline-flex}
@@ -1882,12 +1890,12 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1491");mask-image:url("../bg/pattern-ai.svg?v=1491");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1492");mask-image:url("../bg/pattern-ai.svg?v=1492");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
   /* Тот же тайл и режим, что у фона приложения (#bg-doodles) — рисунок совпадает */
-  -webkit-mask-size:440px 880px;mask-size:440px 880px;
+  -webkit-mask-size:440px 440px;mask-size:440px 440px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
   -webkit-mask-mode:alpha;mask-mode:alpha}
@@ -1968,8 +1976,8 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1491");mask-image:url("../bg/pattern-ai.svg?v=1491");
-  -webkit-mask-size:440px 880px;mask-size:440px 880px;
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1492");mask-image:url("../bg/pattern-ai.svg?v=1492");
+  -webkit-mask-size:440px 440px;mask-size:440px 440px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
   -webkit-mask-mode:alpha;mask-mode:alpha}
@@ -2771,16 +2779,23 @@ body.capture-privacy::after{content:'Конфиденциальные данны
 .cap-tools button{width:34px;height:34px;border:0;border-radius:9px;background:none;color:var(--text);font-size:17px;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .cap-tools button:hover,.cap-tools button.on{background:var(--accent-soft);color:var(--accent)}
 .cap-tools .spacer{width:8px}
+.cap-editor .cap-tools{position:static;left:auto;bottom:auto;transform:none;flex:none;margin:0 auto 12px;max-width:calc(100vw - 16px);flex-wrap:wrap;justify-content:center;row-gap:2px}
+.cap-tools .cap-ready{width:44px!important;height:44px!important;border-radius:50%!important;background:var(--red)!important;color:#fff!important;font-size:21px!important;font-weight:800;box-shadow:0 8px 22px rgba(190,60,60,.4);margin-left:4px}
+.cap-tools .cap-ready:hover{filter:brightness(1.08);background:var(--red)!important;color:#fff!important}
 
 /* Welcome/install modal: как «О приложении» — blur, скролл, без хрома окна */
 .modal--welcome{overflow:visible;max-height:min(88vh,760px)}
 .modal--welcome .modal__h,.modal--install .modal__h{display:none}
 .modal--welcome .modal__h h3{display:none}
 .modal--welcome .modal__b{padding:246px 20px 18px;overflow-y:auto;overscroll-behavior:contain}
-.modal--welcome .welcome-mascots--float{position:absolute;left:-54px;right:-54px;top:14px;width:auto;height:188px;margin:0;z-index:2;pointer-events:none}
+.modal--welcome .welcome-mascots--float{position:absolute;left:-70px;right:-70px;top:8px;width:auto;height:214px;margin:0;z-index:3;pointer-events:none;perspective:720px;transform-style:preserve-3d;justify-content:space-between}
+.modal--welcome .welcome-mascots--float .welcome-mascot--robot{width:192px;height:214px;transform:translateZ(64px) rotate(-3deg);filter:drop-shadow(0 18px 24px rgba(32,33,36,.25))}
+.modal--welcome .welcome-mascots--float .welcome-mascot--human{width:122px;height:174px;filter:drop-shadow(0 12px 16px rgba(32,33,36,.2))}
+.modal--welcome .welcome-mascots--float .welcome-mascot--left{margin-right:-54px;transform:translateZ(18px) translateX(-14px) rotateY(12deg) rotate(-7deg)}
+.modal--welcome .welcome-mascots--float .welcome-mascot--right{margin-left:-54px;transform:translateZ(10px) translateX(14px) rotateY(-12deg) rotate(7deg)}
 .modal-float-x{position:absolute;right:10px;top:10px;z-index:8;width:30px;height:30px;border:0;border-radius:9px;background:color-mix(in srgb,var(--panel) 75%,transparent);color:var(--faint);font-size:19px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .modal-float-x:hover{background:var(--red-soft);color:var(--red)}
-.modal--welcome .modal__b{padding-top:212px}
+.modal--welcome .modal__b{padding-top:224px}
 .modal--install .modal__b{padding-top:52px}
 .modal--welcome .welcome-hero{padding-top:0}
 .modal--install .modal__b{overflow-y:auto;overscroll-behavior:contain}
@@ -2788,7 +2803,7 @@ body.capture-privacy::after{content:'Конфиденциальные данны
 .share-ico{display:inline-flex;vertical-align:-4px;margin-left:4px;color:var(--accent)}
 .share-ico svg{width:16px;height:16px;display:block}
 .sys-ico svg{width:21px;height:21px;display:block}
-@media (max-width:520px){.modal--welcome .welcome-mascots--float{left:-28px;right:-28px;top:34px;height:158px}.modal--welcome .modal__b{padding-top:184px}}
+@media (max-width:520px){.modal--welcome .welcome-mascots--float{left:-36px;right:-36px;top:30px;height:166px}.modal--welcome .welcome-mascots--float .welcome-mascot--robot{width:148px;height:166px}.modal--welcome .welcome-mascots--float .welcome-mascot--human{width:94px;height:134px}.modal--welcome .modal__b{padding-top:190px}}
 /* Пузыри: время float в конце текста, реакции не меняют ширину */
 .msg__bubble .txt{display:block}
 .msg__bubble .txt .time{position:static;float:right;margin:2px 0 0 8px;background:none;box-shadow:none;border-radius:0}

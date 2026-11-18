@@ -10,6 +10,35 @@
   const privacyOn = () => { const st = appSettings(); if (!(st && st.capturePrivacy === false)) document.body.classList.add('capture-privacy'); };
   const privacyOff = () => document.body.classList.remove('capture-privacy');
     const waitFrame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  /* Снимок берём не в момент клика, а когда интерфейс уже закрылся, а курсор
+     остановился: иначе в кадр попадает закрывающееся меню и «первый» кадр. */
+  const waitSettled = (min = 240) => new Promise(res => {
+    const t0 = Date.now();
+    const tick = () => {
+      const closing = document.querySelector('.modal-mask.closing,.aw-win--closing');
+      if ((!closing && Date.now() - t0 >= min) || Date.now() - t0 > 900) res();
+      else setTimeout(tick, 40);
+    };
+    tick();
+  });
+  const waitCursorIdle = (idle = 180, max = 900) => new Promise(res => {
+    let idleTimer = null, started = Date.now(), done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(idleTimer);
+      clearTimeout(capTimer);
+      window.removeEventListener('pointermove', reset, true);
+      res();
+    };
+    const reset = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(finish, idle);
+    };
+    const capTimer = setTimeout(finish, max);
+    window.addEventListener('pointermove', reset, true);
+    reset();
+  });
 
   function notice(text, kind = 'info') {
     if (typeof toast === 'function') toast(text, kind);
@@ -71,7 +100,8 @@
     if (shot) { notice('Сначала завершите текущий снимок','warn'); return; }
     try {
       privacyOn();
-      await waitFrame();
+      await waitSettled();
+      await waitCursorIdle();
       const src = await grabFrame();
       privacyOff();
       const k = src.width / Math.max(1, innerWidth);
@@ -91,7 +121,7 @@
   function openEditor(base, onAttach, guides={xs:[],ys:[],scale:1}) {
     if (shot) shot.root.remove();
     const root = el('div', 'cap-editor');
-    root.innerHTML = `<div class="cap-editor__bar"><b>Снимок экрана</b><span class="cap-editor__hint">Рисуйте поверх снимка</span><span class="spacer"></span><button class="btn btn--ghost btn--sm" data-cap-crop title="Обрезать">✂</button><button class="btn btn--danger btn--sm" data-cap-save>Готово</button>${onAttach ? '<button class="btn btn--soft btn--sm" data-cap-attach>Вложить</button>' : ''}<button class="iconbtn" data-cap-x title="Закрыть">×</button></div><div class="cap-editor__stage"><canvas></canvas></div><div class="cap-tools"><button data-tool="cursor" title="Курсор — взаимодействие с приложением"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 3l14 8-6 1-3 7L5 3Z" fill="currentColor"/></svg></button><button data-tool="hand" class="on" title="Рука"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V6.5a1.5 1.5 0 0 1 3 0V11m0 0V5a1.5 1.5 0 0 1 3 0v6m0 0V6.5a1.5 1.5 0 0 1 3 0V14c0 4.2-2.8 7-7 7H9a5.5 5.5 0 0 1-5.5-5.5v-3a1.5 1.5 0 0 1 3 0V14"/></svg></button><button data-tool="select" title="Выделить">⬚</button><button data-tool="rect" title="Прямоугольник">▭</button><button data-tool="ellipse" title="Эллипс">◯</button><button data-tool="arrow" title="Стрелка">↗</button><button data-tool="pen" title="Маркер">✎</button><button data-tool="text" title="Текст">T</button><span class="spacer"></span><button data-color="#ff5c5c" class="on" style="color:#ff5c5c">●</button><button data-color="#ffd166" style="color:#ffd166">●</button><button data-color="#4cc9f0" style="color:#4cc9f0">●</button><button data-color="#ffffff" style="color:#fff">●</button><button data-cap-undo title="Отменить">↶</button><button data-cap-redo title="Повторить">↷</button></div>`;
+    root.innerHTML = `<div class="cap-editor__stage"><canvas></canvas></div><div class="cap-tools"><button data-tool="cursor" title="Курсор — взаимодействие с приложением"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 3l14 8-6 1-3 7L5 3Z" fill="currentColor"/></svg></button><button data-tool="hand" class="on" title="Рука"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V6.5a1.5 1.5 0 0 1 3 0V11m0 0V5a1.5 1.5 0 0 1 3 0v6m0 0V6.5a1.5 1.5 0 0 1 3 0V14c0 4.2-2.8 7-7 7H9a5.5 5.5 0 0 1-5.5-5.5v-3a1.5 1.5 0 0 1 3 0V14"/></svg></button><button data-tool="select" title="Выделить">⬚</button><button data-tool="rect" title="Прямоугольник">▭</button><button data-tool="ellipse" title="Эллипс">◯</button><button data-tool="arrow" title="Стрелка">↗</button><button data-tool="pen" title="Маркер">✎</button><button data-tool="text" title="Текст">T</button><span class="spacer"></span><button data-color="#ff5c5c" class="on" style="color:#ff5c5c">●</button><button data-color="#ffd166" style="color:#ffd166">●</button><button data-color="#4cc9f0" style="color:#4cc9f0">●</button><button data-color="#ffffff" style="color:#fff">●</button><button data-cap-undo title="Отменить">↶</button><button data-cap-redo title="Повторить">↷</button><span class="spacer"></span><button data-cap-crop title="Обрезать" aria-label="Обрезать">✂</button>${onAttach ? `<button class="btn btn--ghost btn--sm" data-cap-attach>Вложить</button>` : ''}<button data-cap-x title="Закрыть" aria-label="Закрыть">×</button><button class="cap-ready" data-cap-save title="Готово" aria-label="Готово">✓</button></div>`;
     document.body.appendChild(root);
     const canvas = $('canvas', root), ctx = canvas.getContext('2d');
     shot = { root, base, tool:'hand', crop: null, shapes: [], redo: [], sel:null, color:'#ff5c5c', line: 4, onAttach, canvas, guides };
@@ -252,7 +282,16 @@
       let busy=false;
       const pump=()=>{ if(!mr||mr.state==='inactive') return; ctx.drawImage(video,0,0,canvas.width,canvas.height); drawShapes(ctx,canvas.width/innerWidth); };
       mr.start(500); const tick=setInterval(pump,33); pump();
-      const t0=Date.now(); const timer=setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000); const tm=$('.cap-rec-time',bar); if(tm)tm.textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');},500);
+      /* Счётчик идёт только пока запись активна: на паузе время замирает. */
+      let recAccum=0, recRun=Date.now();
+      const paintRecTime=()=>{
+        const elapsed=recAccum + (recRun==null ? 0 : Date.now()-recRun);
+        const s=Math.floor(elapsed/1000);
+        const tm=$('.cap-rec-time',bar);
+        if(tm) tm.textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+      };
+      paintRecTime();
+      const timer=setInterval(paintRecTime,250);
       const stop=()=>{ if(!rec) return; clearInterval(tick); clearInterval(timer); mr.stop(); };
       $('[data-stop]',bar).onclick=stop;
       $('[data-rclear]',root).onclick=()=>{shapes=[];redo=[];redraw();};
@@ -271,7 +310,10 @@
       rec={mr, reveal};
       // Keep a reliable stop that doesn't depend on the closure's rec check.
       $('[data-stop]',bar).onclick=finalStop;
-      $('[data-pause]',bar).onclick=()=>{ if(mr.state==='recording'){ mr.pause(); $('[data-pause]',bar).textContent='Продолжить'; } else if(mr.state==='paused'){ mr.resume(); $('[data-pause]',bar).textContent='Пауза'; } };
+      $('[data-pause]',bar).onclick=()=>{
+        if(mr.state==='recording'){ mr.pause(); recAccum += Date.now()-recRun; recRun=null; paintRecTime(); $('[data-pause]',bar).textContent='Продолжить'; }
+        else if(mr.state==='paused'){ recRun=Date.now(); mr.resume(); paintRecTime(); $('[data-pause]',bar).textContent='Пауза'; }
+      };
       rec.stop=finalStop;
     } catch(e){ privacyOff(); document.body.classList.remove('is-recording'); captureError(e); }
   }
