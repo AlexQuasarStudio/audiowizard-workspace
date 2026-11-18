@@ -22,63 +22,6 @@
   }
 
 
-  async function selfCanvas() {
-    try {
-      if (window.html2canvas) {
-        try { return await window.html2canvas(document.body, {
-          backgroundColor: null, scale: 1, useCORS: true, logging: false, foreignObjectRendering: true,
-          width: innerWidth, height: innerHeight,
-          windowWidth: innerWidth, windowHeight: innerHeight,
-          scrollX: 0, scrollY: 0,
-          ignoreElements: node => !!(node.matches && node.matches('.cap-editor,.cap-tools,.cap-rec-bar,.cap-picker,.cap-rec-live,.cookie-bar,.dd,.tour-card,.tour-spot')),
-          onclone: doc => {
-            doc.querySelectorAll('.cap-editor,.cap-tools,.cap-rec-bar,.cap-picker,.cap-rec-live,.cookie-bar,.dd,.tour-card,.tour-spot').forEach(n=>n.remove());
-            doc.querySelectorAll('.modal-mask .cap-privacy-modal').forEach(n=>n.closest('.modal-mask').remove());
-            if (!(typeof S !== 'undefined' && S.settings && S.settings.capturePrivacy === false)) doc.body.classList.add('capture-privacy');
-            const cv=document.createElement('canvas'), cx=cv.getContext('2d');
-            const norm=v=>{ if(!v||!/color\(/i.test(v)) return v; try{ cx.fillStyle='#000'; cx.fillStyle=v; return cx.fillStyle; }catch(e){ return v; } };
-            const props=['color','background-color','border-top-color','border-right-color','border-bottom-color','border-left-color','outline-color','text-decoration-color','caret-color','column-rule-color'];
-            doc.querySelectorAll('*').forEach(el=>{
-              const cs=doc.defaultView.getComputedStyle(el);
-              props.forEach(p=>{ const v=cs.getPropertyValue(p); if(/color\(/i.test(v)) el.style.setProperty(p,norm(v),'important'); });
-              if(/color\(/i.test(cs.backgroundImage)) el.style.setProperty('background-image','none','important');
-              if(/color\(/i.test(cs.boxShadow)) el.style.setProperty('box-shadow','none','important');
-            });
-          }
-        }); } catch(e) { console.warn('html2canvas', e); }
-      }
-      const css = [];
-      for (const sh of document.styleSheets) {
-        try { css.push([...sh.cssRules].map(r=>r.cssText).join('\n')); }
-        catch (e) { if (sh.href) { try { css.push(await (await fetch(sh.href)).text()); } catch (e2) {} } }
-      }
-      const clone = document.documentElement.cloneNode(true);
-      clone.querySelectorAll('script,link[rel="stylesheet"],.cap-editor,.cap-tools,.cap-rec-bar,.cap-picker,.cookie-bar,.dd,.tour-card,.tour-spot,.cap-rec-live,.cap-rec-bar,.cap-rec-help,.cap-privacy-modal,.cap-privacy-modal').forEach(n=>n.remove());
-      let style = clone.querySelector('style[data-cap-css]');
-      if (!style){ style=document.createElement('style'); style.dataset.capCss='1'; clone.querySelector('head').appendChild(style); }
-      let cssText = css.join('\n');
-      const urls = [...new Set([...cssText.matchAll(/url\((['\"]?)([^)'\"]+)\1\)/g)].map(m=>m[2]).filter(u=>u && !/^(data:|#|blob:)/.test(u)))];
-      const map = {};
-      await Promise.all(urls.map(async u=>{ try { const abs=new URL(u, location.href); const b=await (await fetch(abs)).blob(); map[u]=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(b);}); } catch(e){} }));
-      cssText = cssText.replace(/url\((['\"]?)([^)'\"]+)\1\)/g, (m,q,u)=>map[u]?`url(${q}${map[u]}${q})`:m);
-      style.textContent += '\n'+cssText+'\nbody.capture-privacy::after{display:none!important}';
-      clone.style.width = innerWidth + 'px'; clone.style.height = innerHeight + 'px'; clone.style.overflow='hidden';
-      const imgs = [...clone.querySelectorAll('img')];
-      await Promise.all(imgs.map(async img=>{
-        const src=img.getAttribute('src'); if(!src || /^data:/.test(src)) return;
-        try { const b=await (await fetch(src)).blob(); img.src=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(b);}); } catch(e){}
-      }));
-      const xml = new XMLSerializer().serializeToString(clone);
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${innerWidth}" height="${innerHeight}"><foreignObject width="100%" height="100%">${xml}</foreignObject></svg>`;
-      const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-      const img = await loadImage(url);
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      const c=document.createElement('canvas'); c.width=Math.round(innerWidth*dpr); c.height=Math.round(innerHeight*dpr);
-      c.getContext('2d').drawImage(img,0,0,c.width,c.height); return c;
-    } catch(e){ return null; }
-  }
-  function loadImage(src){ return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=src;}); }
-
   async function grabFrame() {
     const native = window.electronAPI || window.multitool || window.pywebview?.api;
     const nativeCap = native && (native.captureApp || native.capture_app);
@@ -87,8 +30,6 @@
       if (r?.data || r?.dataUrl) return loadCanvas(r.data || r.dataUrl);
       if (r?.error) throw new Error(r.error);
     }
-    const own = await selfCanvas();
-    if (own) return own;
     if (!navigator.mediaDevices?.getDisplayMedia) throw new Error('браузер не поддерживает захват экрана');
     const stream = await navigator.mediaDevices.getDisplayMedia({
       video: { frameRate: 30, displaySurface: 'browser' }, audio: false, preferCurrentTab: true
@@ -263,31 +204,8 @@
         <p class="tiny faint" style="margin:0">В браузере система один раз спросит, что захватывать. В настольной сборке используется нативный захват.</p>
       </div>`,
       footer:'<button class="btn btn--ghost" data-x>Закрыть</button>',
-      onMount:(m,c)=>{ m.querySelectorAll('[data-cap]').forEach(b=>b.onclick=()=>{ const mode=b.dataset.cap; c(); setTimeout(()=>mode==='record'?openRecord():startShot(),120); }); m.querySelector('[data-x]').onclick=c; }
+      onMount:(m,c)=>{ m.querySelectorAll('[data-cap]').forEach(b=>b.onclick=()=>{ const mode=b.dataset.cap; c(); if(mode==='record') setTimeout(openRecord,0); else startShot(); }); m.querySelector('[data-x]').onclick=c; }
     });
-  }
-
-  function openRecordSetup(stream) {
-    const root = el('div','cap-editor cap-rec-setup');
-    root.innerHTML = `<div class="cap-editor__bar"><b>Запись экрана</b><span class="cap-editor__hint">Выделите область кропа</span><span class="spacer"></span><label class="check"><input type="checkbox" id="cap-mic"><span class="box"></span> Микрофон</label><button class="btn btn--primary btn--sm" data-cap-start>Начать</button><button class="iconbtn" data-cap-x>×</button></div><div class="cap-editor__stage"><video autoplay muted playsinline></video><div class="cap-cropbox"></div></div>`;
-    document.body.appendChild(root);
-    const video=$('video',root), box=$('.cap-cropbox',root);
-    video.srcObject=stream; video.play().catch(()=>{});
-    let crop={x:0,y:0,w:0,h:0}, drag=null;
-    const pt=e=>{const r=video.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};};
-    const setBox=()=>{const r=video.getBoundingClientRect();Object.assign(box.style,{left:(crop.x/r.width*video.videoWidth)+'px'});};
-    const draw=()=>{const r=video.getBoundingClientRect();const sx=r.width/video.videoWidth,sy=r.height/video.videoHeight;Object.assign(box.style,{left:crop.x*sx+'px',top:crop.y*sy+'px',width:crop.w*sx+'px',height:crop.h*sy+'px'});};
-    video.addEventListener('pointerdown',e=>{const p=pt(e);drag=p;crop={x:p.x,y:p.y,w:0,h:0};});
-    video.addEventListener('pointermove',e=>{if(!drag)return;const p=pt(e);crop={x:Math.min(drag.x,p.x),y:Math.min(drag.y,p.y),w:Math.abs(p.x-drag.x),h:Math.abs(p.y-drag.y)};draw();});
-    video.addEventListener('pointerup',()=>drag=null);
-    $('[data-cap-x]',root).onclick=()=>{stream.getTracks().forEach(t=>t.stop());root.remove();privacyOff();};
-    $('[data-cap-start]',root).onclick=async()=>{
-      const mic=$('#cap-mic',root).checked;
-      const rect=video.getBoundingClientRect();
-      const kx=rect.width?(video.videoWidth||rect.width)/rect.width:1, ky=rect.height?(video.videoHeight||rect.height)/rect.height:1;
-      const scaled={x:crop.x*kx,y:crop.y*ky,w:crop.w*kx,h:crop.h*ky};
-      root.remove(); await startRecording(stream, video, scaled, mic);
-    };
   }
 
   function openRecord() {
@@ -296,9 +214,9 @@
       return;
     }
     openWinModal({ title:'Запись экрана', icon:'app', narrow:true, locked:true, backdrop:true, backdropBlur:false,
-      body:`<div class="stack" style="gap:10px"><p class="small muted" style="margin:0">Приложение записывает собственный интерфейс без выбора источника браузером. Конфиденциальные данные маскируются.</p><label class="check"><input type="checkbox" id="self-mic"><span class="box"></span><span>Записывать микрофон</span></label><p class="tiny faint" style="margin:0">Микрофон — единственное, на что система может попросить разрешение.</p></div>`,
+      body:`<div class="stack" style="gap:10px"><p class="small muted" style="margin:0">Браузер попросит выбрать вкладку или окно для записи. Конфиденциальные данные маскируются.</p><label class="check"><input type="checkbox" id="self-mic"><span class="box"></span><span>Записывать микрофон</span></label><p class="tiny faint" style="margin:0">Микрофон — единственное, на что система может попросить разрешение.</p></div>`,
       footer:'<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-start>Начать запись</button>',
-      onMount:(m,c)=>{ m.querySelector('[data-x]').onclick=c; m.querySelector('[data-start]').onclick=()=>{ const mic=!!m.querySelector('#self-mic').checked; c(); setTimeout(()=>startSelfRecording(mic),120); }; }
+      onMount:(m,c)=>{ m.querySelector('[data-x]').onclick=c; m.querySelector('[data-start]').onclick=()=>{ const mic=!!m.querySelector('#self-mic').checked; c(); startSelfRecording(mic); }; }
     });
   }
 
@@ -314,12 +232,17 @@
     if (rec) { notice('Запись уже идёт','warn'); return; }
     try {
       privacyOn(); document.body.classList.add('is-recording');
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video:{frameRate:30,displaySurface:'browser'}, audio:false, preferCurrentTab:true });
+      const video = el('video'); video.muted=true; video.playsInline=true; video.srcObject=stream;
+      await new Promise((res,rej)=>{ video.onloadedmetadata=res; video.onerror=rej; setTimeout(res,1200); });
+      await video.play();
+      const vw=video.videoWidth||innerWidth*devicePixelRatio, vh=video.videoHeight||innerHeight*devicePixelRatio;
       const root=el('div','cap-rec-live'); root.innerHTML='<canvas class="cap-anno"></canvas><div class="cap-tools cap-rec-tools"><button data-rtool="cursor" class="on" title="Курсор"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 3l14 8-6 1-3 7L5 3Z" fill="currentColor"/></svg></button><button data-rtool="hand" title="Рука"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V6.5a1.5 1.5 0 0 1 3 0V11m0 0V5a1.5 1.5 0 0 1 3 0v6m0 0V6.5a1.5 1.5 0 0 1 3 0V14c0 4.2-2.8 7-7 7H9a5.5 5.5 0 0 1-5.5-5.5v-3a1.5 1.5 0 0 1 3 0V14"/></svg></button><button data-rtool="select" title="Выделить элемент">□</button><button data-rtool="rect" title="Рамка">□</button><button data-rtool="ellipse" title="Эллипс">○</button><button data-rtool="arrow" title="Стрелка">↗</button><button data-rtool="pen" title="Маркер">✎</button><button data-rtool="text" title="Текст">T</button><span class="spacer"></span><button data-rcolor="#ff5c5c" class="on" style="color:#ff5c5c">●</button><button data-rcolor="#ffd166" style="color:#ffd166">●</button><button data-rcolor="#4cc9f0" style="color:#4cc9f0">●</button><button data-rundo title="Отменить">↶</button><button data-rredo title="Повторить">↷</button><button data-rclear title="Очистить">⌫</button></div>';
       document.body.appendChild(root);
       const anno=$('.cap-anno',root); anno.width=innerWidth*devicePixelRatio; anno.height=innerHeight*devicePixelRatio; anno.style.width=innerWidth+'px'; anno.style.height=innerHeight+'px';
       const actx=anno.getContext('2d'); let tool='cursor', shapes=[], redo=[], drawing=null, drawColor='#ff5c5c';
-      const canvas=document.createElement('canvas'); canvas.width=Math.round(innerWidth*devicePixelRatio); canvas.height=Math.round(innerHeight*devicePixelRatio); const ctx=canvas.getContext('2d');
-      const out=canvas.captureStream(24); let micStream=null;
+      const canvas=document.createElement('canvas'); canvas.width=Math.round(vw); canvas.height=Math.round(vh); const ctx=canvas.getContext('2d');
+      const out=canvas.captureStream(30); let micStream=null;
       if (mic){ try { micStream=await navigator.mediaDevices.getUserMedia({audio:true}); micStream.getAudioTracks().forEach(t=>out.addTrack(t)); } catch(e){ notice('Микрофон недоступен — запись без звука','warn'); } }
       const mp4Types=['video/mp4;codecs=avc1.42E01E','video/mp4;codecs=avc1.42001E','video/mp4;codecs=avc1','video/mp4']; const webm=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm'; const mime=mp4Types.find(t=>MediaRecorder.isTypeSupported(t))||webm; const ext=mime.includes('mp4')?'mp4':'webm'; const chunks=[]; const mr=new MediaRecorder(out,{mimeType:mime,videoBitsPerSecond:4000000,audioBitsPerSecond:128000});
       mr.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
@@ -327,8 +250,8 @@
       const drawShapes=(c,scale=1)=>{ shapes.forEach(sh=>{ c.save(); c.strokeStyle=sh.color||'#ff5c5c';c.fillStyle=c.strokeStyle;c.lineWidth=4*scale;c.lineCap='round';c.lineJoin='round'; if(sh.tool==='rect'||sh.tool==='select'){if(sh.tool==='select')c.setLineDash([7*scale,4*scale]);c.strokeRect(sh.x*scale,sh.y*scale,sh.w*scale,sh.h*scale);} else if(sh.tool==='ellipse'){c.beginPath();c.ellipse((sh.x+sh.w/2)*scale,(sh.y+sh.h/2)*scale,Math.abs(sh.w/2)*scale,Math.abs(sh.h/2)*scale,0,0,Math.PI*2);c.stroke();} else if(sh.tool==='arrow'){const ex=(sh.x+sh.w)*scale,ey=(sh.y+sh.h)*scale;c.beginPath();c.moveTo(sh.x*scale,sh.y*scale);c.lineTo(ex,ey);c.stroke();const a=Math.atan2(sh.h,sh.w),l=16*scale;c.beginPath();c.moveTo(ex,ey);c.lineTo(ex-l*Math.cos(a-.5),ey-l*Math.sin(a-.5));c.moveTo(ex,ey);c.lineTo(ex-l*Math.cos(a+.5),ey-l*Math.sin(a+.5));c.stroke();} else if(sh.tool==='pen'){c.beginPath();sh.points.forEach((p,i)=>i?c.lineTo(p.x*scale,p.y*scale):c.moveTo(p.x*scale,p.y*scale));c.stroke();} else if(sh.tool==='text'){c.font=`700 ${22*scale}px system-ui`;c.fillText(sh.text,sh.x*scale,sh.y*scale);} c.restore(); }); };
       const redraw=()=>{ actx.clearRect(0,0,anno.width,anno.height); actx.save(); actx.scale(devicePixelRatio,devicePixelRatio); drawShapes(actx,1); actx.restore(); };
       let busy=false;
-      const pump=async()=>{ if(busy||!mr||mr.state==='inactive')return; busy=true; try{ const shot=await selfCanvas(); if(shot){ ctx.drawImage(shot,0,0,canvas.width,canvas.height); drawShapes(ctx,canvas.width/innerWidth); } }finally{busy=false;} };
-      mr.start(500); const tick=setInterval(pump,140); pump();
+      const pump=()=>{ if(!mr||mr.state==='inactive') return; ctx.drawImage(video,0,0,canvas.width,canvas.height); drawShapes(ctx,canvas.width/innerWidth); };
+      mr.start(500); const tick=setInterval(pump,33); pump();
       const t0=Date.now(); const timer=setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000); const tm=$('.cap-rec-time',bar); if(tm)tm.textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');},500);
       const stop=()=>{ if(!rec) return; clearInterval(tick); clearInterval(timer); mr.stop(); };
       $('[data-stop]',bar).onclick=stop;
@@ -342,7 +265,7 @@
       anno.addEventListener('pointermove',e=>{if(!drawing)return;const p=pt(e);drawing.w=p.x-drawing.x;drawing.h=p.y-drawing.y;drawing.points.push(p);redraw();});
       anno.addEventListener('pointerup',()=>{drawing=null;});
       const finalStop=()=>{ clearInterval(tick); clearInterval(timer); if(mr.state!=='inactive') mr.stop(); };
-      mr.onstop=()=>{ const blob=new Blob(chunks,{type:mime}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='audiowizard-recording-'+Date.now()+'.'+ext; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); if(micStream)micStream.getTracks().forEach(t=>t.stop()); if(!mr){} privacyOff(); document.body.classList.remove('is-recording'); if(rec && rec.reveal) document.removeEventListener('click', rec.reveal, true); bar.remove(); root.remove(); rec=null; notice('Запись сохранена','ok'); };
+      mr.onstop=()=>{ const blob=new Blob(chunks,{type:mime}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='audiowizard-recording-'+Date.now()+'.'+ext; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); if(micStream)micStream.getTracks().forEach(t=>t.stop()); stream.getTracks().forEach(t=>t.stop()); privacyOff(); document.body.classList.remove('is-recording'); if(rec && rec.reveal) document.removeEventListener('click', rec.reveal, true); bar.remove(); root.remove(); rec=null; notice('Запись сохранена','ok'); };
       const reveal = e => { if(!document.body.classList.contains('capture-privacy')) return; const t=e.target.closest('.chat-head,.chat-item,.avatar,.head__pill--balance,.msg,.order-row,.person-row,.person-card,.card'); if(!t)return; e.preventDefault(); e.stopPropagation(); askReveal(t); };
       document.addEventListener('click', reveal, true);
       rec={mr, reveal};
@@ -353,5 +276,5 @@
     } catch(e){ privacyOff(); document.body.classList.remove('is-recording'); captureError(e); }
   }
 
-  window.CaptureStudio = { open:openMenu, shot:startShot, shotToFile:(cb)=>startShot('shot',cb), record:openRecord, _self:selfCanvas };
+  window.CaptureStudio = { open:openMenu, shot:startShot, shotToFile:(cb)=>startShot('shot',cb), record:openRecord };
 })();
