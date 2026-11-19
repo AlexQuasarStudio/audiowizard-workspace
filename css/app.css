@@ -732,12 +732,12 @@ body.app-bg--none::before{content:'';display:none}
      фон между линиями остаётся фоном приложения. */
   background-repeat:no-repeat;
   background-size:100% 100%;
-  /* Масштаб узора ФИКСИРОВАННЫЙ (1:1, холст 600×600) и не зависит от высоты
+  /* Масштаб узора ФИКСИРОВАННЫЙ (1:2, холст 1600×3200) и не зависит от высоты
      экрана: тайл всегда 440×880, повтор по обеим осям. */
-  -webkit-mask-size:440px 440px;
+  -webkit-mask-size:440px 880px;
   -webkit-mask-mode:alpha;
   mask-mode:alpha;
-  mask-size:440px 440px;
+  mask-size:440px 880px;
   -webkit-mask-repeat:repeat;
   mask-repeat:repeat;
   -webkit-mask-position:top left;
@@ -1890,12 +1890,12 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1493");mask-image:url("../bg/pattern-ai.svg?v=1493");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1494");mask-image:url("../bg/pattern-ai.svg?v=1494");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
   /* Тот же тайл и режим, что у фона приложения (#bg-doodles) — рисунок совпадает */
-  -webkit-mask-size:440px 440px;mask-size:440px 440px;
+  -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
   -webkit-mask-mode:alpha;mask-mode:alpha}
@@ -1976,8 +1976,8 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1493");mask-image:url("../bg/pattern-ai.svg?v=1493");
-  -webkit-mask-size:440px 440px;mask-size:440px 440px;
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1494");mask-image:url("../bg/pattern-ai.svg?v=1494");
+  -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
   -webkit-mask-mode:alpha;mask-mode:alpha}

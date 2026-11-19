@@ -11668,7 +11668,7 @@ function initPWA(){
        делала из той же картинки второй сетевой запрос — браузер видел
        другой ключ кэша. Свежесть узора обеспечивает service worker:
        PRECACHE обновляется вместе со сборкой. */
-    const maskUrl = 'url("bg/pattern-ai.svg?v=1493")';
+    const maskUrl = 'url("bg/pattern-ai.svg?v=1494")';
     const cacheKey = cur + '|' + t + '|bg11';
     /* Единая отрисовка: маску ставим ВСЕГДА. После перерисовки разметки
        (#bg-doodles пересоздаётся при навигации) слой терял маску и узор «отваливался». */
@@ -11688,9 +11688,9 @@ function initPWA(){
       /* Ровный узор по всему экрану: затухание к центру нужно только заставке. */
       el.style.webkitMaskImage = mask;
       el.style.maskImage = mask;
-      /* Фиксированный тайл (холст 600×600 → 1:1): масштаб не зависит от высоты экрана */
-      el.style.webkitMaskSize = '440px 440px';
-      el.style.maskSize = '440px 440px';
+      /* Фиксированный тайл (холст 1600×3200 → 1:2): масштаб не зависит от высоты экрана */
+      el.style.webkitMaskSize = '440px 880px';
+      el.style.maskSize = '440px 880px';
       el.style.webkitMaskRepeat = 'repeat';
       el.style.maskRepeat = 'repeat';
       el.style.webkitMaskPosition = 'top left';

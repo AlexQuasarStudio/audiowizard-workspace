@@ -21,22 +21,26 @@
     };
     tick();
   });
-  const waitCursorIdle = (idle = 180, max = 900) => new Promise(res => {
-    let idleTimer = null, started = Date.now(), done = false;
+  /* Ждём именно остановку курсора: любое движение (и прокрутка, и клавиши)
+     откладывает кадр, снимок берётся через idle мс покоя. Потолок нужен,
+     чтобы съёмка не зависла, если курсор двигают непрерывно. */
+  const waitCursorIdle = (idle = 300, max = 2600) => new Promise(res => {
+    let idleTimer = null, capTimer = null, done = false;
+    const events = ['pointermove','pointerdown','pointerup','wheel','scroll','keydown','touchmove'];
     const finish = () => {
       if (done) return;
       done = true;
       clearTimeout(idleTimer);
       clearTimeout(capTimer);
-      window.removeEventListener('pointermove', reset, true);
+      events.forEach(t => window.removeEventListener(t, reset, true));
       res();
     };
     const reset = () => {
       clearTimeout(idleTimer);
       idleTimer = setTimeout(finish, idle);
     };
-    const capTimer = setTimeout(finish, max);
-    window.addEventListener('pointermove', reset, true);
+    events.forEach(t => window.addEventListener(t, reset, { capture: true, passive: true }));
+    capTimer = setTimeout(finish, max);
     reset();
   });
 
@@ -51,7 +55,10 @@
   }
 
 
-  async function grabFrame() {
+  /* prepare вызывается, когда поток уже получен и системное окно выбора
+     источника закрылось: только тогда страница снова видит курсор, и можно
+     дождаться его остановки перед кадром. */
+  async function grabFrame(prepare) {
     const native = window.electronAPI || window.multitool || window.pywebview?.api;
     const nativeCap = native && (native.captureApp || native.capture_app);
     if (nativeCap) {
@@ -61,12 +68,13 @@
     }
     if (!navigator.mediaDevices?.getDisplayMedia) throw new Error('браузер не поддерживает захват экрана');
     const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: { frameRate: 30, displaySurface: 'browser' }, audio: false, preferCurrentTab: true
+      video: { frameRate: 24, displaySurface: 'browser' }, audio: false, preferCurrentTab: true
     });
     try {
       const video = el('video'); video.muted = true; video.playsInline = true; video.srcObject = stream;
       await new Promise((res, rej) => { video.onloadedmetadata = res; video.onerror = rej; setTimeout(res, 1600); });
       await video.play();
+      if (prepare) await prepare();
       const c = document.createElement('canvas');
       c.width = video.videoWidth || innerWidth * devicePixelRatio;
       c.height = video.videoHeight || innerHeight * devicePixelRatio;
@@ -101,8 +109,7 @@
     try {
       privacyOn();
       await waitSettled();
-      await waitCursorIdle();
-      const src = await grabFrame();
+      const src = await grabFrame(waitCursorIdle);
       privacyOff();
       const k = src.width / Math.max(1, innerWidth);
       const xs = new Set(), ys = new Set();
@@ -262,7 +269,7 @@
     if (rec) { notice('Запись уже идёт','warn'); return; }
     try {
       privacyOn(); document.body.classList.add('is-recording');
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video:{frameRate:30,displaySurface:'browser'}, audio:false, preferCurrentTab:true });
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video:{frameRate:24,displaySurface:'browser'}, audio:false, preferCurrentTab:true });
       const video = el('video'); video.muted=true; video.playsInline=true; video.srcObject=stream;
       await new Promise((res,rej)=>{ video.onloadedmetadata=res; video.onerror=rej; setTimeout(res,1200); });
       await video.play();
@@ -271,17 +278,21 @@
       document.body.appendChild(root);
       const anno=$('.cap-anno',root); anno.width=innerWidth*devicePixelRatio; anno.height=innerHeight*devicePixelRatio; anno.style.width=innerWidth+'px'; anno.style.height=innerHeight+'px';
       const actx=anno.getContext('2d'); let tool='cursor', shapes=[], redo=[], drawing=null, drawColor='#ff5c5c';
-      const canvas=document.createElement('canvas'); canvas.width=Math.round(vw); canvas.height=Math.round(vh); const ctx=canvas.getContext('2d');
-      const out=canvas.captureStream(30); let micStream=null;
+      /* Кадр записи ограничен 1440×900: интерфейс остаётся читаемым, а вес
+         видео падает в разы — полноразмерный Retina-холст давал ~13 МБ за 20 с. */
+      const k=Math.min(1,1440/vw,900/vh);
+      const cw=Math.max(2,Math.round(vw*k/2)*2), chh=Math.max(2,Math.round(vh*k/2)*2);
+      const canvas=document.createElement('canvas'); canvas.width=cw; canvas.height=chh; const ctx=canvas.getContext('2d');
+      const out=canvas.captureStream(24); let micStream=null;
       if (mic){ try { micStream=await navigator.mediaDevices.getUserMedia({audio:true}); micStream.getAudioTracks().forEach(t=>out.addTrack(t)); } catch(e){ notice('Микрофон недоступен — запись без звука','warn'); } }
-      const mp4Types=['video/mp4;codecs=avc1.42E01E','video/mp4;codecs=avc1.42001E','video/mp4;codecs=avc1','video/mp4']; const webm=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm'; const mime=mp4Types.find(t=>MediaRecorder.isTypeSupported(t))||webm; const ext=mime.includes('mp4')?'mp4':'webm'; const chunks=[]; const mr=new MediaRecorder(out,{mimeType:mime,videoBitsPerSecond:4000000,audioBitsPerSecond:128000});
+      const mp4Types=['video/mp4;codecs=avc1.42E01E','video/mp4;codecs=avc1.42001E','video/mp4;codecs=avc1','video/mp4']; const webm=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm'; const mime=mp4Types.find(t=>MediaRecorder.isTypeSupported(t))||webm; const ext=mime.includes('mp4')?'mp4':'webm'; const chunks=[]; const mr=new MediaRecorder(out,{mimeType:mime,videoBitsPerSecond:1400000,audioBitsPerSecond:64000});
       mr.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
       const bar=el('div','cap-rec-bar','<b>● Запись</b><span class="cap-rec-time">00:00</span><button class="btn btn--ghost btn--sm" data-pause>Пауза</button><button class="btn btn--danger btn--sm" data-stop>Остановить</button>'); document.body.appendChild(bar);
       const drawShapes=(c,scale=1)=>{ shapes.forEach(sh=>{ c.save(); c.strokeStyle=sh.color||'#ff5c5c';c.fillStyle=c.strokeStyle;c.lineWidth=4*scale;c.lineCap='round';c.lineJoin='round'; if(sh.tool==='rect'||sh.tool==='select'){if(sh.tool==='select')c.setLineDash([7*scale,4*scale]);c.strokeRect(sh.x*scale,sh.y*scale,sh.w*scale,sh.h*scale);} else if(sh.tool==='ellipse'){c.beginPath();c.ellipse((sh.x+sh.w/2)*scale,(sh.y+sh.h/2)*scale,Math.abs(sh.w/2)*scale,Math.abs(sh.h/2)*scale,0,0,Math.PI*2);c.stroke();} else if(sh.tool==='arrow'){const ex=(sh.x+sh.w)*scale,ey=(sh.y+sh.h)*scale;c.beginPath();c.moveTo(sh.x*scale,sh.y*scale);c.lineTo(ex,ey);c.stroke();const a=Math.atan2(sh.h,sh.w),l=16*scale;c.beginPath();c.moveTo(ex,ey);c.lineTo(ex-l*Math.cos(a-.5),ey-l*Math.sin(a-.5));c.moveTo(ex,ey);c.lineTo(ex-l*Math.cos(a+.5),ey-l*Math.sin(a+.5));c.stroke();} else if(sh.tool==='pen'){c.beginPath();sh.points.forEach((p,i)=>i?c.lineTo(p.x*scale,p.y*scale):c.moveTo(p.x*scale,p.y*scale));c.stroke();} else if(sh.tool==='text'){c.font=`700 ${22*scale}px system-ui`;c.fillText(sh.text,sh.x*scale,sh.y*scale);} c.restore(); }); };
       const redraw=()=>{ actx.clearRect(0,0,anno.width,anno.height); actx.save(); actx.scale(devicePixelRatio,devicePixelRatio); drawShapes(actx,1); actx.restore(); };
       let busy=false;
-      const pump=()=>{ if(!mr||mr.state==='inactive') return; ctx.drawImage(video,0,0,canvas.width,canvas.height); drawShapes(ctx,canvas.width/innerWidth); };
-      mr.start(500); const tick=setInterval(pump,33); pump();
+      const pump=()=>{ if(!mr||mr.state==='inactive'||mr.state==='paused') return; ctx.drawImage(video,0,0,canvas.width,canvas.height); drawShapes(ctx,canvas.width/innerWidth); };
+      mr.start(500); const tick=setInterval(pump,41); pump();
       /* Счётчик идёт только пока запись активна: на паузе время замирает. */
       let recAccum=0, recRun=Date.now();
       const paintRecTime=()=>{
