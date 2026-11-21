@@ -433,11 +433,11 @@ const APP = (() => {
             <button class="iconbtn head__msearch" id="m-search" aria-label="Поиск" title="Поиск">${icon('search')}</button>
           </div>
           <div class="head__search" data-tour="search" id="open-search">
-            <div class="fake-input">${icon('search')}<input id="head-search-input" placeholder="Глобальный поиск…" autocomplete="off" spellcheck="false"><span class="kbd" id="head-search-hint">${fmtKeys(S.keys && S.keys.search)}</span></div>
+            <div class="fake-input">${icon('search')}<input id="head-search-input" placeholder="Глобальный поиск…" autocomplete="off" spellcheck="false">${isNarrowUI() ? '' : `<span class="kbd" id="head-search-hint">${fmtKeys(S.keys && S.keys.search)}</span>`}</div>
           </div>
           <div class="head__right">
                         <div class="head__ops" id="head-actions">
-              <button class="iconbtn head-actions__main" id="btn-new" title="Новый заказ (${fmtKeys(S.keys && S.keys.newOrder)})" aria-label="Новый заказ">${icon('cart')}</button>
+              <button class="iconbtn head-actions__main" id="btn-new" title="Новый заказ${isNarrowUI() ? '' : ` (${fmtKeys(S.keys && S.keys.newOrder)})`}" aria-label="Новый заказ">${icon('cart')}</button>
               <button class="iconbtn head-actions__arrow" id="btn-actions-arrow" title="Выбрать действие" aria-label="Выбрать действие" aria-haspopup="true">${icon('chev-d','ico-sm')}</button>
             </div>
             <div class="head__pill head__pill--balance">
@@ -808,7 +808,7 @@ const APP = (() => {
       const a = quickSelAction();
       bnw.innerHTML = icon(a.icon);
       /* Подсказка — только для действия «Новый заказ», актуальная из настроек */
-      const hk = (a.id === 'order' && S.keys && S.keys.newOrder) ? ' (' + fmtKeys(S.keys.newOrder) + ')' : '';
+      const hk = (!isNarrowUI() && a.id === 'order' && S.keys && S.keys.newOrder) ? ' (' + fmtKeys(S.keys.newOrder) + ')' : '';
       bnw.title = a.label + hk;
       bnw.setAttribute('aria-label', a.label);
     };
@@ -2135,12 +2135,14 @@ ex.innerHTML = avatarHTML(user(), '');
   }
 
   /* ---------- Тур ---------- */
+  /* Шаги тура. video — короткий ролик (H.264, 12 к/с, без звука, ~0,2 МБ):
+     тяжёлые видео не тянем, показываем их только на своём шаге. */
   const TOUR = [
     { sel:'[data-tour="nav"]', t:'Навигация по ролям', d:'Меню подстраивается под вашу роль: дашборд, заказы, чаты, идеи и инструменты.' },
-    { sel:'[data-tour="search"]', t:'Глобальный поиск', d:'Ctrl+K — палетка команд: заказы, клиенты, действия и переходы. Задержка поиска < 200 мс.' },
+    { sel:'[data-tour="search"]', t:'Глобальный поиск', d:'Ctrl K — палетка команд: заказы, клиенты, действия и переходы. Задержка поиска < 200 мс.' },
     { sel:'[data-tour="bell"]', t:'Центр уведомлений', d:'Изменения заказов, патчноуты и тикеты — всё в одном месте.' },
-    { sel:'[data-tour="orders-link"]', t:'Заказы', d:'Цветовые статусы строк, живые фильтры, контекстное меню по правому клику и групповые операции.' },
-    { sel:'[data-tour="user"]', t:'Профиль и темы', d:'Аватар, настройки, пять тем оформления и выход. Настройки сохраняются в профиле.' }
+    { sel:'[data-tour="orders-link"]', t:'Заказы', d:'Цветовые статусы строк, живые фильтры и групповые операции.', video:'assets/tour/windows.mp4', videoNote:'Режим окон: свернуть, развернуть и правый клик по заказу.' },
+    { sel:'[data-tour="user"]', t:'Профиль и темы', d:'Аватар, настройки, пять тем оформления и выход. Настройки сохраняются в профиле.', video:'assets/tour/tasks.mp4', videoNote:'Планировщик и подпункты услуг — как добавить и не потерять.' }
   ];
   function offerOnboarding(){
     const u2 = user();
@@ -2261,14 +2263,23 @@ ex.innerHTML = avatarHTML(user(), '');
     const top = r.bottom + 14 + 200 > innerHeight ? Math.max(14, r.top - 216) : r.bottom + 14;
     const left = Math.min(Math.max(14, r.left), innerWidth - 346);
     Object.assign(card.style, { top: top+'px', left: left+'px' });
+    card.classList.toggle('tour-card--video', !!step.video);
     card.innerHTML = `
       <div class="row row--between"><b>${step.t}</b><span class="badge c-gray">${i+1} / ${TOUR.length}</span></div>
-      <p class="small muted" style="margin:8px 0 14px">${step.d}</p>
+      <p class="small muted" style="margin:8px 0 ${step.video?'10px':'14px'}">${step.d}</p>
+      ${step.video ? `<figure class="tour-video"><video src="${step.video}" muted loop playsinline preload="none" poster=""></video><button class="tour-video__play" type="button" aria-label="Показать короткое видео">${icon('play')}<span>${esc(step.videoNote||'Короткое видео')}</span></button></figure>` : ''}
       <div class="row row--between">
         <button class="btn btn--ghost btn--sm" data-skip>Пропустить</button>
         <button class="btn btn--primary btn--sm" data-next>${i===TOUR.length-1?'Готово':'Далее'} ${icon('arrow-r','ico-sm')}</button>
       </div>`;
     document.body.appendChild(spot); document.body.appendChild(card);
+    const play = card.querySelector('.tour-video__play');
+    if (play) play.onclick = () => {
+      const fig = play.closest('.tour-video'), v = fig && fig.querySelector('video');
+      if (!v) return;
+      fig.classList.add('is-playing');
+      v.play().catch(()=>{});
+    };
     card.querySelector('[data-skip]').onclick = ()=>{ spot.remove(); card.remove(); user().tour_completed = true; saveState(); setTimeout(showInstallHint, 260); };
     card.querySelector('[data-next]').onclick = ()=>{ spot.remove(); card.remove(); startTour(i+1); };
   }
@@ -5602,7 +5613,8 @@ const cm = root.querySelector('.chat-main');
         const dd = showDropdown(e.currentTarget, [], { force:true });
         if (!dd) return;
         dd.className = 'dd emoji-panel';
-        dd.style.width = 'min(360px, calc(100vw - 24px))';
+        /* Ширина — по сетке смайлов (8 колонок), без пустого запаса справа. */
+        dd.style.width = 'min(300px, calc(100vw - 24px))';
         /* Жёсткий потолок высоты: при добавлении вариантов опроса панель
            растёт, а её край уезжал за нижнюю границу экрана */
         dd.style.maxHeight = 'min(560px, calc(100dvh - 24px))';
@@ -8897,14 +8909,15 @@ const cm = root.querySelector('.chat-main');
   }
   function calcSvcRowsHTML(nid){
     const showMargin = user().role === 'admin';
-    return (S.calcServices[nid] || []).map(s => `<tr data-sid="${s.id}">
+    const list = S.calcServices[nid] || [];
+    return list.map(s => `<tr data-sid="${s.id}"${s.parent ? ` class="calc-svc-sub"` : ''}>
       <td><input class="input" data-f="name" value="${esc(s.name)}" style="padding:6px 10px;min-width:220px"></td>
       <td><input class="input" data-f="desc" value="${esc(s.desc||'')}" placeholder="Описание для калькулятора" style="padding:6px 10px;min-width:240px"></td>
       <td><input class="input" data-f="price" type="number" min="0" value="${s.price}" style="padding:6px 10px;width:100px"></td>
       <td><input class="input" data-f="unit" value="${esc(s.unit||'')}" style="padding:6px 10px"></td>
       <td ${showMargin?'':'hidden'}><input class="input" data-f="margin" type="number" min="0" max="90" value="${s.margin||0}" style="padding:6px 10px;width:76px"></td>
       <td><input class="input" data-f="norm" type="number" min="0" step="0.1" value="${calcSvcNormVal(nid,s.id)}" placeholder="${dailyNormFor(nid)||'—'}" style="padding:6px 10px;width:86px"></td>
-      <td style="width:40px"><button class="iconbtn" data-del="${s.id}" title="Удалить услугу">${icon('trash')}</button></td>
+      <td style="width:76px;white-space:nowrap"><button class="iconbtn" data-sub-add="${s.id}" title="Добавить подпункт — уточнение внутри услуги">${icon('plus','ico-sm')}</button><button class="iconbtn" data-del="${s.id}" title="Удалить услугу">${icon('trash')}</button></td>
     </tr>`).join('');
   }
   function calcExtraRowsHTML(nid){
@@ -8955,7 +8968,7 @@ const cm = root.querySelector('.chat-main');
     /* Раздел пришёл из маршрута (#/settings/profile) или это вход в настройки */
     const fromRoute = !!section;
     section = section || settingsSection || 'profile';
-    const sections = [
+    let sections = [
       ['profile','Профиль','clients'], ['look','Внешний вид','palette'], ['notify','Уведомления и рассылки','bell'],
       ['reminders','Напоминания','clock'],
       ['security','Безопасность','shield'], ['keys','Горячие клавиши','terminal'],
@@ -8968,6 +8981,9 @@ const cm = root.querySelector('.chat-main');
       /* «О приложении» — всегда последний пункт, у всех ролей */
       ['about','О приложении','info']
     ];
+    /* На телефоне клавиатурных сокращений нет: раздел «Горячие клавиши»
+       целиком убираем, чтобы в настройках не мелькали «CTRL + …». */
+    if (isNarrowUI()) sections = sections.filter(s => s[0] !== 'keys');
     /* Защита: если запрошенная секция недоступна текущей роли (её нет в
        списке), принудительно показываем профиль. Закрывает утечку, когда
        админская вкладка «пережила» выход и вход менее привилегированным
@@ -9762,7 +9778,8 @@ const cm = root.querySelector('.chat-main');
       });
       openWinModal({ narrow:true, title: isNew ? 'Новая команда (Team)' : 'Команда: ' + t.name, route:'settings',
         body:`<div class="stack" style="gap:12px">
-          <div class="field"><label>Название *</label><input class="input" id="tm-name" value="${esc(t.name)}" placeholder="Например: VoiceLab — команда"></div>
+          <div class="field"><label>Название *</label><input class="input" id="tm-name" value="${esc(t.name)}" placeholder="Например: VoiceLab — команда">
+            <div class="small" id="tm-err" style="color:var(--red);display:none;margin-top:4px">Введите название команды</div></div>
           <div class="field"><label>Тип команды</label><select class="input" id="tm-kind">
             ${Object.entries(TEAM_KIND).map(([k,l])=>`<option value="${k}" ${kind===k?'selected':''}>${l}</option>`).join('')}
           </select></div>
@@ -9777,12 +9794,23 @@ const cm = root.querySelector('.chat-main');
             </div></div>
           <p class="small faint">В финальной версии команда сможет выступать заказчиком или исполнителем, иметь общий баланс и роли участников.</p>
         </div>`,
-        footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-tm-save>${isNew?'Создать':'Сохранить'}</button>`,
+        footer:`<button class="btn btn--ghost" type="button" data-x>Отмена</button><button class="btn btn--primary" type="button" data-tm-save>${isNew?'Создать':'Сохранить'}</button>`,
         onMount:(m2, close)=>{
-          m2.querySelector('[data-x]').onclick = close;
-          m2.querySelector('[data-tm-save]').onclick = ()=>{
-            const name = m2.querySelector('#tm-name').value.trim();
-            if (!name){ toast('Введите название команды','warn'); return; }
+          const nameEl = m2.querySelector('#tm-name');
+          const errEl = m2.querySelector('#tm-err');
+          const save = ()=>{
+            const name = (nameEl.value || '').trim();
+            if (!name){
+              /* Без названия кнопка раньше «молчала»: показываем ошибку
+                 у поля и ставим фокус, чтобы клик давал понятный результат. */
+              if (errEl) errEl.style.display = '';
+              nameEl.classList.add('is-err');
+              nameEl.focus();
+              toast('Введите название команды','warn');
+              return;
+            }
+            if (errEl) errEl.style.display = 'none';
+            nameEl.classList.remove('is-err');
             const next = {
               ...t,
               name,
@@ -9798,6 +9826,18 @@ const cm = root.querySelector('.chat-main');
             logAudit((isNew?'Создана команда: ':'Команда обновлена: ') + name, 'Команды');
             saveState(); close(); renderSec(); toast(isNew?'Команда создана':'Команда сохранена','ok');
           };
+          /* Делегируем клик по окну: футер добавляется в окно отдельным
+             элементом, и прямой onclick по кнопке мог не сработать. */
+          m2.addEventListener('click', e => {
+            if (e.target.closest('[data-tm-save]')){ e.preventDefault(); save(); }
+            else if (e.target.closest('[data-x]')){ e.preventDefault(); close(); }
+          });
+          nameEl.addEventListener('input', ()=>{
+            if (nameEl.value.trim()){
+              if (errEl) errEl.style.display = 'none';
+              nameEl.classList.remove('is-err');
+            }
+          });
         }
       });
     }
@@ -10056,7 +10096,9 @@ const cm = root.querySelector('.chat-main');
             const g = f => tr.querySelector(`[data-f="${f}"]`).value.trim();
             const name = g('name');
             if (!name) return;
-            list.push({ id: tr.dataset.sid, name, desc: g('desc'), price: +g('price')||0, unit: g('unit'), margin: Math.min(90, Math.max(0, +g('margin')||0)) });
+            const item = { id: tr.dataset.sid, name, desc: g('desc'), price: +g('price')||0, unit: g('unit'), margin: Math.min(90, Math.max(0, +g('margin')||0)) };
+            if (tr.dataset.parent) item.parent = tr.dataset.parent;
+            list.push(item);
             const nv = Math.max(0, Number(g('norm')) || 0);
             if (nv) normMap[tr.dataset.sid] = nv;
           });
@@ -10153,6 +10195,32 @@ const cm = root.querySelector('.chat-main');
         const inp = tr.querySelector('[data-f="name"]');
         if (inp) setTimeout(()=>inp.focus(), 30);
       };
+      /* Подпункт услуги: та же таблица, но строка помечена родителем и
+         сдвинута влево. В калькуляторе он идёт отдельной услугой-уточнением. */
+      const addSubRow = parentId => {
+        const tb = el.querySelector('tbody[data-niche]');
+        if (!tb) return;
+        const nid = tb.dataset.niche;
+        const id = 'cs' + uid();
+        const tr = document.createElement('tr');
+        tr.dataset.sid = id;
+        tr.dataset.parent = parentId;
+        tr.className = 'calc-new-row calc-svc-sub';
+        tr.innerHTML = `
+          <td><input class="input" data-f="name" placeholder="Название подпункта" style="padding:6px 10px;min-width:220px"></td>
+          <td><input class="input" data-f="desc" placeholder="Чем отличается от основной услуги" style="padding:6px 10px;min-width:240px"></td>
+          <td><input class="input" data-f="price" type="number" min="0" value="0" style="padding:6px 10px;width:100px"></td>
+          <td><input class="input" data-f="unit" placeholder="за страницу / за шт" style="padding:6px 10px"></td>
+          <td><input class="input" data-f="margin" type="number" min="0" max="90" value="20" style="padding:6px 10px;width:76px"></td>
+          <td><input class="input" data-f="norm" type="number" min="0" step="0.1" placeholder="${dailyNormFor(nid)||'—'}" style="padding:6px 10px;width:86px"></td>
+          <td style="width:76px;white-space:nowrap"><button class="iconbtn" data-del="${id}" title="Удалить подпункт">${icon('trash','icon-sm')}</button></td>`;
+        /* Ставим сразу под родителем, до следующего равного уровня. */
+        const sib = [...tb.querySelectorAll('tr[data-sid]')].filter(r => r === tb.querySelector(`tr[data-sid="${parentId}"]`) || r.dataset.parent === parentId);
+        const last = sib[sib.length - 1];
+        if (last && last.nextSibling) tb.insertBefore(tr, last.nextSibling); else tb.appendChild(tr);
+        const inp = tr.querySelector('[data-f="name"]');
+        if (inp) setTimeout(()=>inp.focus(), 30);
+      };
       const addExtraRow = nid => {
         const tb = el.querySelector(`tbody[data-extra="${nid}"]`);
         if (!tb) return;
@@ -10178,6 +10246,8 @@ const cm = root.querySelector('.chat-main');
         if (addEx){ addExtraRow(addEx.dataset.addExtra); return; }
         const del = e.target.closest('[data-del]');
         if (del){ calcRowOut(del.closest('tr')); toast('Строка удалена — не забудьте сохранить','info'); return; }
+        const subAdd = e.target.closest('[data-sub-add]');
+        if (subAdd){ subAddRow(subAdd.dataset.subAdd); return; }
         const add = e.target.closest('[data-add]');
         if (add) addRow(add.dataset.add);
         const promoSave = e.target.closest('#promo-save');
@@ -11518,6 +11588,8 @@ function initPWA(){
   window.__checkBuild = checkBuild;
 
   /* ---------- Горячие клавиши ---------- */
+  /* На телефоне клавиатурных сокращений нет — подсказки о них не показываем. */
+  function isNarrowUI(){ return !!(window.matchMedia && window.matchMedia('(max-width:960px)').matches); }
   /* "ctrl+shift+f" → "Ctrl Shift F" (для подсказок) */
   function fmtKeys(combo){
     if (!combo) return '';
@@ -11668,7 +11740,7 @@ function initPWA(){
        делала из той же картинки второй сетевой запрос — браузер видел
        другой ключ кэша. Свежесть узора обеспечивает service worker:
        PRECACHE обновляется вместе со сборкой. */
-    const maskUrl = 'url("bg/pattern-ai.svg?v=1494")';
+    const maskUrl = 'url("bg/pattern-ai.svg?v=1498")';
     const cacheKey = cur + '|' + t + '|bg11';
     /* Единая отрисовка: маску ставим ВСЕГДА. После перерисовки разметки
        (#bg-doodles пересоздаётся при навигации) слой терял маску и узор «отваливался». */

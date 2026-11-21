@@ -494,7 +494,9 @@ tr.inl-tr{animation:inlRowIn .2s var(--ease)}
 .calc-combo .input{width:100%}
 .calc-combo__list{position:absolute;z-index:30;left:0;right:0;top:calc(100% + 4px);max-height:240px;overflow:auto;padding:4px;background:var(--panel);border:1px solid var(--border-2);border-radius:12px;box-shadow:0 14px 34px -18px rgba(0,0,0,.55);opacity:0;visibility:hidden;transform:translateY(-4px);transition:opacity .18s var(--ease),transform .18s var(--ease),visibility 0s linear .18s}
 .calc-combo__list.is-on{opacity:1;visibility:visible;transform:none;transition-delay:0s}
-.calc-combo__list--lang{max-height:min(72vh, 640px)}
+.calc-combo__list--lang{max-height:min(78vh, 720px)}
+.calc-combo__list--up{top:auto;bottom:calc(100% + 4px);transform:translateY(4px)}
+.calc-combo__list--up.is-on{transform:none}
 .calc-combo__item{display:block;width:100%;padding:7px 9px;border:0;border-radius:8px;background:transparent;color:var(--text);text-align:left;font-size:12.5px;line-height:1.35;cursor:pointer}
 .calc-combo__item:hover,.calc-combo__item.on{background:var(--accent-soft)}
 .calc-combo__empty{padding:8px 9px;font-size:12px;color:var(--muted)}
@@ -510,7 +512,7 @@ tr.inl-tr{animation:inlRowIn .2s var(--ease)}
 .calc-lang-item:hover{background:var(--panel-2)}
 .calc-lang-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .calc-lang-code{margin-left:auto;color:var(--faint);font-size:10.5px;font-family:var(--mono);flex:none}
-.calc-lang-rate{width:52px!important;min-height:26px!important;padding:2px 4px!important;font-size:11px!important;text-align:right;flex:none}
+.calc-lang-rate{position:static!important;opacity:1!important;width:52px!important;height:26px!important;min-height:26px!important;padding:2px 4px!important;font-size:11px!important;text-align:right;flex:none}
 .calc-qty{display:inline-flex;align-items:center;gap:4px;flex:none;margin-right:4px}
 .calc-qty .input{width:58px!important;min-height:30px!important;padding:3px 6px!important;text-align:right}
 .calc-lang-item[hidden]{display:none}
@@ -1239,7 +1241,11 @@ body:not(.zen) .side{position:fixed;top:7px;left:12px;bottom:7px;height:auto;tra
   .chats-layout .chat-main .chat-msgs{max-width:none;margin:0}
   /* Открытый чат на телефоне — на всю высоту экрана: список/футер остаются
      на своих местах, а лента занимает всё пространство под шапкой. */
-  .view--chats.chats-chat-open{position:fixed;left:0;right:0;top:var(--head-h);bottom:0;z-index:80;display:flex;flex-direction:column;padding:0 12px 10px;background:var(--bg)}
+  /* Фон панели прозрачный: сквозь неё виден общий дудл-фон приложения.
+     Футер под панелью на время открытого чата гасим, иначе он просвечивал
+     сквозь ленту сообщений. */
+  .view--chats.chats-chat-open{position:fixed;left:0;right:0;top:var(--head-h);bottom:0;z-index:80;display:flex;flex-direction:column;padding:0 12px 10px;background:transparent}
+  body:has(.view--chats.chats-chat-open) .foot{opacity:0;visibility:hidden;pointer-events:none}
   .view--chats.chats-chat-open > .page-head{display:none}
   .view--chats.chats-chat-open > .chats-layout{flex:1 1 auto;height:100%!important;min-height:0;display:block}
   .view--chats.chats-chat-open .chat-main{height:100%}
@@ -1391,6 +1397,14 @@ body.menu-dragging .main .theme-card:hover{box-shadow:none!important;transform:n
 /* ---------- Многооконность ---------- */
 #windows-layer{position:fixed;inset:0;pointer-events:none;z-index:3000;overflow:hidden}
 .tour-card{position:fixed;z-index:1601;width:330px;max-width:calc(100vw - 28px);background:var(--panel);border:1px solid var(--border-2);border-radius:16px;box-shadow:var(--sh-2);padding:18px;animation:popIn .4s var(--ease)}
+.tour-card--video{width:390px}
+/* Короткое видео грузим только по нажатию: пока оно не нужно, вес не тратится. */
+.tour-video{position:relative;margin:0 0 12px;border-radius:12px;overflow:hidden;background:var(--bg-2);border:1px solid var(--border);aspect-ratio:4/3}
+.tour-video video{display:block;width:100%;height:100%;object-fit:cover}
+.tour-video__play{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:0;background:rgba(12,10,18,.42);color:#fff;font:inherit;font-size:11.5px;font-weight:650;cursor:pointer;transition:opacity .2s var(--ease),background-color .2s var(--ease)}
+.tour-video__play .ico{width:26px;height:26px}
+.tour-video__play:hover{background:rgba(12,10,18,.55)}
+.tour-video.is-playing .tour-video__play{opacity:0;pointer-events:none}
 .tour-spot{position:fixed;z-index:1600;border-radius:14px;box-shadow:0 0 0 4px var(--accent-soft),0 0 0 9999px rgba(4,6,10,.66);transition:left .48s var(--ease),top .48s var(--ease),width .48s var(--ease),height .48s var(--ease);pointer-events:none}
 /* Появление окна — короткий фейд с лёгким увеличением (0.975 → 1).
    translateY убран: раньше popIn сдвигал окно и это читалось как
@@ -1890,7 +1904,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1494");mask-image:url("../bg/pattern-ai.svg?v=1494");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1499");mask-image:url("../bg/pattern-ai.svg?v=1499");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -1976,7 +1990,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1494");mask-image:url("../bg/pattern-ai.svg?v=1494");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1499");mask-image:url("../bg/pattern-ai.svg?v=1499");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2466,7 +2480,7 @@ body.pills-hide .head{pointer-events:none}
 .dropzone{border:2px dashed var(--border-2);border-radius:16px;padding:38px 20px;text-align:center;color:var(--muted);cursor:pointer;transition:all var(--dur);background:var(--bg-2)}
 .dropzone:hover,.dropzone.over{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
 .dropzone .ico{width:34px;height:34px;stroke-width:1.5;margin-bottom:8px;color:currentColor}
-.emoji-pop{display:grid;grid-template-columns:repeat(8,1fr);gap:2px;width:280px;padding:8px}
+.emoji-pop{display:grid;grid-template-columns:repeat(8,1fr);gap:2px;width:100%;padding:8px}
 .emoji-pop button{font-size:19px;padding:5px;border-radius:8px;border:0;background:none;cursor:pointer}
 .emoji-pop button:hover{background:var(--panel-2)}
 
@@ -2488,7 +2502,7 @@ body.pills-hide .head{pointer-events:none}
 .dd__specs{display:flex;flex-direction:column;max-height:220px;overflow:auto}
 .doc-del{color:var(--muted)}
 .doc-del:hover{color:var(--red);border-color:var(--red)}
-.dd.emoji-panel{width:min(360px,calc(100vw - 24px))!important;height:min(390px,calc(100dvh - 24px));display:flex;flex-direction:column;overflow:hidden}
+.dd.emoji-panel{width:min(300px,calc(100vw - 24px))!important;height:min(390px,calc(100dvh - 24px));display:flex;flex-direction:column;overflow:hidden}
 .emoji-tabs{display:flex;gap:4px;padding:6px 8px;border-bottom:1px solid var(--border);flex:none}
 .emoji-tabs button{flex:1 1 0;min-width:0;justify-content:center;white-space:nowrap;padding:5px 8px;border-radius:8px;font-size:12px;color:var(--muted);background:none;border:0;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
 .emoji-tabs button.on{background:var(--accent-soft);color:var(--accent)}
@@ -2691,6 +2705,11 @@ svg.ico.wip-ico{width:38px;height:38px}
 .td-pick-item:hover,.td-pick-item.on{border-color:var(--accent);background:var(--accent-soft)}
 .td-pick-item .badge{flex:none}
 .td-row{transition:opacity .18s var(--ease),border-color .18s var(--ease),background-color .18s var(--ease)}
+/* Текст задачи не сжимается до буквы в строке: блок занимает остаток
+   ширины, бейджи не тянут строку, перенос — только по словам. */
+.td-row>.small{flex:1 1 auto;min-width:0;flex-wrap:wrap}
+.td-row>.small>span:last-child{flex:1 1 140px;min-width:0}
+.td-row b{display:block;min-width:0;overflow-wrap:break-word;word-break:normal}
 .td-row:hover{border-color:color-mix(in srgb,var(--accent) 34%,var(--border))}
 .td-partial{width:18px;height:18px;padding:0;border:1px solid var(--border);border-radius:5px;background:var(--panel);color:transparent;display:inline-flex;align-items:center;justify-content:center;flex:none;cursor:pointer;transition:color .15s var(--ease),background-color .15s var(--ease),border-color .15s var(--ease),transform .12s var(--ease)}
 .td-partial .ico{width:12px;height:12px}
@@ -2725,8 +2744,12 @@ svg.ico.wip-ico{width:38px;height:38px}
 /* Калькулятор: длинный каталог услуг не растягивает окно */
 #cx-svcs{max-height:380px;overflow:auto;padding-right:4px;overscroll-behavior:contain}
 .calc-svc-wrap{max-height:420px;overflow:auto}
-#cx-lang-wrap{max-height:150px;overflow:hidden;opacity:1;transition:max-height .22s var(--ease),opacity .18s var(--ease)}
-#cx-lang-wrap.is-collapsed{max-height:0;opacity:0;pointer-events:none}
+#cx-lang-wrap{max-height:150px;overflow:visible;opacity:1;transition:max-height .22s var(--ease),opacity .18s var(--ease)}
+#cx-lang-wrap.is-collapsed{max-height:0;overflow:hidden;opacity:0;pointer-events:none}
+/* Открытый список языков должен выходить за пределы блока и быть поверх полей */
+.calc-combo:has(.calc-combo__list.is-on){z-index:60}
+/* Карточка с открытым списком поднимается над залипающим итогом */
+.card:has(.calc-combo__list.is-on){z-index:7}
 .calc-niche-card[hidden]{display:none}
 /* Снимки и запись экрана */
 body.capture-privacy .chat-head,
@@ -2747,7 +2770,15 @@ body.capture-privacy .aw-win--active .card,
 body.capture-privacy .order-detail,
 body.capture-privacy .tbl-wrap,
 body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!important}
-body.capture-privacy::after{content:'Конфиденциальные данные скрыты';position:fixed;left:50%;bottom:92px;transform:translateX(-50%);z-index:9000;padding:6px 12px;border-radius:99px;background:rgba(20,16,28,.86);color:#fff;font-size:11px;font-weight:650;pointer-events:none}
+/* Плашка-кнопка: по нажатию объясняет, что и почему размыто. */
+.cap-privacy-pill{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);z-index:9000;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:0;border-radius:99px;background:rgba(20,16,28,.86);color:#fff;font:inherit;font-size:11px;font-weight:650;cursor:pointer;box-shadow:0 8px 20px -10px rgba(0,0,0,.6);pointer-events:auto;transition:background-color .16s var(--ease),transform .16s var(--ease)}
+.cap-privacy-pill:hover{background:rgba(32,26,44,.94);transform:translateX(-50%) translateY(-1px)}
+.cap-privacy-pill:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.cap-privacy-pill svg{flex:none}
+/* Футер предупреждения: три кнопки центрируем — в узком окне первая
+   уезжала за левый край. */
+.cap-privacy-modal .modal__f{flex-wrap:wrap;justify-content:center;gap:8px}
+.cap-privacy-modal .modal__f .btn{flex:0 1 auto;min-width:0;white-space:nowrap}
 .cap-editor{position:fixed;inset:0;z-index:8000;background:rgba(12,10,18,.78);backdrop-filter:blur(16px);display:flex;flex-direction:column;animation:capIn .18s var(--ease)}
 @keyframes capIn{from{opacity:0}to{opacity:1}}
 .cap-editor__bar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--border);flex-wrap:wrap}
@@ -2793,7 +2824,7 @@ body.capture-privacy::after{content:'Конфиденциальные данны
 .modal--welcome .welcome-mascots--float .welcome-mascot--human{width:122px;height:174px;filter:drop-shadow(0 12px 16px rgba(32,33,36,.2))}
 .modal--welcome .welcome-mascots--float .welcome-mascot--left{margin-right:-54px;transform:translateZ(18px) translateX(-14px) rotateY(12deg) rotate(-7deg)}
 .modal--welcome .welcome-mascots--float .welcome-mascot--right{margin-left:-54px;transform:translateZ(10px) translateX(14px) rotateY(-12deg) rotate(7deg)}
-.modal-float-x{position:absolute;right:10px;top:10px;z-index:8;width:30px;height:30px;border:0;border-radius:9px;background:color-mix(in srgb,var(--panel) 75%,transparent);color:var(--faint);font-size:19px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.modal-float-x{position:absolute;right:10px;top:10px;z-index:8;width:30px;height:30px;border:0;border-radius:9px;background:color-mix(in srgb,var(--panel) 75%,transparent);color:var(--faint);font-size:19px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background-color .15s var(--ease),color .15s var(--ease)}
 .modal-float-x:hover{background:var(--red-soft);color:var(--red)}
 .modal--welcome .modal__b{padding-top:224px}
 .modal--install .modal__b{padding-top:52px}

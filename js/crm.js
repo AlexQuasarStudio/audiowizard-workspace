@@ -5712,6 +5712,9 @@ const wrap = root.querySelector('.pl-wrap');
         /* Выражение до автоматических множителей (проценты, промокод):
            в поле показываем «1000 × 1,3 × 0,9», а считаем от 1000. */
         let autoBase = null;
+        /* true — база набрана вручную: фиксированные опции в поле не
+           подмешиваем, они прибавляются к сумме отдельно (как раньше). */
+        let manualBase = false;
         let userTyping = false;
         const compute = raw => {
           const js = String(raw).replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-').replace(/,/g,'.').replace(/\s+/g,'');
@@ -5768,7 +5771,7 @@ const wrap = root.querySelector('.pl-wrap');
         g2('#cx-in').addEventListener('input', e=>{
           if (autoBase != null){
             /* Пользователь правит поле вручную — новый текст становится базой. */
-            autoBase = e.isTrusted ? g2('#cx-in').value : autoBase;
+            if (e.isTrusted){ autoBase = g2('#cx-in').value; manualBase = true; }
           }
           userTyping = true;
           upd(false);
@@ -5907,6 +5910,17 @@ const wrap = root.querySelector('.pl-wrap');
             list.setAttribute('aria-hidden', 'true');
             active = -1;
           };
+          /* Языковые списки открываются вверх, если снизу мало места:
+             иначе окно обрезало их до пары строк. */
+          const placeList = () => {
+            if (!list.classList.contains('calc-combo__list--lang')) return;
+            const host = input.closest('.aw-win__body') || input.closest('.aw-win') || document.documentElement;
+            const hr = host.getBoundingClientRect(), ir = input.getBoundingClientRect();
+            const below = hr.bottom - ir.bottom - 12, above = ir.top - hr.top - 12;
+            const up = below < 320 && above > below;
+            list.classList.toggle('calc-combo__list--up', up);
+            list.style.maxHeight = Math.max(260, Math.min(720, up ? above : below)) + 'px';
+          };
           const paint = (q='') => {
             const needle = norm(q);
             items = getItems().filter(it => !needle || norm(it.label).includes(needle)).slice(0, 60);
@@ -5914,6 +5928,7 @@ const wrap = root.querySelector('.pl-wrap');
             list.innerHTML = items.length
               ? items.map((it, i) => `<button type="button" class="calc-combo__item${i===active?' on':''}" data-ci="${i}">${esc(it.label)}</button>`).join('')
               : '<div class="calc-combo__empty">Ничего не найдено</div>';
+            placeList();
             list.classList.toggle('is-on', !!items.length);
             list.setAttribute('aria-hidden', items.length ? 'false' : 'true');
           };
@@ -6015,8 +6030,9 @@ const wrap = root.querySelector('.pl-wrap');
           const qtyTxt = Number(v.qty).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
           note.innerHTML = `${qtyTxt} ${label} × ${(+v.rate.toFixed(2)).toLocaleString('ru-RU')} ₽ = <b>${fmtMoney(Math.round(v.qty * v.rate))}</b>`;
           if (auto){
-            autoBase = null;
-            g2('#cx-in').value = `${v.qty} × ${rateStr}`;
+            autoBase = `${v.qty} × ${rateStr}`;
+            manualBase = false;
+            g2('#cx-in').value = autoBase;
             upd(animate);
           }
           paintNormDeadline();
@@ -6051,7 +6067,8 @@ const wrap = root.querySelector('.pl-wrap');
         const picked = () => [...mask.querySelectorAll('[data-sv]:checked,[data-ex]:checked')].map(i => {
           const p = (i.dataset.sv || i.dataset.ex || '').split('|');
           const qty = i.dataset.sv ? 1 : Math.max(1, Math.round(+i.dataset.qty || 1));
-          return { kind: i.dataset.sv ? 'sv' : 'ex', nid:p[0], name:p[1], price:(+p[2] || 0) * qty, pct:+p[3] || 0, qty };
+          const unitPrice = (+p[2] || 0);
+          return { kind: i.dataset.sv ? 'sv' : 'ex', nid:p[0], name:p[1], unitPrice, price:unitPrice * qty, pct:+p[3] || 0, qty };
         });
         const svcOnlySum = () => picked().filter(x => x.kind === 'sv').reduce((s,x)=>s+x.price, 0);
         const fixedExtraSum = () => picked().filter(x => x.kind === 'ex' && !x.pct).reduce((s,x)=>s+x.price, 0);
@@ -6059,21 +6076,24 @@ const wrap = root.querySelector('.pl-wrap');
         const preExtra = () => (isNaN(val) ? 0 : val) + svcOnlySum();
         /* Показываем в поле множители надбавок и промокода. База хранится
            отдельно: иначе скидка и надбавка посчитались бы дважды. */
+        const fixedTerms = () => picked().filter(x => x.kind === 'ex' && !x.pct)
+          .map(x => (x.qty > 1 ? `${x.qty} × ${x.unitPrice}` : `${x.unitPrice}`));
         const syncExpr = (promoPct = 0) => {
           const inp = g2('#cx-in'); if (!inp) return;
-          if (userTyping) return;
-          if (autoBase == null) autoBase = inp.value;
+          if (userTyping || autoBase == null) return;
+          /* В поле — та же арифметика, что и в сумме: объём плюс каждая
+             фиксированная опция с её количеством (копии, заверение). */
+          const parts = manualBase ? [autoBase] : [autoBase, ...fixedTerms()];
+          const body = parts.filter(p => String(p).trim()).join(' + ');
+          if (!body) return;
           const pct = pctSum();
           const mults = [];
           if (pct) mults.push(1 + pct / 100);
           if (promoPct) mults.push(1 - promoPct / 100);
-          if (!mults.length){
-            if (autoBase != null) inp.value = autoBase;
-            autoBase = null;
-            return;
-          }
-          if (!String(autoBase).trim()) return;
-          inp.value = `${autoBase}${mults.map(m => ` × ${+m.toFixed(3)}`).join('')}`;
+          /* Множитель относится ко всей сумме — в поле ставим скобки,
+             чтобы выражение читалось и считалось ровно как итог. */
+          const shown = (!manualBase && parts.length > 1 && mults.length) ? `(${body})` : body;
+          inp.value = `${shown}${mults.map(m => ` × ${+m.toFixed(3)}`).join('')}`;
         };
         /* Свой срок: если он короче обычного срока ниши, заказ считается
            срочным и к сумме применяется надбавка из настроек. */
@@ -6095,10 +6115,12 @@ const wrap = root.querySelector('.pl-wrap');
         const calcDiscount = () => {
           const hours = volumeHours();
           const code = String(g2('#cx-promo').value || '').trim().toUpperCase();
-          const fixed = fixedExtraSum();
           const extraPct = pctSum();
           const priced = (isNaN(val) ? 0 : val) + svcOnlySum();
-          const extraFee = Math.round(priced * extraPct / 100);
+          const fixed = fixedExtraSum();
+          /* Надбавка считается от всей суммы: объём плюс фиксированные
+             опции (копии, заверение) — так же, как это видно в поле. */
+          const extraFee = Math.round((priced + fixed) * extraPct / 100);
           const langFee = langPair() ? Math.round((priced + fixed + extraFee) * langSurcharge() / 100) : 0;
           const base = priced + fixed + extraFee + langFee;
           let best = null;

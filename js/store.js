@@ -196,7 +196,6 @@ const SITE_CALC_SERVICES = {
     { id:'cs-a7',  name:'Подготовка диалоговых/субтитровых листов', price:22, unit:'за минуту', margin:25 },
     { id:'cs-a8',  name:'Изготовление субтитров для видео', price:3000, unit:'за час видео', margin:25 },
     { id:'cs-a9',  name:'Подготовка монтажных листов', price:3600, unit:'за час видео', margin:25 },
-    { id:'cs-a10', name:'Заверение стенограммы', price:1299, unit:'за шт', margin:25 },
     { id:'cs-a11', name:'Тестовая расшифровка', price:0, unit:'2 минуты', margin:25 },
     { id:'cs-a12', name:'Улучшение звука и очистка от шумов', price:2000, unit:'за запись', margin:25 },
     { id:'cs-a13', name:'Озвучка диктором', price:12000, unit:'за час', margin:25 }
@@ -235,6 +234,7 @@ const DEFAULT_CALC_SETTINGS = {
       { id:'ce-a2', name:'Корректура', price:0, pct:20, unit:'% от стоимости', active:true },
       { id:'ce-a3', name:'Повышенная сложность', price:0, pct:20, unit:'% от стоимости', active:true },
       { id:'ce-a4', name:'Особые требования к оформлению', price:0, pct:10, unit:'% от стоимости', active:true },
+      { id:'ce-a0', name:'Заверение стенограммы', price:1299, pct:0, unit:'за документ', active:true },
       { id:'ce-a5', name:'Распечатка копии', price:99, pct:0, unit:'за копию', active:true },
       { id:'ce-a6', name:'Дополнительная копия', price:49, pct:0, unit:'за копию', active:true }
     ],
@@ -660,7 +660,7 @@ let S;
 function loadState(){
   try{
     const raw = localStorage.getItem(LS_KEY);
-    if (raw){ S = JSON.parse(raw); if (S && (S._v >= 1 || Array.isArray(S.users))){ S._v = Number(S._v) || 1; migrateSchema(); migrateSiteCatalog(); migrateTranscriptionMinutes(); migrateSmartcatServices(); migrateLegalServices(); migrateServiceDescriptions(); migrateOrderServices(); migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); migrateKeys(); migrateStaffBalances(); migrateFinance(); saveState(); return; } }
+    if (raw){ S = JSON.parse(raw); if (S && (S._v >= 1 || Array.isArray(S.users))){ S._v = Number(S._v) || 1; migrateSchema(); migrateSiteCatalog(); migrateTranscriptionMinutes(); migrateSmartcatServices(); migrateLegalServices(); migrateTranscriptCertification(); migrateServiceDescriptions(); migrateOrderServices(); migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); migrateKeys(); migrateStaffBalances(); migrateFinance(); saveState(); return; } }
   }catch(e){}
   S = seedState();
   saveState();
@@ -813,6 +813,23 @@ function migrateLegalServices(){
   });
   S.calcSettings.extras.n3 = ex.filter(x => x.id !== 'ce-r1');
   S.settings.legalServicesVersion = 2;
+}
+/* «Заверение стенограммы» раньше было отдельной услугой и терялось среди
+   объёма. Переносим его в доп. опции — сразу перед распечатками и копиями. */
+function migrateTranscriptCertification(){
+  if (!S || !S.settings) return;
+  if (S.settings.transcriptCertVersion >= 1) return;
+  S.calcServices = S.calcServices || {};
+  if (Array.isArray(S.calcServices.n1)) S.calcServices.n1 = S.calcServices.n1.filter(x => x && x.id !== 'cs-a10');
+  S.calcSettings = S.calcSettings || {};
+  S.calcSettings.extras = S.calcSettings.extras || {};
+  const ex = S.calcSettings.extras.n1 = Array.isArray(S.calcSettings.extras.n1) ? S.calcSettings.extras.n1 : [];
+  if (!ex.some(e => e && e.id === 'ce-a0')){
+    const item = { id:'ce-a0', name:'Заверение стенограммы', price:1299, pct:0, unit:'за документ', active:true };
+    const at = ex.findIndex(e => e && (/^(распечат|дополнительн).*копи/i.test(e.name || '') || e.id === 'ce-a5' || e.id === 'ce-a6'));
+    if (at >= 0) ex.splice(at, 0, item); else ex.unshift(item);
+  }
+  S.settings.transcriptCertVersion = 1;
 }
 function migrateServiceDescriptions(){
   Object.values(S.calcServices || {}).forEach(list => {

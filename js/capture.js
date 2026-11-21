@@ -5,10 +5,44 @@
   const $ = (s, r = document) => r.querySelector(s);
   const el = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
   let shot = null, rec = null, picker = null;
+  /* Кегль подписи на снимке — 28 pt в координатах изображения; шрифт тот же,
+     что у интерфейса. Один источник для канвы и поля ввода. */
+  const TEXT_PT = 28, TEXT_FONT = 'system-ui, -apple-system, Segoe UI, sans-serif';
 
   const appSettings = () => (typeof S !== 'undefined' ? S.settings : null);
-  const privacyOn = () => { const st = appSettings(); if (!(st && st.capturePrivacy === false)) document.body.classList.add('capture-privacy'); };
-  const privacyOff = () => document.body.classList.remove('capture-privacy');
+  /* Элементы, которые маскируются на снимке и записи. Один список на все
+     места: плашка предупреждения, клик по элементу и сам снимок. Порядок —
+     от внешнего к вложенному: раскрывать нужно самый внешний, иначе фильтр
+     остаётся на родителе и элемент продолжает выглядеть скрытым. */
+  const PRIVACY_SELECTORS = [
+    '#side-balance','.head__pill--balance','.chat-head','.chat-list','.chat-list__row','.chat-item',
+    '.msg','.msg__bubble','.avatar','.order-card','.order-row','.order-detail','.profile-card',
+    '.person-row','.person-card','.tbl-wrap','.rp-file-row','.aw-win--active .card'
+  ];
+  /* Самый внешний маскированный узел вокруг клика: если размыт и список, и
+     строка внутри, раскрывать нужно список, иначе фильтр родителя остаётся. */
+  const privacyTargetOf = node => {
+    if (!node || !node.closest) return null;
+    const sel = PRIVACY_SELECTORS.join(',');
+    let best = node.closest(sel), cur = best;
+    while (cur){
+      const parent = cur.parentElement && cur.parentElement.closest(sel);
+      if (!parent) break;
+      best = parent; cur = parent;
+    }
+    return best;
+  };
+  const privacyOn = () => {
+    const st = appSettings();
+    if (!(st && st.capturePrivacy === false)){
+      document.body.classList.add('capture-privacy');
+      ensurePrivacyPill();
+    }
+  };
+  const privacyOff = () => {
+    document.body.classList.remove('capture-privacy');
+    document.querySelector('.cap-privacy-pill')?.remove();
+  };
     const waitFrame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
   /* Снимок берём не в момент клика, а когда интерфейс уже закрылся, а курсор
      остановился: иначе в кадр попадает закрывающееся меню и «первый» кадр. */
@@ -43,6 +77,32 @@
     capTimer = setTimeout(finish, max);
     reset();
   });
+
+  /* Плашка «Конфиденциальные данные скрыты» — не псевдоэлемент, а кнопка:
+     по нажатию объясняем правила маскирования и даём раскрыть всё. */
+  const WARN_TEXT = 'На снимках и записях балансы, заказы, люди и переписки автоматически размываются. Чтобы раскрыть один элемент, нажмите на него во время съёмки. Полностью отключить маску можно в профиле — это видно в журнале.';
+  function ensurePrivacyPill(){
+    let pill = document.querySelector('.cap-privacy-pill');
+    if (!pill){
+      pill = el('button', 'cap-privacy-pill', '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 6v6c0 4.6 3.2 7.9 7.5 9 4.3-1.1 7.5-4.4 7.5-9V6L12 3Z"/><path d="M9.5 12l1.8 1.8 3.4-3.6"/></svg><span>Конфиденциальные данные скрыты</span>');
+      pill.type = 'button';
+      pill.setAttribute('aria-label', 'Конфиденциальные данные скрыты — что это значит');
+      pill.addEventListener('click', e => {
+        e.preventDefault(); e.stopPropagation();
+        openModal({ title:'Конфиденциальные данные', narrow:true, modalClass:'cap-privacy-modal',
+          body:`<p class="small" style="margin:0 0 8px">${WARN_TEXT}</p>
+            <p class="small faint" style="margin:0">Пока действует маска, клик по размытому элементу предлагает раскрыть только его или все данные.</p>`,
+          footer:'<button class="btn btn--ghost" type="button" data-cap-warn-x>Понятно</button><button class="btn btn--danger" type="button" data-cap-warn-all>Показать все данные</button>',
+          onMount:(m,c)=>{
+            m.querySelector('[data-cap-warn-x]').onclick=c;
+            m.querySelector('[data-cap-warn-all]').onclick=()=>{ document.body.classList.remove('capture-privacy'); c(); };
+          }
+        });
+      });
+      document.body.appendChild(pill);
+    }
+    return pill;
+  }
 
   function notice(text, kind = 'info') {
     if (typeof toast === 'function') toast(text, kind);
@@ -153,7 +213,11 @@
         if (!sh.points.length) return; x.beginPath(); x.moveTo(sh.points[0].x, sh.points[0].y);
         sh.points.slice(1).forEach(p=>x.lineTo(p.x,p.y)); x.stroke();
       } else if (sh.tool === 'text'){
-        x.font = `700 ${Math.max(16, sh.width*4)}px system-ui, sans-serif`; x.fillText(sh.text || '', sh.x, sh.y);
+        /* Кегль в точках снимка: 28 pt — столько же, сколько в поле ввода.
+           Раньше шрифт зависел от толщины линии и получался ~16 px. */
+        x.font = `700 ${TEXT_PT * (sh.k || 1)}px ${TEXT_FONT}`;
+        x.textBaseline = 'top';
+        x.fillText(sh.text || '', sh.x, sh.y);
       }
       x.restore();
     };
@@ -201,7 +265,31 @@
     $('[data-cap-redo]',root).onclick=()=>{ if(shot.redo.length){ shot.shapes.push(shot.redo.pop()); draw(); } };
     const keys=e=>{ if(!e.ctrlKey&&!e.metaKey)return; if(e.key==='z'||e.key==='Z'){e.preventDefault();e.stopPropagation(); if(e.shiftKey)$('[data-cap-redo]',root).click(); else $('[data-cap-undo]',root).click();} else if(e.key==='y'||e.key==='Y'){e.preventDefault();e.stopPropagation();$('[data-cap-redo]',root).click();} };
     document.addEventListener('keydown',keys,true);
-    const inlineText = p => { const inp=document.createElement('input'); inp.className='cap-text-input'; inp.placeholder='Текст'; const cr=canvas.getBoundingClientRect(); const sx=cr.left+p.x/canvas.width*cr.width, sy=cr.top+p.y/canvas.height*cr.height; Object.assign(inp.style,{position:'fixed',left:sx+'px',top:sy+'px',zIndex:9000,background:'var(--panel)',color:shot.color,border:'1px solid var(--accent)',borderRadius:'6px',padding:'3px 6px',font:'700 14px system-ui'}); document.body.appendChild(inp); const done=()=>{const t=inp.value.trim();if(t){shot.shapes.push({tool:'text',x:p.x,y:p.y,text:t,color:shot.color,width:shot.line});}inp.remove();draw();}; inp.onblur=done; inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();done();}if(e.key==='Escape'){inp.value='';done();}}; setTimeout(()=>inp.focus(),0); };
+    /* Поле ввода текста совпадает по кеглю с тем, что печатается на снимке:
+       пользователь видит ровно тот размер, который получится в кадре. */
+    const inlineText = p => {
+      const cr = canvas.getBoundingClientRect();
+      const scale = cr.width / canvas.width;
+      const sx = cr.left + p.x * scale, sy = cr.top + p.y * scale;
+      const inp = document.createElement('input');
+      inp.className = 'cap-text-input';
+      inp.placeholder = 'Текст';
+      Object.assign(inp.style, {
+        position:'fixed', left:sx+'px', top:sy+'px', zIndex:9000,
+        minWidth:'220px', background:'var(--panel)', color:shot.color,
+        border:'1px solid var(--accent)', borderRadius:'6px', padding:'4px 6px',
+        font:`700 ${TEXT_PT * scale}px ${TEXT_FONT}`, lineHeight:'1.2'
+      });
+      document.body.appendChild(inp);
+      const done = () => {
+        const t = inp.value.trim();
+        if (t) shot.shapes.push({ tool:'text', x:p.x, y:p.y, text:t, color:shot.color, width:shot.line, k: shot.guides.scale || 1 });
+        inp.remove(); draw();
+      };
+      inp.onblur = done;
+      inp.onkeydown = e => { if (e.key === 'Enter'){ e.preventDefault(); done(); } if (e.key === 'Escape'){ inp.value=''; done(); } };
+      setTimeout(()=>inp.focus(), 0);
+    };
     $('[data-cap-x]',root).onclick = close;
     $('[data-cap-save]',root).onclick = ()=>{ download(compose(), 'audiowizard-shot-'+Date.now()+'.jpg'); close(); };
     const attach = $('[data-cap-attach]',root); if (attach) attach.onclick = ()=>{ onAttach(dataUrlToFile(compose(), 'screenshot.jpg')); close(); };
@@ -257,11 +345,28 @@
     });
   }
 
-  function askReveal(el){
+  /* Снимаем маску не только с найденного узла, но и со всех скрытых
+     предков и потомков внутри него: иначе родительский фильтр продолжает
+     размывать элемент, и «раскрыть только это» визуально не срабатывает. */
+  const revealOnly = node => {
+    if (!node) return;
+    [...document.querySelectorAll(PRIVACY_SELECTORS.join(','))].forEach(el => {
+      if (el === node || el.contains(node) || node.contains(el)){
+        el.style.setProperty('filter','none','important');
+        el.style.setProperty('user-select','auto','important');
+      }
+    });
+  };
+  function askReveal(target, openedBy){
     openModal({ title:'Раскрыть данные?', narrow:true, modalClass:'cap-privacy-modal',
       body:'<p class="small muted">На записи/снимке этот элемент скрыт. Раскрыть только его или все заблюренные данные?</p>',
-      footer:'<button class="btn btn--ghost" data-cap-cancel>Оставить скрытым</button><button class="btn btn--soft" data-cap-only>Только это</button><button class="btn btn--danger" data-cap-all>Все данные</button>',
-      onMount:(m,c)=>{ m.querySelector('[data-cap-cancel]').onclick=c; m.querySelector('[data-cap-only]').onclick=()=>{ el.style.setProperty('filter','none','important'); el.style.setProperty('user-select','auto','important'); c(); }; m.querySelector('[data-cap-all]').onclick=()=>{ document.body.classList.remove('capture-privacy'); c(); }; }
+      footer:'<button class="btn btn--ghost" type="button" data-cap-cancel>Оставить скрытым</button><button class="btn btn--soft" type="button" data-cap-only>Только это</button><button class="btn btn--danger" type="button" data-cap-all>Все данные</button>',
+      onMount:(m,c)=>{
+        const only = () => { revealOnly(target); c(); };
+        m.querySelector('[data-cap-cancel]').onclick=c;
+        m.querySelector('[data-cap-only]').onclick=only;
+        m.querySelector('[data-cap-all]').onclick=()=>{ document.body.classList.remove('capture-privacy'); c(); };
+      }
     });
   }
 
@@ -284,14 +389,55 @@
       const cw=Math.max(2,Math.round(vw*k/2)*2), chh=Math.max(2,Math.round(vh*k/2)*2);
       const canvas=document.createElement('canvas'); canvas.width=cw; canvas.height=chh; const ctx=canvas.getContext('2d');
       const out=canvas.captureStream(24); let micStream=null;
+      /* Волна-капелька от клика и наезд камеры на выбранную область —
+         одноместные состояния записи, живут вне разметки. */
+      let ripples = [], zoom = null;
       if (mic){ try { micStream=await navigator.mediaDevices.getUserMedia({audio:true}); micStream.getAudioTracks().forEach(t=>out.addTrack(t)); } catch(e){ notice('Микрофон недоступен — запись без звука','warn'); } }
       const mp4Types=['video/mp4;codecs=avc1.42E01E','video/mp4;codecs=avc1.42001E','video/mp4;codecs=avc1','video/mp4']; const webm=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm'; const mime=mp4Types.find(t=>MediaRecorder.isTypeSupported(t))||webm; const ext=mime.includes('mp4')?'mp4':'webm'; const chunks=[]; const mr=new MediaRecorder(out,{mimeType:mime,videoBitsPerSecond:1400000,audioBitsPerSecond:64000});
       mr.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
-      const bar=el('div','cap-rec-bar','<b>● Запись</b><span class="cap-rec-time">00:00</span><button class="btn btn--ghost btn--sm" data-pause>Пауза</button><button class="btn btn--danger btn--sm" data-stop>Остановить</button>'); document.body.appendChild(bar);
+      const bar=el('div','cap-rec-bar','<b>● Запись</b><span class="cap-rec-time">00:00</span><button class="btn btn--ghost btn--sm" data-recsnap>Снимок</button><button class="btn btn--ghost btn--sm" data-rzoom>Зум</button><button class="btn btn--ghost btn--sm" data-pause>Пауза</button><button class="btn btn--danger btn--sm" data-stop>Остановить</button>'); document.body.appendChild(bar);
       const drawShapes=(c,scale=1)=>{ shapes.forEach(sh=>{ c.save(); c.strokeStyle=sh.color||'#ff5c5c';c.fillStyle=c.strokeStyle;c.lineWidth=4*scale;c.lineCap='round';c.lineJoin='round'; if(sh.tool==='rect'||sh.tool==='select'){if(sh.tool==='select')c.setLineDash([7*scale,4*scale]);c.strokeRect(sh.x*scale,sh.y*scale,sh.w*scale,sh.h*scale);} else if(sh.tool==='ellipse'){c.beginPath();c.ellipse((sh.x+sh.w/2)*scale,(sh.y+sh.h/2)*scale,Math.abs(sh.w/2)*scale,Math.abs(sh.h/2)*scale,0,0,Math.PI*2);c.stroke();} else if(sh.tool==='arrow'){const ex=(sh.x+sh.w)*scale,ey=(sh.y+sh.h)*scale;c.beginPath();c.moveTo(sh.x*scale,sh.y*scale);c.lineTo(ex,ey);c.stroke();const a=Math.atan2(sh.h,sh.w),l=16*scale;c.beginPath();c.moveTo(ex,ey);c.lineTo(ex-l*Math.cos(a-.5),ey-l*Math.sin(a-.5));c.moveTo(ex,ey);c.lineTo(ex-l*Math.cos(a+.5),ey-l*Math.sin(a+.5));c.stroke();} else if(sh.tool==='pen'){c.beginPath();sh.points.forEach((p,i)=>i?c.lineTo(p.x*scale,p.y*scale):c.moveTo(p.x*scale,p.y*scale));c.stroke();} else if(sh.tool==='text'){c.font=`700 ${22*scale}px system-ui`;c.fillText(sh.text,sh.x*scale,sh.y*scale);} c.restore(); }); };
       const redraw=()=>{ actx.clearRect(0,0,anno.width,anno.height); actx.save(); actx.scale(devicePixelRatio,devicePixelRatio); drawShapes(actx,1); actx.restore(); };
       let busy=false;
-      const pump=()=>{ if(!mr||mr.state==='inactive'||mr.state==='paused') return; ctx.drawImage(video,0,0,canvas.width,canvas.height); drawShapes(ctx,canvas.width/innerWidth); };
+      /* Кадр записи: камера (наезд) → рисунки → волны от кликов. */
+      const paintRipple = (c, r, scale) => {
+        const age = (performance.now() - r.t) / 520;
+        if (age >= 1) return;
+        const k = scale;
+        c.save();
+        c.globalAlpha = (1 - age) * .85;
+        c.strokeStyle = '#4cc9f0';
+        c.lineWidth = 3 * k;
+        c.beginPath();
+        c.ellipse(r.x*k, r.y*k, (10 + age * 34) * k, (10 + age * 34) * k * .62, 0, 0, Math.PI * 2);
+        c.stroke();
+        /* Капля: точка в месте клика, чуть темнее к краю. */
+        c.globalAlpha = Math.max(0, 1 - age * .7) * .9;
+        c.fillStyle = '#4cc9f0';
+        c.beginPath(); c.arc(r.x*k, r.y*k, Math.max(3.5, 7 - age * 3) * k, 0, Math.PI * 2); c.fill();
+        c.restore();
+      };
+      const pump=()=>{
+        if(!mr||mr.state==='inactive'||mr.state==='paused') return;
+        ripples = ripples.filter(r => performance.now() - r.t < 520);
+        if (zoom){
+          /* Плавный наезд: к центру выбранной области, 520 мс с easing. */
+          const p = Math.min(1, (performance.now() - zoom.t0) / 520);
+          const e = 1 - Math.pow(1 - p, 3);
+          const cx = (zoom.x + zoom.w / 2) * vw, cy = (zoom.y + zoom.h / 2) * vh;
+          const z = 1 + (zoom.k - 1) * e;
+          ctx.save();
+          ctx.translate(canvas.width / 2, canvas.height / 2);
+          ctx.scale(z, z);
+          ctx.translate(-cx * (canvas.width / vw), -cy * (canvas.height / vh));
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          ctx.restore();
+        } else {
+          ctx.drawImage(video,0,0,canvas.width,canvas.height);
+        }
+        drawShapes(ctx,canvas.width/innerWidth);
+        ripples.forEach(r => paintRipple(ctx, r, canvas.width / innerWidth));
+      };
       mr.start(500); const tick=setInterval(pump,41); pump();
       /* Счётчик идёт только пока запись активна: на паузе время замирает. */
       let recAccum=0, recRun=Date.now();
@@ -311,12 +457,82 @@
       root.querySelectorAll('[data-rcolor]').forEach(b=>b.onclick=()=>{drawColor=b.dataset.rcolor;root.querySelectorAll('[data-rcolor]').forEach(x=>x.classList.toggle('on',x===b));});
       root.querySelectorAll('[data-rtool]').forEach(b=>b.onclick=()=>{ tool=b.dataset.rtool; root.querySelectorAll('[data-rtool]').forEach(x=>x.classList.toggle('on',x===b)); anno.style.pointerEvents=(tool==='cursor'||tool==='hand')?'none':'auto'; });
       const pt=e=>({x:e.clientX,y:e.clientY});
+      /* Клик видно на видео: короткая волна-капелька в точке нажатия,
+         даже когда инструмент — «Курсор» и событие уходит в приложение. */
+      window.addEventListener('pointerdown', e => {
+        if (!rec) return;
+        if (e.target.closest && e.target.closest('.cap-rec-bar,.cap-rec-live,.cap-tools,.cap-editor,.modal-mask')) return;
+        ripples.push({ x:e.clientX, y:e.clientY, t:performance.now() });
+      }, true);
+      /* Наезд камеры на область: кроп-рамкой в режиме «Обрезать». */
+      const applyZoom = box => {
+        if (!box) return;
+        zoom = { ...box, t0: performance.now(), k: Math.max(1.6, Math.min(6, innerWidth / Math.max(80, box.w))) };
+        redraw();
+        notice('Наезд камеры — сброс повторным нажатием «Зум»','info');
+      };
+      const zbtn = $('[data-rzoom]', bar);
+      const startZoomPick = () => {
+        if (zoom){ zoom = null; zbtn.classList.remove('on'); return; }
+        let box = null, start = null;
+        const pickMove = e => { if (!start) return; box = { x:Math.min(start.x,e.clientX), y:Math.min(start.y,e.clientY), w:Math.abs(e.clientX-start.x), h:Math.abs(e.clientY-start.y) }; pickDraw(); };
+        const pickUp = () => {
+          window.removeEventListener('pointermove', pickMove, true);
+          window.removeEventListener('pointerup', pickUp, true);
+          pickCv.remove();
+          if (box && box.w > 40 && box.h > 40){ applyZoom(box); zbtn.classList.add('on'); }
+          else notice('Область слишком мала — выделите её заново','warn');
+        };
+        const ov = el('div', 'cap-zoom-pick');
+        const pickCv = el('canvas');
+        pickCv.style.cssText = 'position:fixed;inset:0;z-index:9600;cursor:crosshair;width:100vw;height:100vh';
+        ov.appendChild(pickCv);
+        document.body.appendChild(pickCv);
+        const pctx = pickCv.getContext('2d');
+        pickCv.width = innerWidth; pickCv.height = innerHeight;
+        const pickDraw = () => {
+          pctx.clearRect(0,0,innerWidth,innerHeight);
+          pctx.fillStyle = 'rgba(8,10,16,.35)'; pctx.fillRect(0,0,innerWidth,innerHeight);
+          if (box){ pctx.clearRect(box.x, box.y, box.w, box.h); pctx.strokeStyle = '#4cc9f0'; pctx.lineWidth = 2; pctx.setLineDash([6,4]); pctx.strokeRect(box.x, box.y, box.w, box.h); }
+        };
+        window.addEventListener('pointerdown', e => { start = { x:e.clientX, y:e.clientY }; }, true);
+        window.addEventListener('pointermove', pickMove, true);
+        window.addEventListener('pointerup', pickUp, true);
+        pickDraw();
+      };
       anno.addEventListener('pointerdown',e=>{ if(tool==='cursor'||tool==='hand')return; const p=pt(e); if(tool==='select'){ const list=document.elementsFromPoint(e.clientX,e.clientY).filter(el=>!el.closest('.cap-rec-live,.cap-rec-bar,.cap-tools')); const t=list.find(el=>el && el!==document.documentElement && el!==document.body); if(!t)return; const r=t.getBoundingClientRect(); shapes.push({tool:'select',x:r.left,y:r.top,w:r.width,h:r.height,color:'#4cc9f0'}); redraw(); return; } if(tool==='text'){ const inp=document.createElement('input');inp.placeholder='Текст';inp.style.cssText='position:fixed;z-index:10000;left:'+p.x+'px;top:'+p.y+'px;background:var(--panel);border:1px solid var(--accent);border-radius:5px;padding:3px;color:#ff5c5c';document.body.appendChild(inp);inp.focus();const done=()=>{if(inp.value.trim()){shapes.push({tool:'text',x:p.x,y:p.y,text:inp.value.trim(),color:'#ff5c5c'});redraw();}inp.remove();};inp.onblur=done;inp.onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();done();}};return;} drawing={tool,x:p.x,y:p.y,w:0,h:0,points:[p],color:drawColor}; shapes.push(drawing); });
       anno.addEventListener('pointermove',e=>{if(!drawing)return;const p=pt(e);drawing.w=p.x-drawing.x;drawing.h=p.y-drawing.y;drawing.points.push(p);redraw();});
       anno.addEventListener('pointerup',()=>{drawing=null;});
-      const finalStop=()=>{ clearInterval(tick); clearInterval(timer); if(mr.state!=='inactive') mr.stop(); };
-      mr.onstop=()=>{ const blob=new Blob(chunks,{type:mime}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='audiowizard-recording-'+Date.now()+'.'+ext; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); if(micStream)micStream.getTracks().forEach(t=>t.stop()); stream.getTracks().forEach(t=>t.stop()); privacyOff(); document.body.classList.remove('is-recording'); if(rec && rec.reveal) document.removeEventListener('click', rec.reveal, true); bar.remove(); root.remove(); rec=null; notice('Запись сохранена','ok'); };
-      const reveal = e => { if(!document.body.classList.contains('capture-privacy')) return; const t=e.target.closest('.chat-head,.chat-item,.avatar,.head__pill--balance,.msg,.order-row,.person-row,.person-card,.card'); if(!t)return; e.preventDefault(); e.stopPropagation(); askReveal(t); };
+      /* Снимок во время записи: кадр записи без разметки уходит в редактор,
+         а запись продолжается — панель одна на оба режима. */
+      $('[data-recsnap]', bar).onclick = () => {
+        const c = document.createElement('canvas'); c.width = canvas.width; c.height = canvas.height;
+        c.getContext('2d').drawImage(canvas, 0, 0);
+        const k = c.width / Math.max(1, innerWidth);
+        const xs = new Set(), ys = new Set();
+        [...document.querySelectorAll('body *')].forEach(n => {
+          if (n.closest('.cap-editor,.cap-tools,.cap-rec-live,.cap-rec-bar,.cap-picker,.cap-zoom-pick')) return;
+          const r = n.getBoundingClientRect(), cs = getComputedStyle(n);
+          if (r.width < 6 || r.height < 6) return;
+          if (cs.visibility === 'hidden' || cs.display === 'none' || +cs.opacity === 0) return;
+          [r.left, r.right, r.left + r.width/2].forEach(v => xs.add(Math.round(v*k)));
+          [r.top, r.bottom, r.top + r.height/2].forEach(v => ys.add(Math.round(v*k)));
+        });
+        openEditor(c, null, { xs:[...xs], ys:[...ys], scale:k });
+      };
+      $('[data-rzoom]', bar).onclick = startZoomPick;
+      const finalStop=()=>{ clearInterval(tick); clearInterval(timer); if(rec) rec.zoomOn = false; if(mr.state!=='inactive') mr.stop(); };
+      mr.onstop=()=>{ zoom = null; ripples = []; const blob=new Blob(chunks,{type:mime}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='audiowizard-recording-'+Date.now()+'.'+ext; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); if(micStream)micStream.getTracks().forEach(t=>t.stop()); stream.getTracks().forEach(t=>t.stop()); privacyOff(); document.body.classList.remove('is-recording'); if(rec && rec.reveal) document.removeEventListener('click', rec.reveal, true); bar.remove(); root.remove(); rec=null; notice('Запись сохранена','ok'); };
+      /* Клик по скрытому элементу и по самой плашке открывает один и тот же
+         диалог. Раскрываем самый внешний скрытый узел вокруг точки клика. */
+      const reveal = e => {
+        if (!document.body.classList.contains('capture-privacy')) return;
+        if (e.target.closest && e.target.closest('.modal-mask,.cap-editor,.cap-rec-bar,.cap-tools,.cap-privacy-pill')) return;
+        const t = privacyTargetOf(e.target);
+        if (!t) return;
+        e.preventDefault(); e.stopPropagation();
+        askReveal(t);
+      };
       document.addEventListener('click', reveal, true);
       rec={mr, reveal};
       // Keep a reliable stop that doesn't depend on the closure's rec check.
