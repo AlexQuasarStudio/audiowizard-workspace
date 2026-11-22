@@ -468,7 +468,7 @@
       if (mic){ try { micStream=await navigator.mediaDevices.getUserMedia({audio:true}); micStream.getAudioTracks().forEach(t=>out.addTrack(t)); } catch(e){ notice('Микрофон недоступен — запись без звука','warn'); } }
       const mp4Types=['video/mp4;codecs=avc1.42E01E','video/mp4;codecs=avc1.42001E','video/mp4;codecs=avc1','video/mp4']; const webm=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm'; const mime=mp4Types.find(t=>MediaRecorder.isTypeSupported(t))||webm; const ext=mime.includes('mp4')?'mp4':'webm'; const chunks=[]; const mr=new MediaRecorder(out,{mimeType:mime,videoBitsPerSecond:1400000,audioBitsPerSecond:64000});
       mr.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
-      const bar=el('div','cap-rec-bar','<b>● Запись</b><span class="cap-rec-time">00:00</span><button class="btn btn--ghost btn--sm" data-recsnap>Снимок</button><button class="btn btn--ghost btn--sm" data-rzoom>Зум</button><button class="btn btn--ghost btn--sm" data-pause>Пауза</button><button class="btn btn--danger btn--sm" data-stop>Остановить</button>'); document.body.appendChild(bar);
+      const bar=el('div','cap-rec-bar','<b>● Запись</b><span class="cap-rec-time">00:00</span><button class="btn btn--ghost btn--sm" data-recsnap>Снимок</button><button class="btn btn--ghost btn--sm" data-rzoom>Зум</button><button class="btn btn--ghost btn--sm" data-pause>Пауза</button><button class="btn btn--ghost btn--sm" data-cancel title="Прервать запись без сохранения">Отменить</button><button class="btn btn--danger btn--sm" data-stop>Остановить</button>'); document.body.appendChild(bar);
       const drawShapes=(c,scale=1)=>{ shapes.forEach(sh=>{ c.save(); c.strokeStyle=sh.color||'#ff5c5c';c.fillStyle=c.strokeStyle;c.lineWidth=4*scale;c.lineCap='round';c.lineJoin='round'; if(sh.tool==='rect'||sh.tool==='select'){if(sh.tool==='select')c.setLineDash([7*scale,4*scale]);c.strokeRect(sh.x*scale,sh.y*scale,sh.w*scale,sh.h*scale);} else if(sh.tool==='ellipse'){c.beginPath();c.ellipse((sh.x+sh.w/2)*scale,(sh.y+sh.h/2)*scale,Math.abs(sh.w/2)*scale,Math.abs(sh.h/2)*scale,0,0,Math.PI*2);c.stroke();} else if(sh.tool==='arrow'){const ex=(sh.x+sh.w)*scale,ey=(sh.y+sh.h)*scale;c.beginPath();c.moveTo(sh.x*scale,sh.y*scale);c.lineTo(ex,ey);c.stroke();const a=Math.atan2(sh.h,sh.w),l=16*scale;c.beginPath();c.moveTo(ex,ey);c.lineTo(ex-l*Math.cos(a-.5),ey-l*Math.sin(a-.5));c.moveTo(ex,ey);c.lineTo(ex-l*Math.cos(a+.5),ey-l*Math.sin(a+.5));c.stroke();} else if(sh.tool==='pen'){c.beginPath();sh.points.forEach((p,i)=>i?c.lineTo(p.x*scale,p.y*scale):c.moveTo(p.x*scale,p.y*scale));c.stroke();} else if(sh.tool==='text'){c.font=`700 ${22*scale}px system-ui`;c.fillText(sh.text,sh.x*scale,sh.y*scale);} c.restore(); }); };
       const redraw=()=>{ actx.clearRect(0,0,anno.width,anno.height); actx.save(); actx.scale(devicePixelRatio,devicePixelRatio); drawShapes(actx,1); actx.restore(); };
       let busy=false;
@@ -617,8 +617,38 @@
         openEditor(c, null, { xs:[...xs], ys:[...ys], scale:k });
       };
       $('[data-rzoom]', bar).onclick = startZoomPick;
+      /* cancelled = прервать без сохранения: чанки выбрасываем, файл не
+         скачиваем. Ждём события stop, иначе захват завершится раньше нас. */
+      let cancelled = false;
       const finalStop=()=>{ clearInterval(tick); clearInterval(timer); if(rec) rec.zoomOn = false; if(mr.state!=='inactive') mr.stop(); };
-      mr.onstop=()=>{ zoom = null; ripples = []; const blob=new Blob(chunks,{type:mime}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='audiowizard-recording-'+Date.now()+'.'+ext; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); if(micStream)micStream.getTracks().forEach(t=>t.stop()); stream.getTracks().forEach(t=>t.stop()); privacyOff(); document.body.classList.remove('is-recording'); if(rec && rec.reveal) document.removeEventListener('click', rec.reveal, true); bar.remove(); root.remove(); rec=null; notice('Запись сохранена','ok'); };
+      const cancelRec=()=>{
+        if (!rec) return;
+        cancelled = true;
+        notice('Запись отменена — файл не сохранён','info');
+        finalStop();
+      };
+      const cleanup = ()=>{
+        zoom = null; ripples = [];
+        if (micStream) micStream.getTracks().forEach(t=>t.stop());
+        stream.getTracks().forEach(t=>t.stop());
+        privacyOff(); document.body.classList.remove('is-recording');
+        if (rec && rec.reveal) document.removeEventListener('click', rec.reveal, true);
+        bar.remove(); root.remove(); rec = null;
+        /* Сервисный флаг загрузки снимается здесь же: раньше он оставался
+           true после записи, и следующий снимок/запись отвечали «уже идёт». */
+        capturing = false;
+      };
+      mr.onstop=()=>{
+        if (!cancelled){
+          const blob=new Blob(chunks,{type:mime});
+          const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+          a.download='audiowizard-recording-'+Date.now()+'.'+ext;
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+          notice('Запись сохранена','ok');
+        }
+        cleanup();
+      };
       /* Клик по скрытому элементу и по самой плашке открывает один и тот же
          диалог. Раскрываем самый внешний скрытый узел вокруг точки клика. */
       const reveal = e => {
@@ -638,7 +668,9 @@
         else if(mr.state==='paused'){ recRun=Date.now(); mr.resume(); paintRecTime(); $('[data-pause]',bar).textContent='Пауза'; }
       };
       rec.stop=finalStop;
-    } catch(e){ privacyOff(); document.body.classList.remove('is-recording'); captureError(e); }
+      const cancelBtn = $('[data-cancel]',bar);
+      if (cancelBtn) cancelBtn.onclick = cancelRec;
+    } catch(e){ privacyOff(); document.body.classList.remove('is-recording'); capturing = false; captureError(e); }
   }
 
   window.CaptureStudio = { open:openMenu, shot:startShot, shotToFile:(cb)=>startShot('shot',cb), record:openRecord };
