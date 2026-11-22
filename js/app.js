@@ -1393,52 +1393,52 @@ const QUICK_BY_ROLE = {
   }
   const MASCOT_ROBOT_SVG = `<svg class="mascot-svg" viewBox="0 0 180 200" role="img" aria-label="Робот"><ellipse cx="90" cy="190" rx="50" ry="6" fill="#202124" opacity=".12"/>
   <g stroke="none">
-    <circle cx="90" cy="22" r="5" fill="#4285F4"/><circle cx="99" cy="25" r="5" fill="#EA4335"/>
-    <circle cx="90" cy="32" r="5" fill="#FBBC05"/><circle cx="81" cy="25" r="5" fill="#34A853"/>
+    <circle cx="90" cy="22" r="5" fill="var(--accent)"/><circle cx="99" cy="25" r="5" fill="color-mix(in srgb,var(--accent) 62%,#fff)"/>
+    <circle cx="90" cy="32" r="5" fill="color-mix(in srgb,var(--accent) 34%,#fff)"/><circle cx="81" cy="25" r="5" fill="var(--accent-2,var(--accent))"/>
   </g>
-  <g stroke="#5F6368" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+  <g stroke="var(--mascot-line,#3b3155)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
     <path d="M90 50V31" fill="none"/>
-    <rect x="14" y="82" width="15" height="40" rx="7.5" fill="#4285F4"/>
-    <rect x="151" y="82" width="15" height="40" rx="7.5" fill="#34A853"/>
+    <rect x="14" y="82" width="15" height="40" rx="7.5" fill="var(--accent)"/>
+    <rect x="151" y="82" width="15" height="40" rx="7.5" fill="var(--accent-2,var(--accent))"/>
     <rect x="30" y="56" width="120" height="88" rx="30" fill="#fff"/>
-    <rect x="46" y="73" width="88" height="54" rx="21" fill="#F1F3F4" stroke="none"/>
+    <rect x="46" y="73" width="88" height="54" rx="21" fill="var(--accent-soft,rgba(122,104,153,.12))" stroke="none"/>
     <circle cx="70" cy="97" r="7" fill="#202124" stroke="none"/>
     <circle cx="110" cy="97" r="7" fill="#202124" stroke="none"/>
     <circle cx="72" cy="94" r="2.2" fill="#fff" stroke="none"/>
     <circle cx="112" cy="94" r="2.2" fill="#fff" stroke="none"/>
     <path d="M78 112c4 5 8 6.5 12 6.5s8-1.5 12-6.5" fill="none"/>
     <rect x="44" y="146" width="92" height="44" rx="20" fill="#fff"/>
-    <circle cx="66" cy="168" r="5" fill="#4285F4" stroke="none"/>
-    <circle cx="82" cy="168" r="5" fill="#EA4335" stroke="none"/>
-    <circle cx="98" cy="168" r="5" fill="#FBBC05" stroke="none"/>
-    <circle cx="114" cy="168" r="5" fill="#34A853" stroke="none"/>
+    <circle cx="66" cy="168" r="5" fill="var(--accent)" stroke="none"/>
+    <circle cx="82" cy="168" r="5" fill="color-mix(in srgb,var(--accent) 62%,#fff)" stroke="none"/>
+    <circle cx="98" cy="168" r="5" fill="color-mix(in srgb,var(--accent) 34%,#fff)" stroke="none"/>
+    <circle cx="114" cy="168" r="5" fill="var(--accent-2,var(--accent))" stroke="none"/>
     <path d="M59 150c-8 2-13 8-14 16M121 150c8 2 13 8 14 16" fill="none"/>
     <path d="M72 190v4M108 190v4" fill="none"/>
   </g>
   </svg>`;
   const MASCOT_ROBOT_ERROR_SVG = `<svg class="mascot-svg" viewBox="0 0 180 200" role="img" aria-label="Растерянный робот"><ellipse cx="90" cy="190" rx="50" ry="6" fill="#202124" opacity=".12"/>
   <g stroke="none">
-    <circle cx="90" cy="22" r="5" fill="#4285F4"/><circle cx="99" cy="25" r="5" fill="#EA4335"/>
-    <circle cx="90" cy="32" r="5" fill="#FBBC05"/><circle cx="81" cy="25" r="5" fill="#34A853"/>
+    <circle cx="90" cy="22" r="5" fill="var(--accent)"/><circle cx="99" cy="25" r="5" fill="color-mix(in srgb,var(--accent) 62%,#fff)"/>
+    <circle cx="90" cy="32" r="5" fill="color-mix(in srgb,var(--accent) 34%,#fff)"/><circle cx="81" cy="25" r="5" fill="var(--accent-2,var(--accent))"/>
   </g>
-  <g stroke="#5F6368" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+  <g stroke="var(--mascot-line,#3b3155)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
     <path d="M90 50V31" fill="none"/>
-    <rect x="14" y="82" width="15" height="40" rx="7.5" fill="#4285F4"/>
-    <rect x="151" y="82" width="15" height="40" rx="7.5" fill="#34A853"/>
+    <rect x="14" y="82" width="15" height="40" rx="7.5" fill="var(--accent)"/>
+    <rect x="151" y="82" width="15" height="40" rx="7.5" fill="var(--accent-2,var(--accent))"/>
     <rect x="30" y="56" width="120" height="88" rx="30" fill="#fff"/>
-    <rect x="46" y="73" width="88" height="54" rx="21" fill="#F1F3F4" stroke="none"/>
+    <rect x="46" y="73" width="88" height="54" rx="21" fill="var(--accent-soft,rgba(122,104,153,.12))" stroke="none"/>
     <path d="M58 91c5-5 10-4 14 0M108 91c4-4 9-5 14 0" fill="none"/>
     <circle cx="70" cy="99" r="6.4" fill="#202124" stroke="none"/>
     <circle cx="110" cy="99" r="6.4" fill="#202124" stroke="none"/>
     <circle cx="72" cy="96" r="2" fill="#fff" stroke="none"/>
     <circle cx="112" cy="96" r="2" fill="#fff" stroke="none"/>
     <path d="M78 116c4-4 8 4 12 0s8 4 12 0" fill="none"/>
-    <path d="M128 82c-4 6-3 12 1 12 4 0 5-6 1-12Z" fill="#8AB4F8" stroke="#5F6368" stroke-width="2"/>
+    <path d="M128 82c-4 6-3 12 1 12 4 0 5-6 1-12Z" fill="var(--accent-2,var(--accent))" stroke="var(--mascot-line,#3b3155)" stroke-width="2"/>
     <rect x="44" y="146" width="92" height="44" rx="20" fill="#fff"/>
-    <circle cx="66" cy="168" r="5" fill="#4285F4" stroke="none"/>
-    <circle cx="82" cy="168" r="5" fill="#EA4335" stroke="none"/>
-    <circle cx="98" cy="168" r="5" fill="#FBBC05" stroke="none"/>
-    <circle cx="114" cy="168" r="5" fill="#34A853" stroke="none"/>
+    <circle cx="66" cy="168" r="5" fill="var(--accent)" stroke="none"/>
+    <circle cx="82" cy="168" r="5" fill="color-mix(in srgb,var(--accent) 62%,#fff)" stroke="none"/>
+    <circle cx="98" cy="168" r="5" fill="color-mix(in srgb,var(--accent) 34%,#fff)" stroke="none"/>
+    <circle cx="114" cy="168" r="5" fill="var(--accent-2,var(--accent))" stroke="none"/>
     <path d="M59 150c-8 2-13 8-14 16M121 150c8 2 13 8 14 16" fill="none"/>
     <path d="M72 190v4M108 190v4" fill="none"/>
   </g>
@@ -2182,6 +2182,9 @@ ex.innerHTML = avatarHTML(user(), '');
         const mrow = m2.querySelector('.welcome-mascots--modal');
         if (mrow && wm){ mrow.classList.add('welcome-mascots--float'); wm.appendChild(mrow); }
         if (wm){ const cx=document.createElement('button'); cx.className='modal-float-x'; cx.type='button'; cx.setAttribute('aria-label','Закрыть'); cx.textContent='×'; cx.onclick=c2; wm.appendChild(cx); }
+        /* При скролле тела окна маскоты отъезжают наверх и гаснут — не наезжают на поля. */
+        const body2 = wm && wm.querySelector('.modal__b');
+        if (body2) body2.addEventListener('scroll', ()=>body2.classList.toggle('is-scrolled', body2.scrollTop > 12), { passive:true });
         let avatarData = null;
         m2.querySelector('#ob-avatar').onclick = ()=>m2.querySelector('#ob-avatar-file').click();
         m2.querySelector('#ob-avatar-file').onchange = e=>{
@@ -11516,6 +11519,44 @@ document.addEventListener('contextmenu', e => {
   e.preventDefault();
   return false;
 });
+/* Долгое нажатие на тач-экране = правый клик: интерфейс слушает contextmenu,
+   и на телефоне без этого меню было недоступно. Гасим последующий click,
+   иначе меню открывается и сразу закрывается. */
+function initLongPress(){
+  if (window.__longPressReady) return;
+  window.__longPressReady = true;
+  let timer = null, start = null, fired = false;
+  const cancel = ()=>{ clearTimeout(timer); timer = null; start = null; };
+  document.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'touch') return;
+    if (e.target.closest('input,textarea,select,[contenteditable],.chat-msgs,.cap-editor,.modal-mask,.cap-rec-bar,.cap-tools')) return;
+    /* Нажатие должно попасть в интерфейс, а не в уведомление/тост поверх него. */
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    if (!hit || hit.closest('.toast,.toasts,.cookie-bar,.tour-card,.cap-privacy-pill')) return;
+    start = { x:e.clientX, y:e.clientY, target: hit };
+    fired = false;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (!start) return;
+      fired = true;
+      const ev = new MouseEvent('contextmenu', { bubbles:true, cancelable:true, clientX:start.x, clientY:start.y });
+      start.target.dispatchEvent(ev);
+      try { navigator.vibrate && navigator.vibrate(12); } catch(e){}
+    }, 480);
+  }, true);
+  document.addEventListener('pointermove', e => {
+    if (!start) return;
+    if (Math.abs(e.clientX - start.x) > 8 || Math.abs(e.clientY - start.y) > 8) cancel();
+  }, true);
+  document.addEventListener('pointerup', () => cancel(), true);
+  document.addEventListener('pointercancel', () => cancel(), true);
+  /* Событие-контекст-меню уже отрисовано — глушим парный тап. */
+  document.addEventListener('click', e => {
+    if (!fired) return;
+    fired = false;
+    e.preventDefault(); e.stopPropagation();
+  }, true);
+}
 function initPWA(){
     if (!('serviceWorker' in navigator)) return;
     navigator.serviceWorker.register('sw.js').then(reg=>{
@@ -11740,7 +11781,7 @@ function initPWA(){
        делала из той же картинки второй сетевой запрос — браузер видел
        другой ключ кэша. Свежесть узора обеспечивает service worker:
        PRECACHE обновляется вместе со сборкой. */
-    const maskUrl = 'url("bg/pattern-ai.svg?v=1498")';
+    const maskUrl = 'url("bg/pattern-ai.svg?v=1500")';
     const cacheKey = cur + '|' + t + '|bg11';
     /* Единая отрисовка: маску ставим ВСЕГДА. После перерисовки разметки
        (#bg-doodles пересоздаётся при навигации) слой терял маску и узор «отваливался». */
@@ -12081,6 +12122,7 @@ function initPWA(){
       applyTheme(user()?.mode || 'system', user()?.accent || 'violet');
       initKeys();
       initPWA();
+      initLongPress();
       const h = parseHash();
       if (h) route = h;
       if (!user() && !route.name.startsWith('err') && !parseToken() && !parseRef()) route = { name:'login' };
