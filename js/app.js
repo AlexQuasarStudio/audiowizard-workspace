@@ -1406,7 +1406,7 @@ const QUICK_BY_ROLE = {
     <circle cx="110" cy="97" r="7" fill="#202124" stroke="none"/>
     <circle cx="72" cy="94" r="2.2" fill="#fff" stroke="none"/>
     <circle cx="112" cy="94" r="2.2" fill="#fff" stroke="none"/>
-    <path d="M78 112c4 5 8 6.5 12 6.5s8-1.5 12-6.5" fill="none"/>
+    <path d="M78 112c4 5 8 6.5 12 6.5s8-1.5 12-6.5" fill="none" stroke-width="3.6"/>
     <rect x="44" y="146" width="92" height="44" rx="20" fill="#fff"/>
     <circle cx="66" cy="168" r="5" fill="var(--accent)" stroke="none"/>
     <circle cx="82" cy="168" r="5" fill="color-mix(in srgb,var(--accent) 62%,#fff)" stroke="none"/>
@@ -1427,12 +1427,12 @@ const QUICK_BY_ROLE = {
     <rect x="151" y="82" width="15" height="40" rx="7.5" fill="var(--accent-2,var(--accent))"/>
     <rect x="30" y="56" width="120" height="88" rx="30" fill="#fff"/>
     <rect x="46" y="73" width="88" height="54" rx="21" fill="var(--accent-soft,rgba(122,104,153,.12))" stroke="none"/>
-    <path d="M58 91c5-5 10-4 14 0M108 91c4-4 9-5 14 0" fill="none"/>
+    <path d="M58 91c5-5 10-4 14 0M108 91c4-4 9-5 14 0" fill="none" stroke-width="3.6"/>
     <circle cx="70" cy="99" r="6.4" fill="#202124" stroke="none"/>
     <circle cx="110" cy="99" r="6.4" fill="#202124" stroke="none"/>
     <circle cx="72" cy="96" r="2" fill="#fff" stroke="none"/>
     <circle cx="112" cy="96" r="2" fill="#fff" stroke="none"/>
-    <path d="M78 116c4-4 8 4 12 0s8 4 12 0" fill="none"/>
+    <path d="M78 116c4-4 8 4 12 0s8 4 12 0" fill="none" stroke-width="3.6"/>
     <path d="M128 82c-4 6-3 12 1 12 4 0 5-6 1-12Z" fill="var(--accent-2,var(--accent))" stroke="var(--mascot-line,#3b3155)" stroke-width="2"/>
     <rect x="44" y="146" width="92" height="44" rx="20" fill="#fff"/>
     <circle cx="66" cy="168" r="5" fill="var(--accent)" stroke="none"/>
@@ -2141,9 +2141,55 @@ ex.innerHTML = avatarHTML(user(), '');
     { sel:'[data-tour="nav"]', t:'Навигация по ролям', d:'Меню подстраивается под вашу роль: дашборд, заказы, чаты, идеи и инструменты.' },
     { sel:'[data-tour="search"]', t:'Глобальный поиск', d:'Ctrl K — палетка команд: заказы, клиенты, действия и переходы. Задержка поиска < 200 мс.' },
     { sel:'[data-tour="bell"]', t:'Центр уведомлений', d:'Изменения заказов, патчноуты и тикеты — всё в одном месте.' },
-    { sel:'[data-tour="orders-link"]', t:'Заказы', d:'Цветовые статусы строк, живые фильтры и групповые операции.', video:'assets/tour/windows.mp4', videoNote:'Режим окон: свернуть, развернуть и правый клик по заказу.' },
-    { sel:'[data-tour="user"]', t:'Профиль и темы', d:'Аватар, настройки, пять тем оформления и выход. Настройки сохраняются в профиле.', video:'assets/tour/tasks.mp4', videoNote:'Планировщик и подпункты услуг — как добавить и не потерять.' }
+    { sel:'[data-tour="orders-link"]', t:'Заказы', d:'Цветовые статусы строк, живые фильтры и групповые операции.', scene:'windows' },
+    { sel:'[data-tour="user"]', t:'Профиль и темы', d:'Аватар, настройки, пять тем оформления и выход. Настройки сохраняются в профиле.', scene:'tasks' }
   ];
+
+  /* Демонстрационные сцены тура — чистая векторная графика вместо видео:
+     ничего не грузится, масштабируется без потерь и не выходит за карточку. */
+  const TOUR_SCENES = {
+    windows: `<svg class="tour-scene" viewBox="0 0 340 200" role="img" aria-label="Окна: свернуть, развернуть, правый клик">
+      <rect x="12" y="14" width="196" height="120" rx="10" fill="var(--panel)" stroke="var(--border-2)"/>
+      <path d="M12 34h196" stroke="var(--border)" fill="none"/>
+      <circle cx="26" cy="24" r="4" fill="var(--red,#e5484d)"/><circle cx="40" cy="24" r="4" fill="var(--yellow,#f5a524)"/><circle cx="54" cy="24" r="4" fill="var(--green,#30a46c)"/>
+      <rect x="26" y="46" width="120" height="8" rx="4" fill="var(--border-2)"/>
+      <rect x="26" y="62" width="164" height="8" rx="4" fill="var(--border)"/>
+      <rect x="26" y="78" width="96" height="8" rx="4" fill="var(--border)"/>
+      <rect x="26" y="98" width="72" height="20" rx="8" fill="var(--accent-soft)"/>
+      <rect x="134" y="52" width="176" height="102" rx="10" fill="var(--panel)" stroke="var(--accent)" opacity=".9"/>
+      <path d="M134 72h176" stroke="var(--accent)" opacity=".45" fill="none"/>
+      <rect x="148" y="84" width="90" height="8" rx="4" fill="var(--border-2)"/>
+      <rect x="148" y="100" width="140" height="8" rx="4" fill="var(--border)"/>
+      <rect x="148" y="118" width="64" height="8" rx="4" fill="var(--border)"/>
+      <path d="M282 34l-8 8m0-8l8 8" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx="226" cy="158" r="12" fill="var(--accent)" opacity=".18"/>
+      <path d="M222 150l10 6-4 1-2 5-4-12Z" fill="var(--accent)"/>
+    </svg>`,
+    tasks: `<svg class="tour-scene" viewBox="0 0 340 200" role="img" aria-label="Планировщик и подпункты услуг">
+      <rect x="14" y="16" width="150" height="168" rx="12" fill="var(--panel)" stroke="var(--border-2)"/>
+      <rect x="30" y="34" width="86" height="9" rx="4.5" fill="var(--border-2)"/>
+      <g stroke="none">
+        <rect x="30" y="58" width="18" height="18" rx="6" fill="var(--accent)"/><path d="M34 67l4 4 7-8" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+        <rect x="56" y="62" width="88" height="9" rx="4.5" fill="var(--border)"/>
+        <rect x="30" y="90" width="18" height="18" rx="6" fill="var(--accent)"/><path d="M34 99l4 4 7-8" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+        <rect x="56" y="94" width="70" height="9" rx="4.5" fill="var(--border)"/>
+        <rect x="56" y="118" width="12" height="3" rx="1.5" fill="var(--accent)" opacity=".7"/>
+        <rect x="72" y="118" width="56" height="9" rx="4.5" fill="var(--border)" opacity=".8"/>
+        <rect x="30" y="146" width="18" height="18" rx="6" fill="none" stroke="var(--border-2)" stroke-width="2"/>
+        <rect x="56" y="150" width="80" height="9" rx="4.5" fill="var(--border)"/>
+      </g>
+      <rect x="178" y="16" width="148" height="168" rx="12" fill="var(--panel)" stroke="var(--border-2)"/>
+      <rect x="192" y="34" width="64" height="9" rx="4.5" fill="var(--border-2)"/>
+      <rect x="192" y="56" width="120" height="26" rx="8" fill="var(--bg-2)" stroke="var(--border)"/>
+      <rect x="200" y="64" width="72" height="9" rx="4.5" fill="var(--border)"/>
+      <rect x="198" y="88" width="108" height="26" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" opacity=".85"/>
+      <path d="M214 94v14M208 101h13" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"/>
+      <rect x="228" y="97" width="62" height="8" rx="4" fill="var(--accent)" opacity=".45"/>
+      <rect x="192" y="128" width="120" height="8" rx="4" fill="var(--border)"/>
+      <rect x="192" y="144" width="88" height="8" rx="4" fill="var(--border)"/>
+      <rect x="192" y="160" width="52" height="14" rx="7" fill="var(--accent)"/>
+    </svg>`
+  };
   function offerOnboarding(){
     const u2 = user();
     openModal({
@@ -2263,26 +2309,20 @@ ex.innerHTML = avatarHTML(user(), '');
     const spot = document.createElement('div'); spot.className = 'tour-spot';
     Object.assign(spot.style, { left:r.left-6+'px', top:r.top-6+'px', width:r.width+12+'px', height:r.height+12+'px' });
     const card = document.createElement('div'); card.className = 'tour-card';
-    const top = r.bottom + 14 + 200 > innerHeight ? Math.max(14, r.top - 216) : r.bottom + 14;
+    const cardH = step.scene ? 340 : 200;
+    const top = Math.max(14, Math.min(innerHeight - cardH - 8, r.bottom + 14 + cardH > innerHeight ? r.top - cardH : r.bottom + 14));
     const left = Math.min(Math.max(14, r.left), innerWidth - 346);
     Object.assign(card.style, { top: top+'px', left: left+'px' });
     card.classList.toggle('tour-card--video', !!step.video);
     card.innerHTML = `
       <div class="row row--between"><b>${step.t}</b><span class="badge c-gray">${i+1} / ${TOUR.length}</span></div>
       <p class="small muted" style="margin:8px 0 ${step.video?'10px':'14px'}">${step.d}</p>
-      ${step.video ? `<figure class="tour-video"><video src="${step.video}" muted loop playsinline preload="none" poster=""></video><button class="tour-video__play" type="button" aria-label="Показать короткое видео">${icon('play')}<span>${esc(step.videoNote||'Короткое видео')}</span></button></figure>` : ''}
+      ${step.scene ? `<figure class="tour-figure">${TOUR_SCENES[step.scene] || ''}</figure>` : ''}
       <div class="row row--between">
         <button class="btn btn--ghost btn--sm" data-skip>Пропустить</button>
         <button class="btn btn--primary btn--sm" data-next>${i===TOUR.length-1?'Готово':'Далее'} ${icon('arrow-r','ico-sm')}</button>
       </div>`;
     document.body.appendChild(spot); document.body.appendChild(card);
-    const play = card.querySelector('.tour-video__play');
-    if (play) play.onclick = () => {
-      const fig = play.closest('.tour-video'), v = fig && fig.querySelector('video');
-      if (!v) return;
-      fig.classList.add('is-playing');
-      v.play().catch(()=>{});
-    };
     card.querySelector('[data-skip]').onclick = ()=>{ spot.remove(); card.remove(); user().tour_completed = true; saveState(); setTimeout(showInstallHint, 260); };
     card.querySelector('[data-next]').onclick = ()=>{ spot.remove(); card.remove(); startTour(i+1); };
   }
@@ -10112,7 +10152,11 @@ const cm = root.querySelector('.chat-main');
             const gf = f => tr.querySelector(`[data-ef="${f}"]`);
             const name = gf('name').value.trim();
             if (!name) return;
-            extras.push({ id: tr.dataset.eid, name, price: Math.max(0, +gf('price').value || 0), pct: Math.max(0, Math.min(200, +((gf('pct')||{}).value) || 0)), unit: gf('unit').value.trim(), active: !!gf('active').checked });
+            const prev = (((S.calcSettings || {}).extras || {})[nid] || []).find(x => x && x.id === tr.dataset.eid) || {};
+            const unit = gf('unit').value.trim();
+            extras.push({ id: tr.dataset.eid, name, price: Math.max(0, +gf('price').value || 0), pct: Math.max(0, Math.min(200, +((gf('pct')||{}).value) || 0)), unit, active: !!gf('active').checked,
+              /* Подчинение и «много копий» настраиваются только кодом/миграцией — при сохранении их не теряем. */
+              ...(prev.parent ? { parent: prev.parent } : {}), ...(prev.multi ? { multi: true } : {}) });
           });
           S.calcSettings = S.calcSettings || { rushPct:{}, extras:{}, minPrice:{}, minExecPrice:{}, deadlineDays:{}, dailyNorm:{}, clientBufferPct:30 };
           S.calcSettings.extras[nid] = extras;
@@ -10201,7 +10245,10 @@ const cm = root.querySelector('.chat-main');
       /* Подпункт услуги: та же таблица, но строка помечена родителем и
          сдвинута влево. В калькуляторе он идёт отдельной услугой-уточнением. */
       const addSubRow = parentId => {
-        const tb = el.querySelector('tbody[data-niche]');
+        /* Таблица ищется в группе родителя: `tbody[data-niche]` без значения
+           подхватывал чужую (первую) группу и подпункт уезжал не туда. */
+        const parentRow = el.querySelector(`tr[data-sid="${parentId}"]`);
+        const tb = parentRow ? parentRow.closest('tbody[data-niche]') : el.querySelector('tbody[data-niche]');
         if (!tb) return;
         const nid = tb.dataset.niche;
         const id = 'cs' + uid();
@@ -10250,7 +10297,7 @@ const cm = root.querySelector('.chat-main');
         const del = e.target.closest('[data-del]');
         if (del){ calcRowOut(del.closest('tr')); toast('Строка удалена — не забудьте сохранить','info'); return; }
         const subAdd = e.target.closest('[data-sub-add]');
-        if (subAdd){ subAddRow(subAdd.dataset.subAdd); return; }
+        if (subAdd){ addSubRow(subAdd.dataset.subAdd); return; }
         const add = e.target.closest('[data-add]');
         if (add) addRow(add.dataset.add);
         const promoSave = e.target.closest('#promo-save');

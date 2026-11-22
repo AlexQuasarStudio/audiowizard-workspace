@@ -5617,7 +5617,7 @@ const wrap = root.querySelector('.pl-wrap');
       narrow:true, tall:true, noFit:true, title:'Калькулятор услуг', route:'orders', persistKey: onResult ? '' : 'calculator',
       body:`<div class="calc-display">
           <input class="expr" id="cx-in" placeholder="например: 2.5 × 1800 + 5600" autocomplete="off" spellcheck="false" aria-label="Выражение">
-          <div class="val" id="cx-val">0</div>
+          <div class="cx-valrow"><div class="val" id="cx-val">0</div><label class="cx-copies" id="cx-copies-wrap" hidden><span>×</span><input class="input" id="cx-copies" type="number" min="1" max="999" step="1" value="1" inputmode="numeric" aria-label="Число дополнительных копий"><span class="faint">копий</span></label></div>
         </div>
         <div class="small faint" style="margin-top:6px">Поддерживаются + − × ÷ ( ) % и запятая как десятичный разделитель · Enter — в результат</div>
         <div class="card card-pad" style="margin-top:10px;background:var(--panel-2)">
@@ -6064,12 +6064,31 @@ const wrap = root.querySelector('.pl-wrap');
 
         /* Услуги и доп. опции: фиксированные прибавляются напрямую,
            процентные надбавки считаются от суммы «выражение + фикс. услуги». */
-        const picked = () => [...mask.querySelectorAll('[data-sv]:checked,[data-ex]:checked')].map(i => {
-          const p = (i.dataset.sv || i.dataset.ex || '').split('|');
-          const qty = i.dataset.sv ? 1 : Math.max(1, Math.round(+i.dataset.qty || 1));
-          const unitPrice = (+p[2] || 0);
-          return { kind: i.dataset.sv ? 'sv' : 'ex', nid:p[0], name:p[1], unitPrice, price:unitPrice * qty, pct:+p[3] || 0, qty };
-        });
+        /* Подпункт-родитель с multi (распечатка) превращается в строку
+           «qty × цена»; выбранный родитель включает и его подпункты. */
+        const exDef = (nid, eid) => calcExtrasFor(nid).find(x => x && x.id === eid) || {};
+        const isMany = d => !!(d && (d.multi || /копи|распечат|экземпляр/i.test(d.unit || '')));
+        const picked = () => {
+          const out = [];
+          mask.querySelectorAll('[data-ex]:checked').forEach(i => {
+            const p = (i.dataset.ex || '').split('|');
+            const def = exDef(p[0], p[1]);
+            const base = { kind:'ex', nid:p[0], name:p[1], unitPrice:+p[2] || 0, price:0, pct:+p[3] || 0, qty:1, parent:def.parent || '' };
+            out.push({ ...base, multi:isMany(def), qty:Math.max(1, Math.round(+i.dataset.qty || 1)) });
+          });
+          /* подпункты без галочки тоже идут, если выбран их родитель */
+          calcExtrasFor(g2('#cx-niche').value).filter(e => e && e.parent && !out.some(o => o.name === e.id))
+            .forEach(e => {
+              if (!out.some(o => o.name === e.parent)) return;
+              out.push({ kind:'ex', nid:g2('#cx-niche').value, name:e.id, unitPrice:Number(e.price)||0, price:0, pct:Number(e.pct)||0, qty:1, parent:e.parent });
+            });
+          out.forEach(o => { o.price = o.pct ? 0 : o.unitPrice * (o.multi ? o.qty : 1); });
+          const svcs = [...mask.querySelectorAll('[data-sv]:checked')].map(i => {
+            const p = (i.dataset.sv || '').split('|');
+            return { kind:'sv', nid:p[0], name:p[1], unitPrice:+p[2] || 0, price:+p[2] || 0, pct:0, qty:1 };
+          });
+          return [...svcs, ...out];
+        };
         const svcOnlySum = () => picked().filter(x => x.kind === 'sv').reduce((s,x)=>s+x.price, 0);
         const fixedExtraSum = () => picked().filter(x => x.kind === 'ex' && !x.pct).reduce((s,x)=>s+x.price, 0);
         const pctSum = () => picked().filter(x => x.kind === 'ex' && x.pct > 0).reduce((s,x)=>s+x.pct, 0);
@@ -6077,8 +6096,37 @@ const wrap = root.querySelector('.pl-wrap');
         /* Показываем в поле множители надбавок и промокода. База хранится
            отдельно: иначе скидка и надбавка посчитались бы дважды. */
         const fixedTerms = () => picked().filter(x => x.kind === 'ex' && !x.pct)
-          .map(x => (x.qty > 1 ? `${x.qty} × ${x.unitPrice}` : `${x.unitPrice}`));
+          .map(x => (x.multi && x.qty > 1 ? `${x.qty} × ${x.unitPrice}` : `${x.unitPrice}`));
+        /* Число копий: поле появляется, как только выбрана распечатка. */
+        const copiesOpt = () => {
+          const nid = g2('#cx-niche') ? g2('#cx-niche').value : '';
+          /* Распечатка не обязана стоять первой в списке выбранного. */
+          const all = [...mask.querySelectorAll('[data-ex]:checked')].map(x => {
+            const q = (x.dataset.ex || '').split('|');
+            return { el:x, def:calcExtrasFor(q[0]).find(y => y && y.id === q[1]) || {} };
+          }).filter(x => /копи|распечат|экземпляр/i.test(x.def.unit || ''));
+          const el = (all.find(x => x.def.parent) || all[0] || {}).el;
+          if (!el) return null;
+          const p = (el.dataset.ex || '').split('|');
+          const def = calcExtrasFor(p[0]).find(x => x && x.id === p[1]);
+          const unit = (def && (def.unit || p[4])) || '';
+          const many = /копи|распечат|экземпляр/i.test(unit) || !!(def && def.multi);
+          return (many && p[0] === nid) ? { nid:p[0], eid:p[1], el, multi:!!def.multi } : null;
+        };
+        /* hidden снимает только появление: если пользователь переключил
+           выбор, поле прячем явно. */
+        const syncCopiesField = () => {
+          const wrap = g2('#cx-copies-wrap');
+          if (!wrap) return;
+          const want = !!copiesOpt();
+          if (want) wrap.removeAttribute('hidden');
+          else if (!wrap.hidden) wrap.hidden = true;
+        };
+        syncCopiesField();
         const syncExpr = (promoPct = 0) => {
+          /* Поле копий зависит от выбора, а не от готовности выражения:
+             при ручном вводе autoBase ещё null, но распечатка уже выбрана. */
+          syncCopiesField();
           const inp = g2('#cx-in'); if (!inp) return;
           if (userTyping || autoBase == null) return;
           /* В поле — та же арифметика, что и в сумме: объём плюс каждая
@@ -6287,11 +6335,13 @@ const wrap = root.querySelector('.pl-wrap');
         const paintSvcs = ()=>{
           const onlyNid = g2('#cx-niche') ? g2('#cx-niche').value : '';
           g2('#cx-svcs').innerHTML = S.niches.filter(n => !onlyNid || n.id === onlyNid).map(n=>{
-            const extras = calcExtrasFor(n.id);
+            /* Подпункты идут сразу под своим родителем (как в настройках). */
+            const all = calcExtrasFor(n.id);
+            const extras = all.filter(e => !e.parent).flatMap(e => [e, ...all.filter(x => x.parent === e.id)]);
             if (!extras.length) return '';
             return `<div class="small cx-svc-group"><b style="margin-bottom:4px;display:block">${esc(n.name)}</b>
               <div class="tiny faint" data-svc-extra style="margin:6px 0 2px">Доп. опции</div>
-              ${extras.map(e=>{const perCopy=!e.pct&&/копи|распечат|экземпляр/i.test(e.unit||'');return `<label class="svc-row check" data-search="${esc(norm(n.name+' '+(e.name||'')+' '+(e.unit||'')+(e.pct?' процент':'')))}"><input type="checkbox" data-ex="${n.id}|${esc(e.id)}|${Number(e.price)||0}|${Number(e.pct)||0}" data-qty="1"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${esc(e.name)} <span class="faint">${esc(e.unit || (e.pct ? '% от стоимости' : ''))}</span></span>${perCopy?`<span class="calc-qty"><input class="input" data-exq="${n.id}|${esc(e.id)}|${Number(e.price)||0}|${Number(e.pct)||0}" type="number" min="1" max="999" step="1" value="1" inputmode="numeric" aria-label="Количество копий или распечаток"><span class="faint">×</span></span>`:''}<b>${e.pct ? '+' + e.pct + '%' : fmtMoney(e.price)}</b></label>`}).join('')}
+              ${extras.map(e=>{const isSub=!!e.parent;return `<label class="svc-row check${isSub?' svc-row--sub':''}" data-search="${esc(norm(n.name+' '+(e.name||'')+' '+(e.unit||'')+(e.pct?' процент':'')))}"><input type="checkbox" data-ex="${n.id}|${esc(e.id)}|${Number(e.price)||0}|${Number(e.pct)||0}" data-qty="1"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${isSub?`<span class="faint">└ </span>`:''}${esc(e.name)} <span class="faint">${esc(e.unit || (e.pct ? '% от стоимости' : ''))}</span></span><b>${e.pct ? '+' + e.pct + '%' : fmtMoney(e.price)}</b></label>`}).join('')}
             </div>`;
           }).join('') + '<div id="cx-svc-empty" class="small faint" hidden style="padding:8px 0">Ничего не найдено</div>';
           filterSvcs();
@@ -6329,33 +6379,43 @@ const wrap = root.querySelector('.pl-wrap');
         };
         g2('#cx-days').addEventListener('input', ()=>{ syncDaysToDate(); paintRush(); upd(true); });
         g2('#cx-deadline').addEventListener('input', ()=>{ syncDateToDays(); paintRush(); upd(true); });
+        /* У опции-родителя (распечатка) есть подпункты: галочка родителя
+           включает и их, снятие галочки — снимает. */
+        const subOf = (nid, eid) => { const list = calcExtrasFor(nid); const self = list.find(x => x && x.id === eid); const isParent = list.some(x => x && x.parent === eid); return { self, isParent }; };
+        const toggleSubs = (inp, on) => {
+          const p = (inp.dataset.ex || '').split('|');
+          if (!p[0]) return;
+          const { isParent } = subOf(p[0], p[1]);
+          if (!isParent) return;
+          mask.querySelectorAll('[data-ex]').forEach(x => {
+            const q = (x.dataset.ex || '').split('|');
+            if (q[0] === p[0] && calcExtrasFor(p[0]).find(y => y && y.id === q[1] && y.parent === p[1])) x.checked = on;
+          });
+        };
         g2('#cx-svcs').addEventListener('change', e=>{
-          const qsel = e.target.closest('[data-exq]');
-          if (qsel){
-            const inp = mask.querySelector(`[data-ex="${qsel.dataset.exq}"]`);
-            if (inp){ inp.dataset.qty = qsel.value; inp.checked = true; }
-            upd(true);
-            setTimeout(paintNormDeadline, 0);
-            return;
-          }
           const inp = e.target.closest('[data-sv],[data-ex]');
           if (inp && inp.checked){
             const nid = (inp.dataset.sv || inp.dataset.ex || '').split('|')[0];
             const sel = g2('#cx-niche');
             if (sel && nid && sel.value !== nid){ sel.value = nid; paintRush(); }
+            toggleSubs(inp, true);
+            if (!autoBase && !isNaN(val)){ autoBase = String(val); manualBase = false; }
+          } else if (inp){
+            toggleSubs(inp, false);
           }
           upd(true);
           setTimeout(paintNormDeadline, 0);
         });
-        /* Количество распечаток/копий — числом, без ограничения списком 1–10. */
-        g2('#cx-svcs').addEventListener('input', e=>{
-          const qsel = e.target.closest('[data-exq]');
-          if (!qsel) return;
-          const inp = mask.querySelector(`[data-ex="${qsel.dataset.exq}"]`);
-          if (inp){ inp.dataset.qty = qsel.value; inp.checked = true; }
-          upd(true);
-          setTimeout(paintNormDeadline, 0);
-        });
+        /* Число копий — одно поле на всю калькуляцию. */
+        const copiesInp = g2('#cx-copies');
+        if (copiesInp){
+          copiesInp.addEventListener('input', ()=>{
+            const opt = copiesOpt();
+            if (opt) opt.el.dataset.qty = Math.max(1, Math.round(+copiesInp.value || 1));
+            upd(true);
+          });
+          copiesInp.addEventListener('focus', ()=>copiesInp.select());
+        }
         /* Услуги правятся в настройках, но выгрузить и догрузить их можно прямо здесь */
         const svcExportBtn = mask.querySelector('[data-cx-export]');
         if (svcExportBtn) svcExportBtn.onclick = ()=>{ if (window.CalcServices) window.CalcServices.exportServices('xlsx'); };

@@ -513,6 +513,13 @@ tr.inl-tr{animation:inlRowIn .2s var(--ease)}
 .calc-lang-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .calc-lang-code{margin-left:auto;color:var(--faint);font-size:10.5px;font-family:var(--mono);flex:none}
 .calc-lang-rate{position:static!important;opacity:1!important;width:52px!important;height:26px!important;min-height:26px!important;padding:2px 4px!important;font-size:11px!important;text-align:right;flex:none}
+.calc-display .cx-valrow{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+/* Поле числа копий появляется мягко, без скачка высоты */
+.cx-copies{display:inline-flex;align-items:center;gap:6px;flex:none;padding:4px 8px;border:1px solid var(--border);border-radius:10px;background:var(--panel)}
+.cx-copies[hidden]{display:none}
+.cx-copies .input{width:58px!important;min-height:28px!important;padding:2px 6px!important;text-align:right;border:none!important;background:transparent!important}
+.svc-row--sub{padding-left:18px!important;opacity:.92}
+.svc-row--sub>span:first-of-type{position:relative}
 .calc-qty{display:inline-flex;align-items:center;gap:4px;flex:none;margin-right:4px}
 .calc-qty .input{width:58px!important;min-height:30px!important;padding:3px 6px!important;text-align:right}
 .calc-lang-item[hidden]{display:none}
@@ -1398,13 +1405,9 @@ body.menu-dragging .main .theme-card:hover{box-shadow:none!important;transform:n
 #windows-layer{position:fixed;inset:0;pointer-events:none;z-index:3000;overflow:hidden}
 .tour-card{position:fixed;z-index:1601;width:330px;max-width:calc(100vw - 28px);background:var(--panel);border:1px solid var(--border-2);border-radius:16px;box-shadow:var(--sh-2);padding:18px;animation:popIn .4s var(--ease)}
 .tour-card--video{width:390px}
-/* Короткое видео грузим только по нажатию: пока оно не нужно, вес не тратится. */
-.tour-video{position:relative;margin:0 0 12px;border-radius:12px;overflow:hidden;background:var(--bg-2);border:1px solid var(--border);aspect-ratio:4/3}
-.tour-video video{display:block;width:100%;height:100%;object-fit:cover}
-.tour-video__play{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:0;background:rgba(12,10,18,.42);color:#fff;font:inherit;font-size:11.5px;font-weight:650;cursor:pointer;transition:opacity .2s var(--ease),background-color .2s var(--ease)}
-.tour-video__play .ico{width:26px;height:26px}
-.tour-video__play:hover{background:rgba(12,10,18,.55)}
-.tour-video.is-playing .tour-video__play{opacity:0;pointer-events:none}
+/* Сцена тура — вектор: масштабируется без потерь и не выходит за карточку. */
+.tour-figure{margin:0 0 12px;border-radius:12px;overflow:hidden;background:var(--bg-2);border:1px solid var(--border)}
+.tour-scene{display:block;width:100%;height:auto}
 .tour-spot{position:fixed;z-index:1600;border-radius:14px;box-shadow:0 0 0 4px var(--accent-soft),0 0 0 9999px rgba(4,6,10,.66);transition:left .48s var(--ease),top .48s var(--ease),width .48s var(--ease),height .48s var(--ease);pointer-events:none}
 /* Появление окна — короткий фейд с лёгким увеличением (0.975 → 1).
    translateY убран: раньше popIn сдвигал окно и это читалось как
@@ -1904,7 +1907,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1502");mask-image:url("../bg/pattern-ai.svg?v=1502");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1503");mask-image:url("../bg/pattern-ai.svg?v=1503");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -1990,7 +1993,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1502");mask-image:url("../bg/pattern-ai.svg?v=1502");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1503");mask-image:url("../bg/pattern-ai.svg?v=1503");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2777,7 +2780,9 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 .cap-privacy-pill svg{flex:none}
 /* Футер предупреждения: три кнопки центрируем — в узком окне первая
    уезжала за левый край. */
-.cap-privacy-modal .modal__f{flex-wrap:wrap;justify-content:center;gap:8px}
+.cap-privacy-modal .modal__f{display:flex;flex-wrap:nowrap;justify-content:center;gap:8px}
+.cap-privacy-modal .modal__f .btn{flex:1 1 0;min-width:0;padding-left:10px;padding-right:10px;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:420px){.cap-privacy-modal .modal__f{flex-wrap:wrap}.cap-privacy-modal .modal__f .btn{flex:1 1 45%}}
 .cap-privacy-modal .modal__f .btn{flex:0 1 auto;min-width:0;white-space:nowrap}
 .cap-editor{position:fixed;inset:0;z-index:8000;background:rgba(12,10,18,.78);backdrop-filter:blur(16px);display:flex;flex-direction:column;animation:capIn .18s var(--ease)}
 @keyframes capIn{from{opacity:0}to{opacity:1}}
@@ -2842,7 +2847,14 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 .msg__bubble .txt .time{position:static;float:right;margin:2px 0 0 8px;background:none;box-shadow:none;border-radius:0}
 .msg__bubble .txt--time-inline{padding-right:0}
 .msg__foot{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px;width:100%;min-width:0;margin-top:4px}
-.msg__reactions{width:auto;min-width:0;max-width:100%;margin-right:0;flex-wrap:wrap;overflow:hidden}
+/* Ширину пузыря держит только текст: реакции живут в отдельной строке
+   снизу и не участвуют в расчёте shrink-to-fit. Иначе при добавлении
+   пилюли пузырь сначала расширяется до колонки реакций, а после пересчёта
+   текста сужается — это и было «прыгающее» поведение. */
+.msg__bubble>.msg__foot{flex:none}
+.msg__reactions{position:absolute;left:0;top:100%;margin-top:2px;display:flex;flex-wrap:wrap;align-items:center;gap:4px;max-width:100%;min-width:0}
+.msg__foot:has(.msg__reactions) .time{margin-left:auto}
+.msg:has(.msg__reactions){margin-bottom:26px}
 .msg--own .msg__bubble .txt .time{background:none;box-shadow:none}
 
 /* ===== Мобильные окна: полноэкранный лист вместо плавающей карточки =====

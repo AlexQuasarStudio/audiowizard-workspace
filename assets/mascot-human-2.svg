@@ -1,21 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 190" role="img" aria-label="Человек с ноутбуком">
-  <ellipse cx="65" cy="183" rx="36" ry="5" fill="#202124" opacity=".12"/>
-  <path d="M45 94c0-14 9-23 20-23s20 9 20 23l6 45H39l6-45Z" fill="#34A853"/>
-  <path d="M51 139l-5 37h14l5-28 5 28h14l-5-37H51Z" fill="#3C4043"/>
-  <path d="M43 100c-10 7-14 17-13 29" fill="none" stroke="#E8B48C" stroke-width="10" stroke-linecap="round"/>
-  <path d="M87 100c10 6 14 15 14 24" fill="none" stroke="#E8B48C" stroke-width="10" stroke-linecap="round"/>
-  <rect x="84" y="114" width="38" height="25" rx="4" fill="#DADCE0"/>
-  <rect x="89" y="119" width="28" height="15" rx="2" fill="#8AB4F8"/>
-  <path d="M80 139h46l4 7H76l4-7Z" fill="#BDC1C6"/>
-  <path d="M56 70h18v13H56z" fill="#E8B48C"/>
-  <path d="M50 83l15 12 15-12-5-5-10 8-10-8-5 5Z" fill="#fff"/>
-  <path d="M65 86l5 4-5 27-5-27 5-4Z" fill="#FBBC05"/>
-  <circle cx="65" cy="46" r="24" fill="#E8B48C"/>
-  <path d="M40 45c0-16 10-27 25-27 15 0 25 11 24 28-8 1-16-3-22-9-4 7-16 10-27 8Z" fill="#5F3B2E"/>
-  <circle cx="56" cy="48" r="2.3" fill="#202124"/>
-  <circle cx="74" cy="48" r="2.3" fill="#202124"/>
-  <path d="M58 58c4 4 10 4 14 0" fill="none" stroke="#9C5A3C" stroke-width="2.3" stroke-linecap="round"/>
-  <circle cx="48" cy="56" r="4" fill="#EA4335" opacity=".2"/>
-  <circle cx="82" cy="56" r="4" fill="#EA4335" opacity=".2"/>
+  <ellipse cx="65" cy="183" rx="30" ry="4.5" fill="#202124" opacity=".12"/>
+  <path d="M46 95c0-13 8-22 19-22s19 9 19 22l5 43H41l5-43Z" fill="#34A853"/>
+  <path d="M52 138h26l-3 42h-8l-2-27-2 27h-8l-3-42Z" fill="#3C4043"/>
+  <rect x="34" y="103" width="9" height="31" rx="4.5" fill="#34A853"/>
+  <rect x="87" y="103" width="9" height="31" rx="4.5" fill="#34A853"/>
+  <rect x="30" y="130" width="14" height="24" rx="7" fill="#E8B48C"/>
+  <rect x="86" y="130" width="14" height="24" rx="7" fill="#E8B48C"/>
+  <path d="M84 112h30v20H84z" fill="#DADCE0"/>
+  <path d="M88 116h22v12H88z" fill="#8AB4F8"/>
+  <path d="M78 132h42l4 6H74l4-6Z" fill="#BDC1C6"/>
+  <path d="M57 70h16v14H57z" fill="#E8B48C"/>
+  <path d="M50 84l15 11 15-11-5-6-10 8-10-8-5 6Z" fill="#fff"/>
+  <path d="M65 87l5 4-5 26-5-26 5-4Z" fill="#FBBC05"/>
+  <circle cx="65" cy="46" r="23" fill="#E8B48C"/>
+  <path d="M42 45c0-15 10-26 23-26s23 11 23 26c-7 3-15 0-21-6-6 6-17 8-25 6Z" fill="#5F3B2E"/>
+  <ellipse cx="56" cy="48" rx="2.4" ry="2.8" fill="#202124"/>
+  <ellipse cx="74" cy="48" rx="2.4" ry="2.8" fill="#202124"/>
+  <path d="M58 57.5c4.2 3.6 9.8 3.6 14 0" fill="none" stroke="#9C5A3C" stroke-width="2.4" stroke-linecap="round"/>
+  <ellipse cx="48" cy="55" rx="4.5" ry="3.4" fill="#EA4335" opacity=".2"/>
+  <ellipse cx="82" cy="55" rx="4.5" ry="3.4" fill="#EA4335" opacity=".2"/>
 </svg>

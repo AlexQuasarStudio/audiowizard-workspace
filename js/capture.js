@@ -32,16 +32,39 @@
     }
     return best;
   };
+  /* Маска аватаров дорисовывается на холсте, а не CSS-фильтром: у круглого
+     элемента filter:blur даёт рваный левый край (края фильтра обрезаются
+     границей круга). Холст с blur + clip по кругу даёт ровный ореол. */
+  const AVATAR_SEL = '.avatar,.msg__av,.chat-av,.person-av';
+  const blurAvatars = () => {
+    document.querySelectorAll(AVATAR_SEL).forEach(a => {
+      if (a.querySelector('canvas[data-priv-av]')) return;
+      const r = a.getBoundingClientRect();
+      if (r.width < 8 || r.height < 8) return;
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      const c = document.createElement('canvas');
+      c.dataset.privAv = '1';
+      c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
+      Object.assign(c.style, { position:'absolute', inset:'0', width:'100%', height:'100%',
+        borderRadius:'inherit', backdropFilter:'blur(6px) saturate(.9)', webkitBackdropFilter:'blur(6px) saturate(.9)',
+        background:'color-mix(in srgb, var(--panel) 55%, transparent)', pointerEvents:'none', zIndex:'1' });
+      if (getComputedStyle(a).position === 'static') a.style.position = 'relative';
+      a.appendChild(c);
+    });
+  };
+  const unblurAvatars = () => document.querySelectorAll('canvas[data-priv-av]').forEach(c => c.remove());
   const privacyOn = () => {
     const st = appSettings();
     if (!(st && st.capturePrivacy === false)){
       document.body.classList.add('capture-privacy');
       ensurePrivacyPill();
+      blurAvatars();
     }
   };
   const privacyOff = () => {
     document.body.classList.remove('capture-privacy');
     document.querySelector('.cap-privacy-pill')?.remove();
+    unblurAvatars();
   };
     const waitFrame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
   /* Снимок берём не в момент клика, а когда интерфейс уже закрылся, а курсор
@@ -164,8 +187,13 @@
   }
 
 
+  /* Пока идёт снимок, редактор или запись — новый захват не запускаем:
+     иначе два окна выбора источника и два редактора поверх друг друга. */
+  let capturing = false;
+  const busyBusy = () => capturing || !!shot || !!rec;
   async function startShot(mode = 'shot', onAttach = null) {
-    if (shot) { notice('Сначала завершите текущий снимок','warn'); return; }
+    if (busyBusy()) { notice('Захват уже идёт — завершите текущий','warn'); return; }
+    capturing = true;
     try {
       privacyOn();
       await waitSettled();
@@ -182,13 +210,13 @@
         [r.top,r.bottom,r.top+r.height/2].forEach(v=>ys.add(Math.round(v*k)));
       });
       openEditor(src, onAttach, {xs:[...xs], ys:[...ys], scale:k});
-    } catch (e) { captureError(e); }
+    } catch (e) { captureError(e); } finally { capturing = false; }
   }
 
   function openEditor(base, onAttach, guides={xs:[],ys:[],scale:1}) {
     if (shot) shot.root.remove();
     const root = el('div', 'cap-editor');
-    root.innerHTML = `<div class="cap-editor__stage"><canvas></canvas></div><div class="cap-tools"><button data-tool="cursor" title="Курсор — взаимодействие с приложением"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 3l14 8-6 1-3 7L5 3Z" fill="currentColor"/></svg></button><button data-tool="hand" class="on" title="Рука"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V6.5a1.5 1.5 0 0 1 3 0V11m0 0V5a1.5 1.5 0 0 1 3 0v6m0 0V6.5a1.5 1.5 0 0 1 3 0V14c0 4.2-2.8 7-7 7H9a5.5 5.5 0 0 1-5.5-5.5v-3a1.5 1.5 0 0 1 3 0V14"/></svg></button><button data-tool="select" title="Выделить">⬚</button><button data-tool="rect" title="Прямоугольник">▭</button><button data-tool="ellipse" title="Эллипс">◯</button><button data-tool="arrow" title="Стрелка">↗</button><button data-tool="pen" title="Маркер">✎</button><button data-tool="text" title="Текст">T</button><span class="spacer"></span><button data-color="#ff5c5c" class="on" style="color:#ff5c5c">●</button><button data-color="#ffd166" style="color:#ffd166">●</button><button data-color="#4cc9f0" style="color:#4cc9f0">●</button><button data-color="#ffffff" style="color:#fff">●</button><button data-cap-undo title="Отменить">↶</button><button data-cap-redo title="Повторить">↷</button><span class="spacer"></span><button data-cap-crop title="Обрезать" aria-label="Обрезать">✂</button>${onAttach ? `<button class="btn btn--ghost btn--sm" data-cap-attach>Вложить</button>` : ''}<button data-cap-x title="Закрыть" aria-label="Закрыть">×</button><button class="cap-ready" data-cap-save title="Готово" aria-label="Готово">✓</button></div>`;
+    root.innerHTML = `<div class="cap-editor__stage"><canvas></canvas></div><div class="cap-tools"><button data-tool="cursor" title="Курсор — нажимать элементы приложения под снимком"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 3l14 8-6 1-3 7L5 3Z" fill="currentColor"/></svg></button><button data-tool="hand" class="on" title="Рука — двигать и растягивать выделенное, не трогая приложение"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V6.5a1.5 1.5 0 0 1 3 0V11m0 0V5a1.5 1.5 0 0 1 3 0v6m0 0V6.5a1.5 1.5 0 0 1 3 0V14c0 4.2-2.8 7-7 7H9a5.5 5.5 0 0 1-5.5-5.5v-3a1.5 1.5 0 0 1 3 0V14"/></svg></button><button data-tool="select" title="Выделить">⬚</button><button data-tool="rect" title="Прямоугольник">▭</button><button data-tool="ellipse" title="Эллипс">◯</button><button data-tool="arrow" title="Стрелка">↗</button><button data-tool="pen" title="Маркер">✎</button><button data-tool="text" title="Текст">T</button><span class="spacer"></span><button data-color="#ff5c5c" class="on" style="color:#ff5c5c">●</button><button data-color="#ffd166" style="color:#ffd166">●</button><button data-color="#4cc9f0" style="color:#4cc9f0">●</button><button data-color="#ffffff" style="color:#fff">●</button><button data-cap-undo title="Отменить">↶</button><button data-cap-redo title="Повторить">↷</button><span class="spacer"></span><button data-cap-crop title="Обрезать" aria-label="Обрезать">✂</button>${onAttach ? `<button class="btn btn--ghost btn--sm" data-cap-attach>Вложить</button>` : ''}<button data-cap-x title="Закрыть" aria-label="Закрыть">×</button><button class="cap-ready" data-cap-save title="Готово" aria-label="Готово">✓</button></div>`;
     document.body.appendChild(root);
     const canvas = $('canvas', root), ctx = canvas.getContext('2d');
     shot = { root, base, tool:'hand', crop: null, shapes: [], redo: [], sel:null, color:'#ff5c5c', line: 4, onAttach, canvas, guides };
@@ -230,7 +258,7 @@
       }
       shot.shapes.forEach(sh=>drawShape(ctx,sh));
       if (shot.snapLines){ ctx.save(); ctx.strokeStyle='#ff4fa3'; ctx.lineWidth=1.5; ctx.setLineDash([6,4]); shot.snapLines.forEach(l=>{ctx.beginPath(); if(l.axis==='x'){ctx.moveTo(l.v,0);ctx.lineTo(l.v,canvas.height);} else {ctx.moveTo(0,l.v);ctx.lineTo(canvas.width,l.v);} ctx.stroke();}); ctx.restore(); }
-      if (shot.sel){ const bb=bbox(shot.sel); ctx.save(); ctx.strokeStyle='#4cc9f0'; ctx.lineWidth=2; ctx.setLineDash([5,4]); ctx.strokeRect(bb.x,bb.y,bb.w,bb.h); ctx.setLineDash([]); [[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x,bb.y+bb.h],[bb.x+bb.w,bb.y+bb.h]].forEach(p=>{ctx.fillStyle='#fff';ctx.fillRect(p[0]-4,p[1]-4,8,8);ctx.strokeRect(p[0]-4,p[1]-4,8,8);}); const rx=bb.x+bb.w/2, ry=bb.y-22; ctx.beginPath(); ctx.arc(rx,ry,5,0,Math.PI*2); ctx.fillStyle='#4cc9f0'; ctx.fill(); ctx.restore(); }
+      if (shot.sel){ const bb=bbox(shot.sel); ctx.save(); const pulse = .5 + .5*Math.sin(performance.now()/320); const t0 = shot.sel.t0 || (shot.sel.t0 = performance.now()); const rise = Math.min(1, (performance.now()-t0)/180); ctx.globalAlpha = rise; ctx.strokeStyle=`rgba(76,201,240,${.72+.28*pulse})`; ctx.lineWidth=2; ctx.setLineDash([5,4]); ctx.strokeRect(bb.x,bb.y,bb.w,bb.h); ctx.setLineDash([]); [[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x,bb.y+bb.h],[bb.x+bb.w,bb.y+bb.h]].forEach(p=>{ctx.fillStyle='#fff';ctx.fillRect(p[0]-4,p[1]-4,8,8);ctx.strokeRect(p[0]-4,p[1]-4,8,8);}); const rx=bb.x+bb.w/2, ry=bb.y-22; ctx.beginPath(); ctx.arc(rx,ry,5,0,Math.PI*2); ctx.fillStyle='#4cc9f0'; ctx.fill(); ctx.restore(); }
     };
     let drag = null;
     const snap = p => { const th=9*shot.guides.scale; let bestX=null,bestY=null,dx=th,dy=th; (shot.guides.xs||[]).forEach(v=>{if(Math.abs(p.x-v)<dx){dx=Math.abs(p.x-v);bestX=v;}}); (shot.guides.ys||[]).forEach(v=>{if(Math.abs(p.y-v)<dy){dy=Math.abs(p.y-v);bestY=v;}}); shot.snapLines=[]; if(bestX!=null)shot.snapLines.push({axis:'x',v:bestX}); if(bestY!=null)shot.snapLines.push({axis:'y',v:bestY}); return {x:bestX??p.x,y:bestY??p.y}; };
@@ -239,10 +267,23 @@
     let mode=null, last=null;
     const hit = p => [...shot.shapes].reverse().find(sh=>{const b=bbox(sh);return p.x>=b.x-6&&p.x<=b.x+b.w+6&&p.y>=b.y-6&&p.y<=b.y+b.h+6;});
     const handleAt = p => { if(!shot.sel)return null; const b=bbox(shot.sel); const hs={nw:[b.x,b.y],ne:[b.x+b.w,b.y],sw:[b.x,b.y+b.h],se:[b.x+b.w,b.y+b.h],rot:[b.x+b.w/2,b.y-22]}; return Object.keys(hs).find(k=>Math.hypot(p.x-hs[k][0],p.y-hs[k][1])<10)||null; };
+    /* Пока выделение активно — пульсация обводки и мягкое появление/уход. */
+    let selRaf = 0;
+    const keepSelAlive = () => {
+      if (selRaf) return;
+      const step = () => {
+        if (!shot || !shot.sel){ selRaf = 0; if (shot) draw(); return; }
+        draw(); selRaf = requestAnimationFrame(step);
+      };
+      selRaf = requestAnimationFrame(step);
+    };
     canvas.addEventListener('pointerdown', e => {
       const raw = pt(e); const p = (mode || drag) ? raw : snap(raw);
       if (shot.tool === 'text'){ inlineText(p); return; }
-      if (shot.tool === 'hand' || shot.tool === 'select'){ const h=handleAt(p); if(h){ mode=h; last=p; shot._orig=JSON.parse(JSON.stringify(shot.sel)); canvas.setPointerCapture(e.pointerId); return; } const s=hit(p); shot.sel=s||null; if(s){mode='move';last=p;shot._orig=JSON.parse(JSON.stringify(s));} draw(); return; }
+      if (shot.tool === 'hand' || shot.tool === 'select'){ const h=handleAt(p); if(h){ mode=h; last=p; shot._orig=JSON.parse(JSON.stringify(shot.sel)); canvas.setPointerCapture(e.pointerId); return; } const s=hit(p);
+        /* Повторный клик по уже выделенному элементу снимает выделение. */
+        if (s && shot.sel === s){ shot.sel = null; shot.selFade = performance.now(); draw(); return; }
+        shot.sel=s||null; if(s){mode='move';last=p;shot._orig=JSON.parse(JSON.stringify(s)); keepSelAlive(); } draw(); return; }
       drag = p; const sh = startShape(p); shot.shapes.push(sh); shot.sel=null; canvas.setPointerCapture(e.pointerId); draw();
     });
     canvas.addEventListener('pointermove', e => {
@@ -259,7 +300,7 @@
     });
     const end = () => { drag = null; mode=null; last=null; shot.snapLines=null; draw(); };
     canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end);
-    root.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{ shot.tool=b.dataset.tool; root.querySelectorAll('[data-tool]').forEach(x=>x.classList.toggle('on',x===b)); root.classList.toggle('is-cursor', shot.tool==='cursor'); canvas.style.cursor=shot.tool==='hand'?'grab':'crosshair'; });
+    root.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{ if (b.dataset.tool==='crop' && typeof syncCropBtn==='function') syncCropBtn(); shot.tool=b.dataset.tool; root.querySelectorAll('[data-tool]').forEach(x=>x.classList.toggle('on',x===b)); root.classList.toggle('is-cursor', shot.tool==='cursor'); canvas.style.cursor=shot.tool==='hand'?'grab':'crosshair'; });
     root.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{ shot.color=b.dataset.color; root.querySelectorAll('[data-color]').forEach(x=>x.classList.toggle('on',x===b)); });
     $('[data-cap-undo]',root).onclick=()=>{ if(shot.shapes.length){ shot.redo.push(shot.shapes.pop()); draw(); } };
     $('[data-cap-redo]',root).onclick=()=>{ if(shot.redo.length){ shot.shapes.push(shot.redo.pop()); draw(); } };
@@ -293,11 +334,15 @@
     $('[data-cap-x]',root).onclick = close;
     $('[data-cap-save]',root).onclick = ()=>{ download(compose(), 'audiowizard-shot-'+Date.now()+'.jpg'); close(); };
     const attach = $('[data-cap-attach]',root); if (attach) attach.onclick = ()=>{ onAttach(dataUrlToFile(compose(), 'screenshot.jpg')); close(); };
+    /* Кроп — обычный инструмент: выделили область, нажали ✂ ещё раз и
+       кадр обрезан. Раньше после выделения повторное нажатие не срабатывало,
+       если фокус успевал уйти с холста. */
     const cropBtn = $('[data-cap-crop]',root);
+    const syncCropBtn = () => cropBtn.classList.toggle('on', shot.tool === 'crop');
     cropBtn.onclick = () => {
-      if (shot.tool === 'crop' && shot.crop){ applyCrop(); return; }
-      shot.tool='crop'; shot.crop=null; canvas.style.cursor='crosshair';
-      toast('Выделите область для кропа и нажмите «Кроп» ещё раз','info');
+      if (shot.tool === 'crop' && shot.crop){ applyCrop(); syncCropBtn(); return; }
+      shot.tool='crop'; shot.crop=null; canvas.style.cursor='crosshair'; syncCropBtn();
+      toast('Выделите область и нажмите ✂ снова — кадр обрежется','info');
     };
     canvas.addEventListener('pointerdown', e => {
       if (shot.tool !== 'crop') return;
@@ -310,7 +355,7 @@
     function applyCrop(){
       const c=shot.crop; if(!c||c.w<4||c.h<4){toast('Сначала выделите область','warn');return;}
       const out=document.createElement('canvas'); out.width=Math.max(1,Math.round(c.w)); out.height=Math.max(1,Math.round(c.h)); out.getContext('2d').drawImage(shot.base,c.x,c.y,c.w,c.h,0,0,out.width,out.height);
-      shot.base=out; shot.crop=null; shot.shapes=[]; canvas.width=out.width; canvas.height=out.height; draw(); toast('Кроп применён','ok'); shot.tool='hand';
+      shot.base=out; shot.crop=null; shot.shapes=[]; canvas.width=out.width; canvas.height=out.height; draw(); toast('Кроп применён','ok'); shot.tool='hand'; if (typeof syncCropBtn==='function') syncCropBtn();
     }
     function compose(){
       const out=document.createElement('canvas'); out.width=shot.base.width; out.height=shot.base.height; const x=out.getContext('2d'); x.drawImage(shot.base,0,0); shot.shapes.forEach(sh=>drawShape(x,sh));
@@ -334,6 +379,7 @@
   }
 
   function openRecord() {
+    if (capturing || shot){ notice('Сначала завершите текущий снимок','warn'); return; }
     if (rec && rec.stop){
       confirmModal({ title:'Запись уже идёт', text:'Остановить и сохранить текущую запись, затем начать новую?', okText:'Сохранить и начать новую', danger:true }).then(ok=>{ if(!ok) return; rec.stop(); setTimeout(openRecord, 700); });
       return;
@@ -372,6 +418,8 @@
 
   async function startSelfRecording(mic){
     if (rec) { notice('Запись уже идёт','warn'); return; }
+    if (capturing || shot) { notice('Сначала завершите текущий снимок','warn'); return; }
+    capturing = true;
     try {
       privacyOn(); document.body.classList.add('is-recording');
       const stream = await navigator.mediaDevices.getDisplayMedia({ video:{frameRate:24,displaySurface:'browser'}, audio:false, preferCurrentTab:true });
@@ -379,7 +427,7 @@
       await new Promise((res,rej)=>{ video.onloadedmetadata=res; video.onerror=rej; setTimeout(res,1200); });
       await video.play();
       const vw=video.videoWidth||innerWidth*devicePixelRatio, vh=video.videoHeight||innerHeight*devicePixelRatio;
-      const root=el('div','cap-rec-live'); root.innerHTML='<canvas class="cap-anno"></canvas><div class="cap-tools cap-rec-tools"><button data-rtool="cursor" class="on" title="Курсор"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 3l14 8-6 1-3 7L5 3Z" fill="currentColor"/></svg></button><button data-rtool="hand" title="Рука"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V6.5a1.5 1.5 0 0 1 3 0V11m0 0V5a1.5 1.5 0 0 1 3 0v6m0 0V6.5a1.5 1.5 0 0 1 3 0V14c0 4.2-2.8 7-7 7H9a5.5 5.5 0 0 1-5.5-5.5v-3a1.5 1.5 0 0 1 3 0V14"/></svg></button><button data-rtool="select" title="Выделить элемент">□</button><button data-rtool="rect" title="Рамка">□</button><button data-rtool="ellipse" title="Эллипс">○</button><button data-rtool="arrow" title="Стрелка">↗</button><button data-rtool="pen" title="Маркер">✎</button><button data-rtool="text" title="Текст">T</button><span class="spacer"></span><button data-rcolor="#ff5c5c" class="on" style="color:#ff5c5c">●</button><button data-rcolor="#ffd166" style="color:#ffd166">●</button><button data-rcolor="#4cc9f0" style="color:#4cc9f0">●</button><button data-rundo title="Отменить">↶</button><button data-rredo title="Повторить">↷</button><button data-rclear title="Очистить">⌫</button></div>';
+      const root=el('div','cap-rec-live'); root.innerHTML='<canvas class="cap-anno"></canvas><div class="cap-tools cap-rec-tools"><button data-rtool="cursor" class="on" title="Курсор — нажимать приложение"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 3l14 8-6 1-3 7L5 3Z" fill="currentColor"/></svg></button><button data-rtool="hand" title="Рука — двигать и растягивать выделенное, не трогая приложение"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V6.5a1.5 1.5 0 0 1 3 0V11m0 0V5a1.5 1.5 0 0 1 3 0v6m0 0V6.5a1.5 1.5 0 0 1 3 0V14c0 4.2-2.8 7-7 7H9a5.5 5.5 0 0 1-5.5-5.5v-3a1.5 1.5 0 0 1 3 0V14"/></svg></button><button data-rtool="select" title="Выделить элемент">□</button><button data-rtool="rect" title="Рамка">□</button><button data-rtool="ellipse" title="Эллипс">○</button><button data-rtool="arrow" title="Стрелка">↗</button><button data-rtool="pen" title="Маркер">✎</button><button data-rtool="text" title="Текст">T</button><span class="spacer"></span><button data-rcolor="#ff5c5c" class="on" style="color:#ff5c5c">●</button><button data-rcolor="#ffd166" style="color:#ffd166">●</button><button data-rcolor="#4cc9f0" style="color:#4cc9f0">●</button><button data-rundo title="Отменить">↶</button><button data-rredo title="Повторить">↷</button><button data-rclear title="Очистить">⌫</button></div>';
       document.body.appendChild(root);
       const anno=$('.cap-anno',root); anno.width=innerWidth*devicePixelRatio; anno.height=innerHeight*devicePixelRatio; anno.style.width=innerWidth+'px'; anno.style.height=innerHeight+'px';
       const actx=anno.getContext('2d'); let tool='cursor', shapes=[], redo=[], drawing=null, drawColor='#ff5c5c';
@@ -416,6 +464,16 @@
         c.fillStyle = '#4cc9f0';
         c.beginPath(); c.arc(r.x*k, r.y*k, Math.max(3.5, 7 - age * 3) * k, 0, Math.PI * 2); c.fill();
         c.restore();
+      };
+      /* Кадр прямо из видеопотока: после возврата с зума на холсте может
+         лежать старая картинка, поэтому снимок берём свежий. */
+      const freshFrame = () => {
+        const c = document.createElement('canvas');
+        c.width = canvas.width; c.height = canvas.height;
+        const g = c.getContext('2d');
+        if (video && video.videoWidth) g.drawImage(video, 0, 0, c.width, c.height);
+        else g.drawImage(canvas, 0, 0);
+        return c;
       };
       const pump=()=>{
         if(!mr||mr.state==='inactive'||mr.state==='paused') return;
@@ -506,8 +564,21 @@
       /* Снимок во время записи: кадр записи без разметки уходит в редактор,
          а запись продолжается — панель одна на оба режима. */
       $('[data-recsnap]', bar).onclick = () => {
+        /* Свежий кадр из видеопотока, а не последний отрисованный на холсте:
+           иначе при возврате с зума остаётся старая картинка. */
         const c = document.createElement('canvas'); c.width = canvas.width; c.height = canvas.height;
-        c.getContext('2d').drawImage(canvas, 0, 0);
+        const cx0 = c.getContext('2d');
+        const fresh = freshFrame();
+        if (zoom){
+          const cx = (zoom.x + zoom.w / 2) * vw, cy = (zoom.y + zoom.h / 2) * vh;
+          cx0.save();
+          cx0.translate(c.width / 2, c.height / 2); cx0.scale(zoom.k, zoom.k);
+          cx0.translate(-cx * (c.width / vw), -cy * (c.height / vh));
+          cx0.drawImage(fresh, 0, 0, c.width, c.height);
+          cx0.restore();
+        } else {
+          cx0.drawImage(fresh, 0, 0);
+        }
         const k = c.width / Math.max(1, innerWidth);
         const xs = new Set(), ys = new Set();
         [...document.querySelectorAll('body *')].forEach(n => {

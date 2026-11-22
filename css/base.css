@@ -246,8 +246,11 @@ button.chip,.chip[role="button"]{cursor:pointer}
 @keyframes fadeOut{to{opacity:0}}
 @keyframes popIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
 @keyframes popOut{to{opacity:0;transform:translateY(8px) scale(.99)}}
-.modal-mask.closing{animation:none}
+.modal-mask.closing{animation:modalMaskOut .18s var(--ease) forwards;pointer-events:none}
 .modal-mask.closing .modal{animation:popOut .18s var(--ease) forwards}
+/* Подложка гаснет так же плавно, как появлялась: затемнение и размытие
+   уходят в ноль, иначе фон «щёлкал» из размытого в резкий. */
+@keyframes modalMaskOut{to{opacity:0;backdrop-filter:blur(0);-webkit-backdrop-filter:blur(0)}}
 
 /* ---------- Дропдаун-меню ---------- */
 .dd{position:fixed;z-index:4300;min-width:190px;max-width:calc(100vw - 16px);max-height:min(70vh, 520px);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;background:var(--panel);border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--sh-2);padding:6px;animation:popIn .18s var(--ease)}

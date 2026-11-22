@@ -236,7 +236,7 @@ const DEFAULT_CALC_SETTINGS = {
       { id:'ce-a4', name:'Особые требования к оформлению', price:0, pct:10, unit:'% от стоимости', active:true },
       { id:'ce-a0', name:'Заверение стенограммы', price:1299, pct:0, unit:'за документ', active:true },
       { id:'ce-a5', name:'Распечатка копии', price:99, pct:0, unit:'за копию', active:true },
-      { id:'ce-a6', name:'Дополнительная копия', price:49, pct:0, unit:'за копию', active:true }
+      { id:'ce-a6', name:'Дополнительная копия', price:49, pct:0, unit:'за копию', parent:'ce-a5', active:true }
     ],
     n2: [],
     n3: [
@@ -660,7 +660,7 @@ let S;
 function loadState(){
   try{
     const raw = localStorage.getItem(LS_KEY);
-    if (raw){ S = JSON.parse(raw); if (S && (S._v >= 1 || Array.isArray(S.users))){ S._v = Number(S._v) || 1; migrateSchema(); migrateSiteCatalog(); migrateTranscriptionMinutes(); migrateSmartcatServices(); migrateLegalServices(); migrateTranscriptCertification(); migrateServiceDescriptions(); migrateOrderServices(); migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); migrateKeys(); migrateStaffBalances(); migrateFinance(); saveState(); return; } }
+    if (raw){ S = JSON.parse(raw); if (S && (S._v >= 1 || Array.isArray(S.users))){ S._v = Number(S._v) || 1; migrateSchema(); migrateSiteCatalog(); migrateTranscriptionMinutes(); migrateSmartcatServices(); migrateLegalServices(); migrateTranscriptCertification(); migrateCopiesAsSub(); migrateServiceDescriptions(); migrateOrderServices(); migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); migrateKeys(); migrateStaffBalances(); migrateFinance(); saveState(); return; } }
   }catch(e){}
   S = seedState();
   saveState();
@@ -830,6 +830,19 @@ function migrateTranscriptCertification(){
     if (at >= 0) ex.splice(at, 0, item); else ex.unshift(item);
   }
   S.settings.transcriptCertVersion = 1;
+}
+/* Доп. копия — подпункт распечатки: выбор распечатки включает её,
+   а количество копий вводится числом прямо в калькуляторе. */
+function migrateCopiesAsSub(){
+  if (!S || !S.settings) return;
+  if (S.settings.copiesSubVersion >= 1) return;
+  const ex = (((S.calcSettings || {}).extras || {}).n1) || [];
+  ex.forEach(e => {
+    if (!e) return;
+    if (e.id === 'ce-a6') e.parent = e.parent || 'ce-a5';
+    if (e.id === 'ce-a5' && /копи|распечат|экземпляр/i.test(e.unit || '')) e.multi = e.multi !== false;
+  });
+  S.settings.copiesSubVersion = 1;
 }
 function migrateServiceDescriptions(){
   Object.values(S.calcServices || {}).forEach(list => {
