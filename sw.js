@@ -1,5 +1,5 @@
 /* Audiowizard Workspace — Service Worker (кеш оболочки, обновления, офлайн) */
-const VER = '0.1-prototype.1500';
+const VER = '0.1-prototype.1501';
 const CACHE = `aw-shell-${VER}`;
 
 const PRECACHE = [
@@ -9,7 +9,7 @@ const PRECACHE = [
   './js/store.js', './js/xlsx.js', './js/ui.js', './js/ai-data.js', './js/ai.js', './js/finance.js', './js/crm.js', './js/windows.js', './js/navdrag.js', './js/app.js', './js/capture.js',
   './assets/demo-podcast.wav',
   './assets/mascot-robot.svg', './assets/tour/windows.mp4', './assets/tour/tasks.mp4', './assets/mascot-human-1.svg', './assets/mascot-human-2.svg',
-  './icons/icon.svg', './icons/maskable.svg', './bg/pattern-ai.svg', './bg/pattern-ai.svg?v=1500'
+  './icons/icon.svg', './icons/maskable.svg', './bg/pattern-ai.svg', './bg/pattern-ai.svg?v=1501'
 ];
 
 self.addEventListener('install', e => {

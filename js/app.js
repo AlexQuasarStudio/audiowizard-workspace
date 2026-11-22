@@ -11781,7 +11781,7 @@ function initPWA(){
        делала из той же картинки второй сетевой запрос — браузер видел
        другой ключ кэша. Свежесть узора обеспечивает service worker:
        PRECACHE обновляется вместе со сборкой. */
-    const maskUrl = 'url("bg/pattern-ai.svg?v=1500")';
+    const maskUrl = 'url("bg/pattern-ai.svg?v=1501")';
     const cacheKey = cur + '|' + t + '|bg11';
     /* Единая отрисовка: маску ставим ВСЕГДА. После перерисовки разметки
        (#bg-doodles пересоздаётся при навигации) слой терял маску и узор «отваливался». */
@@ -12155,18 +12155,51 @@ function initPWA(){
       });
       themeObs.observe(document.documentElement, { attributes:true, attributeFilter:['data-theme'] });
     } catch(e){}
+      /* Успешная загрузка снимает счётчик аварийного восстановления. */
+      try { sessionStorage.removeItem('aw_boot_stage'); } catch(e){}
     } catch(bootErr){
-      /* Показываем фатальную ошибку загрузки на сплэше вместо вечного ожидания */
       console.error('Boot failed:', bootErr);
-      const sp = $('#splash');
-      if (sp){
+      /* Аварийное восстановление: сначала сбрасываем кэш и service worker,
+         затем — локальное состояние (с резервной копией). Так застрявшая
+         ошибка загрузки не оставляет пользователя без приложения. */
+      let ss = null;
+      try { ss = sessionStorage; ss.setItem('__aw', '1'); ss.removeItem('__aw'); } catch(e){ ss = null; }
+      const stage = ss ? Number(ss.getItem('aw_boot_stage') || 0) : 3;
+      const showFatal = () => {
+        const sp = $('#splash');
+        if (!sp) return;
         sp.classList.remove('gone');
         sp.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:24px;max-width:520px;text-align:center">
           <b style="color:var(--red)">Ошибка загрузки приложения</b>
           <span class="small muted" style="word-break:break-all">${esc(bootErr && bootErr.message || bootErr)}</span>
-          <button class="btn btn--primary" onclick="location.reload(true)">Перезагрузить</button>
+          <div class="row" style="gap:8px;flex-wrap:wrap;justify-content:center">
+            <button class="btn btn--ghost" onclick="location.reload()">Перезагрузить</button>
+            <button class="btn btn--primary" onclick="try{localStorage.removeItem('aw_state_v1')}catch(e){};try{localStorage.clear()}catch(e){};location.reload()">Сбросить данные</button>
+          </div>
         </div>`;
-      }
+      };
+      if (!ss || stage >= 2){ showFatal(); return; }
+      try {
+        if (stage === 0){
+          ss.setItem('aw_boot_stage', '1');
+          const jobs = [];
+          if ('serviceWorker' in navigator) jobs.push(navigator.serviceWorker.getRegistrations().then(rs => Promise.all(rs.map(r => r.unregister()))).catch(()=>{}));
+          if (window.caches) jobs.push(caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).catch(()=>{}));
+          Promise.race([Promise.all(jobs), new Promise(r => setTimeout(r, 900))]).then(()=>location.reload());
+          return;
+        }
+        if (stage === 1){
+          ss.setItem('aw_boot_stage', '2');
+          try {
+            const raw = localStorage.getItem('aw_state_v1');
+            if (raw) localStorage.setItem('aw_state_broken_' + Date.now(), raw);
+            localStorage.removeItem('aw_state_v1');
+          } catch(e){}
+          setTimeout(()=>location.reload(), 80);
+          return;
+        }
+      } catch(e){}
+      showFatal();
     }
   }
 
