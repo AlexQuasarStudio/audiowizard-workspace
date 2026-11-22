@@ -4309,9 +4309,12 @@ ex.innerHTML = avatarHTML(user(), '');
     const time = foot && foot.querySelector('.time');
     const txt = msg.querySelector('.txt');
     if (!foot || !time || !txt) return;
+    /* Пустой подвал оставляет собственный отступ пузыря — его снимаем,
+       иначе после снятия реакции под текстом висит лишняя полоса. */
+    foot.remove();
     time.classList.add('time--in');
     txt.appendChild(time);
-    foot.remove();
+    msg.classList.add('msg--nofoot');
   }
   function animateBubbleHeight(mid, prevH){
     if (!prevH) return;
@@ -6673,7 +6676,14 @@ const cm = root.querySelector('.chat-main');
             setTimeout(()=>{
               const row = rBtn.closest('.msg__reactions');
               rBtn.remove();
-              if (row && !row.querySelector('.react-pill')) row.remove();
+              /* Отступ под строку реакций снимаем классом, а не удалением
+                 узла: так он уходит плавно вместе с margin-bottom. */
+              const msgEl = rBtn.closest('.msg');
+              if (row && !row.querySelector('.react-pill')){
+                row.classList.add('is-gone');
+                if (msgEl) msgEl.classList.add('msg--noreact');
+                setTimeout(()=>{ row.remove(); if (msgEl) msgEl.classList.remove('msg--noreact'); }, 220);
+              }
               restoreInlineTime(mid);
               animateBubbleHeight(mid, prevH);
               animateBubbleWidth(mid, prevW);
@@ -6790,9 +6800,10 @@ const cm = root.querySelector('.chat-main');
             return;
           }
           if (pill){
+            /* Лицо реакции меняется внутри границ пилюли, поэтому пузырь
+               не пересчитывает ширину и не «дёргается» на каждый клик. */
             patchReactionPill(pill, ids, em);
             pill.classList.toggle('on', ids.includes(u.id));
-            animateBubbleWidth(m.id, prevW);
           } else {
             renderChat();
             animateBubbleHeight(m.id, prevH);
@@ -6970,7 +6981,11 @@ const cm = root.querySelector('.chat-main');
         setTimeout(()=>{
           const row = pill.closest('.msg__reactions');
           pill.remove();
-          if (row && !row.querySelector('.react-pill')) row.remove();
+          if (row && !row.querySelector('.react-pill')){
+            row.classList.add('is-gone');
+            el2.classList.add('msg--noreact');
+            setTimeout(()=>{ row.remove(); el2.classList.remove('msg--noreact'); }, 220);
+          }
           restoreInlineTime(mm.id);
           animateBubbleHeight(mm.id, prevH);
           animateBubbleWidth(mm.id, prevW);

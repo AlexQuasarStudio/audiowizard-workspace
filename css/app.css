@@ -1907,7 +1907,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1503");mask-image:url("../bg/pattern-ai.svg?v=1503");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1504");mask-image:url("../bg/pattern-ai.svg?v=1504");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -1993,7 +1993,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1503");mask-image:url("../bg/pattern-ai.svg?v=1503");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1504");mask-image:url("../bg/pattern-ai.svg?v=1504");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2151,7 +2151,6 @@ html.splash-hold #splash{visibility:hidden}
    галочками и счётчиком ответов — справа. Строка не переносится
    (nowrap), пилюли переносятся только внутри своей левой зоны; при
    нехватке ширины время остаётся справа, прокрутки нет. */
-.msg__reactions{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:4px;width:0;min-width:100%;max-width:100%;margin-right:auto;overflow:visible}
 .msg__reactions .react-pill{flex:none}
 
 /* --- Кнопка быстрой реакции 👍 --- */
@@ -2852,9 +2851,19 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
    пилюли пузырь сначала расширяется до колонки реакций, а после пересчёта
    текста сужается — это и было «прыгающее» поведение. */
 .msg__bubble>.msg__foot{flex:none}
-.msg__reactions{position:absolute;left:0;top:100%;margin-top:2px;display:flex;flex-wrap:wrap;align-items:center;gap:4px;max-width:100%;min-width:0}
+.msg__reactions{position:absolute;left:0;top:100%;margin-top:2px;display:flex;flex-wrap:wrap;align-items:center;gap:4px;width:max-content;max-width:min(100%,240px);min-width:0}
+/* Пилюля с цифрой появляется плавно и не раскрывает пузырь: ширину держит
+   только текст, реакции живут в своей строке. */
+.msg__reactions .react-pill{animation:none}
 .msg__foot:has(.msg__reactions) .time{margin-left:auto}
-.msg:has(.msg__reactions){margin-bottom:26px}
+/* Отступ под строку реакций — только пока она есть, и снимается плавно. */
+.msg:has(.msg__reactions){margin-bottom:26px;transition:margin-bottom .22s var(--ease)}
+/* Снятие последней реакции: строка гаснет и место под неё уходит плавно. */
+.msg__reactions.is-gone{opacity:0;transform:translateY(-2px);transition:opacity .2s var(--ease),transform .2s var(--ease)}
+.msg.msg--noreact{margin-bottom:0!important}
+/* Время вернулось в строку текста — лишний подвал больше не занимает место. */
+.msg--nofoot .msg__bubble{padding-bottom:8px}
+.msg:has(.msg__reactions) .msg__bubble{width:fit-content;max-width:100%}
 .msg--own .msg__bubble .txt .time{background:none;box-shadow:none}
 
 /* ===== Мобильные окна: полноэкранный лист вместо плавающей карточки =====
