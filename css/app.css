@@ -1904,7 +1904,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1501");mask-image:url("../bg/pattern-ai.svg?v=1501");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1502");mask-image:url("../bg/pattern-ai.svg?v=1502");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -1990,7 +1990,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1501");mask-image:url("../bg/pattern-ai.svg?v=1501");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1502");mask-image:url("../bg/pattern-ai.svg?v=1502");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2844,3 +2844,35 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 .msg__foot{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px;width:100%;min-width:0;margin-top:4px}
 .msg__reactions{width:auto;min-width:0;max-width:100%;margin-right:0;flex-wrap:wrap;overflow:hidden}
 .msg--own .msg__bubble .txt .time{background:none;box-shadow:none}
+
+/* ===== Мобильные окна: полноэкранный лист вместо плавающей карточки =====
+   На телефоне нет смысла таскать и растягивать окно: оно занимает весь
+   экран, как «О приложении», но с шапкой и закрытием. Драг, ресайз,
+   минимизация и миниатюры на ≤960px отключены. */
+@media (max-width:960px){
+  #windows-layer .aw-win{
+    left:0!important;top:0!important;right:0!important;bottom:0!important;
+    width:100%!important;height:100%!important;
+    max-width:none!important;max-height:none!important;
+    min-width:0!important;min-height:0!important;
+    border:0!important;border-radius:0!important;box-shadow:none!important;
+    animation:winSheetIn .22s var(--ease);
+  }
+  #windows-layer .aw-win__corner,
+  #windows-layer .aw-win__min,
+  #windows-layer .aw-win__max{display:none!important}
+  #windows-layer .aw-win__head{
+    cursor:default;
+    padding-top:calc(9px + env(safe-area-inset-top,0px));
+  }
+  #windows-layer .aw-win__body{
+    padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+  }
+  #windows-layer .aw-win__close{width:40px;height:36px;border-radius:11px}
+  #windows-layer .aw-win__foot{padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+  .aw-win-preview,.aw-win-preview--vertical{display:none!important}
+  body .aw-win{min-width:0}
+}
+@keyframes winSheetIn{from{opacity:.45;transform:translateY(14px)}to{opacity:1;transform:none}}

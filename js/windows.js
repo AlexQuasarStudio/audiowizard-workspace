@@ -11,6 +11,8 @@ const Windows = (() => {
   let layer = null;
   let winZ = 3010; // глобальный счётчик z-index
   let active = null; // { kind:'drag'|'resize', win, sx, sy, ox, oy, ow, oh, moved, dir }
+  /* На телефоне окна — полноэкранные листы: drag/resize/миниатюры выключены. */
+  const isMobileWin = () => !!(window.matchMedia && window.matchMedia('(max-width:960px)').matches);
 
   // Реестр открытых окон: route → [ { win, minimized, html, scrollTop, hiddenPos } ]
   const registry = new Map();
@@ -554,7 +556,7 @@ const Windows = (() => {
     }
     const layer = ensureLayer();
     const win = document.createElement('div');
-    win.className = 'aw-win';
+    win.className = 'aw-win' + (isMobileWin() ? ' aw-win--sheet' : '');
     win._iconName = iconName;
     win._title = title;
 
@@ -677,6 +679,7 @@ const Windows = (() => {
       const dir = c.dataset.dir;
       c.addEventListener('mousemove', e => { e.stopPropagation(); win.style.cursor = CURSORS[dir]; win._resizeDir = dir; });
       c.addEventListener('mousedown', e => {
+        if (isMobileWin()) return;
         if (win._locked) return;
         if (active) return;
         e.preventDefault(); e.stopPropagation();
@@ -689,6 +692,7 @@ const Windows = (() => {
     });
     win.addEventListener('mouseleave', () => { if (!win._resizing) { win.style.cursor = ''; win._resizeDir = null; } });
     win.addEventListener('mousedown', e => {
+      if (isMobileWin()) return;
       if (win._locked) return;
       if (active) return;
       /* Во время активного ресайза/драга — не начинать новый; чистый нейтральный
@@ -908,6 +912,7 @@ const Windows = (() => {
 
     /* --- Drag за заголовок (общий слой) --- */
     head.addEventListener('mousedown', e => {
+      if (isMobileWin()) return;
       if (win._locked) return;
       if (e.button !== 0) return; /* ПКМ — только контекстное меню, не drag */
       if (e.target.closest('.aw-win__close') || e.target.closest('.aw-win__max')) return;
@@ -929,6 +934,7 @@ const Windows = (() => {
     /* Двойной клик по заголовку — разворот на весь экран / восстановление.
        Подавляем, если только что был именно драг (второй «клик» после дропа). */
     head.addEventListener('dblclick', e => {
+      if (isMobileWin()) return;
       if (win._locked) return;
       if (e.target.closest('.aw-win__close') || e.target.closest('.aw-win__max') || e.target.closest('.aw-win__min')) return;
       /* При активном зуме двойной тап не разворачивает окно: иначе геометрия
@@ -944,7 +950,7 @@ const Windows = (() => {
        остаётся 'auto' и окно уходит ПОД ранее открытые (баг «виджет под окнами»). */
     focusWin(win);
     /* Дроп «Чатов» сразу в уголок: окно рождается в компактном режиме. */
-    if (param && param.corner) enterCorner(win, param.corner);
+    if (!isMobileWin() && param && param.corner) enterCorner(win, param.corner);
     return win;
   }
 
