@@ -263,11 +263,21 @@ body .head__mtools{
  radial-gradient(45% 45% at 68.6% 32.9%,rgba(122,149,196,.09),transparent 100%),
  radial-gradient(55% 55% at 51.4% 73.6%,rgba(143,120,176,.10),transparent 100%);
  pointer-events:none}
-.mascot-art{--mascot-shell-1:color-mix(in srgb,var(--accent) 24%,#fff8ff);--mascot-shell-2:color-mix(in srgb,var(--accent) 74%,#e4d4ff);--mascot-shell-3:var(--accent);--mascot-body-1:color-mix(in srgb,var(--accent) 82%,#d8c8ff);--mascot-body-2:color-mix(in srgb,var(--accent) 98%,#3f2c78);--mascot-face-1:#fffdf5;--mascot-face-2:#ffe9c9;--mascot-line:#3b3155;--mascot-eye:#3b3155;--mascot-pupil:#fff;--mascot-inset:#fff;--mascot-heart-1:#ffadad;--mascot-heart-2:#f06d8f;--mascot-glow:#ffb3c7;--mascot-blush:#ff9fb2;--mascot-spark:#ffd37a}
-html[data-theme^='dark'] .mascot-art{--mascot-shell-1:color-mix(in srgb,var(--accent) 34%,#251c39);--mascot-shell-2:color-mix(in srgb,var(--accent) 82%,#3b2a5c);--mascot-shell-3:var(--accent);--mascot-body-1:color-mix(in srgb,var(--accent) 88%,#3b2d57);--mascot-body-2:color-mix(in srgb,var(--accent) 98%,#241a39);--mascot-face-1:#2b223e;--mascot-face-2:#3a2a52;--mascot-line:#f1e9ff;--mascot-eye:#f1e9ff;--mascot-pupil:#2b223e;--mascot-inset:#d8c9ff;--mascot-heart-1:#ff9fa9;--mascot-heart-2:#e95f80;--mascot-glow:#ff8fb0;--mascot-blush:#ff7e9b;--mascot-spark:#ffd37a}
+.mascot-art{--mascot-shell-1:color-mix(in srgb,var(--accent) 24%,#fff8ff);--mascot-shell-2:color-mix(in srgb,var(--accent) 74%,#e4d4ff);--mascot-shell-3:var(--accent);--mascot-body-1:color-mix(in srgb,var(--accent) 82%,#d8c8ff);--mascot-body-2:color-mix(in srgb,var(--accent) 98%,#3f2c78);--mascot-face-1:#fffdf5;--mascot-face-2:#ffe9c9;--mascot-line:#3b3155;--mascot-eye:#3b3155;--mascot-pupil:#fff;--mascot-inset:#fff;--mascot-heart-1:#ffadad;--mascot-heart-2:#f06d8f;--mascot-glow:#ffb3c7;--mascot-blush:#ff9fb2;--mascot-spark:#ffd37a;--mascot-mouth:#5a3f78;--mascot-brow:#4a3563;--mascot-cheek:#f2839f;--mascot-cheek-op:.55}
+html[data-theme^='dark'] .mascot-art{--mascot-shell-1:color-mix(in srgb,var(--accent) 34%,#251c39);--mascot-shell-2:color-mix(in srgb,var(--accent) 82%,#3b2a5c);--mascot-shell-3:var(--accent);--mascot-body-1:color-mix(in srgb,var(--accent) 88%,#3b2d57);--mascot-body-2:color-mix(in srgb,var(--accent) 98%,#241a39);--mascot-face-1:#2b223e;--mascot-face-2:#3a2a52;--mascot-line:#f1e9ff;--mascot-eye:#f1e9ff;--mascot-pupil:#2b223e;--mascot-inset:#d8c9ff;--mascot-heart-1:#ff9fa9;--mascot-heart-2:#e95f80;--mascot-glow:#ff8fb0;--mascot-blush:#ff7e9b;--mascot-spark:#ffd37a;--mascot-mouth:#2a1d40;--mascot-brow:#2a1d40;--mascot-cheek:#ff7f9c;--mascot-cheek-op:.62}
 .welcome-mascots{display:flex;align-items:flex-end;justify-content:center;pointer-events:none;user-select:none}
 .welcome-mascot{display:block;object-fit:contain;flex:none}
 .mascot-svg{display:block;width:100%;height:100%}
+/* Робот «дышит», глаза моргают: оживляет заставку, ничего не двигая в раскладке. */
+@keyframes mascotFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes mascotBlink{0%,92%,100%{transform:scaleY(1)}95%,97%{transform:scaleY(.12)}}
+.mascot-svg .m-eyes{transform-box:fill-box;transform-origin:center;animation:mascotBlink 5.2s var(--ease) infinite}
+.welcome-mascot--robot .mascot-svg{animation:mascotFloat 4.6s ease-in-out infinite}
+.welcome-mascot--human img,img.welcome-mascot{animation:mascotFloat 5.4s ease-in-out infinite}
+.welcome-mascot--right img,.welcome-mascot--right{animation-delay:.7s}
+@media (prefers-reduced-motion:reduce){
+  .mascot-svg .m-eyes,.welcome-mascot--robot .mascot-svg,img.welcome-mascot{animation:none!important}
+}
 .welcome-mascot--robot{width:154px;height:172px;filter:drop-shadow(0 12px 18px rgba(45,34,70,.22))}
 .welcome-mascot--human{width:96px;height:140px;filter:drop-shadow(0 8px 13px rgba(45,34,70,.18))}
 .welcome-mascot--left{margin-right:-36px;transform:rotate(-4deg) translateY(4px)}
@@ -1914,7 +1924,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1507");mask-image:url("../bg/pattern-ai.svg?v=1507");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1508");mask-image:url("../bg/pattern-ai.svg?v=1508");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2000,7 +2010,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1507");mask-image:url("../bg/pattern-ai.svg?v=1507");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1508");mask-image:url("../bg/pattern-ai.svg?v=1508");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2903,3 +2913,51 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
   body .aw-win{min-width:0}
 }
 @keyframes winSheetIn{from{opacity:.45;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* ===== Сцены тура: анимация повторяющихся действий =====
+   Всё внутри viewBox 340×200 — карточка не может вытолкнуть содержимое
+   за экран. Анимации идут по кругу и гасятся при prefers-reduced-motion. */
+.tour-scene .t-sway{animation:tSway 5s var(--ease) infinite}
+.tour-scene .t-rows{animation:tRows 5.2s var(--ease) infinite}
+.tour-scene .t-caret{animation:tCaret 2.4s steps(1,end) infinite}
+.tour-scene .t-fade{animation:tFade 4.2s var(--ease) infinite}
+.tour-scene .t-tap{animation:tTap 2.6s var(--ease) infinite;transform-box:fill-box;transform-origin:center}
+.tour-scene .t-grow{animation:tGrow 5s var(--ease) infinite}
+.tour-scene .t-slide{animation:tSlide 5s var(--ease) infinite}
+.tour-scene .t-stop{animation:tStop 5s var(--ease) infinite;opacity:.35}
+.tour-scene .t-pop{animation:tPop 5s var(--ease) infinite;transform-box:fill-box;transform-origin:top left}
+.tour-scene .t-ring{animation:tRing 3.4s var(--ease) infinite;transform-box:fill-box;transform-origin:50% 20%}
+@keyframes tSway{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes tRows{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes tCaret{0%,49%{opacity:1}50%,100%{opacity:0}}
+@keyframes tFade{0%,20%{opacity:0}40%,90%{opacity:1}100%{opacity:0}}
+@keyframes tTap{0%,15%{transform:scale(.6);opacity:0}35%{transform:scale(1);opacity:1}70%{transform:scale(1.35);opacity:.35}100%{transform:scale(1.4);opacity:0}}
+@keyframes tGrow{
+  0%,12%{transform:scale(1)}
+  45%,88%{transform:scale(1.08)}
+  100%{transform:scale(1)}
+}
+@keyframes tSlide{
+  0%,10%{transform:translateX(0)}
+  55%,80%{transform:translateX(64px)}
+  100%{transform:translateX(0)}
+}
+@keyframes tStop{0%,45%{opacity:0}58%,85%{opacity:1}100%{opacity:0}}
+@keyframes tPop{
+  0%,20%{transform:scale(.92);opacity:0}
+  34%,86%{transform:scale(1);opacity:1}
+  100%{transform:scale(.92);opacity:0}
+}
+@keyframes tRing{
+  0%,60%,100%{transform:rotate(0)}
+  66%{transform:rotate(-12deg)}
+  72%{transform:rotate(10deg)}
+  78%{transform:rotate(-6deg)}
+  84%{transform:rotate(3deg)}
+}
+@media (prefers-reduced-motion:reduce){
+  .tour-scene .t-sway,.tour-scene .t-rows,.tour-scene .t-caret,.tour-scene .t-fade,
+  .tour-scene .t-tap,.tour-scene .t-grow,.tour-scene .t-slide,.tour-scene .t-stop,
+  .tour-scene .t-pop,.tour-scene .t-ring{animation:none}
+  .tour-scene .t-stop{opacity:1}
+}

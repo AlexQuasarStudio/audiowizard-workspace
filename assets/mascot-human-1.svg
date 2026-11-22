@@ -1,22 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 190" role="img" aria-label="Человек с папкой">
-  <ellipse cx="65" cy="183" rx="30" ry="4.5" fill="#202124" opacity=".12"/>
-  <path d="M47 95c0-13 8-22 18-22s18 9 18 22l5 43H42l5-43Z" fill="#4285F4"/>
-  <path d="M52 138h26l-3 42h-8l-2-27-2 27h-8l-3-42Z" fill="#3C4043"/>
-  <rect x="35" y="103" width="9" height="31" rx="4.5" fill="#4285F4"/>
-  <rect x="86" y="103" width="9" height="31" rx="4.5" fill="#4285F4"/>
-  <rect x="33" y="128" width="13" height="26" rx="6.5" fill="#F6C9A8"/>
-  <rect x="84" y="128" width="13" height="26" rx="6.5" fill="#F6C9A8"/>
-  <rect x="86" y="106" width="30" height="40" rx="4" fill="#FBBC05"/>
-  <path d="M92 116h18M92 124h18M92 132h12" stroke="#fff" stroke-width="2.6" stroke-linecap="round" opacity=".92"/>
-  <path d="M57 70h16v14H57z" fill="#F6C9A8"/>
-  <path d="M50 84l15 11 15-11-5-6-10 8-10-8-5 6Z" fill="#fff"/>
-  <path d="M65 87l5 4-5 26-5-26 5-4Z" fill="#EA4335"/>
-  <circle cx="65" cy="46" r="23" fill="#F6C9A8"/>
-  <path d="M42 45c0-15 10-26 23-26s23 11 23 26c-7 3-15 0-21-6-6 6-17 8-25 6Z" fill="#3C4043"/>
-  <ellipse cx="56" cy="48" rx="2.4" ry="2.8" fill="#202124"/>
-  <ellipse cx="74" cy="48" rx="2.4" ry="2.8" fill="#202124"/>
-  <path d="M58 57.5c4.2 3.6 9.8 3.6 14 0" fill="none" stroke="#B0603F" stroke-width="2.4" stroke-linecap="round"/>
-  <ellipse cx="48" cy="55" rx="4.5" ry="3.4" fill="#EA4335" opacity=".2"/>
-  <ellipse cx="82" cy="55" rx="4.5" ry="3.4" fill="#EA4335" opacity=".2"/>
+  <!-- Плоская геометрия в духе Material: руки — единое продолжение плеча,
+       кисти соединены с предплечьем, без «отрубленных» прямоугольников. -->
+  <ellipse cx="65" cy="184" rx="29" ry="4.2" fill="#202124" opacity=".12"/>
+  <path d="M50 146h30l-2 34h-9l-4-22-4 22h-9l-2-34Z" fill="#3C4043"/>
+  <!-- плечи и туловище одной формой -->
+  <path d="M42 100c0-9 6-16 15-18h16c9 2 15 9 15 18l4 38c0 5-3 8-8 8H46c-5 0-8-3-8-8l4-38Z" fill="#4285F4"/>
+  <path d="M48 104h34" stroke="#3C4043" stroke-width="2.4" stroke-linecap="round" opacity=".14"/>
+  <!-- левая рука: плечо → предплечье → кисть, всё залито рукавом -->
+  <path d="M44 104c-7 6-10 15-10 24l-1 8" fill="none" stroke="#4285F4" stroke-width="11" stroke-linecap="round"/>
+  <path d="M33 132c0 6 2 11 3 15" fill="none" stroke="#F6C9A8" stroke-width="9" stroke-linecap="round"/>
+  <!-- правая рука держит папку, кисть поверх неё -->
+  <path d="M87 104c7 5 10 13 10 21" fill="none" stroke="#4285F4" stroke-width="11" stroke-linecap="round"/>
+  <path d="M97 124c1 6 0 10-1 14" fill="none" stroke="#F6C9A8" stroke-width="9" stroke-linecap="round"/>
+  <rect x="82" y="112" width="26" height="34" rx="3" fill="#FBBC05"/>
+  <path d="M87 121h15M87 129h15M87 137h10" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".92"/>
+  <path d="M94 138c0 3-1 5-2 7" fill="none" stroke="#F6C9A8" stroke-width="9" stroke-linecap="round"/>
+  <!-- воротник и галстук -->
+  <path d="M57 82h16v12H57z" fill="#F6C9A8"/>
+  <path d="M50 84l15 10 15-10-4-5-11 8-11-8-4 5Z" fill="#fff"/>
+  <path d="M65 88l4 3-4 22-4-22 4-3Z" fill="#EA4335"/>
+  <!-- голова -->
+  <circle cx="65" cy="47" r="22" fill="#F6C9A8"/>
+  <path d="M43 46c0-14 10-25 22-25s22 11 22 25c-6 2-13 0-18-5-6 5-16 7-26 5Z" fill="#3C4043"/>
+  <ellipse cx="57" cy="49" rx="2.3" ry="2.7" fill="#202124"/>
+  <ellipse cx="73" cy="49" rx="2.3" ry="2.7" fill="#202124"/>
+  <path d="M59 58c3.6 3.2 8.4 3.2 12 0" fill="none" stroke="#A55A3C" stroke-width="2.2" stroke-linecap="round"/>
+  <ellipse cx="50" cy="56" rx="4" ry="3" fill="#EA4335" opacity=".18"/>
+  <ellipse cx="80" cy="56" rx="4" ry="3" fill="#EA4335" opacity=".18"/>
 </svg>

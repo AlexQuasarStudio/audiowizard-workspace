@@ -1401,12 +1401,17 @@ const QUICK_BY_ROLE = {
     <rect x="14" y="82" width="15" height="40" rx="7.5" fill="var(--accent)"/>
     <rect x="151" y="82" width="15" height="40" rx="7.5" fill="var(--accent-2,var(--accent))"/>
     <rect x="30" y="56" width="120" height="88" rx="30" fill="#fff"/>
-    <rect x="46" y="73" width="88" height="54" rx="21" fill="var(--accent-soft,rgba(122,104,153,.12))" stroke="none"/>
-    <circle cx="70" cy="97" r="7" fill="#202124" stroke="none"/>
-    <circle cx="110" cy="97" r="7" fill="#202124" stroke="none"/>
-    <circle cx="72" cy="94" r="2.2" fill="#fff" stroke="none"/>
-    <circle cx="112" cy="94" r="2.2" fill="#fff" stroke="none"/>
-    <path d="M78 112c4 5 8 6.5 12 6.5s8-1.5 12-6.5" fill="none" stroke-width="3.6"/>
+    <rect x="46" y="73" width="88" height="54" rx="21" fill="var(--mascot-screen,color-mix(in srgb,var(--accent) 16%,#fff))" stroke="none"/>
+    <ellipse cx="58" cy="112" rx="7" ry="4.4" fill="var(--mascot-cheek)" opacity="var(--mascot-cheek-op,.55)" stroke="none"/>
+    <ellipse cx="122" cy="112" rx="7" ry="4.4" fill="var(--mascot-cheek)" opacity="var(--mascot-cheek-op,.55)" stroke="none"/>
+    <path d="M60 84c5-4 11-4 16 0M104 84c5-4 11-4 16 0" fill="none" stroke="var(--mascot-brow,#4a3563)" stroke-width="3.4"/>
+    <g class="m-eyes">
+      <circle cx="70" cy="97" r="7" fill="var(--mascot-eye,#202124)" stroke="none"/>
+      <circle cx="110" cy="97" r="7" fill="var(--mascot-eye,#202124)" stroke="none"/>
+      <circle cx="72" cy="94" r="2.2" fill="var(--mascot-pupil,#fff)" stroke="none"/>
+      <circle cx="112" cy="94" r="2.2" fill="var(--mascot-pupil,#fff)" stroke="none"/>
+    </g>
+    <path d="M79 111c3.6 4.8 7.4 6.2 11 6.2s7.4-1.4 11-6.2" fill="none" stroke="var(--mascot-mouth,#5a3f78)" stroke-width="3.8"/>
     <rect x="44" y="146" width="92" height="44" rx="20" fill="#fff"/>
     <circle cx="66" cy="168" r="5" fill="var(--accent)" stroke="none"/>
     <circle cx="82" cy="168" r="5" fill="color-mix(in srgb,var(--accent) 62%,#fff)" stroke="none"/>
@@ -1426,13 +1431,17 @@ const QUICK_BY_ROLE = {
     <rect x="14" y="82" width="15" height="40" rx="7.5" fill="var(--accent)"/>
     <rect x="151" y="82" width="15" height="40" rx="7.5" fill="var(--accent-2,var(--accent))"/>
     <rect x="30" y="56" width="120" height="88" rx="30" fill="#fff"/>
-    <rect x="46" y="73" width="88" height="54" rx="21" fill="var(--accent-soft,rgba(122,104,153,.12))" stroke="none"/>
-    <path d="M58 91c5-5 10-4 14 0M108 91c4-4 9-5 14 0" fill="none" stroke-width="3.6"/>
-    <circle cx="70" cy="99" r="6.4" fill="#202124" stroke="none"/>
-    <circle cx="110" cy="99" r="6.4" fill="#202124" stroke="none"/>
-    <circle cx="72" cy="96" r="2" fill="#fff" stroke="none"/>
-    <circle cx="112" cy="96" r="2" fill="#fff" stroke="none"/>
-    <path d="M78 116c4-4 8 4 12 0s8 4 12 0" fill="none" stroke-width="3.6"/>
+    <rect x="46" y="73" width="88" height="54" rx="21" fill="var(--mascot-screen,color-mix(in srgb,var(--accent) 16%,#fff))" stroke="none"/>
+    <ellipse cx="58" cy="112" rx="7" ry="4.4" fill="var(--mascot-cheek)" opacity="var(--mascot-cheek-op,.55)" stroke="none"/>
+    <ellipse cx="122" cy="112" rx="7" ry="4.4" fill="var(--mascot-cheek)" opacity="var(--mascot-cheek-op,.55)" stroke="none"/>
+    <path d="M58 89c5-5 10-4 15 1M107 90c4-5 9-6 15-1" fill="none" stroke="var(--mascot-brow,#4a3563)" stroke-width="3.4"/>
+    <g class="m-eyes">
+      <circle cx="70" cy="99" r="6.4" fill="var(--mascot-eye,#202124)" stroke="none"/>
+      <circle cx="110" cy="99" r="6.4" fill="var(--mascot-eye,#202124)" stroke="none"/>
+      <circle cx="72" cy="96" r="2" fill="var(--mascot-pupil,#fff)" stroke="none"/>
+      <circle cx="112" cy="96" r="2" fill="var(--mascot-pupil,#fff)" stroke="none"/>
+    </g>
+    <path d="M79 115c3.6-4 7.4 4 11 0s7.4 4 11 0" fill="none" stroke="var(--mascot-mouth,#5a3f78)" stroke-width="3.4"/>
     <path d="M128 82c-4 6-3 12 1 12 4 0 5-6 1-12Z" fill="var(--accent-2,var(--accent))" stroke="var(--mascot-line,#3b3155)" stroke-width="2"/>
     <rect x="44" y="146" width="92" height="44" rx="20" fill="#fff"/>
     <circle cx="66" cy="168" r="5" fill="var(--accent)" stroke="none"/>
@@ -2137,54 +2146,168 @@ ex.innerHTML = avatarHTML(user(), '');
   /* ---------- Тур ---------- */
   /* Шаги тура. video — короткий ролик (H.264, 12 к/с, без звука, ~0,2 МБ):
      тяжёлые видео не тянем, показываем их только на своём шаге. */
+  /* Шаги тура. Вместо видео — вектора: каждая сцена повторяет интерфейс
+     приложения и анимируется по кругу (только transform/opacity — дёшево
+     и без разметки). Ничего не грузится и не выходит за карточку. */
   const TOUR = [
-    { sel:'[data-tour="nav"]', t:'Навигация по ролям', d:'Меню подстраивается под вашу роль: дашборд, заказы, чаты, идеи и инструменты.' },
-    { sel:'[data-tour="search"]', t:'Глобальный поиск', d:'Ctrl K — палетка команд: заказы, клиенты, действия и переходы. Задержка поиска < 200 мс.' },
-    { sel:'[data-tour="bell"]', t:'Центр уведомлений', d:'Изменения заказов, патчноуты и тикеты — всё в одном месте.' },
-    { sel:'[data-tour="orders-link"]', t:'Заказы', d:'Цветовые статусы строк, живые фильтры и групповые операции.', scene:'windows' },
+    { sel:'[data-tour="nav"]', t:'Навигация по ролям', d:'Меню подстраивается под вашу роль: дашборд, заказы, чаты, идеи и инструменты.', scene:'nav' },
+    { sel:'[data-tour="search"]', t:'Глобальный поиск', d:'Ctrl K — палетка команд: заказы, клиенты, действия и переходы. Задержка поиска < 200 мс.', scene:'search' },
+    { sel:'[data-tour="bell"]', t:'Центр уведомлений', d:'Изменения заказов, патчноуты и тикеты — всё в одном месте.', scene:'bell' },
+    { sel:'[data-tour="orders-link"]', t:'Заказы', d:'Цветовые статусы строк, живые фильтры и групповые операции.', scene:'orders' },
+    { t:'Окна: свернуть и развернуть', d:'Двойной клик по шапке разворачивает окно на весь экран, повторный — возвращает прежний размер.', scene:'winSize' },
+    { t:'Окна: тащить за заголовок', d:'Заголовок — ручка перетаскивания. Окно не уезжает за край: оно упирается в границу экрана.', scene:'winDrag' },
+    { t:'Окна: правый клик по заказу', d:'Контекстное меню даёт быстрые действия без похода в карточку: статус, задача, чат.', scene:'winMenu' },
     { sel:'[data-tour="user"]', t:'Профиль и темы', d:'Аватар, настройки, пять тем оформления и выход. Настройки сохраняются в профиле.', scene:'tasks' }
   ];
 
-  /* Демонстрационные сцены тура — чистая векторная графика вместо видео:
-     ничего не грузится, масштабируется без потерь и не выходит за карточку. */
+  /* Сцены 340×200: рамка окна повторяет настоящую шапку с тремя точками,
+     тело — полосы интерфейса. Все элементы внутри viewBox. */
   const TOUR_SCENES = {
-    windows: `<svg class="tour-scene" viewBox="0 0 340 200" role="img" aria-label="Окна: свернуть, развернуть, правый клик">
-      <rect x="12" y="14" width="196" height="120" rx="10" fill="var(--panel)" stroke="var(--border-2)"/>
-      <path d="M12 34h196" stroke="var(--border)" fill="none"/>
-      <circle cx="26" cy="24" r="4" fill="var(--red,#e5484d)"/><circle cx="40" cy="24" r="4" fill="var(--yellow,#f5a524)"/><circle cx="54" cy="24" r="4" fill="var(--green,#30a46c)"/>
-      <rect x="26" y="46" width="120" height="8" rx="4" fill="var(--border-2)"/>
-      <rect x="26" y="62" width="164" height="8" rx="4" fill="var(--border)"/>
-      <rect x="26" y="78" width="96" height="8" rx="4" fill="var(--border)"/>
-      <rect x="26" y="98" width="72" height="20" rx="8" fill="var(--accent-soft)"/>
-      <rect x="134" y="52" width="176" height="102" rx="10" fill="var(--panel)" stroke="var(--accent)" opacity=".9"/>
-      <path d="M134 72h176" stroke="var(--accent)" opacity=".45" fill="none"/>
-      <rect x="148" y="84" width="90" height="8" rx="4" fill="var(--border-2)"/>
-      <rect x="148" y="100" width="140" height="8" rx="4" fill="var(--border)"/>
-      <rect x="148" y="118" width="64" height="8" rx="4" fill="var(--border)"/>
-      <path d="M282 34l-8 8m0-8l8 8" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/>
-      <circle cx="226" cy="158" r="12" fill="var(--accent)" opacity=".18"/>
-      <path d="M222 150l10 6-4 1-2 5-4-12Z" fill="var(--accent)"/>
+    nav: `<svg class="tour-scene" viewBox="0 0 340 200" role="img" aria-label="Навигация по ролям">
+      <rect x="10" y="12" width="104" height="176" rx="12" fill="var(--panel)" stroke="var(--border-2)"/>
+      <circle cx="30" cy="32" r="7" fill="var(--accent)"/>
+      <rect x="44" y="28" width="46" height="8" rx="4" fill="var(--border-2)"/>
+      <g class="t-sway">
+        <rect x="18" y="52" width="86" height="20" rx="7" fill="var(--accent-soft)"/>
+        <rect x="28" y="58" width="54" height="8" rx="4" fill="var(--accent)"/>
+        <rect x="18" y="80" width="86" height="20" rx="7" fill="none"/>
+        <rect x="28" y="86" width="62" height="8" rx="4" fill="var(--border)"/>
+        <rect x="18" y="108" width="86" height="20" rx="7" fill="none"/>
+        <rect x="28" y="114" width="48" height="8" rx="4" fill="var(--border)"/>
+      </g>
+      <rect x="18" y="150" width="86" height="26" rx="9" fill="var(--bg-2)" stroke="var(--border)"/>
+      <circle cx="32" cy="163" r="7" fill="var(--accent-2)"/>
+      <rect x="44" y="159" width="48" height="8" rx="4" fill="var(--border)"/>
+      <rect x="126" y="12" width="204" height="176" rx="12" fill="var(--panel)" stroke="var(--border-2)"/>
+      <rect x="142" y="28" width="96" height="10" rx="5" fill="var(--border-2)"/>
+      <rect x="142" y="50" width="172" height="54" rx="10" fill="var(--bg-2)" stroke="var(--border)"/>
+      <rect x="154" y="62" width="66" height="8" rx="4" fill="var(--border-2)"/>
+      <rect x="154" y="80" width="94" height="8" rx="4" fill="var(--border)"/>
+      <rect x="142" y="116" width="82" height="54" rx="10" fill="var(--accent-soft)"/>
+      <rect x="232" y="116" width="82" height="54" rx="10" fill="var(--bg-2)" stroke="var(--border)"/>
+    </svg>`,
+    search: `<svg class="tour-scene" viewBox="0 0 340 200" role="img" aria-label="Палетка команд Ctrl K">
+      <rect x="10" y="12" width="320" height="24" rx="9" fill="var(--panel)" stroke="var(--border-2)"/>
+      <circle cx="26" cy="24" r="5.5" fill="none" stroke="var(--accent)" stroke-width="2"/>
+      <path d="M30 28l4 4" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+      <rect x="42" y="20" width="120" height="8" rx="4" fill="var(--border)"/>
+      <rect x="286" y="18" width="30" height="12" rx="4" fill="var(--bg-2)" stroke="var(--border)"/>
+      <g class="t-caret"><rect x="42" y="20" width="2" height="8" fill="var(--accent)"/></g>
+      <rect x="10" y="46" width="212" height="140" rx="12" fill="var(--panel)" stroke="var(--accent)" opacity=".9"/>
+      <rect x="22" y="58" width="90" height="8" rx="4" fill="var(--border-2)"/>
+      <g class="t-rows">
+        <rect x="22" y="76" width="188" height="18" rx="7" fill="var(--accent-soft)"/>
+        <rect x="32" y="82" width="72" height="7" rx="3.5" fill="var(--accent)"/>
+        <rect x="22" y="100" width="188" height="18" rx="7" fill="none"/>
+        <rect x="32" y="106" width="98" height="7" rx="3.5" fill="var(--border)"/>
+        <rect x="22" y="124" width="188" height="18" rx="7" fill="none"/>
+        <rect x="32" y="130" width="60" height="7" rx="3.5" fill="var(--border)"/>
+      </g>
+      <rect x="232" y="46" width="98" height="140" rx="12" fill="var(--bg-2)" stroke="var(--border)"/>
+      <rect x="244" y="58" width="60" height="8" rx="4" fill="var(--border-2)"/>
+      <rect x="244" y="76" width="74" height="8" rx="4" fill="var(--border)"/>
+      <rect x="244" y="92" width="52" height="8" rx="4" fill="var(--border)"/>
+      <g class="t-fade"><rect x="244" y="112" width="74" height="22" rx="8" fill="var(--accent)" opacity=".22"/></g>
+    </svg>`,
+    bell: `<svg class="tour-scene" viewBox="0 0 340 200" role="img" aria-label="Центр уведомлений">
+      <g class="t-ring">
+        <path d="M300 44c-7 0-12 6-12 13v10l-4 6h32l-4-6v-10c0-7-5-13-12-13Z" fill="none" stroke="var(--accent)" stroke-width="2.6" stroke-linejoin="round"/>
+        <path d="M296 76h8" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round"/>
+      </g>
+      <circle cx="310" cy="40" r="9" fill="var(--red,#e5484d)"/>
+      <rect x="10" y="12" width="212" height="176" rx="12" fill="var(--panel)" stroke="var(--border-2)"/>
+      <rect x="24" y="26" width="104" height="10" rx="5" fill="var(--border-2)"/>
+      <g class="t-rows">
+        <rect x="24" y="48" width="184" height="34" rx="9" fill="var(--accent-soft)"/>
+        <rect x="36" y="56" width="94" height="8" rx="4" fill="var(--accent)"/>
+        <rect x="36" y="70" width="140" height="6" rx="3" fill="var(--border)"/>
+        <rect x="24" y="90" width="184" height="30" rx="9" fill="var(--bg-2)" stroke="var(--border)"/>
+        <rect x="36" y="98" width="72" height="7" rx="3.5" fill="var(--border-2)"/>
+        <rect x="36" y="109" width="120" height="6" rx="3" fill="var(--border)"/>
+        <rect x="24" y="128" width="184" height="30" rx="9" fill="none"/>
+        <rect x="36" y="136" width="86" height="7" rx="3.5" fill="var(--border)"/>
+      </g>
+      <rect x="234" y="12" width="96" height="176" rx="12" fill="var(--bg-2)" stroke="var(--border)"/>
+    </svg>`,
+    orders: `<svg class="tour-scene" viewBox="0 0 340 200" role="img" aria-label="Заказы: статусы и фильтры">
+      <rect x="10" y="12" width="320" height="176" rx="12" fill="var(--panel)" stroke="var(--border-2)"/>
+      <rect x="24" y="26" width="70" height="18" rx="7" fill="var(--accent-soft)"/>
+      <rect x="32" y="32" width="44" height="7" rx="3.5" fill="var(--accent)"/>
+      <rect x="102" y="26" width="58" height="18" rx="7" fill="var(--bg-2)" stroke="var(--border)"/>
+      <rect x="164" y="26" width="46" height="18" rx="7" fill="var(--bg-2)" stroke="var(--border)"/>
+      <g class="t-rows">
+        <rect x="24" y="56" width="292" height="22" rx="7" fill="var(--bg-2)" stroke="var(--border)"/>
+        <circle cx="38" cy="67" r="5" fill="var(--accent)"/>
+        <rect x="50" y="63" width="70" height="8" rx="4" fill="var(--border-2)"/>
+        <rect x="240" y="63" width="60" height="8" rx="4" fill="var(--border)"/>
+        <rect x="24" y="84" width="292" height="22" rx="7" fill="var(--bg-2)" stroke="var(--border)"/>
+        <circle cx="38" cy="95" r="5" fill="var(--yellow,#f5a524)"/>
+        <rect x="50" y="91" width="86" height="8" rx="4" fill="var(--border-2)"/>
+        <rect x="240" y="91" width="60" height="8" rx="4" fill="var(--border)"/>
+        <rect x="24" y="112" width="292" height="22" rx="7" fill="var(--bg-2)" stroke="var(--border)"/>
+        <circle cx="38" cy="123" r="5" fill="var(--green,#30a46c)"/>
+        <rect x="50" y="119" width="58" height="8" rx="4" fill="var(--border-2)"/>
+        <rect x="240" y="119" width="60" height="8" rx="4" fill="var(--border)"/>
+      </g>
+      <g class="t-fade"><rect x="24" y="112" width="292" height="22" rx="7" fill="var(--accent-soft)" opacity=".7"/></g>
+      <rect x="24" y="150" width="92" height="22" rx="8" fill="var(--accent)"/>
+      <rect x="36" y="157" width="62" height="8" rx="4" fill="#fff" opacity=".85"/>
+    </svg>`,
+    winSize: `<svg class="tour-scene" viewBox="0 0 340 200" role="img" aria-label="Окно: двойной клик по шапке разворачивает окно">
+      <rect x="10" y="12" width="320" height="176" rx="12" fill="var(--bg-2)" stroke="var(--border)"/>
+      <g class="t-grow" transform-origin="170px 100px">
+        <rect x="28" y="34" width="284" height="140" rx="12" fill="var(--panel)" stroke="var(--accent)"/>
+        <path d="M28 58h284" stroke="var(--accent)" opacity=".4"/>
+        <rect x="44" y="48" width="104" height="8" rx="4" fill="var(--border-2)"/>
+        <circle cx="290" cy="46" r="5" fill="var(--border-2)"/>
+      </g>
+      <g class="t-tap"><circle cx="170" cy="52" r="13" fill="none" stroke="var(--accent)" stroke-width="2.4"/></g>
+      <rect x="44" y="72" width="80" height="8" rx="4" fill="var(--border-2)"/>
+      <rect x="44" y="88" width="120" height="8" rx="4" fill="var(--border)"/>
+    </svg>`,
+    winDrag: `<svg class="tour-scene" viewBox="0 0 340 200" role="img" aria-label="Окно: перетаскивание за заголовок, упор в край">
+      <rect x="10" y="12" width="320" height="176" rx="12" fill="var(--bg-2)" stroke="var(--border)"/>
+      <rect x="18" y="20" width="304" height="160" rx="10" fill="none" stroke="var(--border-2)" stroke-dasharray="5 5"/>
+      <g class="t-slide">
+        <rect x="26" y="38" width="196" height="118" rx="12" fill="var(--panel)" stroke="var(--accent)"/>
+        <path d="M26 62h196" stroke="var(--accent)" opacity=".4"/>
+        <path d="M42 54h14M49 47v14M44 49l10 10M54 49l-10 10" stroke="var(--border-2)" stroke-width="2" stroke-linecap="round"/>
+        <rect x="66" y="50" width="80" height="8" rx="4" fill="var(--border-2)"/>
+        <rect x="38" y="76" width="98" height="8" rx="4" fill="var(--border)"/>
+        <rect x="38" y="92" width="130" height="8" rx="4" fill="var(--border)"/>
+        <rect x="38" y="108" width="64" height="8" rx="4" fill="var(--border)"/>
+      </g>
+      <g class="t-stop"><path d="M214 44v132" stroke="var(--red,#e5484d)" stroke-width="2.6" stroke-linecap="round"/></g>
+    </svg>`,
+    winMenu: `<svg class="tour-scene" viewBox="0 0 340 200" role="img" aria-label="Правый клик по заказу: контекстное меню">
+      <rect x="10" y="12" width="320" height="176" rx="12" fill="var(--panel)" stroke="var(--border-2)"/>
+      <rect x="24" y="26" width="292" height="26" rx="8" fill="var(--bg-2)" stroke="var(--border)"/>
+      <rect x="36" y="35" width="70" height="8" rx="4" fill="var(--border-2)"/>
+      <rect x="24" y="58" width="292" height="26" rx="8" fill="var(--bg-2)" stroke="var(--border)"/>
+      <rect x="36" y="67" width="92" height="8" rx="4" fill="var(--border-2)"/>
+      <g class="t-pop" transform-origin="120px 90px">
+        <rect x="24" y="90" width="150" height="92" rx="10" fill="var(--panel)" stroke="var(--accent)" filter="url(#none)"/>
+        <rect x="36" y="102" width="86" height="8" rx="4" fill="var(--border-2)"/>
+        <rect x="36" y="120" width="110" height="8" rx="4" fill="var(--border)"/>
+        <rect x="36" y="138" width="74" height="8" rx="4" fill="var(--border)"/>
+        <rect x="36" y="156" width="98" height="8" rx="4" fill="var(--border)"/>
+      </g>
+      <g class="t-tap"><circle cx="70" cy="67" r="12" fill="none" stroke="var(--accent)" stroke-width="2.4"/></g>
     </svg>`,
     tasks: `<svg class="tour-scene" viewBox="0 0 340 200" role="img" aria-label="Планировщик и подпункты услуг">
       <rect x="14" y="16" width="150" height="168" rx="12" fill="var(--panel)" stroke="var(--border-2)"/>
       <rect x="30" y="34" width="86" height="9" rx="4.5" fill="var(--border-2)"/>
-      <g stroke="none">
-        <rect x="30" y="58" width="18" height="18" rx="6" fill="var(--accent)"/><path d="M34 67l4 4 7-8" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <g class="t-rows">
+        <rect x="30" y="58" width="18" height="18" rx="6" fill="var(--accent)"/>
+        <path d="M34 67l4 4 7-8" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round"/>
         <rect x="56" y="62" width="88" height="9" rx="4.5" fill="var(--border)"/>
-        <rect x="30" y="90" width="18" height="18" rx="6" fill="var(--accent)"/><path d="M34 99l4 4 7-8" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round"/>
-        <rect x="56" y="94" width="70" height="9" rx="4.5" fill="var(--border)"/>
         <rect x="56" y="118" width="12" height="3" rx="1.5" fill="var(--accent)" opacity=".7"/>
         <rect x="72" y="118" width="56" height="9" rx="4.5" fill="var(--border)" opacity=".8"/>
-        <rect x="30" y="146" width="18" height="18" rx="6" fill="none" stroke="var(--border-2)" stroke-width="2"/>
-        <rect x="56" y="150" width="80" height="9" rx="4.5" fill="var(--border)"/>
       </g>
       <rect x="178" y="16" width="148" height="168" rx="12" fill="var(--panel)" stroke="var(--border-2)"/>
       <rect x="192" y="34" width="64" height="9" rx="4.5" fill="var(--border-2)"/>
       <rect x="192" y="56" width="120" height="26" rx="8" fill="var(--bg-2)" stroke="var(--border)"/>
-      <rect x="200" y="64" width="72" height="9" rx="4.5" fill="var(--border)"/>
-      <rect x="198" y="88" width="108" height="26" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" opacity=".85"/>
-      <path d="M214 94v14M208 101h13" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"/>
-      <rect x="228" y="97" width="62" height="8" rx="4" fill="var(--accent)" opacity=".45"/>
+      <rect x="192" y="88" width="120" height="26" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" opacity=".85"/>
       <rect x="192" y="128" width="120" height="8" rx="4" fill="var(--border)"/>
       <rect x="192" y="144" width="88" height="8" rx="4" fill="var(--border)"/>
       <rect x="192" y="160" width="52" height="14" rx="7" fill="var(--accent)"/>
