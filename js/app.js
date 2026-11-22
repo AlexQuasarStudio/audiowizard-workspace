@@ -8980,13 +8980,17 @@ const cm = root.querySelector('.chat-main');
   }
   function calcExtraRowsHTML(nid){
     const list = (((S.calcSettings || {}).extras || {})[nid]) || [];
-    return list.map(e => `<tr data-eid="${e.id}">
-      <td><input class="input" data-ef="name" value="${esc(e.name||'')}" style="padding:6px 10px"></td>
+    /* Подпункты стоят сразу под своей опцией — как у услуг. */
+    const ordered = list.filter(e => e && !e.parent)
+      .flatMap(e => [e, ...list.filter(x => x && x.parent === e.id)]);
+    const rest = list.filter(e => e && e.parent && !list.some(p => p && p.id === e.parent));
+    return [...ordered, ...rest].map(e => `<tr data-eid="${e.id}"${e.parent ? ` class="calc-extra-sub" data-eparent="${esc(e.parent)}"` : ''}>
+      <td><input class="input" data-ef="name" value="${esc(e.name||'')}" placeholder="${e.parent?'Название подпункта':'Название опции'}" style="padding:6px 10px${e.parent?';padding-left:26px':''}"></td>
       <td><input class="input" data-ef="price" type="number" min="0" value="${Number(e.price)||0}" style="padding:6px 10px;width:100px"></td>
       <td><input class="input" data-ef="pct" type="number" min="0" max="200" value="${Number(e.pct)||0}" style="padding:6px 10px;width:86px"></td>
       <td><input class="input" data-ef="unit" value="${esc(e.unit||'')}" placeholder="за час / % от стоимости" style="padding:6px 10px"></td>
       <td><label class="check"><input type="checkbox" data-ef="active" ${e.active!==false?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span></label></td>
-      <td style="width:40px"><button class="iconbtn" data-extra-del="${e.id}" title="Удалить опцию">${icon('trash','ico-sm')}</button></td>
+      <td style="width:76px;white-space:nowrap"><button class="iconbtn" data-esub-add="${e.id}" title="Добавить подпункт опции">${icon('plus','ico-sm')}</button><button class="iconbtn" data-extra-del="${e.id}" title="Удалить опцию">${icon('trash','ico-sm')}</button></td>
     </tr>`).join('');
   }
   /* Калькулятор в CRM живёт отдельным файлом — отдаём ему те же функции */
@@ -10168,10 +10172,11 @@ const cm = root.querySelector('.chat-main');
             const name = gf('name').value.trim();
             if (!name) return;
             const prev = (((S.calcSettings || {}).extras || {})[nid] || []).find(x => x && x.id === tr.dataset.eid) || {};
+            const parent = tr.dataset.eparent || prev.parent || '';
             const unit = gf('unit').value.trim();
             extras.push({ id: tr.dataset.eid, name, price: Math.max(0, +gf('price').value || 0), pct: Math.max(0, Math.min(200, +((gf('pct')||{}).value) || 0)), unit, active: !!gf('active').checked,
               /* Подчинение и «много копий» настраиваются только кодом/миграцией — при сохранении их не теряем. */
-              ...(prev.parent ? { parent: prev.parent } : {}), ...(prev.multi ? { multi: true } : {}) });
+              ...(parent ? { parent } : {}), ...(prev.multi ? { multi: true } : {}) });
           });
           S.calcSettings = S.calcSettings || { rushPct:{}, extras:{}, minPrice:{}, minExecPrice:{}, deadlineDays:{}, dailyNorm:{}, clientBufferPct:30 };
           S.calcSettings.extras[nid] = extras;
@@ -10304,7 +10309,32 @@ const cm = root.querySelector('.chat-main');
         const inp = tr.querySelector('[data-ef="name"]');
         if (inp) setTimeout(()=>inp.focus(), 30);
       };
+      /* Подпункт опции: строка под родителем, в расчёте — вместе с ним. */
+      const addExtraSubRow = pid => {
+        const parentRow = el.querySelector(`tr[data-eid="${pid}"]`);
+        const tb = parentRow && parentRow.closest('tbody[data-extra]');
+        if (!tb) return;
+        const id = 'ce' + uid();
+        const tr = document.createElement('tr');
+        tr.dataset.eid = id; tr.dataset.eparent = pid;
+        tr.className = 'calc-new-row calc-extra-sub';
+        tr.innerHTML = `
+          <td><input class="input" data-ef="name" placeholder="Название подпункта" style="padding:6px 10px;padding-left:26px"></td>
+          <td><input class="input" data-ef="price" type="number" min="0" value="0" style="padding:6px 10px;width:100px"></td>
+          <td><input class="input" data-ef="pct" type="number" min="0" max="200" value="0" style="padding:6px 10px;width:86px"></td>
+          <td><input class="input" data-ef="unit" placeholder="за копию / за документ" style="padding:6px 10px"></td>
+          <td><label class="check"><input type="checkbox" data-ef="active" checked><span class="box"><svg><use href="#i-check-c"/></svg></span></label></td>
+          <td style="width:76px;white-space:nowrap"><button class="iconbtn" data-esub-add="${id}" title="Добавить подпункт опции">${icon('plus','ico-sm')}</button><button class="iconbtn" data-extra-del="${id}" title="Удалить подпункт">${icon('trash','ico-sm')}</button></td>`;
+        /* Сразу под родителем, после его последнего подпункта. */
+        const subs = [...tb.querySelectorAll(`tr[data-eparent="${pid}"]`)];
+        const last = subs.length ? subs[subs.length - 1] : parentRow;
+        if (last.nextSibling) tb.insertBefore(tr, last.nextSibling); else tb.appendChild(tr);
+        const inp = tr.querySelector('[data-ef="name"]');
+        if (inp) setTimeout(()=>inp.focus(), 30);
+      };
       el.addEventListener('click', e=>{
+        const esub = e.target.closest('[data-esub-add]');
+        if (esub){ addExtraSubRow(esub.dataset.esubAdd); return; }
         const exDel = e.target.closest('[data-extra-del]');
         if (exDel){ calcRowOut(exDel.closest('tr')); toast('Опция удалена — не забудьте сохранить','info'); return; }
         const addEx = e.target.closest('[data-add-extra]');

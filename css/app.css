@@ -520,7 +520,10 @@ tr.inl-tr{animation:inlRowIn .2s var(--ease)}
 .svc-row--sub>span:first-of-type{position:relative}
 .calc-qty{display:inline-flex;align-items:center;gap:4px;flex:none;margin-right:4px}
 .calc-qty .input{width:52px!important;min-height:28px!important;padding:2px 6px!important;text-align:center}
-.calc-qty.is-off{opacity:.45}
+/* Поле «N копий» всегда доступно для ввода, даже пока не выбрана распечатка:
+   так видно, куда вводить число, и оно применится, как только галочка встанет. */
+.calc-qty.is-off{opacity:.6}
+.calc-qty.is-off .input{border-color:color-mix(in srgb,var(--accent) 40%,var(--border))}
 .calc-lang-item[hidden]{display:none}
 @media (max-width:640px){.calc-lang-list{grid-template-columns:1fr}}
 @media (max-width:520px){.calc-disc-row{grid-template-columns:1fr}}
@@ -1906,7 +1909,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1505");mask-image:url("../bg/pattern-ai.svg?v=1505");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1506");mask-image:url("../bg/pattern-ai.svg?v=1506");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -1992,7 +1995,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1505");mask-image:url("../bg/pattern-ai.svg?v=1505");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1506");mask-image:url("../bg/pattern-ai.svg?v=1506");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2848,20 +2851,15 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 .msg__bubble .txt{display:block}
 .msg__bubble .txt .time{position:static;float:right;margin:2px 0 0 8px;background:none;box-shadow:none;border-radius:0}
 .msg__bubble .txt--time-inline{padding-right:0}
-.msg__foot{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px;width:100%;min-width:0;margin-top:4px}
-/* Ширину пузыря держит только текст: реакции живут в отдельной строке
-   снизу и не участвуют в расчёте shrink-to-fit. Иначе при добавлении
-   пилюли пузырь сначала расширяется до колонки реакций, а после пересчёта
-   текста сужается — это и было «прыгающее» поведение. */
+/* Подвал пузыря держит только время: колонка реакций здесь не участвует,
+   иначе короткое сообщение не встаёт со временем в одну строку. */
+.msg__foot{display:flex;justify-content:flex-end;align-items:flex-end;gap:8px;width:100%;min-width:0;margin-top:2px}
 .msg__bubble>.msg__foot{flex:none}
-.msg__reactions{position:absolute;left:0;top:100%;margin-top:2px;display:flex;flex-wrap:wrap;align-items:center;gap:4px;width:max-content;max-width:min(100%,240px);min-width:0}
-/* Пилюля с цифрой появляется плавно и не раскрывает пузырь: ширину держит
-   только текст, реакции живут в своей строке. */
+/* Ширину пузыря держит только текст: реакции живут отдельной строкой снизу
+   и не участвуют в shrink-to-fit, поэтому клик по реакции не меняет ширину. */
+.msg__reactions{position:absolute;left:0;top:100%;margin-top:1px;display:flex;flex-wrap:wrap;align-items:center;gap:4px;width:max-content;max-width:min(100%,240px);min-width:0}
 .msg__reactions .react-pill{animation:none}
-.msg__foot:has(.msg__reactions) .time{margin-left:auto}
-/* Отступ под строку реакций — только пока она есть, и снимается плавно. */
-.msg:has(.msg__reactions){margin-bottom:26px;transition:margin-bottom .22s var(--ease)}
-/* Снятие последней реакции: строка гаснет и место под неё уходит плавно. */
+.msg:has(.msg__reactions){margin-bottom:22px;transition:margin-bottom .22s var(--ease)}
 .msg__reactions.is-gone{opacity:0;transform:translateY(-2px);transition:opacity .2s var(--ease),transform .2s var(--ease)}
 .msg.msg--noreact{margin-bottom:0!important}
 /* Время вернулось в строку текста — лишний подвал больше не занимает место. */

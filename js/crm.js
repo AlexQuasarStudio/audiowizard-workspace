@@ -6076,11 +6076,15 @@ const wrap = root.querySelector('.pl-wrap');
             const base = { kind:'ex', nid:p[0], name:p[1], unitPrice:+p[2] || 0, price:0, pct:+p[3] || 0, qty:1, parent:def.parent || '' };
             out.push({ ...base, multi:isMany(def), qty:Math.max(1, Math.round(+i.dataset.qty || 1)) });
           });
-          /* подпункты без галочки тоже идут, если выбран их родитель */
+          /* Подпункт идёт, если у него своя галочка или включён родитель.
+             Количество подпункта берётся из его счётчика. */
           calcExtrasFor(g2('#cx-niche').value).filter(e => e && e.parent && !out.some(o => o.name === e.id))
             .forEach(e => {
               if (!out.some(o => o.name === e.parent)) return;
-              out.push({ kind:'ex', nid:g2('#cx-niche').value, name:e.id, unitPrice:Number(e.price)||0, price:0, pct:Number(e.pct)||0, qty:1, parent:e.parent });
+              const own = mask.querySelector(`[data-ex^="${g2('#cx-niche').value}|${e.id}|"]`);
+              out.push({ kind:'ex', nid:g2('#cx-niche').value, name:e.id, unitPrice:Number(e.price)||0, price:0,
+                pct:Number(e.pct)||0, qty:Math.max(1, Math.round(+(own && own.dataset.qty) || 1)),
+                parent:e.parent, multi:isMany(e) });
             });
           out.forEach(o => { o.price = o.pct ? 0 : o.unitPrice * (o.multi ? o.qty : 1); });
           const svcs = [...mask.querySelectorAll('[data-sv]:checked')].map(i => {
@@ -6095,8 +6099,14 @@ const wrap = root.querySelector('.pl-wrap');
         const preExtra = () => (isNaN(val) ? 0 : val) + svcOnlySum();
         /* Показываем в поле множители надбавок и промокода. База хранится
            отдельно: иначе скидка и надбавка посчитались бы дважды. */
+        /* В поле — та же арифметика, что и в сумме: «число копий × цена».
+           Считаем по счётчику строки, а не по прежнему правилу «только > 1». */
         const fixedTerms = () => picked().filter(x => x.kind === 'ex' && !x.pct)
-          .map(x => (isMany(calcExtrasFor(x.nid).find(y => y && y.id === x.name)) && x.qty > 1 ? `${x.qty} × ${x.unitPrice}` : `${x.unitPrice}`));
+          .map(x => {
+              const many = isMany(calcExtrasFor(x.nid).find(y => y && y.id === x.name));
+            if (!many) return `${x.unitPrice}`;
+            return x.qty > 1 ? `${x.qty} × ${x.unitPrice}` : `${x.unitPrice}`;
+          });
         /* Число копий вводится прямо в пункте распечатки: у своей строки
            в калькуляторе есть счётчик × N (по умолчанию 1). */
         const copiesSel = nid => {
@@ -6107,14 +6117,19 @@ const wrap = root.querySelector('.pl-wrap');
         /* Поле ввода живёт внутри пилюли, количество — в dataset чекбокса. */
         const copiesBox = sel2 => mask.querySelector(`[data-ex^="${sel2}|"]`);
         const copiesInpOf = sel2 => mask.querySelector(`[data-exq="${sel2}"] input`);
+        /* Счётчик активен, когда его строка участвует в расчёте: своя
+           галочка стоит, либо включён родитель-распечатка. */
         const syncCopiesCounters = () => {
           mask.querySelectorAll('[data-exq]').forEach(wrap => {
             const box = copiesBox(wrap.dataset.exq);
             const inp = wrap.querySelector('input');
             if (!inp) return;
             inp.value = Math.max(1, Math.round(+(box && box.dataset.qty) || 1));
-            inp.disabled = !box;
-            wrap.classList.toggle('is-off', !(box && box.checked));
+            const def = exDef(wrap.dataset.exq.split('|')[0], wrap.dataset.exq.split('|')[1]);
+            const parentOn = def.parent ? !!(copiesBox(wrap.dataset.exq.split('|')[0] + '|' + def.parent) || {}).checked : false;
+            const active = !!(box && (box.checked || parentOn));
+            inp.disabled = !active;
+            wrap.classList.toggle('is-off', !active);
           });
         };
         syncCopiesCounters();
@@ -6335,7 +6350,7 @@ const wrap = root.querySelector('.pl-wrap');
             if (!extras.length) return '';
             return `<div class="small cx-svc-group"><b style="margin-bottom:4px;display:block">${esc(n.name)}</b>
               <div class="tiny faint" data-svc-extra style="margin:6px 0 2px">Доп. опции</div>
-              ${extras.map(e=>{const isSub=!!e.parent;const qty = /копи|распечат|экземпляр/i.test(e.unit||'');return `<label class="svc-row check${isSub?' svc-row--sub':''}" data-search="${esc(norm(n.name+' '+(e.name||'')+' '+(e.unit||'')+(e.pct?' процент':'')))}"><input type="checkbox" data-ex="${n.id}|${esc(e.id)}|${Number(e.price)||0}|${Number(e.pct)||0}" data-qty="1"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${isSub?`<span class="faint">└ </span>`:''}${esc(e.name)} <span class="faint">${esc(e.unit || (e.pct ? '% от стоимости' : ''))}</span></span>${qty?`<span class="calc-qty" data-exq="${n.id}|${esc(e.id)}"><input class="input" type="number" min="1" max="999" step="1" value="1" inputmode="numeric" aria-label="Число копий"><span class="faint">×</span></span>`:''}<b>${e.pct ? '+' + e.pct + '%' : fmtMoney(e.price)}</b></label>`}).join('')}
+              ${extras.map(e=>{const isSub=!!e.parent;const qty = /копи|распечат|экземпляр/i.test(e.unit||'');return `<label class="svc-row check${isSub?' svc-row--sub':''}" data-search="${esc(norm(n.name+' '+(e.name||'')+' '+(e.unit||'')+(e.pct?' процент':'')))}"><input type="checkbox" data-ex="${n.id}|${esc(e.id)}|${Number(e.price)||0}|${Number(e.pct)||0}" data-qty="1"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${isSub?`<span class="faint">└ </span>`:''}${esc(e.name)} <span class="faint">${esc(e.unit || (e.pct ? '% от стоимости' : ''))}</span></span>${qty?`<span class="calc-qty" data-exq="${n.id}|${esc(e.id)}" title="Число копий — подставится в сумму как «N × цена»"><span class="faint">×</span><input class="input" type="number" min="1" max="999" step="1" value="1" inputmode="numeric" aria-label="Число копий"></span>`:''}<b>${e.pct ? '+' + e.pct + '%' : fmtMoney(e.price)}</b></label>`}).join('')}
             </div>`;
           }).join('') + '<div id="cx-svc-empty" class="small faint" hidden style="padding:8px 0">Ничего не найдено</div>';
           filterSvcs();
