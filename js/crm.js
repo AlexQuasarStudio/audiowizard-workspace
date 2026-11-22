@@ -5617,7 +5617,7 @@ const wrap = root.querySelector('.pl-wrap');
       narrow:true, tall:true, noFit:true, title:'Калькулятор услуг', route:'orders', persistKey: onResult ? '' : 'calculator',
       body:`<div class="calc-display">
           <input class="expr" id="cx-in" placeholder="например: 2.5 × 1800 + 5600" autocomplete="off" spellcheck="false" aria-label="Выражение">
-          <div class="cx-valrow"><div class="val" id="cx-val">0</div><label class="cx-copies" id="cx-copies-wrap" hidden><span>×</span><input class="input" id="cx-copies" type="number" min="1" max="999" step="1" value="1" inputmode="numeric" aria-label="Число дополнительных копий"><span class="faint">копий</span></label></div>
+          <div class="cx-valrow"><div class="val" id="cx-val">0</div></div>
         </div>
         <div class="small faint" style="margin-top:6px">Поддерживаются + − × ÷ ( ) % и запятая как десятичный разделитель · Enter — в результат</div>
         <div class="card card-pad" style="margin-top:10px;background:var(--panel-2)">
@@ -6096,37 +6096,31 @@ const wrap = root.querySelector('.pl-wrap');
         /* Показываем в поле множители надбавок и промокода. База хранится
            отдельно: иначе скидка и надбавка посчитались бы дважды. */
         const fixedTerms = () => picked().filter(x => x.kind === 'ex' && !x.pct)
-          .map(x => (x.multi && x.qty > 1 ? `${x.qty} × ${x.unitPrice}` : `${x.unitPrice}`));
-        /* Число копий: поле появляется, как только выбрана распечатка. */
-        const copiesOpt = () => {
-          const nid = g2('#cx-niche') ? g2('#cx-niche').value : '';
-          /* Распечатка не обязана стоять первой в списке выбранного. */
-          const all = [...mask.querySelectorAll('[data-ex]:checked')].map(x => {
-            const q = (x.dataset.ex || '').split('|');
-            return { el:x, def:calcExtrasFor(q[0]).find(y => y && y.id === q[1]) || {} };
-          }).filter(x => /копи|распечат|экземпляр/i.test(x.def.unit || ''));
-          const el = (all.find(x => x.def.parent) || all[0] || {}).el;
-          if (!el) return null;
-          const p = (el.dataset.ex || '').split('|');
-          const def = calcExtrasFor(p[0]).find(x => x && x.id === p[1]);
-          const unit = (def && (def.unit || p[4])) || '';
-          const many = /копи|распечат|экземпляр/i.test(unit) || !!(def && def.multi);
-          return (many && p[0] === nid) ? { nid:p[0], eid:p[1], el, multi:!!def.multi } : null;
+          .map(x => (isMany(calcExtrasFor(x.nid).find(y => y && y.id === x.name)) && x.qty > 1 ? `${x.qty} × ${x.unitPrice}` : `${x.unitPrice}`));
+        /* Число копий вводится прямо в пункте распечатки: у своей строки
+           в калькуляторе есть счётчик × N (по умолчанию 1). */
+        const copiesSel = nid => {
+          const list = calcExtrasFor(nid).filter(e => /копи|распечат|экземпляр/i.test(e.unit || ''));
+          /* Подпункт («доп. копия») — та строка, где и вводят число. */
+          return (list.find(e => e.parent) || list[0] || {}).id || '';
         };
-        /* hidden снимает только появление: если пользователь переключил
-           выбор, поле прячем явно. */
-        const syncCopiesField = () => {
-          const wrap = g2('#cx-copies-wrap');
-          if (!wrap) return;
-          const want = !!copiesOpt();
-          if (want) wrap.removeAttribute('hidden');
-          else if (!wrap.hidden) wrap.hidden = true;
+        /* Поле ввода живёт внутри пилюли, количество — в dataset чекбокса. */
+        const copiesBox = sel2 => mask.querySelector(`[data-ex^="${sel2}|"]`);
+        const copiesInpOf = sel2 => mask.querySelector(`[data-exq="${sel2}"] input`);
+        const syncCopiesCounters = () => {
+          mask.querySelectorAll('[data-exq]').forEach(wrap => {
+            const box = copiesBox(wrap.dataset.exq);
+            const inp = wrap.querySelector('input');
+            if (!inp) return;
+            inp.value = Math.max(1, Math.round(+(box && box.dataset.qty) || 1));
+            inp.disabled = !box;
+            wrap.classList.toggle('is-off', !(box && box.checked));
+          });
         };
-        syncCopiesField();
+        syncCopiesCounters();
         const syncExpr = (promoPct = 0) => {
-          /* Поле копий зависит от выбора, а не от готовности выражения:
-             при ручном вводе autoBase ещё null, но распечатка уже выбрана. */
-          syncCopiesField();
+          /* Счётчики копий зависят от выбора, а не от готовности выражения. */
+          syncCopiesCounters();
           const inp = g2('#cx-in'); if (!inp) return;
           if (userTyping || autoBase == null) return;
           /* В поле — та же арифметика, что и в сумме: объём плюс каждая
@@ -6341,7 +6335,7 @@ const wrap = root.querySelector('.pl-wrap');
             if (!extras.length) return '';
             return `<div class="small cx-svc-group"><b style="margin-bottom:4px;display:block">${esc(n.name)}</b>
               <div class="tiny faint" data-svc-extra style="margin:6px 0 2px">Доп. опции</div>
-              ${extras.map(e=>{const isSub=!!e.parent;return `<label class="svc-row check${isSub?' svc-row--sub':''}" data-search="${esc(norm(n.name+' '+(e.name||'')+' '+(e.unit||'')+(e.pct?' процент':'')))}"><input type="checkbox" data-ex="${n.id}|${esc(e.id)}|${Number(e.price)||0}|${Number(e.pct)||0}" data-qty="1"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${isSub?`<span class="faint">└ </span>`:''}${esc(e.name)} <span class="faint">${esc(e.unit || (e.pct ? '% от стоимости' : ''))}</span></span><b>${e.pct ? '+' + e.pct + '%' : fmtMoney(e.price)}</b></label>`}).join('')}
+              ${extras.map(e=>{const isSub=!!e.parent;const qty = /копи|распечат|экземпляр/i.test(e.unit||'');return `<label class="svc-row check${isSub?' svc-row--sub':''}" data-search="${esc(norm(n.name+' '+(e.name||'')+' '+(e.unit||'')+(e.pct?' процент':'')))}"><input type="checkbox" data-ex="${n.id}|${esc(e.id)}|${Number(e.price)||0}|${Number(e.pct)||0}" data-qty="1"><span class="box"><svg><use href="#i-check-c"/></svg></span><span style="flex:1">${isSub?`<span class="faint">└ </span>`:''}${esc(e.name)} <span class="faint">${esc(e.unit || (e.pct ? '% от стоимости' : ''))}</span></span>${qty?`<span class="calc-qty" data-exq="${n.id}|${esc(e.id)}"><input class="input" type="number" min="1" max="999" step="1" value="1" inputmode="numeric" aria-label="Число копий"><span class="faint">×</span></span>`:''}<b>${e.pct ? '+' + e.pct + '%' : fmtMoney(e.price)}</b></label>`}).join('')}
             </div>`;
           }).join('') + '<div id="cx-svc-empty" class="small faint" hidden style="padding:8px 0">Ничего не найдено</div>';
           filterSvcs();
@@ -6406,16 +6400,17 @@ const wrap = root.querySelector('.pl-wrap');
           upd(true);
           setTimeout(paintNormDeadline, 0);
         });
-        /* Число копий — одно поле на всю калькуляцию. */
-        const copiesInp = g2('#cx-copies');
-        if (copiesInp){
-          copiesInp.addEventListener('input', ()=>{
-            const opt = copiesOpt();
-            if (opt) opt.el.dataset.qty = Math.max(1, Math.round(+copiesInp.value || 1));
+        /* Счётчик × N в пункте копий меняет количество только этой строки. */
+        g2('#cx-svcs').addEventListener('input', e=>{
+          const q = e.target.closest('[data-exq] input');
+          if (!q) return;
+          const wrap = q.closest('[data-exq]');
+          const box = copiesBox(wrap.dataset.exq);
+          if (box){
+            box.dataset.qty = Math.max(1, Math.round(+q.value || 1));
             upd(true);
-          });
-          copiesInp.addEventListener('focus', ()=>copiesInp.select());
-        }
+          }
+        });
         /* Услуги правятся в настройках, но выгрузить и догрузить их можно прямо здесь */
         const svcExportBtn = mask.querySelector('[data-cx-export]');
         if (svcExportBtn) svcExportBtn.onclick = ()=>{ if (window.CalcServices) window.CalcServices.exportServices('xlsx'); };

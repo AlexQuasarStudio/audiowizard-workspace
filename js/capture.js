@@ -36,23 +36,32 @@
      элемента filter:blur даёт рваный левый край (края фильтра обрезаются
      границей круга). Холст с blur + clip по кругу даёт ровный ореол. */
   const AVATAR_SEL = '.avatar,.msg__av,.chat-av,.person-av';
+  /* Маску аватара рисуем прямо в его стилях: размытые цвета и градиент
+     «стекла», с переполнением в 2 px. Медальон ШВАЦ не нужен — реверсивная
+     маска давала артефакт среза слева у sticky-аватара группы. */
   const blurAvatars = () => {
     document.querySelectorAll(AVATAR_SEL).forEach(a => {
-      if (a.querySelector('canvas[data-priv-av]')) return;
+      if (!a || a.dataset.privMask || a.querySelector('[data-priv-av]')) return;
+      /* Готовые маски из child-разметки (старые наложения) снимаем: фильтр
+         теперь живёт на самом аватаре. */
+      a.querySelectorAll('[data-priv-av]').forEach(n => n.remove());
       const r = a.getBoundingClientRect();
       if (r.width < 8 || r.height < 8) return;
-      const dpr = Math.min(2, devicePixelRatio || 1);
-      const c = document.createElement('canvas');
-      c.dataset.privAv = '1';
-      c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
-      Object.assign(c.style, { position:'absolute', inset:'0', width:'100%', height:'100%',
-        borderRadius:'inherit', backdropFilter:'blur(6px) saturate(.9)', webkitBackdropFilter:'blur(6px) saturate(.9)',
-        background:'color-mix(in srgb, var(--panel) 55%, transparent)', pointerEvents:'none', zIndex:'1' });
       if (getComputedStyle(a).position === 'static') a.style.position = 'relative';
-      a.appendChild(c);
+      if (getComputedStyle(a).overflow === 'visible') a.style.overflow = 'hidden';
+      a.style.setProperty('filter', 'blur(5px)', 'important');
+      a.style.setProperty('user-select', 'none', 'important');
+      a.dataset.privMask = '1';
     });
   };
-  const unblurAvatars = () => document.querySelectorAll('canvas[data-priv-av]').forEach(c => c.remove());
+  const unblurAvatars = () => {
+    document.querySelectorAll('[data-priv-mask]').forEach(a => {
+      a.style.removeProperty('filter');
+      a.style.removeProperty('user-select');
+      delete a.dataset.privMask;
+    });
+    document.querySelectorAll('[data-priv-av]').forEach(c => c.remove());
+  };
   const privacyOn = () => {
     const st = appSettings();
     if (!(st && st.capturePrivacy === false)){
@@ -334,15 +343,31 @@
     $('[data-cap-x]',root).onclick = close;
     $('[data-cap-save]',root).onclick = ()=>{ download(compose(), 'audiowizard-shot-'+Date.now()+'.jpg'); close(); };
     const attach = $('[data-cap-attach]',root); if (attach) attach.onclick = ()=>{ onAttach(dataUrlToFile(compose(), 'screenshot.jpg')); close(); };
-    /* Кроп — обычный инструмент: выделили область, нажали ✂ ещё раз и
-       кадр обрезан. Раньше после выделения повторное нажатие не срабатывало,
-       если фокус успевал уйти с холста. */
+    /* Кроп: нажали ✂ → клики по кадру выделяют область → кнопка
+       становится красной галочкой, и она обрезает. Раньше приходилось
+       нажимать ту же кнопку второй раз, и это было неочевидно. */
     const cropBtn = $('[data-cap-crop]',root);
-    const syncCropBtn = () => cropBtn.classList.toggle('on', shot.tool === 'crop');
+    const applyCropBtn = (() => {
+      const b = document.createElement('button');
+      b.dataset.capCropApply = '';
+      b.title = 'Применить обрезку';
+      b.setAttribute('aria-label', 'Применить обрезку');
+      b.textContent = '✓';
+      b.className = 'cap-crop-apply';
+      b.hidden = true;
+      cropBtn.after(b);
+      b.onclick = () => applyCrop();
+      return b;
+    })();
+    const syncCropBtn = () => {
+      const on = shot.tool === 'crop';
+      cropBtn.classList.toggle('on', on);
+      applyCropBtn.hidden = !(on && shot.crop && shot.crop.w >= 4 && shot.crop.h >= 4);
+    };
     cropBtn.onclick = () => {
-      if (shot.tool === 'crop' && shot.crop){ applyCrop(); syncCropBtn(); return; }
+      if (shot.tool === 'crop' && shot.crop){ applyCrop(); return; }
       shot.tool='crop'; shot.crop=null; canvas.style.cursor='crosshair'; syncCropBtn();
-      toast('Выделите область и нажмите ✂ снова — кадр обрежется','info');
+      toast('Обведите нужную область на кадре, затем нажмите «✓»','info');
     };
     canvas.addEventListener('pointerdown', e => {
       if (shot.tool !== 'crop') return;
@@ -351,11 +376,11 @@
     canvas.addEventListener('pointermove', e => {
       if (shot.tool !== 'crop' || !drag) return; const p=pt(e); shot.crop={x:Math.min(drag.x,p.x),y:Math.min(drag.y,p.y),w:Math.abs(p.x-drag.x),h:Math.abs(p.y-drag.y)}; draw();
     }, true);
-    canvas.addEventListener('pointerup', ()=>{ if(shot.tool==='crop') drag=null; }, true);
+    canvas.addEventListener('pointerup', ()=>{ if(shot.tool==='crop'){ drag=null; syncCropBtn(); } }, true);
     function applyCrop(){
       const c=shot.crop; if(!c||c.w<4||c.h<4){toast('Сначала выделите область','warn');return;}
       const out=document.createElement('canvas'); out.width=Math.max(1,Math.round(c.w)); out.height=Math.max(1,Math.round(c.h)); out.getContext('2d').drawImage(shot.base,c.x,c.y,c.w,c.h,0,0,out.width,out.height);
-      shot.base=out; shot.crop=null; shot.shapes=[]; canvas.width=out.width; canvas.height=out.height; draw(); toast('Кроп применён','ok'); shot.tool='hand'; if (typeof syncCropBtn==='function') syncCropBtn();
+      shot.base=out; shot.crop=null; shot.shapes=[]; canvas.width=out.width; canvas.height=out.height; draw(); toast('Кроп применён','ok'); shot.tool='hand'; syncCropBtn();
     }
     function compose(){
       const out=document.createElement('canvas'); out.width=shot.base.width; out.height=shot.base.height; const x=out.getContext('2d'); x.drawImage(shot.base,0,0); shot.shapes.forEach(sh=>drawShape(x,sh));
