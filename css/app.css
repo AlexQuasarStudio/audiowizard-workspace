@@ -512,7 +512,12 @@ tr.inl-tr{animation:inlRowIn .2s var(--ease)}
 .calc-lang-item:hover{background:var(--panel-2)}
 .calc-lang-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .calc-lang-code{margin-left:auto;color:var(--faint);font-size:10.5px;font-family:var(--mono);flex:none}
-.calc-lang-rate{position:static!important;opacity:1!important;width:52px!important;height:26px!important;min-height:26px!important;padding:2px 4px!important;font-size:11px!important;text-align:right;flex:none}
+.calc-lang-rate{position:static!important;opacity:1!important;width:40px!important;height:26px!important;min-height:26px!important;padding:2px 2px 2px 6px!important;font-size:11px!important;text-align:right;flex:none;border-top-right-radius:0!important;border-bottom-right-radius:0!important}
+/* Единица рядом с числом: сразу видно, что это проценты надбавки */
+.calc-lang-rate-wrap{display:inline-flex;align-items:center;flex:none;margin-left:auto}
+.calc-lang-rate-unit{height:26px;display:inline-flex;align-items:center;padding:0 6px;border:1px solid var(--border);border-left:0;border-radius:0 7px 7px 0;background:var(--bg-2);color:var(--muted);font-size:10.5px;font-weight:650}
+.calc-lang-legend{display:inline-flex;align-items:center;gap:6px}
+.calc-lang-rate--demo{width:34px!important;height:22px!important;min-height:22px!important;border-radius:7px!important;border:1px solid var(--border)!important;background:var(--bg-2);color:var(--muted);font-size:10.5px;display:inline-flex;align-items:center;justify-content:flex-end;padding-right:4px!important}
 .calc-display .cx-valrow{display:flex;align-items:center;justify-content:flex-end;gap:10px}
 /* Числа суммы — у правого края поля ввода, как справочный итог. */
 .calc-display .val{text-align:right;margin-left:auto}
@@ -1909,7 +1914,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1506");mask-image:url("../bg/pattern-ai.svg?v=1506");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1507");mask-image:url("../bg/pattern-ai.svg?v=1507");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -1995,7 +2000,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1506");mask-image:url("../bg/pattern-ai.svg?v=1506");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1507");mask-image:url("../bg/pattern-ai.svg?v=1507");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;

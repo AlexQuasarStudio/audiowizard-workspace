@@ -9302,16 +9302,17 @@ const cm = root.querySelector('.chat-main');
         <div class="card card-pad calc-lang-card" style="background:var(--bg-2);margin-top:10px">
           <div class="row row--between" style="gap:10px;flex-wrap:wrap">
             <b class="small">Языки переводов</b>
+            <span class="small faint calc-lang-legend"><span class="calc-lang-rate calc-lang-rate--demo">10</span> надбавка за язык, %</span>
             <span class="small faint" id="calc-langs-count"></span>
           </div>
-          <p class="small muted" style="margin:6px 0 8px">Все языки Smartcat по-русски. Найдите нужные и отметьте доступные в калькуляторе.</p>
+          <p class="small muted" style="margin:6px 0 8px">Все языки Smartcat по-русски. Найдите нужные и отметьте доступные в калькуляторе. Число справа от языка — надбавка в процентах к сумме перевода: например 10 значит +10%. Если в паре два языка, берётся большая надбавка.</p>
           <div class="input-wrap">${icon('search')}<input class="input" id="calc-lang-q" type="search" placeholder="Поиск языка: немецкий, китайский…" autocomplete="off" spellcheck="false" aria-label="Поиск языка" style="padding-left:36px"></div>
           <div class="calc-lang-list" id="calc-langs">
             ${langList.map(l => `<label class="check calc-lang-item" data-lang-row data-search="${esc(norm(l.label + ' ' + l.code))}">
               <input type="checkbox" class="calc-lang-cb" value="${esc(l.code)}" ${!enabledLangs || enabledLangs.has(l.code) ? 'checked' : ''}>
               <span class="box"><svg><use href="#i-check-c"/></svg></span>
               <span class="calc-lang-name">${esc(l.label)}</span><span class="calc-lang-code">${esc(l.code)}</span>
-              <input class="input calc-lang-rate" data-lang-pct="${esc(l.code)}" type="number" min="0" max="100" step="1" title="Надбавка за язык, %" value="${Number((S.calcSettings.langPctByCode||{})[l.code] ?? S.calcSettings.langPct ?? 10)}">
+              <span class="calc-lang-rate-wrap" title="Надбавка за этот язык, % к сумме"><input class="input calc-lang-rate" data-lang-pct="${esc(l.code)}" type="number" min="0" max="100" step="1" aria-label="Надбавка за язык ${esc(l.label)}, %" value="${Number((S.calcSettings.langPctByCode||{})[l.code] ?? S.calcSettings.langPct ?? 10)}"><span class="calc-lang-rate-unit">%</span></span>
             </label>`).join('')}
           </div>
           <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
