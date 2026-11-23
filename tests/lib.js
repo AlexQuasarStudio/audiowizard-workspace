@@ -52,7 +52,9 @@ async function login(page, uid = 'u-admin'){
     const b = document.querySelector('.cookie-bar [data-ok]');
     if (b) b.click();
   });
-  /* Онбординг показывается не всем, но тестам он мешает: закрываем «Пропустить». */
+  /* Онбординг двухэтапный: сначала «Начать настройку», затем «Пропустить». */
+  const begin = await page.$('.modal--welcome [data-begin]');
+  if (begin){ await begin.click(); await page.waitForTimeout(300); }
   const skip = await page.$('.modal--welcome [data-skip]');
   if (skip){ await skip.click(); await page.waitForTimeout(350); }
   await page.evaluate(() => { if (window.Windows) Windows.closeAll(); });

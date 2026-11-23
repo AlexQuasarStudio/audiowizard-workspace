@@ -2318,7 +2318,12 @@ ex.innerHTML = avatarHTML(user(), '');
     openModal({
       narrow:true, title:'Добро пожаловать!', modalClass:'modal--welcome', hideTitle:true, dismissible:false,
       body:`${mascotsHTML('welcome-mascots--modal')}
-        <div class="welcome-hero"><span class="welcome-kicker">Audiowizard Workspace</span><h2>Добро пожаловать в свою мастерскую</h2><p>Настроим профиль за три шага: расскажите о себе, поставьте аватар и выберите оформление. Всё остальное уже готово к работе.</p></div>
+        <div class="welcome-intro" data-ob-intro>
+          <div class="welcome-hero"><span class="welcome-kicker">Audiowizard Workspace</span><h2>Добро пожаловать в свою мастерскую</h2><p>Профиль уже создан. Можно сразу настроить имя, аватар и оформление — или отложить это на потом и вернуться к работе.</p></div>
+          <p class="tiny faint welcome-intro__hint">Настройка занимает меньше минуты. Отложить можно в любой момент — приветствие вернётся при следующем входе.</p>
+        </div>
+        <div class="welcome-form is-hidden" data-ob-form>
+        <div class="welcome-hero"><span class="welcome-kicker">Настройка профиля</span><h2>Пара деталей — и готово</h2><p>Эти данные видят коллеги и заказчики. Всё можно изменить позже в настройках.</p></div>
         <div class="stack" style="gap:12px;margin-top:14px">
           <div class="field"><label>Как к вам обращаться</label><input class="input" id="ob-name" value="${esc(u2.full_name)}"></div>
           <div class="field"><label>О себе</label><textarea class="input" id="ob-about" placeholder="Пара слов для коллег" rows="2">${esc(u2.about||'')}</textarea></div>
@@ -2344,15 +2349,39 @@ ex.innerHTML = avatarHTML(user(), '');
             </div>
             <div class="tiny faint" style="margin-top:6px">Мягкий рукописный узор за интерфейсом — можно сменить позже в настройках.</div>
           </div>
+        </div>
         </div>`,
-      footer:`<button class="btn btn--ghost" data-skip>Пропустить</button><button class="btn btn--primary" data-go>Сохранить и начать тур</button>`,
+      footer:`<button class="btn btn--ghost" data-later>Отложить</button><button class="btn btn--primary" data-begin>Начать настройку</button><button class="btn btn--ghost is-hidden" data-skip>Пропустить</button><button class="btn btn--primary is-hidden" data-go>Сохранить и начать тур</button>`,
       onMount:(m2,c2)=>{
         const wm = m2.querySelector('.modal');
         const mrow = m2.querySelector('.welcome-mascots--modal');
         if (mrow && wm){ mrow.classList.add('welcome-mascots--float'); wm.appendChild(mrow); }
         if (wm){ const cx=document.createElement('button'); cx.className='modal-float-x'; cx.type='button'; cx.setAttribute('aria-label','Закрыть'); cx.textContent='×'; cx.onclick=c2; wm.appendChild(cx); }
-        /* При скролле тела окна маскоты отъезжают наверх и гаснут — не наезжают на поля. */
+        /* Два этапа: сначала только маскоты и выбор, затем — поля профиля.
+           На первом этапе нет ни скролла, ни формы. */
+        const intro = m2.querySelector('[data-ob-intro]');
+        const form = m2.querySelector('[data-ob-form]');
+        const later = m2.querySelector('[data-later]');
+        const begin = m2.querySelector('[data-begin]');
+        const skip = m2.querySelector('[data-skip]');
+        const save = m2.querySelector('[data-go]');
         const body2 = wm && wm.querySelector('.modal__b');
+        const showSetup = on => {
+          if (intro) intro.classList.toggle('is-hidden', on);
+          if (form) form.classList.toggle('is-hidden', !on);
+          if (later) later.classList.toggle('is-hidden', on);
+          if (begin) begin.classList.toggle('is-hidden', on);
+          if (skip) skip.classList.toggle('is-hidden', !on);
+          if (save) save.classList.toggle('is-hidden', !on);
+          if (body2 && on) body2.scrollTop = 0;
+        };
+        if (begin) begin.onclick = ()=>{
+          showSetup(true);
+          const n = m2.querySelector('#ob-name');
+          if (n) setTimeout(()=>n.focus(), 60);
+        };
+        if (later) later.onclick = ()=>{ c2(); };
+        /* При скролле тела окна маскоты отъезжают наверх и гаснут — не наезжают на поля. */
         if (body2) body2.addEventListener('scroll', ()=>body2.classList.toggle('is-scrolled', body2.scrollTop > 12), { passive:true });
         let avatarData = null;
         m2.querySelector('#ob-avatar').onclick = ()=>m2.querySelector('#ob-avatar-file').click();

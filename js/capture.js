@@ -225,10 +225,44 @@
   function openEditor(base, onAttach, guides={xs:[],ys:[],scale:1}) {
     if (shot) shot.root.remove();
     const root = el('div', 'cap-editor');
-    root.innerHTML = `<div class="cap-editor__stage"><canvas></canvas></div><div class="cap-tools"><button data-tool="cursor" title="Курсор — нажимать элементы приложения под снимком"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 3l14 8-6 1-3 7L5 3Z" fill="currentColor"/></svg></button><button data-tool="hand" class="on" title="Рука — двигать и растягивать выделенное, не трогая приложение"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V6.5a1.5 1.5 0 0 1 3 0V11m0 0V5a1.5 1.5 0 0 1 3 0v6m0 0V6.5a1.5 1.5 0 0 1 3 0V14c0 4.2-2.8 7-7 7H9a5.5 5.5 0 0 1-5.5-5.5v-3a1.5 1.5 0 0 1 3 0V14"/></svg></button><button data-tool="select" title="Выделить">⬚</button><button data-tool="rect" title="Прямоугольник">▭</button><button data-tool="ellipse" title="Эллипс">◯</button><button data-tool="arrow" title="Стрелка">↗</button><button data-tool="pen" title="Маркер">✎</button><button data-tool="text" title="Текст">T</button><span class="spacer"></span><button data-color="#ff5c5c" class="on" style="color:#ff5c5c">●</button><button data-color="#ffd166" style="color:#ffd166">●</button><button data-color="#4cc9f0" style="color:#4cc9f0">●</button><button data-color="#ffffff" style="color:#fff">●</button><button data-cap-undo title="Отменить">↶</button><button data-cap-redo title="Повторить">↷</button><span class="spacer"></span><button data-cap-crop title="Обрезать" aria-label="Обрезать">✂</button>${onAttach ? `<button class="btn btn--ghost btn--sm" data-cap-attach>Вложить</button>` : ''}<button data-cap-x title="Закрыть" aria-label="Закрыть">×</button><button class="cap-ready" data-cap-save title="Готово" aria-label="Готово">✓</button></div>`;
+    root.innerHTML = `<div class="cap-editor__stage"><canvas></canvas></div><div class="cap-tools"><button data-tool="cursor" title="Курсор — нажимать элементы приложения под снимком"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 3l14 8-6 1-3 7L5 3Z" fill="currentColor"/></svg></button><button data-tool="hand" class="on" title="Рука — двигать и растягивать выделенное, не трогая приложение"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V6.5a1.5 1.5 0 0 1 3 0V11m0 0V5a1.5 1.5 0 0 1 3 0v6m0 0V6.5a1.5 1.5 0 0 1 3 0V14c0 4.2-2.8 7-7 7H9a5.5 5.5 0 0 1-5.5-5.5v-3a1.5 1.5 0 0 1 3 0V14"/></svg></button><button data-tool="select" title="Выделить">⬚</button><button data-tool="rect" title="Прямоугольник">▭</button><button data-tool="ellipse" title="Эллипс">◯</button><button data-tool="arrow" title="Стрелка">↗</button><button data-tool="pen" title="Маркер">✎</button><button data-tool="text" title="Текст">T</button><span class="spacer"></span><button data-color="#ff5c5c" class="on" style="color:#ff5c5c">●</button><button data-color="#ffd166" style="color:#ffd166">●</button><button data-color="#4cc9f0" style="color:#4cc9f0">●</button><button data-color="#ffffff" style="color:#fff">●</button><button data-cap-undo title="Отменить">↶</button><button data-cap-redo title="Повторить">↷</button><span class="spacer"></span><span class="cap-zoomctl" role="group" aria-label="Масштаб"><button type="button" data-cap-zoom-out title="Уменьшить" aria-label="Уменьшить">−</button><button type="button" data-cap-zoom-val title="Сбросить масштаб" aria-label="Сбросить масштаб">100%</button><button type="button" data-cap-zoom-in title="Увеличить" aria-label="Увеличить">+</button></span><button data-cap-crop title="Обрезать" aria-label="Обрезать">✂</button>${onAttach ? `<button class="btn btn--ghost btn--sm" data-cap-attach>Вложить</button>` : ''}<button data-cap-x title="Закрыть" aria-label="Закрыть">×</button><button class="cap-ready" data-cap-save title="Готово" aria-label="Готово">✓</button></div>`;
     document.body.appendChild(root);
     const canvas = $('canvas', root), ctx = canvas.getContext('2d');
-    shot = { root, base, tool:'hand', crop: null, shapes: [], redo: [], sel:null, color:'#ff5c5c', line: 4, onAttach, canvas, guides };
+    /* Масштаб снимка: кнопки − / % / +, Ctrl/⌘+колесо и перетаскивание
+       холста рукой при увеличении. Снимок сохраняется в исходном размере —
+       масштаб только для просмотра и точной обводки. */
+    let viewZoom = 1, panX = 0, panY = 0;
+    const zoomVal = $('[data-cap-zoom-val]', root);
+    const applyView = () => {
+      canvas.style.transformOrigin = 'center center';
+      canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${viewZoom})`;
+      canvas.style.cursor = viewZoom > 1 ? 'grab' : 'crosshair';
+      if (zoomVal) zoomVal.textContent = Math.round(viewZoom * 100) + '%';
+      root.classList.toggle('is-zoomed', viewZoom > 1);
+    };
+    const setZoom = (next, ax, ay) => {
+      const prev = viewZoom;
+      viewZoom = Math.max(1, Math.min(5, +next.toFixed(2)));
+      if (viewZoom === 1){ panX = panY = 0; }
+      else if (ax != null && prev !== viewZoom){
+        /* Приближаем к точке курсора/центру, а не к левому верхнему углу. */
+        const f = viewZoom / prev - 1;
+        panX -= (ax - innerWidth / 2) * f;
+        panY -= (ay - innerHeight / 2) * f;
+      }
+      applyView();
+    };
+    shot = { root, base, tool:'hand', crop: null, shapes: [], redo: [], sel:null, color:'#ff5c5c', line: 4, onAttach, canvas, guides, get viewZoom(){return viewZoom}, get pan(){return {x:panX,y:panY}} };
+    const zoomIn = $('[data-cap-zoom-in]', root), zoomOut = $('[data-cap-zoom-out]', root);
+    if (zoomIn) zoomIn.onclick = ()=>setZoom(viewZoom * 1.25, innerWidth/2, innerHeight/2);
+    if (zoomOut) zoomOut.onclick = ()=>setZoom(viewZoom / 1.25, innerWidth/2, innerHeight/2);
+    if (zoomVal) zoomVal.onclick = ()=>setZoom(1);
+    canvas.addEventListener('wheel', e => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      setZoom(viewZoom * (e.deltaY < 0 ? 1.12 : 1/1.12), e.clientX, e.clientY);
+    }, { passive:false });
+    applyView();
     const bbox = sh => {
       if (sh.tool === 'pen' && sh.points && sh.points.length){ const xs=sh.points.map(p=>p.x), ys=sh.points.map(p=>p.y); return {x:Math.min(...xs),y:Math.min(...ys),w:Math.max(...xs)-Math.min(...xs),h:Math.max(...ys)-Math.min(...ys)}; }
       return { x:sh.x||0, y:sh.y||0, w:sh.w||0, h:sh.h||0 };
@@ -286,8 +320,10 @@
       };
       selRaf = requestAnimationFrame(step);
     };
+    let lastC = null;
     canvas.addEventListener('pointerdown', e => {
       const raw = pt(e); const p = (mode || drag) ? raw : snap(raw);
+      if (shot.tool === 'hand' && viewZoom > 1){ mode='pan'; lastC={x:e.clientX,y:e.clientY}; canvas.setPointerCapture(e.pointerId); return; }
       if (shot.tool === 'text'){ inlineText(p); return; }
       if (shot.tool === 'hand' || shot.tool === 'select'){ const h=handleAt(p); if(h){ mode=h; last=p; shot._orig=JSON.parse(JSON.stringify(shot.sel)); canvas.setPointerCapture(e.pointerId); return; } const s=hit(p);
         /* Повторный клик по уже выделенному элементу снимает выделение. */
@@ -296,6 +332,15 @@
       drag = p; const sh = startShape(p); shot.shapes.push(sh); shot.sel=null; canvas.setPointerCapture(e.pointerId); draw();
     });
     canvas.addEventListener('pointermove', e => {
+      if (mode === 'pan' && lastC){
+        panX += e.clientX - lastC.x; panY += e.clientY - lastC.y;
+        /* Не даём утащить кадр целиком за пределы сцены. */
+        const r = canvas.getBoundingClientRect();
+        const limX = Math.max(120, r.width / 2), limY = Math.max(120, r.height / 2);
+        panX = Math.max(-limX, Math.min(limX, panX));
+        panY = Math.max(-limY, Math.min(limY, panY));
+        lastC={x:e.clientX,y:e.clientY}; applyView(); return;
+      }
       const raw=pt(e); const p=(mode||drag)?raw:snap(raw);
       if (mode && shot.sel){ const s=shot.sel,o=shot._orig; if(mode==='move'){ s.x=o.x+(p.x-last.x); s.y=o.y+(p.y-last.y); if(s.points) s.points=s.points.map(q=>({x:q.x+(p.x-last.x),y:q.y+(p.y-last.y)})); }
         else if(mode==='rot'){ const b=bbox(s); s.rot=Math.atan2(p.y-(b.y+b.h/2),p.x-(b.x+b.w/2))+Math.PI/2; }
@@ -307,7 +352,7 @@
       else { sh.w=p.x-drag.x; sh.h=p.y-drag.y; }
       draw();
     });
-    const end = () => { drag = null; mode=null; last=null; shot.snapLines=null; draw(); };
+    const end = () => { drag = null; mode=null; last=null; lastC=null; shot.snapLines=null; draw(); };
     canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end);
     root.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{ if (b.dataset.tool==='crop' && typeof syncCropBtn==='function') syncCropBtn(); shot.tool=b.dataset.tool; root.querySelectorAll('[data-tool]').forEach(x=>x.classList.toggle('on',x===b)); root.classList.toggle('is-cursor', shot.tool==='cursor'); canvas.style.cursor=shot.tool==='hand'?'grab':'crosshair'; });
     root.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{ shot.color=b.dataset.color; root.querySelectorAll('[data-color]').forEach(x=>x.classList.toggle('on',x===b)); });
@@ -380,7 +425,7 @@
     function applyCrop(){
       const c=shot.crop; if(!c||c.w<4||c.h<4){toast('Сначала выделите область','warn');return;}
       const out=document.createElement('canvas'); out.width=Math.max(1,Math.round(c.w)); out.height=Math.max(1,Math.round(c.h)); out.getContext('2d').drawImage(shot.base,c.x,c.y,c.w,c.h,0,0,out.width,out.height);
-      shot.base=out; shot.crop=null; shot.shapes=[]; canvas.width=out.width; canvas.height=out.height; draw(); toast('Кроп применён','ok'); shot.tool='hand'; syncCropBtn();
+      shot.base=out; shot.crop=null; shot.shapes=[]; canvas.width=out.width; canvas.height=out.height; draw(); toast('Кроп применён','ok'); shot.tool='hand'; setZoom(1); syncCropBtn();
     }
     function compose(){
       const out=document.createElement('canvas'); out.width=shot.base.width; out.height=shot.base.height; const x=out.getContext('2d'); x.drawImage(shot.base,0,0); shot.shapes.forEach(sh=>drawShape(x,sh));

@@ -1924,7 +1924,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1509");mask-image:url("../bg/pattern-ai.svg?v=1509");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1510");mask-image:url("../bg/pattern-ai.svg?v=1510");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2010,7 +2010,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1509");mask-image:url("../bg/pattern-ai.svg?v=1509");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1510");mask-image:url("../bg/pattern-ai.svg?v=1510");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2859,6 +2859,17 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 .modal--welcome .modal__b{padding-top:224px}
 .modal--install .modal__b{padding-top:52px}
 .modal--welcome .welcome-hero{padding-top:0}
+/* Первый этап приветствия: только маскоты и два выбора, без полей и скролла. */
+.welcome-intro{text-align:center;padding:0 4px 4px}
+.welcome-intro .welcome-hero p{max-width:360px}
+.welcome-intro__hint{max-width:330px;margin:10px auto 2px;line-height:1.55}
+.welcome-form.is-hidden,.welcome-intro.is-hidden,.modal--welcome .modal__f .is-hidden{display:none!important}
+/* В форме маскоты уже не нужны: они остаются в шапке, но не мешают полям. */
+.modal--welcome:has(.welcome-form:not(.is-hidden)) .welcome-mascots--float{opacity:.4}
+@media (max-width:520px){
+  .welcome-intro{padding:0 2px}
+  .welcome-intro__hint{max-width:290px}
+}
 .modal--install .modal__b{overflow-y:auto;overscroll-behavior:contain}
 .modal--install .modal__b .card{max-width:none}
 .share-ico{display:inline-flex;vertical-align:-4px;margin-left:4px;color:var(--accent)}
@@ -2963,4 +2974,16 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
   .tour-scene .t-tap,.tour-scene .t-grow,.tour-scene .t-slide,.tour-scene .t-stop,
   .tour-scene .t-pop,.tour-scene .t-ring{animation:none}
   .tour-scene .t-stop{opacity:1}
+}
+
+/* Масштаб снимка: − / процент / +. Кнопки компактные, чтобы панель
+   инструментов не переносилась на телефоне. */
+.cap-zoomctl{display:inline-flex;align-items:center;gap:0;border:1px solid var(--border);border-radius:9px;overflow:hidden;flex:none}
+.cap-tools .cap-zoomctl button{width:28px;height:30px;border-radius:0;border:0;font-size:16px;line-height:1}
+.cap-tools .cap-zoomctl button[data-cap-zoom-val]{width:48px;font-size:10.5px;font-weight:700;color:var(--muted);background:var(--bg-2)}
+.cap-tools .cap-zoomctl button:hover{background:var(--accent-soft);color:var(--accent)}
+.cap-editor.is-zoomed .cap-editor__stage{overflow:hidden;cursor:grabbing}
+@media (max-width:520px){
+  .cap-tools .cap-zoomctl button[data-cap-zoom-val]{width:42px}
+  .cap-tools .cap-zoomctl button{width:26px;height:28px}
 }
