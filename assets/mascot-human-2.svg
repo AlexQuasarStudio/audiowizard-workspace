@@ -1,26 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 190" role="img" aria-label="Человек с ноутбуком">
-  <!-- Плоская геометрия в духе Material: рука — единое плечо-предплечье-кисть,
-       кисти лежат на крышке ноутбука, без отдельно висящих прямоугольников. -->
-  <ellipse cx="65" cy="184" rx="29" ry="4.2" fill="#202124" opacity=".12"/>
-  <path d="M50 146h30l-2 34h-9l-4-22-4 22h-9l-2-34Z" fill="#3C4043"/>
-  <path d="M42 100c0-9 6-16 15-18h16c9 2 15 9 15 18l4 38c0 5-3 8-8 8H46c-5 0-8-3-8-8l4-38Z" fill="#34A853"/>
-  <!-- ноутбук рисуем до рук: кисти лягут поверх крышки -->
-  <path d="M86 116h28v18H86z" fill="#DADCE0"/>
-  <path d="M89 119h22v11H89z" fill="#8AB4F8"/>
-  <path d="M80 134h40l4 6H76l4-6Z" fill="#BDC1C6"/>
-  <path d="M44 104c-7 6-10 15-10 24l-1 6" fill="none" stroke="#34A853" stroke-width="11" stroke-linecap="round"/>
-  <path d="M33 130c0 6 2 10 3 14" fill="none" stroke="#E8B48C" stroke-width="9" stroke-linecap="round"/>
-  <path d="M87 104c6 5 9 12 9 19" fill="none" stroke="#34A853" stroke-width="11" stroke-linecap="round"/>
-  <path d="M96 121c1 5 0 9-1 12" fill="none" stroke="#E8B48C" stroke-width="9" stroke-linecap="round"/>
-  <path d="M57 82h16v12H57z" fill="#E8B48C"/>
-  <path d="M50 84l15 10 15-10-4-5-11 8-11-8-4 5Z" fill="#fff"/>
-  <path d="M65 88l4 3-4 22-4-22 4-3Z" fill="#FBBC05"/>
-  <circle cx="65" cy="47" r="22" fill="#E8B48C"/>
-  <path d="M43 46c0-14 10-25 22-25s22 11 22 25c-6 2-13 0-18-5-6 5-16 7-26 5Z" fill="#5F3B2E"/>
-  <ellipse cx="57" cy="49" rx="2.3" ry="2.7" fill="#202124"/>
-  <ellipse cx="73" cy="49" rx="2.3" ry="2.7" fill="#202124"/>
-  <path d="M59 58c3.6 3.2 8.4 3.2 12 0" fill="none" stroke="#9C5A3C" stroke-width="2.2" stroke-linecap="round"/>
-  <ellipse cx="50" cy="56" rx="4" ry="3" fill="#EA4335" opacity=".18"/>
-  <ellipse cx="80" cy="56" rx="4" ry="3" fill="#EA4335" opacity=".18"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 200" role="img" aria-label="Менеджер с ноутбуком">
+  <ellipse cx="65" cy="192" rx="30" ry="4" fill="#202124" opacity=".13"/>
+  <path d="M54 137h22l-2 50h-8l-3-31-3 31h-8l2-50Z" fill="#334155"/>
+  <path d="M46 184h18a4 4 0 0 1 4 4v4H42v-4a4 4 0 0 1 4-4Z" fill="#1F2937"/>
+  <path d="M66 184h18a4 4 0 0 1 4 4v4H62v-4a4 4 0 0 1 4-4Z" fill="#1F2937"/>
+  <rect x="57" y="48" width="16" height="18" rx="7" fill="#F1C7A6"/>
+  <path d="M43 66c6-5 14-8 22-8s16 3 22 8l3 69c0 5-4 8-9 8H49c-5 0-9-3-9-8l3-69Z" fill="#34A853"/>
+  <path d="M60 61h10l5 8-10 6-10-6 5-8Z" fill="#2D944A"/><path d="M60 61h10l5 8" fill="none" stroke="#F7FAFF" stroke-width="1.6" stroke-linecap="round"/>
+  <rect x="45" y="135" width="40" height="6" rx="3" fill="#1F2937" opacity=".5"/>
+  <!-- руки обхватывают ноутбук с двух сторон -->
+  <path d="M45 70c-8 12-11 26-8 39" fill="none" stroke="#2A8C46" stroke-width="11" stroke-linecap="round"/>
+  <path d="M37 117c1 6 3 10 6 13" fill="none" stroke="#F1C7A6" stroke-width="8" stroke-linecap="round"/>
+  <ellipse cx="45" cy="133" rx="6" ry="5" fill="#F1C7A6"/>
+  <path d="M85 70c8 12 11 26 8 39" fill="none" stroke="#2A8C46" stroke-width="11" stroke-linecap="round"/>
+  <path d="M93 117c-1 6-3 10-6 13" fill="none" stroke="#F1C7A6" stroke-width="8" stroke-linecap="round"/>
+  <ellipse cx="85" cy="133" rx="6" ry="5" fill="#F1C7A6"/>
+  <!-- ноутбук: крышка и клавиатура, кисти лежат на краях -->
+  <path d="M44 112h42v24H44z" fill="#DADCE0"/>
+  <path d="M48 116h34v16H48z" fill="#8AB4F8"/>
+  <path d="M53 120h16M53 126h22" stroke="#F7FAFF" stroke-width="2" stroke-linecap="round" opacity=".9"/>
+  <path d="M36 136h58l4 7H32l4-7Z" fill="#BDC1C6"/>
+  <g fill="#F1C7A6"><ellipse cx="43" cy="136" rx="7" ry="5"/><ellipse cx="87" cy="136" rx="7" ry="5"/></g>
+  <path d="M40 134c2 1 4 1 6 0M84 134c2 1 4 1 6 0" stroke="#C98F6E" stroke-width="1.3" stroke-linecap="round" fill="none"/>
+  <ellipse cx="65" cy="35" rx="18" ry="21" fill="#F1C7A6"/>
+  <circle cx="47" cy="38" r="3.6" fill="#F1C7A6"/>
+  <circle cx="83" cy="38" r="3.6" fill="#F1C7A6"/>
+  <path d="M47 34c0-15 8-24 18-24 11 0 18 10 19 25-4-2-7-5-10-9-6 6-16 9-27 8Z" fill="#2F211B"/>
+  <path d="M55 33c2-1.6 4-1.6 6 0M69 33c2-1.6 4-1.6 6 0" stroke="#2F211B" stroke-width="1.7" stroke-linecap="round" fill="none"/>
+  <circle cx="58" cy="37" r="2.1" fill="#202124"/>
+  <circle cx="72" cy="37" r="2.1" fill="#202124"/>
+  <path d="M64.8 40l-1 4.4h2.8" stroke="#C98F6E" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M59 47c3.4 2.8 7.4 2.8 11 0" stroke="#A85E45" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <ellipse cx="52" cy="44" rx="3.6" ry="2.5" fill="#EA4335" opacity=".15"/>
+  <ellipse cx="78" cy="44" rx="3.6" ry="2.5" fill="#EA4335" opacity=".15"/>
 </svg>

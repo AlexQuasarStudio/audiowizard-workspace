@@ -271,7 +271,6 @@ html[data-theme^='dark'] .mascot-art{--mascot-shell-1:color-mix(in srgb,var(--ac
 /* Робот «дышит», глаза моргают: оживляет заставку, ничего не двигая в раскладке. */
 @keyframes mascotFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
 @keyframes mascotBlink{0%,92%,100%{transform:scaleY(1)}95%,97%{transform:scaleY(.12)}}
-.mascot-svg .m-eyes{transform-box:fill-box;transform-origin:center;animation:mascotBlink 5.2s var(--ease) infinite}
 .welcome-mascot--robot .mascot-svg{animation:mascotFloat 4.6s ease-in-out infinite}
 .welcome-mascot--human img,img.welcome-mascot{animation:mascotFloat 5.4s ease-in-out infinite}
 .welcome-mascot--right img,.welcome-mascot--right{animation-delay:.7s}
@@ -1257,21 +1256,31 @@ body:not(.zen) .side{position:fixed;top:7px;left:12px;bottom:7px;height:auto;tra
   .side__balance-chev{margin-left:auto;color:var(--faint)}
   /* Мобильные чаты: одна панель на всю ширину — список ИЛИ лента.
      Класс chats-layout--withlist ставит JS (mobilePane). */
-  .chats-layout{display:block;width:100%}
-  .chats-layout .chat-list,.chats-layout .chat-main{width:100%;min-width:0}
-  .chats-layout:not(.chats-layout--withlist) .chat-list{display:none}
-  .chats-layout--withlist .chat-main{display:none}
-  .chats-layout--withlist .chat-list{display:flex}
+  .chats-layout{display:block;width:100%;position:relative;overflow:hidden}
+  /* Список и лента — два слоя: уход одного и приход другого анимируются
+     одновременно, без display:none (он и давал резкий скачок и мерцание). */
+  .chats-layout .chat-list,.chats-layout .chat-main{position:absolute;inset:0;width:100%;height:100%;min-width:0;z-index:1}
+  .chats-layout.chats-pane-anim .chat-list,
+  .chats-layout.chats-pane-anim .chat-main{transition:opacity .24s var(--ease),transform .26s var(--ease);will-change:opacity,transform;backface-visibility:hidden}
+  .chats-layout .chat-list{display:flex;opacity:0;transform:translateX(-16px);pointer-events:none}
+  .chats-layout .chat-main{display:flex;opacity:0;transform:translateX(16px);pointer-events:none}
+  .chats-layout--withlist .chat-list{opacity:1;transform:none;pointer-events:auto;z-index:2}
+  .chats-layout--withlist .chat-main{opacity:0;transform:translateX(16px);pointer-events:none;z-index:1}
+  .chats-layout:not(.chats-layout--withlist) .chat-main{opacity:1;transform:none;pointer-events:auto;z-index:2}
+  .chats-layout:not(.chats-layout--withlist) .chat-list{opacity:0;transform:translateX(-16px);pointer-events:none;z-index:1}
   .chats-layout .chat-main .chat-msgs{max-width:none;margin:0}
   /* Открытый чат на телефоне — на всю высоту экрана: список/футер остаются
      на своих местах, а лента занимает всё пространство под шапкой. */
   /* Фон панели прозрачный: сквозь неё виден общий дудл-фон приложения.
      Футер под панелью на время открытого чата гасим, иначе он просвечивал
      сквозь ленту сообщений. */
-  .view--chats.chats-chat-open{position:fixed;left:0;right:0;top:var(--head-h);bottom:0;z-index:80;display:flex;flex-direction:column;padding:0 12px 10px;background:transparent}
+  .view--chats.chats-chat-open{position:relative;left:auto;right:auto;top:auto;bottom:auto;z-index:80;display:flex;flex-direction:column;height:calc(100dvh - var(--head-h) - 12px);padding:0 12px 10px;background:transparent;overflow:hidden}
   body:has(.view--chats.chats-chat-open) .foot{opacity:0;visibility:hidden;pointer-events:none}
-  .view--chats.chats-chat-open > .page-head{display:none}
-  .view--chats.chats-chat-open > .chats-layout{flex:1 1 auto;height:100%!important;min-height:0;display:block}
+  /* Шапка не исчезает мгновенно: она складывается по высоте, поэтому
+     контейнер и лента плавно поднимаются, а при выходе так же плавно
+     опускаются на место списка. */
+  .view--chats.chats-chat-open > .page-head{max-height:0;opacity:0;margin:0!important;padding-top:0!important;padding-bottom:0!important;transform:translateY(-8px);pointer-events:none;overflow:hidden}
+  .view--chats.chats-chat-open > .chats-layout{flex:1 1 auto;height:auto!important;min-height:0;display:block}
   .view--chats.chats-chat-open .chat-main{height:100%}
 .head__burger{display:inline-flex;flex:none}
   .side__burger{display:none}
@@ -1924,7 +1933,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1510");mask-image:url("../bg/pattern-ai.svg?v=1510");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1511");mask-image:url("../bg/pattern-ai.svg?v=1511");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2010,7 +2019,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1510");mask-image:url("../bg/pattern-ai.svg?v=1510");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1511");mask-image:url("../bg/pattern-ai.svg?v=1511");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2838,7 +2847,9 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 .cap-tools button:hover,.cap-tools button.on{background:var(--accent-soft);color:var(--accent)}
 .cap-tools .spacer{width:8px}
 .cap-tools .cap-crop-apply{width:34px!important;height:34px!important;border-radius:9px!important;background:var(--green,#30a46c)!important;color:#fff!important;font-size:16px!important;font-weight:800}
-.cap-editor .cap-tools{position:static;left:auto;bottom:auto;transform:none;flex:none;margin:0 auto 12px;max-width:calc(100vw - 16px);flex-wrap:wrap;justify-content:center;row-gap:2px}
+/* Панель снимка — поверх кадра, как у записи: не отнимает высоту у сцены
+   и не сдвигает картинку при появлении. */
+.cap-editor .cap-tools{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:8100;flex:none;margin:0;width:max-content;max-width:calc(100vw - 16px);flex-wrap:wrap;justify-content:center;row-gap:2px;pointer-events:auto}
 .cap-tools .cap-ready{width:44px!important;height:44px!important;border-radius:50%!important;background:var(--red)!important;color:#fff!important;font-size:21px!important;font-weight:800;box-shadow:0 8px 22px rgba(190,60,60,.4);margin-left:4px}
 .cap-tools .cap-ready:hover{filter:brightness(1.08);background:var(--red)!important;color:#fff!important}
 
@@ -2865,7 +2876,11 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 .welcome-intro__hint{max-width:330px;margin:10px auto 2px;line-height:1.55}
 .welcome-form.is-hidden,.welcome-intro.is-hidden,.modal--welcome .modal__f .is-hidden{display:none!important}
 /* В форме маскоты уже не нужны: они остаются в шапке, но не мешают полям. */
-.modal--welcome:has(.welcome-form:not(.is-hidden)) .welcome-mascots--float{opacity:.4}
+/* На втором этапе маскоты с человечками больше не показываем: форма
+   начинается сверху, без пустого места под ними. */
+.modal--welcome.is-setup .welcome-mascots--float{opacity:0;pointer-events:none;transform:translateY(-18px) scale(.92)}
+.modal--welcome.is-setup .modal__b{padding-top:18px;transition:padding-top .28s var(--ease)}
+.modal--welcome .modal__b{transition:padding-top .28s var(--ease)}
 @media (max-width:520px){
   .welcome-intro{padding:0 2px}
   .welcome-intro__hint{max-width:290px}

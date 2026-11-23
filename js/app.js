@@ -1411,7 +1411,7 @@ const QUICK_BY_ROLE = {
       <circle cx="72" cy="94" r="2.2" fill="var(--mascot-pupil,#fff)" stroke="none"/>
       <circle cx="112" cy="94" r="2.2" fill="var(--mascot-pupil,#fff)" stroke="none"/>
     </g>
-    <path d="M79 111c3.6 4.8 7.4 6.2 11 6.2s7.4-1.4 11-6.2" fill="none" stroke="var(--mascot-mouth,#5a3f78)" stroke-width="3.8"/>
+    <path d="M78 112c4 5 8 6.5 12 6.5s8-1.5 12-6.5" fill="none" stroke="var(--mascot-mouth,#5a3f78)" stroke-width="3.6"/>
     <rect x="44" y="146" width="92" height="44" rx="20" fill="#fff"/>
     <circle cx="66" cy="168" r="5" fill="var(--accent)" stroke="none"/>
     <circle cx="82" cy="168" r="5" fill="color-mix(in srgb,var(--accent) 62%,#fff)" stroke="none"/>
@@ -1441,7 +1441,7 @@ const QUICK_BY_ROLE = {
       <circle cx="72" cy="96" r="2" fill="var(--mascot-pupil,#fff)" stroke="none"/>
       <circle cx="112" cy="96" r="2" fill="var(--mascot-pupil,#fff)" stroke="none"/>
     </g>
-    <path d="M79 115c3.6-4 7.4 4 11 0s7.4 4 11 0" fill="none" stroke="var(--mascot-mouth,#5a3f78)" stroke-width="3.4"/>
+    <path d="M78 116c4-4 8 4 12 0s8 4 12 0" fill="none" stroke="var(--mascot-mouth,#5a3f78)" stroke-width="3.4"/>
     <path d="M128 82c-4 6-3 12 1 12 4 0 5-6 1-12Z" fill="var(--accent-2,var(--accent))" stroke="var(--mascot-line,#3b3155)" stroke-width="2"/>
     <rect x="44" y="146" width="92" height="44" rx="20" fill="#fff"/>
     <circle cx="66" cy="168" r="5" fill="var(--accent)" stroke="none"/>
@@ -2367,6 +2367,7 @@ ex.innerHTML = avatarHTML(user(), '');
         const save = m2.querySelector('[data-go]');
         const body2 = wm && wm.querySelector('.modal__b');
         const showSetup = on => {
+          if (wm) wm.classList.toggle('is-setup', on);
           if (intro) intro.classList.toggle('is-hidden', on);
           if (form) form.classList.toggle('is-hidden', !on);
           if (later) later.classList.toggle('is-hidden', on);
@@ -2454,16 +2455,31 @@ ex.innerHTML = avatarHTML(user(), '');
   }
   function startTour(i){
     if (i >= TOUR.length){ user().tour_completed = true; saveState(); toast('Тур завершён — отличная работа!','ok'); setTimeout(showInstallHint, 260); return; }
+    /* Старые карточки убираем до расчёта новой: иначе они копятся и
+       перекрывают друг друга при быстрых переходах. */
+    document.querySelectorAll('.tour-card,.tour-spot').forEach(n=>n.remove());
     const step = TOUR[i];
-    const el = $(step.sel);
-    if (!el){ startTour(i+1); return; }
-    const r = el.getBoundingClientRect();
-    const spot = document.createElement('div'); spot.className = 'tour-spot';
-    Object.assign(spot.style, { left:r.left-6+'px', top:r.top-6+'px', width:r.width+12+'px', height:r.height+12+'px' });
+    /* Шаг без привязки к элементу (сцены окон) показываем по центру, а не
+       пропускаем: раньше `$(undefined)` давал null и тур перепрыгивал
+       сразу несколько шагов. */
+    const el = step.sel ? $(step.sel) : null;
+    const r = el ? el.getBoundingClientRect() : null;
+    const hasSpot = !!(r && r.width > 2 && r.height > 2 && r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth);
+    let spot = null;
+    if (hasSpot){
+      spot = document.createElement('div'); spot.className = 'tour-spot';
+      Object.assign(spot.style, { left:r.left-6+'px', top:r.top-6+'px', width:r.width+12+'px', height:r.height+12+'px' });
+    }
     const card = document.createElement('div'); card.className = 'tour-card';
-    const cardH = step.scene ? 340 : 200;
-    const top = Math.max(14, Math.min(innerHeight - cardH - 8, r.bottom + 14 + cardH > innerHeight ? r.top - cardH : r.bottom + 14));
-    const left = Math.min(Math.max(14, r.left), innerWidth - 346);
+    const cardH = step.scene ? 360 : 200;
+    let top, left;
+    if (hasSpot){
+      top = Math.max(14, Math.min(innerHeight - cardH - 8, r.bottom + 14 + cardH > innerHeight ? r.top - cardH : r.bottom + 14));
+      left = Math.max(14, Math.min(r.left, innerWidth - 346));
+    } else {
+      top = Math.max(14, Math.round((innerHeight - cardH) / 2));
+      left = Math.max(14, Math.round((innerWidth - Math.min(346, innerWidth - 28)) / 2));
+    }
     Object.assign(card.style, { top: top+'px', left: left+'px' });
     card.classList.toggle('tour-card--video', !!step.video);
     card.innerHTML = `
@@ -2474,9 +2490,10 @@ ex.innerHTML = avatarHTML(user(), '');
         <button class="btn btn--ghost btn--sm" data-skip>Пропустить</button>
         <button class="btn btn--primary btn--sm" data-next>${i===TOUR.length-1?'Готово':'Далее'} ${icon('arrow-r','ico-sm')}</button>
       </div>`;
-    document.body.appendChild(spot); document.body.appendChild(card);
-    card.querySelector('[data-skip]').onclick = ()=>{ spot.remove(); card.remove(); user().tour_completed = true; saveState(); setTimeout(showInstallHint, 260); };
-    card.querySelector('[data-next]').onclick = ()=>{ spot.remove(); card.remove(); startTour(i+1); };
+    if (spot) document.body.appendChild(spot);
+    document.body.appendChild(card);
+    card.querySelector('[data-skip]').onclick = ()=>{ if (spot) spot.remove(); card.remove(); user().tour_completed = true; saveState(); setTimeout(showInstallHint, 260); };
+    card.querySelector('[data-next]').onclick = ()=>{ if (spot) spot.remove(); card.remove(); startTour(i+1); };
   }
 
   /* ---------- Cookie banner ---------- */
@@ -4576,8 +4593,12 @@ ex.innerHTML = avatarHTML(user(), '');
     const mobilePane = (showList) => {
       const lay = root.querySelector('.chats-layout');
       const list = root.querySelector('.chat-list');
+      const main = root.querySelector('.chat-main');
       const back = root.querySelector('#chat-back');
       if (!lay) return;
+      /* Переходы включаем после первого кадра: при первичной раскладке
+         список уже должен стоять на месте, без анимации из пустоты. */
+      if (!lay.classList.contains('chats-pane-anim')) requestAnimationFrame(()=>lay.classList.add('chats-pane-anim'));
       if (!isMobileChats()){
         lay.classList.remove('chats-layout--withlist');
         root.classList.remove('chats-chat-open');
@@ -4587,7 +4608,8 @@ ex.innerHTML = avatarHTML(user(), '');
       }
       lay.classList.toggle('chats-layout--withlist', showList);
       root.classList.toggle('chats-chat-open', !showList);
-      if (list) list.classList.toggle('open', showList);
+      if (list){ list.classList.toggle('open', showList); list.setAttribute('aria-hidden', showList ? 'false' : 'true'); list.inert = !showList; }
+      if (main){ main.setAttribute('aria-hidden', showList ? 'true' : 'false'); main.inert = showList; }
       if (back) back.style.display = showList ? 'none' : 'flex';
     };
     window.__chatsMobilePane = mobilePane;
