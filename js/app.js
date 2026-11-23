@@ -1402,16 +1402,16 @@ const QUICK_BY_ROLE = {
     <rect x="151" y="82" width="15" height="40" rx="7.5" fill="var(--accent-2,var(--accent))"/>
     <rect x="30" y="56" width="120" height="88" rx="30" fill="#fff"/>
     <rect x="46" y="73" width="88" height="54" rx="21" fill="var(--mascot-screen,color-mix(in srgb,var(--accent) 16%,#fff))" stroke="none"/>
-    <ellipse cx="58" cy="112" rx="7" ry="4.4" fill="var(--mascot-cheek)" opacity="var(--mascot-cheek-op,.55)" stroke="none"/>
-    <ellipse cx="122" cy="112" rx="7" ry="4.4" fill="var(--mascot-cheek)" opacity="var(--mascot-cheek-op,.55)" stroke="none"/>
+    <ellipse cx="58" cy="115" rx="7.5" ry="4.3" fill="var(--mascot-cheek)" opacity="var(--mascot-cheek-op,.55)" stroke="none"/>
+    <ellipse cx="122" cy="115" rx="7.5" ry="4.3" fill="var(--mascot-cheek)" opacity="var(--mascot-cheek-op,.55)" stroke="none"/>
     <path d="M60 84c5-4 11-4 16 0M104 84c5-4 11-4 16 0" fill="none" stroke="var(--mascot-brow,#4a3563)" stroke-width="3.4"/>
     <g class="m-eyes">
-      <circle cx="70" cy="97" r="7" fill="var(--mascot-eye,#202124)" stroke="none"/>
-      <circle cx="110" cy="97" r="7" fill="var(--mascot-eye,#202124)" stroke="none"/>
+      <ellipse cx="70" cy="97" rx="6.8" ry="9" fill="var(--mascot-eye,#202124)" stroke="none"/>
+      <ellipse cx="110" cy="97" rx="6.8" ry="9" fill="var(--mascot-eye,#202124)" stroke="none"/>
       <circle cx="72" cy="94" r="2.2" fill="var(--mascot-pupil,#fff)" stroke="none"/>
       <circle cx="112" cy="94" r="2.2" fill="var(--mascot-pupil,#fff)" stroke="none"/>
     </g>
-    <path d="M78 112c4 5 8 6.5 12 6.5s8-1.5 12-6.5" fill="none" stroke="var(--mascot-mouth,#5a3f78)" stroke-width="3.6"/>
+    <path d="M77 112c4.6 5.6 8.6 7.8 13 7.8s8.4-2.2 13-7.8" fill="none" stroke="var(--mascot-mouth,#5a3f78)" stroke-width="3.6"/>
     <rect x="44" y="146" width="92" height="44" rx="20" fill="#fff"/>
     <circle cx="66" cy="168" r="5" fill="var(--accent)" stroke="none"/>
     <circle cx="82" cy="168" r="5" fill="color-mix(in srgb,var(--accent) 62%,#fff)" stroke="none"/>
@@ -1432,16 +1432,16 @@ const QUICK_BY_ROLE = {
     <rect x="151" y="82" width="15" height="40" rx="7.5" fill="var(--accent-2,var(--accent))"/>
     <rect x="30" y="56" width="120" height="88" rx="30" fill="#fff"/>
     <rect x="46" y="73" width="88" height="54" rx="21" fill="var(--mascot-screen,color-mix(in srgb,var(--accent) 16%,#fff))" stroke="none"/>
-    <ellipse cx="58" cy="112" rx="7" ry="4.4" fill="var(--mascot-cheek)" opacity="var(--mascot-cheek-op,.55)" stroke="none"/>
-    <ellipse cx="122" cy="112" rx="7" ry="4.4" fill="var(--mascot-cheek)" opacity="var(--mascot-cheek-op,.55)" stroke="none"/>
+    <ellipse cx="58" cy="115" rx="7.5" ry="4.3" fill="var(--mascot-cheek)" opacity="var(--mascot-cheek-op,.55)" stroke="none"/>
+    <ellipse cx="122" cy="115" rx="7.5" ry="4.3" fill="var(--mascot-cheek)" opacity="var(--mascot-cheek-op,.55)" stroke="none"/>
     <path d="M58 89c5-5 10-4 15 1M107 90c4-5 9-6 15-1" fill="none" stroke="var(--mascot-brow,#4a3563)" stroke-width="3.4"/>
     <g class="m-eyes">
-      <circle cx="70" cy="99" r="6.4" fill="var(--mascot-eye,#202124)" stroke="none"/>
-      <circle cx="110" cy="99" r="6.4" fill="var(--mascot-eye,#202124)" stroke="none"/>
+      <ellipse cx="70" cy="99" rx="6.4" ry="8.4" fill="var(--mascot-eye,#202124)" stroke="none"/>
+      <ellipse cx="110" cy="99" rx="6.4" ry="8.4" fill="var(--mascot-eye,#202124)" stroke="none"/>
       <circle cx="72" cy="96" r="2" fill="var(--mascot-pupil,#fff)" stroke="none"/>
       <circle cx="112" cy="96" r="2" fill="var(--mascot-pupil,#fff)" stroke="none"/>
     </g>
-    <path d="M78 116c4-4 8 4 12 0s8 4 12 0" fill="none" stroke="var(--mascot-mouth,#5a3f78)" stroke-width="3.4"/>
+    <path d="M77 115c4.6-4.6 8.4 4.6 13 0s8.4 4.6 13 0" fill="none" stroke="var(--mascot-mouth,#5a3f78)" stroke-width="3.4"/>
     <path d="M128 82c-4 6-3 12 1 12 4 0 5-6 1-12Z" fill="var(--accent-2,var(--accent))" stroke="var(--mascot-line,#3b3155)" stroke-width="2"/>
     <rect x="44" y="146" width="92" height="44" rx="20" fill="#fff"/>
     <circle cx="66" cy="168" r="5" fill="var(--accent)" stroke="none"/>

@@ -17,7 +17,7 @@
 <!-- Дудл-маска заставки: только вектор (SVG), без растрового тайла —
        на retina и при зуме растр давал мыло. Грузим маску до стилей и не
        показываем заставку, пока она не готова: первый кадр сразу с узором. -->
-<link rel="preload" as="image" href="bg/pattern-ai.svg?v=1511" type="image/svg+xml" fetchpriority="high">
+<link rel="preload" as="image" href="bg/pattern-ai.svg?v=1512" type="image/svg+xml" fetchpriority="high">
 <script>
   (function(){
     var h = document.documentElement;
@@ -26,7 +26,7 @@
     /* Ждём тот же preload, а не создаём второй Image: раньше узор качался
        дважды — объектом и маской. Страховка снимает заставку, если сеть
        задержалась: первый кадр важнее идеальной готовности узора. */
-    var link = document.querySelector('link[rel="preload"][as="image"][href$="pattern-ai.svg?v=1511"]');
+    var link = document.querySelector('link[rel="preload"][as="image"][href$="pattern-ai.svg?v=1512"]');
     if (link){
       link.addEventListener('load', function(){ setTimeout(done, 0); }, { once:true });
       link.addEventListener('error', done, { once:true });
@@ -34,8 +34,8 @@
     setTimeout(done, 1200);
   })();
 </script>
-<link rel="stylesheet" href="css/base.css?v=1511">
-<link rel="stylesheet" href="css/app.css?v=1511">
+<link rel="stylesheet" href="css/base.css?v=1512">
+<link rel="stylesheet" href="css/app.css?v=1512">
 </head>
 <body>
 
@@ -170,17 +170,17 @@
 
 <noscript><p style="padding:24px;color:#e8ecf4;font-family:sans-serif">Для работы Audiowizard Workspace включите JavaScript.</p></noscript>
 
-<script>window.__BUILD_NUM__ = 1511;</script>
-<script src="js/store.js?v=1511" defer></script>
-<script src="js/xlsx.js?v=1511" defer></script>
-<script src="js/ui.js?v=1511" defer></script>
-<script src="js/ai-data.js?v=1511" defer></script>
-<script src="js/ai.js?v=1511" defer></script>
-<script src="js/finance.js?v=1511" defer></script>
-<script src="js/crm.js?v=1511" defer></script>
-<script src="js/windows.js?v=1511" defer></script>
-<script src="js/navdrag.js?v=1511" defer></script>
-<script src="js/app.js?v=1511" defer></script>
-<script src="js/capture.js?v=1511" defer></script>
+<script>window.__BUILD_NUM__ = 1512;</script>
+<script src="js/store.js?v=1512" defer></script>
+<script src="js/xlsx.js?v=1512" defer></script>
+<script src="js/ui.js?v=1512" defer></script>
+<script src="js/ai-data.js?v=1512" defer></script>
+<script src="js/ai.js?v=1512" defer></script>
+<script src="js/finance.js?v=1512" defer></script>
+<script src="js/crm.js?v=1512" defer></script>
+<script src="js/windows.js?v=1512" defer></script>
+<script src="js/navdrag.js?v=1512" defer></script>
+<script src="js/app.js?v=1512" defer></script>
+<script src="js/capture.js?v=1512" defer></script>
 </body>
 </html>
