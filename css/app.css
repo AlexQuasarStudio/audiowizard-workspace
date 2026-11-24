@@ -269,6 +269,10 @@ html[data-theme^='dark'] .mascot-art{--mascot-shell-1:color-mix(in srgb,var(--ac
 /* Тёмная монохромная: робот выглядит как в светлой монохромной —
    светлый корпус и тёмный контур, а не белый на белом. */
 html[data-theme="dark-mono"] .mascot-art{--accent:#14181f;--accent-2:#3d434d;--accent-soft:rgba(20,24,31,.08);--mascot-line:#3b3155;--mascot-eye:#3b3155;--mascot-pupil:#fff;--mascot-screen:#f2f0ea;--mascot-mouth:#5a3f78;--mascot-brow:#4a3563}
+
+/* Уши робота в тёмной монохромной остаются белыми, как раньше: тёмный
+   контур на тёмном фоне их не заменяет. */
+html[data-theme="dark-mono"] .mascot-art .m-ear{fill:#fff}
 .welcome-mascots{display:flex;align-items:flex-end;justify-content:center;pointer-events:none;user-select:none}
 .welcome-mascot{display:block;object-fit:contain;flex:none}
 .mascot-svg{display:block;width:100%;height:100%}
@@ -1931,7 +1935,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1515");mask-image:url("../bg/pattern-ai.svg?v=1515");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1516");mask-image:url("../bg/pattern-ai.svg?v=1516");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2017,7 +2021,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1515");mask-image:url("../bg/pattern-ai.svg?v=1515");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1516");mask-image:url("../bg/pattern-ai.svg?v=1516");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;

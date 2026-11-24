@@ -1398,8 +1398,8 @@ const QUICK_BY_ROLE = {
   </g>
   <g stroke="var(--mascot-line,#3b3155)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
     <path d="M90 50V31" fill="none"/>
-    <rect x="14" y="82" width="15" height="40" rx="7.5" fill="var(--accent)"/>
-    <rect x="151" y="82" width="15" height="40" rx="7.5" fill="var(--accent-2,var(--accent))"/>
+    <rect class="m-ear" x="14" y="82" width="15" height="40" rx="7.5" fill="var(--accent)"/>
+    <rect class="m-ear" x="151" y="82" width="15" height="40" rx="7.5" fill="var(--accent-2,var(--accent))"/>
     <rect x="30" y="56" width="120" height="88" rx="30" fill="#fff"/>
     <rect x="46" y="73" width="88" height="54" rx="21" fill="var(--mascot-screen,color-mix(in srgb,var(--accent) 16%,#fff))" stroke="none"/>
     <ellipse cx="58" cy="115" rx="7.5" ry="4.3" fill="var(--mascot-cheek)" opacity="var(--mascot-cheek-op,.55)" stroke="none"/>
@@ -1428,8 +1428,8 @@ const QUICK_BY_ROLE = {
   </g>
   <g stroke="var(--mascot-line,#3b3155)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
     <path d="M90 50V31" fill="none"/>
-    <rect x="14" y="82" width="15" height="40" rx="7.5" fill="var(--accent)"/>
-    <rect x="151" y="82" width="15" height="40" rx="7.5" fill="var(--accent-2,var(--accent))"/>
+    <rect class="m-ear" x="14" y="82" width="15" height="40" rx="7.5" fill="var(--accent)"/>
+    <rect class="m-ear" x="151" y="82" width="15" height="40" rx="7.5" fill="var(--accent-2,var(--accent))"/>
     <rect x="30" y="56" width="120" height="88" rx="30" fill="#fff"/>
     <rect x="46" y="73" width="88" height="54" rx="21" fill="var(--mascot-screen,color-mix(in srgb,var(--accent) 16%,#fff))" stroke="none"/>
     <ellipse cx="58" cy="115" rx="7.5" ry="4.3" fill="var(--mascot-cheek)" opacity="var(--mascot-cheek-op,.55)" stroke="none"/>
