@@ -1428,6 +1428,9 @@ body.menu-dragging .main .theme-card:hover{box-shadow:none!important;transform:n
 
 /* ---------- Многооконность ---------- */
 #windows-layer{position:fixed;inset:0;pointer-events:none;z-index:3000;overflow:hidden}
+.tour-card.tour-card--out{animation:tourCardOut .18s var(--ease) forwards;pointer-events:none}
+@keyframes tourCardOut{to{opacity:0;transform:translateY(-5px) scale(.98)}}
+.tour-spot.tour-spot--out{opacity:0;transition:opacity .18s var(--ease)}
 .tour-card{position:fixed;z-index:1601;width:330px;max-width:calc(100vw - 28px);background:var(--panel);border:1px solid var(--border-2);border-radius:16px;box-shadow:var(--sh-2);padding:18px;animation:popIn .4s var(--ease)}
 .tour-card--video{width:390px}
 /* Сцена тура — вектор: масштабируется без потерь и не выходит за карточку. */
@@ -1935,7 +1938,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1516");mask-image:url("../bg/pattern-ai.svg?v=1516");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1517");mask-image:url("../bg/pattern-ai.svg?v=1517");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2021,7 +2024,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1516");mask-image:url("../bg/pattern-ai.svg?v=1516");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1517");mask-image:url("../bg/pattern-ai.svg?v=1517");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2888,6 +2891,10 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
   .welcome-intro__hint{max-width:290px}
 }
 .modal--install .modal__b{overflow-y:auto;overscroll-behavior:contain}
+/* Нижние углы приветствия и подсказки установки: футер с фоном не должен
+   закрывать скругление корпуса. */
+.modal--welcome .modal__f,.modal--install .modal__f{border-radius:0 0 18px 18px;overflow:hidden;background-clip:padding-box}
+.modal--install .modal__b{border-radius:18px 18px 0 0}
 .modal--install .modal__b .card{max-width:none}
 .share-ico{display:inline-flex;vertical-align:-4px;margin-left:4px;color:var(--accent)}
 .share-ico svg{width:16px;height:16px;display:block}

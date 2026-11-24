@@ -2521,9 +2521,24 @@ ex.innerHTML = avatarHTML(user(), '');
       </div>`;
     if (spot) document.body.appendChild(spot);
     document.body.appendChild(card);
-    card.querySelector('[data-skip]').onclick = ()=>{ if (spot) spot.remove(); card.remove(); user().tour_completed = true; saveState(); setTimeout(showInstallHint, 260); };
+    /* Карточка и подсветка уходят мягко: резкое remove() читалось как
+       «мигнуло и пропало», особенно на кнопке «Пропустить». */
+    const closeTour = done => {
+      card.classList.add('tour-card--out');
+      if (spot) spot.classList.add('tour-spot--out');
+      setTimeout(()=>{ if (spot) spot.remove(); card.remove(); if (done) done(); }, 190);
+    };
+    card.querySelector('[data-skip]').onclick = ()=>closeTour(()=>{
+      user().tour_completed = true; saveState(); setTimeout(showInstallHint, 260);
+    });
     card.querySelector('[data-prev]').onclick = ()=>{ if (spot) spot.remove(); card.remove(); startTour(i-1); };
-    card.querySelector('[data-next]').onclick = ()=>{ if (spot) spot.remove(); card.remove(); startTour(i+1); };
+    card.querySelector('[data-next]').onclick = ()=>{
+      if (i === TOUR.length-1){
+        closeTour(()=>{ user().tour_completed = true; saveState(); go('dash'); toast('Тур завершён — отличная работа!','ok'); setTimeout(showInstallHint, 260); });
+        return;
+      }
+      if (spot) spot.remove(); card.remove(); startTour(i+1);
+    };
   }
 
   /* ---------- Cookie banner ---------- */
@@ -10172,7 +10187,7 @@ const cm = root.querySelector('.chat-main');
         <div class="stack" style="margin-top:10px">${teamRowsHTML()}</div>
       </div>
       <div class="card card-pad" style="border-color:var(--red)">
-        <h3 style="margin-bottom:6px;color:var(--red)">Сброс демо-данных</h3>
+        <h3 style="margin-bottom:6px;color:var(--red)">Сброс данных</h3>
         <p class="small muted">Перед сбросом автоматически создаётся полный бекап. Все данные вернутся к исходному состоянию.</p>
         <button class="btn btn--danger btn--sm" id="dt-reset" style="margin-top:12px">${icon('trash')} Сбросить данные</button></div>
       <div class="card card-pad" style="margin-top:14px"><h3 style="margin-bottom:6px">Меню</h3>
@@ -11759,7 +11774,7 @@ const cm = root.querySelector('.chat-main');
 
         const resetBtn = el.querySelector('#dt-reset');
         if (resetBtn) resetBtn.onclick = async ()=>{
-          const ok = await confirmModal({ title:'Сбросить демо-данные?', okText:'Сбросить', danger:true, text:'Будет создан полный бекап, затем данные вернутся к исходным.' });
+          const ok = await confirmModal({ title:'Сбросить данные?', okText:'Сбросить', danger:true, text:'Будет создан полный бекап, затем данные вернутся к исходным.' });
           if (!ok) return;
           const pre = Migrate.createBackup('auto','pre-reset-' + Date.now() + '.json');
           if (pre && pre.error){ toast(pre.error,'err'); return; }
