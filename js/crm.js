@@ -5563,8 +5563,27 @@ const wrap = root.querySelector('.pl-wrap');
 
   /* ==================== КАЛЬКУЛЯТОР ==================== */
   function openCalculator({ onResult=null, nishId='', deadline=null } = {}){
-    const langRateFor = code => Math.max(0, Math.min(100, Number((((S.calcSettings || {}).langPctByCode || {})[code]) ?? (S.calcSettings || {}).langPct ?? 10)));
-    const langSurcharge = () => { const f = document.querySelector('#cx-lang-from'); const t = document.querySelector('#cx-lang-to'); return Math.max(langRateFor(f ? f.value : ''), langRateFor(t ? t.value : '')); };
+    /* Две направленные ставки: «с языка» и «на язык». Старое одиночное
+       значение делится пополам, чтобы сумма пары осталась прежней. */
+    const langOldRate = code => Math.max(0, Math.min(100, Number((((S.calcSettings || {}).langPctByCode || {})[code]) ?? (S.calcSettings || {}).langPct ?? 10)));
+    const langFromRate = code => Math.max(0, Math.min(100, Number((((S.calcSettings || {}).langFromPctByCode || {})[code]) ?? (langOldRate(code) / 2))));
+    const langToRate = code => Math.max(0, Math.min(100, Number((((S.calcSettings || {}).langToPctByCode || {})[code]) ?? (langOldRate(code) / 2))));
+    const langBase = code => String(code || '').split('-')[0].toLowerCase();
+    const POPULAR_LANGS = new Set(['ru','en','de','fr','es','it','pt','zh','ja','ko','ar','tr','pl','uk','nl','sv','fi','da','no','cs','ro','hu','bg','el','he','hi','id','vi','th']);
+    /* Редкая пара без общего популярного языка идёт через посредника:
+       сначала на английский, если он включён, иначе на русский. */
+    const langRoute = (from, to) => {
+      if (!from || !to || from === to) return { rate:0, via:'', legs:[], rates:[] };
+      const f = langBase(from), t = langBase(to);
+      let via = '';
+      if (!POPULAR_LANGS.has(f) && !POPULAR_LANGS.has(t) && f !== 'en' && f !== 'ru' && t !== 'en' && t !== 'ru'){
+        const enabled = new Set(CALC_LANGS.map(([code]) => code));
+        via = ['en','ru'].find(code => enabled.has(code) && code !== from && code !== to) || '';
+      }
+      const legs = via ? [[from, via], [via, to]] : [[from, to]];
+      const rates = legs.map(([a,b]) => langFromRate(a) + langToRate(b));
+      return { rate:rates.reduce((n,x)=>n+x,0), via, legs, rates };
+    };
     if (!onResult){
       window.__modalRestorers = window.__modalRestorers || {};
       window.__modalRestorers.calculator = () => openCalculator();
@@ -5660,6 +5679,11 @@ const wrap = root.querySelector('.pl-wrap');
                 </div></div>
             </div>
             <div class="tiny faint" id="cx-lang-note" style="margin-top:4px"></div>
+            <label class="check small" style="margin-top:8px" id="cx-multi-label"><input type="checkbox" id="cx-multi"><span class="box"><svg><use href="#i-check-c"/></svg></span><span>Мультиперевод — несколько языков перевода</span></label>
+            <div id="cx-multi-box" hidden style="margin-top:6px">
+              <select class="input" id="cx-lang-targets" multiple size="4" aria-label="Дополнительные языки перевода">${CALC_LANGS.map(([code,name])=>`<option value="${esc(code)}">${esc(name)}</option>`).join('')}</select>
+              <div class="tiny faint" style="margin-top:4px">Выберите дополнительные языки — каждый считается отдельной языковой парой. Ctrl/⌘ — несколько.</div>
+            </div>
           </div>
           <div class="small" id="cx-volume-note" style="margin-top:6px"></div>
           <div class="field calc-char${volUnit==='char'?' is-open':''}" id="cx-char">
@@ -5856,12 +5880,31 @@ const wrap = root.querySelector('.pl-wrap');
             input.disabled = !!s.disabled;
           });
         };
+        /* Все цели перевода: основная плюс выбранные в мультисписке. */
+        const langTargets = () => {
+          const from = g2('#cx-lang-from') ? g2('#cx-lang-from').value : '';
+          const primary = g2('#cx-lang-to') ? g2('#cx-lang-to').value : '';
+          const multiOn = g2('#cx-multi') ? g2('#cx-multi').checked : false;
+          const sel = g2('#cx-lang-targets');
+          const extras = multiOn && sel ? [...sel.selectedOptions].map(o => o.value) : [];
+          return [...new Set([primary, ...extras].filter(Boolean))].filter(t => t !== from);
+        };
+        const langSurcharge = () => {
+          const from = g2('#cx-lang-from') ? g2('#cx-lang-from').value : '';
+          return langTargets().reduce((sum,t)=>sum + langRoute(from,t).rate, 0);
+        };
         const paintLang = () => {
           const box = g2('#cx-lang-note'); if (!box) return;
           const from = g2('#cx-lang-from') ? g2('#cx-lang-from').value : '';
-          const to = g2('#cx-lang-to') ? g2('#cx-lang-to').value : '';
           const name = c => ((CALC_LANGS.find(x => x[0] === c) || [])[1]) || c;
-          box.textContent = from && to ? `Языковая пара: ${name(from)} → ${name(to)} · +${langSurcharge()}% к стоимости и сроку` : '';
+          const targets = langTargets();
+          const parts = targets.map(t => {
+            const r = langRoute(from, t);
+            return `${name(t)}${r.via ? ` через ${name(r.via)}` : ''} +${r.rate}%`;
+          });
+          box.textContent = from && targets.length
+            ? `Языковая пара: ${name(from)} → ${parts.join(' · ')}${targets.length > 1 ? ` · ${targets.length} языка, каждая пара считается отдельно` : ` · итого +${langSurcharge()}% к стоимости и сроку`}`
+            : '';
           syncLangInputs();
         };
         const paintLangVisibility = nid => {
@@ -5888,8 +5931,9 @@ const wrap = root.querySelector('.pl-wrap');
           syncLangInputs();
           paintLang();
         };
+        const applyLang = () => { paintLang(); upd(true); setTimeout(paintNormDeadline, 0); };
         ['#cx-lang-from','#cx-lang-to'].forEach(sel => {
-          const el = g2(sel); if (el) el.addEventListener('change', paintLang);
+          const el = g2(sel); if (el) el.addEventListener('change', applyLang);
         });
         const langSwap = g2('#cx-lang-swap');
         if (langSwap) langSwap.onclick = ()=>{
@@ -5898,7 +5942,7 @@ const wrap = root.querySelector('.pl-wrap');
           const t = from.value;
           from.value = to.value; to.value = t;
           syncLangInputs();
-          paintLang();
+          applyLang();
         };
         /* Комбобоксы с плавной подсказкой: скрытый select хранит значение,
            видимый input — только поиск и выбранную подпись. */
@@ -5972,14 +6016,27 @@ const wrap = root.querySelector('.pl-wrap');
         bindCalcCombo({
           input: g2('#cx-lang-from-q'), select: g2('#cx-lang-from'), list: g2('#cx-lang-from-live'),
           getItems: () => CALC_LANGS.map(([code,name]) => ({ value: code, label: name })),
-          onPick: () => { paintLang(); }
+          onPick: () => { applyLang(); }
         });
         bindCalcCombo({
           input: g2('#cx-lang-to-q'), select: g2('#cx-lang-to'), list: g2('#cx-lang-to-live'),
           getItems: () => CALC_LANGS.map(([code,name]) => ({ value: code, label: name })),
-          onPick: () => { paintLang(); }
+          onPick: () => { applyLang(); }
         });
         paintLangVisibility(initNiche);
+        /* Мультиперевод: вторая цель и более. */
+        {
+          const multiCb = g2('#cx-multi');
+          const multiBox = g2('#cx-multi-box');
+          const targetsSel = g2('#cx-lang-targets');
+          if (multiCb) multiCb.onchange = ()=>{
+            if (multiBox) multiBox.hidden = !multiCb.checked;
+            paintLang(); upd(true); setTimeout(paintNormDeadline, 0);
+          };
+          if (targetsSel) targetsSel.onchange = ()=>{
+            paintLang(); upd(true); setTimeout(paintNormDeadline, 0);
+          };
+        }
         syncVolInput();
         /* Срок по суточной норме объёма: исполнителю — объём ÷ норма,
            клиенту — тот же срок плюс настраиваемый запас (по умолчанию 30%). */
@@ -6175,11 +6232,16 @@ const wrap = root.querySelector('.pl-wrap');
           const extraPct = pctSum();
           const priced = (isNaN(val) ? 0 : val) + svcOnlySum();
           const fixed = fixedExtraSum();
-          /* Надбавка считается от всей суммы: объём плюс фиксированные
-             опции (копии, заверение) — так же, как это видно в поле. */
-          const extraFee = Math.round((priced + fixed) * extraPct / 100);
-          const langFee = langPair() ? Math.round((priced + fixed + extraFee) * langSurcharge() / 100) : 0;
-          const base = priced + fixed + extraFee + langFee;
+          const targets = langTargets();
+          const langUnits = Math.max(1, targets.length);
+          /* Каждый язык перевода — отдельный объём работы. Фиксированные
+             опции (заверение, копии) берём один раз на заказ. */
+          const pricedAll = priced * langUnits;
+          const extraFee = Math.round((pricedAll + fixed) * extraPct / 100);
+          const langFrom = g2('#cx-lang-from') ? g2('#cx-lang-from').value : '';
+          const langShare = priced + fixed / langUnits + extraFee / langUnits;
+          const langFee = targets.reduce((sum,t) => sum + Math.round(langShare * langRoute(langFrom, t).rate / 100), 0);
+          const base = pricedAll + fixed + extraFee + langFee;
           let best = null;
           promoList().filter(p => p.kind === 'volume' && hours >= (+p.minHours || 0)).forEach(p => {
             if (!best || +p.percent > +best.percent) best = { ...p, by: 'volume' };
@@ -6203,8 +6265,8 @@ const wrap = root.querySelector('.pl-wrap');
           const nid = g2('#cx-niche') ? g2('#cx-niche').value : '';
           if (nid !== 'n3') return '';
           const from = g2('#cx-lang-from') ? g2('#cx-lang-from').value : '';
-          const to = g2('#cx-lang-to') ? g2('#cx-lang-to').value : '';
-          return from && to ? from+'→'+to : '';
+          const targets = langTargets();
+          return from && targets.length ? from + '→' + targets.join('+') : '';
         };
         const metaOf = d => ({ deadline:d.deadline, rush:d.rush, rushPct:d.rushPct, rushFee:d.rushFee, nishId:d.nid,
           service: (volState().s || {}).name || '',
@@ -6249,6 +6311,7 @@ const wrap = root.querySelector('.pl-wrap');
                 } else {
                   out += `<b>${calcNum(amount)}</b>`;
                 }
+                if (d.langFee) out += ` <span class="small faint">· языки +${calcNum(d.langFee)}</span>`;
                 if (d.rush) out += ` <span class="small faint">· срочно +${d.rushPct}%</span>`;
                 if (d.minApplied) out += ` <span class="small faint">· минимум категории</span>`;
                 return out;

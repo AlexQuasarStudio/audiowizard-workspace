@@ -1938,7 +1938,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1517");mask-image:url("../bg/pattern-ai.svg?v=1517");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1518");mask-image:url("../bg/pattern-ai.svg?v=1518");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2024,7 +2024,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1517");mask-image:url("../bg/pattern-ai.svg?v=1517");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1518");mask-image:url("../bg/pattern-ai.svg?v=1518");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -3016,3 +3016,28 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
   .cap-tools .cap-zoomctl button[data-cap-zoom-val]{width:42px}
   .cap-tools .cap-zoomctl button{width:26px;height:28px}
 }
+
+/* Горячие клавиши: комбинация всегда у правого края, не у названия. */
+.key-row{display:flex;align-items:center;gap:10px}
+.key-row>span{flex:1;min-width:0}
+.key-row .kbd{margin-left:0;flex:none}
+.key-row .iconbtn{flex:none}
+
+/* Активные сессии: карточки вместо простыни строк. */
+.sess-list{display:flex;flex-direction:column;gap:8px}
+.sess-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--bg-2);min-width:0}
+.sess-item.is-current{border-color:color-mix(in srgb,var(--accent) 38%,var(--border));background:var(--accent-soft)}
+.sess-ico{width:34px;height:34px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;flex:none;background:var(--panel);color:var(--accent);border:1px solid var(--border)}
+.sess-main{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.sess-main b{font-size:12.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sess-main span{font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sess-badge{flex:none;padding:2px 7px;border-radius:99px;font-size:10px;font-weight:700;color:var(--muted);background:var(--panel);border:1px solid var(--border)}
+.sess-item.is-current .sess-badge{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 35%,var(--border));background:var(--panel)}
+@media (max-width:420px){.sess-item{align-items:flex-start}.sess-badge{margin-top:2px}}
+
+/* Языки: две ставки — «с» и «на». */
+.calc-lang-fromto{display:flex;align-items:center;gap:3px;margin-left:auto;flex:none}
+.calc-lang-rate-label{font-size:9.5px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.02em}
+.calc-lang-fromto .calc-lang-rate{width:34px!important;height:24px!important;min-height:24px!important;padding:1px 3px!important;font-size:10px!important;border-radius:6px!important}
+.calc-lang-fromto .calc-lang-rate-unit{height:24px;padding:0 3px}
+@media (max-width:520px){.calc-lang-fromto{gap:2px}.calc-lang-fromto .calc-lang-rate{width:31px!important}}

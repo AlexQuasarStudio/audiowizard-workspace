@@ -887,7 +887,7 @@ const QUICK_BY_ROLE = {
   admin:       ['order','calc','client','executor','-','chats','transcribe','texts','translate','-','shot','planner','invite','report'],
   top_manager: ['order','calc','client','executor','-','chats','transcribe','texts','translate','-','shot','invite','report'],
   manager:     ['order','calc','client','-','chats','texts','kanban','-','shot','invite','report'],
-  client:      ['order','-','chats','-','shot','report'],
+  client:      ['order','calc','-','chats','-','shot','report'],
   executor:    ['myorders','-','chats','transcribe','translate','-','shot','invite','report']
 };
 
@@ -9452,6 +9452,11 @@ const cm = root.querySelector('.chat-main');
       const langList = (typeof SMARTCAT_LANGUAGES !== 'undefined' ? SMARTCAT_LANGUAGES : [])
         .map(([code, name]) => ({ code, label: smartcatLanguageName(code, name) }))
         .sort((a, b) => a.label.localeCompare(b.label, 'ru'));
+      /* Ставки «с языка» и «на язык». Старое одно число делили пополам,
+         чтобы цена пары не выросла после перехода на два направления. */
+      const oldLangRate = code => Math.max(0, Math.min(200, Number((((S.calcSettings || {}).langPctByCode || {})[code]) ?? (S.calcSettings || {}).langPct ?? 10)));
+      const langFromVal = code => Math.max(0, Math.min(100, Number((((S.calcSettings || {}).langFromPctByCode || {})[code]) ?? (oldLangRate(code) / 2))));
+      const langToVal = code => Math.max(0, Math.min(100, Number((((S.calcSettings || {}).langToPctByCode || {})[code]) ?? (oldLangRate(code) / 2))));
       const pending = S.settings && S.settings.calcPending;
       const pendingHtml = pending ? `<div class="card card-pad" style="border-color:var(--accent);margin-bottom:12px">
         <b class="small">Изменения на согласовании</b>
@@ -9464,7 +9469,7 @@ const cm = root.querySelector('.chat-main');
         <div class="cols-2 grid" style="gap:12px">
           ${u.role==='admin'?`<div class="field"><label>Доля админа в заказе, %</label><input class="input" id="calc-admin-margin" type="number" min="0" max="100" step="1" value="${Finance.cfg().adminMargin}"></div>`:''}
           <div class="field"><label>Доля менеджера по умолчанию, %</label><input class="input" id="calc-manager-fee" type="number" min="0" max="100" step="1" value="${Finance.cfg().managerFee}"></div>
-          <div class="field"><label>Надбавка за языковую пару, %</label><input class="input" id="calc-lang-pct" type="number" min="0" max="100" step="1" value="${Number(S.calcSettings.langPct ?? 10)}"></div>
+          <div class="field"><label>Надбавка за язык по умолчанию, %</label><input class="input" id="calc-lang-pct" type="number" min="0" max="100" step="1" value="${Number(S.calcSettings.langPct ?? 10)}"></div>
         </div>
       </div>`;
       return `${pendingHtml}${financeCard}<div class="card card-pad" style="margin-bottom:12px"><h3 style="margin-bottom:6px">Гонорары менеджеров</h3>
@@ -9521,17 +9526,22 @@ const cm = root.querySelector('.chat-main');
         <div class="card card-pad calc-lang-card" style="background:var(--bg-2);margin-top:10px">
           <div class="row row--between" style="gap:10px;flex-wrap:wrap">
             <b class="small">Языки переводов</b>
-            <span class="small faint calc-lang-legend"><span class="calc-lang-rate calc-lang-rate--demo">10</span> надбавка за язык, %</span>
+            <span class="small faint calc-lang-legend"><span class="calc-lang-rate calc-lang-rate--demo">5</span> + <span class="calc-lang-rate calc-lang-rate--demo">5</span> = 10% за пару</span>
             <span class="small faint" id="calc-langs-count"></span>
           </div>
-          <p class="small muted" style="margin:6px 0 8px">Все языки Smartcat по-русски. Найдите нужные и отметьте доступные в калькуляторе. Число справа от языка — надбавка в процентах к сумме перевода: например 10 значит +10%. Если в паре два языка, берётся большая надбавка.</p>
+          <p class="small muted" style="margin:6px 0 8px">Все языки Smartcat по-русски. Найдите нужные и отметьте доступные в калькуляторе. Для каждого языка две ставки: «с» — когда язык оригинал, «на» — когда язык перевода. Надбавка пары складывается из «с» исходного и «на» целевого. Для редкой пары без общего популярного языка калькулятор строит маршрут через английский или русский и считает два плеча.</p>
           <div class="input-wrap">${icon('search')}<input class="input" id="calc-lang-q" type="search" placeholder="Поиск языка: немецкий, китайский…" autocomplete="off" spellcheck="false" aria-label="Поиск языка" style="padding-left:36px"></div>
           <div class="calc-lang-list" id="calc-langs">
             ${langList.map(l => `<label class="check calc-lang-item" data-lang-row data-search="${esc(norm(l.label + ' ' + l.code))}">
               <input type="checkbox" class="calc-lang-cb" value="${esc(l.code)}" ${!enabledLangs || enabledLangs.has(l.code) ? 'checked' : ''}>
               <span class="box"><svg><use href="#i-check-c"/></svg></span>
               <span class="calc-lang-name">${esc(l.label)}</span>
-              <span class="calc-lang-rate-wrap" title="Надбавка за этот язык, % к сумме"><input class="input calc-lang-rate" data-lang-pct="${esc(l.code)}" type="number" min="0" max="100" step="1" aria-label="Надбавка за язык ${esc(l.label)}, %" value="${Number((S.calcSettings.langPctByCode||{})[l.code] ?? S.calcSettings.langPct ?? 10)}"><span class="calc-lang-rate-unit">%</span></span>
+              <span class="calc-lang-fromto" title="Надбавка с языка и на язык, % к сумме">
+                <span class="calc-lang-rate-label">с</span><input class="input calc-lang-rate" data-lang-from="${esc(l.code)}" type="number" min="0" max="100" step="1" aria-label="Надбавка с языка ${esc(l.label)}, %" value="${langFromVal(l.code)}">
+                <span class="calc-lang-rate-unit">%</span>
+                <span class="calc-lang-rate-label">на</span><input class="input calc-lang-rate" data-lang-to="${esc(l.code)}" type="number" min="0" max="100" step="1" aria-label="Надбавка на язык ${esc(l.label)}, %" value="${langToVal(l.code)}">
+                <span class="calc-lang-rate-unit">%</span>
+              </span>
             </label>`).join('')}
           </div>
           <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
@@ -9821,11 +9831,21 @@ const cm = root.querySelector('.chat-main');
       const suspicious = realAudit.filter(a => a.entity === 'Безопасность').slice(0, 2);
       return `<div class="card card-pad"><h3 style="margin-bottom:6px">Активные сессии</h3>
         <p class="small muted" style="margin-bottom:8px">Устройства, браузеры и IP-адреса ваших сессий.</p>
-        ${(sess.length ? sess : [[{ dev:'MacBook Pro · Chrome · текущая' , ip:'—' }]]).map(s=>{
-          const devTxt = s.user ? `${s.user} · ${s.action}` : s.dev;
-          const ipTxt = s.ip || '—';
-          return `<div class="session-row">${icon('device')}<span style="flex:1"><b class="small">${esc(String(devTxt).slice(0,64))}</b><div class="cell-sub">IP ${esc(ipTxt)} · вход ${fmtTime(s.t || Date.now())}</div></span></div>`;
-        }).join('')}
+        <div class="sess-list">${(()=>{
+          const ua = navigator.userAgent || '';
+          const os = /iPhone|iPad/.test(ua) ? 'iPhone · Safari' : /Android/.test(ua) ? 'Android · Chrome' : /Mac/.test(ua) ? 'macOS · Safari' : /Windows/.test(ua) ? 'Windows · Chrome' : 'Браузер';
+          const list = sess.length ? sess : [{ ip:'—', t:Date.now() }, { ip:'—', t:Date.now() - 86400000 }, { ip:'—', t:Date.now() - 172800000 }];
+          const devices = [os, 'iPhone · Safari', 'Windows · Chrome'];
+          return list.map((s,i)=>{
+            const devTxt = s.dev || devices[i] || 'Браузер';
+            const ipTxt = s.ip || '—';
+            return `<div class="sess-item${i===0?' is-current':''}">
+              <span class="sess-ico">${icon('device')}</span>
+              <span class="sess-main"><b>${esc(String(devTxt).slice(0,64))}</b><span>IP ${esc(ipTxt)} · вход ${fmtTime(s.t || Date.now())}</span></span>
+              <span class="sess-badge">${i===0?'Текущая':'Активна'}</span>
+            </div>`;
+          }).join('');
+        })()}</div>
         <button class="btn btn--danger btn--sm" id="sec-revoke" style="margin-top:12px">${icon('exit')} Выйти на всех устройствах</button></div>
       <div class="card card-pad"><h3 style="margin-bottom:10px">Двухфакторная аутентификация</h3>
         <div class="row row--between"><span class="small">SMS-код на номер ${esc(u2.phone)}</span><button class="btn btn--soft btn--sm" id="sec-2fa">Включить</button></div>
@@ -9844,9 +9864,9 @@ const cm = root.querySelector('.chat-main');
       ];
       const fmt = c => String(c||'').split('+').map((p,i)=> i===0 ? p.toUpperCase() : (p===''?'':p.toUpperCase())).map(x=>x===' '?'SPACE':x).join(' + ');
       return `<div class="card card-pad"><h3 style="margin-bottom:12px">Горячие клавиши</h3>
-        ${defs.map(([label,id])=>`<div class="session-row" data-kbind="${id}">${icon('terminal')}<span style="flex:1" class="small">${label}</span>
-          <button class="btn btn--ghost btn--sm kbd" data-key="${id}" title="Клик — переназначить">${fmt(S.keys && S.keys[id])}</button>
-          <button class="iconbtn" data-kreset="${id}" title="Сбросить">${icon('refresh')}</button></div>`).join('')}
+        ${defs.map(([label,id])=>`<div class="session-row key-row" data-kbind="${id}">${icon('terminal')}<span class="small">${label}</span>
+          <button class="iconbtn" data-kreset="${id}" title="Сбросить">${icon('refresh')}</button>
+          <button class="btn btn--ghost btn--sm kbd" data-key="${id}" title="Клик — переназначить">${fmt(S.keys && S.keys[id])}</button></div>`).join('')}
         <p class="small faint" style="margin-top:12px">Кликните по комбинации и нажмите новую. Запись идёт в вашем браузере.</p>
         <p class="small faint" style="margin-top:6px">Ctrl и Cmd на macOS считаются одним модификатором.</p>
         <button class="btn btn--ghost btn--sm" data-kreset-all style="margin-top:10px">${icon('refresh')} Вернуть все по умолчанию</button></div>`;
@@ -10417,8 +10437,12 @@ const cm = root.querySelector('.chat-main');
         S.calcSettings.clientBufferPct = Math.max(0, Math.min(200, Number((el.querySelector('#calc-buffer')||{}).value) || 0));
         const lpEl = el.querySelector('#calc-lang-pct');
         if (lpEl) S.calcSettings.langPct = Math.max(0, Math.min(100, Number(lpEl.value) || 0));
-        const langRateMap = {};
-        el.querySelectorAll('[data-lang-pct]').forEach(inp=>{ langRateMap[inp.dataset.langPct] = Math.max(0, Math.min(100, Number(inp.value) || 0)); });
+        const langFromMap = {}, langToMap = {}, langRateMap = {};
+        el.querySelectorAll('[data-lang-from]').forEach(inp=>{ langFromMap[inp.dataset.langFrom] = Math.max(0, Math.min(100, Number(inp.value) || 0)); });
+        el.querySelectorAll('[data-lang-to]').forEach(inp=>{ langToMap[inp.dataset.langTo] = Math.max(0, Math.min(100, Number(inp.value) || 0)); });
+        Object.keys(langFromMap).forEach(code=>{ langRateMap[code] = Math.round((langFromMap[code] + (langToMap[code] || 0)) / 2); });
+        S.calcSettings.langFromPctByCode = langFromMap;
+        S.calcSettings.langToPctByCode = langToMap;
         S.calcSettings.langPctByCode = langRateMap;
         const langsSel = el.querySelector('#calc-langs');
         const chosenLangs = langsSel ? [...langsSel.querySelectorAll('.calc-lang-cb:checked')].map(o => o.value) : [];
