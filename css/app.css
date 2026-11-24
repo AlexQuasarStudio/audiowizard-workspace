@@ -264,19 +264,10 @@ body .head__mtools{
  radial-gradient(55% 55% at 51.4% 73.6%,rgba(143,120,176,.10),transparent 100%);
  pointer-events:none}
 .mascot-art{--mascot-shell-1:color-mix(in srgb,var(--accent) 24%,#fff8ff);--mascot-shell-2:color-mix(in srgb,var(--accent) 74%,#e4d4ff);--mascot-shell-3:var(--accent);--mascot-body-1:color-mix(in srgb,var(--accent) 82%,#d8c8ff);--mascot-body-2:color-mix(in srgb,var(--accent) 98%,#3f2c78);--mascot-face-1:#fffdf5;--mascot-face-2:#ffe9c9;--mascot-line:#3b3155;--mascot-eye:#3b3155;--mascot-pupil:#fff;--mascot-inset:#fff;--mascot-heart-1:#ffadad;--mascot-heart-2:#f06d8f;--mascot-glow:#ffb3c7;--mascot-blush:#ff9fb2;--mascot-spark:#ffd37a;--mascot-mouth:#5a3f78;--mascot-brow:#4a3563;--mascot-cheek:#f2839f;--mascot-cheek-op:.55}
-html[data-theme^='dark'] .mascot-art{--mascot-shell-1:color-mix(in srgb,var(--accent) 34%,#251c39);--mascot-shell-2:color-mix(in srgb,var(--accent) 82%,#3b2a5c);--mascot-shell-3:var(--accent);--mascot-body-1:color-mix(in srgb,var(--accent) 88%,#3b2d57);--mascot-body-2:color-mix(in srgb,var(--accent) 98%,#241a39);--mascot-face-1:#2b223e;--mascot-face-2:#3a2a52;--mascot-line:#f1e9ff;--mascot-eye:#f1e9ff;--mascot-pupil:#2b223e;--mascot-inset:#d8c9ff;--mascot-heart-1:#ff9fa9;--mascot-heart-2:#e95f80;--mascot-glow:#ff8fb0;--mascot-blush:#ff7e9b;--mascot-spark:#ffd37a;--mascot-mouth:#2a1d40;--mascot-brow:#2a1d40;--mascot-cheek:#ff7f9c;--mascot-cheek-op:.62}
+html[data-theme^='dark'] .mascot-art{--mascot-shell-1:color-mix(in srgb,var(--accent) 34%,#251c39);--mascot-shell-2:color-mix(in srgb,var(--accent) 82%,#3b2a5c);--mascot-shell-3:var(--accent);--mascot-body-1:color-mix(in srgb,var(--accent) 88%,#3b2d57);--mascot-body-2:color-mix(in srgb,var(--accent) 98%,#241a39);--mascot-face-1:#2b223e;--mascot-face-2:#3a2a52;--mascot-line:#f1e9ff;--mascot-eye:#3b3155;--mascot-pupil:#fff;--mascot-inset:#d8c9ff;--mascot-heart-1:#ff9fa9;--mascot-heart-2:#e95f80;--mascot-glow:#ff8fb0;--mascot-blush:#ff7e9b;--mascot-spark:#ffd37a;--mascot-mouth:#2a1d40;--mascot-brow:#2a1d40;--mascot-cheek:#ff7f9c;--mascot-cheek-op:.62}
 .welcome-mascots{display:flex;align-items:flex-end;justify-content:center;pointer-events:none;user-select:none}
 .welcome-mascot{display:block;object-fit:contain;flex:none}
 .mascot-svg{display:block;width:100%;height:100%}
-/* Робот «дышит», глаза моргают: оживляет заставку, ничего не двигая в раскладке. */
-@keyframes mascotFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
-@keyframes mascotBlink{0%,92%,100%{transform:scaleY(1)}95%,97%{transform:scaleY(.12)}}
-.welcome-mascot--robot .mascot-svg{animation:mascotFloat 4.6s ease-in-out infinite}
-.welcome-mascot--human img,img.welcome-mascot{animation:mascotFloat 5.4s ease-in-out infinite}
-.welcome-mascot--right img,.welcome-mascot--right{animation-delay:.7s}
-@media (prefers-reduced-motion:reduce){
-  .mascot-svg .m-eyes,.welcome-mascot--robot .mascot-svg,img.welcome-mascot{animation:none!important}
-}
 .welcome-mascot--robot{width:154px;height:172px;filter:drop-shadow(0 12px 18px rgba(45,34,70,.22))}
 .welcome-mascot--human{width:96px;height:140px;filter:drop-shadow(0 8px 13px rgba(45,34,70,.18))}
 .welcome-mascot--left{margin-right:-36px;transform:rotate(-4deg) translateY(4px)}
@@ -1933,7 +1924,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1512");mask-image:url("../bg/pattern-ai.svg?v=1512");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1513");mask-image:url("../bg/pattern-ai.svg?v=1513");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2019,7 +2010,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1512");mask-image:url("../bg/pattern-ai.svg?v=1512");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1513");mask-image:url("../bg/pattern-ai.svg?v=1513");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
