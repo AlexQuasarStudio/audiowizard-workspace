@@ -12,21 +12,21 @@
   <path d="M58 60h14l5 9-12 9-12-9 5-9Z" fill="#F7FAFF"/>
   <path d="M64 87l6 4-6 34-6-34 6-4Z" fill="#EA4335"/>
   <!-- рука с папкой: плечо, локоть и кисть одной линией -->
-  <path d="M45 70c-8 12-12 26-9 40" fill="none" stroke="#3367D6" stroke-width="11" stroke-linecap="round"/>
-  <path d="M35 116c1 6 5 11 12 14" fill="none" stroke="#E8B48C" stroke-width="8" stroke-linecap="round"/>
+  <path d="M45 70c-8 11-12 23-9 35" fill="none" stroke="#3367D6" stroke-width="11" stroke-linecap="round"/>
+  <path d="M35 104c1 4 3 7 5 8" fill="none" stroke="#E8B48C" stroke-width="8" stroke-linecap="round"/>
   <ellipse cx="46" cy="136" rx="6.4" ry="5.2" fill="#E8B48C"/>
   <!-- правая рука опущена, кисть у бедра -->
   <path d="M85 70c8 13 11 27 9 41" fill="none" stroke="#3367D6" stroke-width="11" stroke-linecap="round"/>
   <path d="M94 119c-1 6-3 11-7 14" fill="none" stroke="#E8B48C" stroke-width="8" stroke-linecap="round"/>
   <ellipse cx="84" cy="136" rx="6.4" ry="5.2" fill="#E8B48C"/>
   <!-- папка в левой руке, кисть поверх -->
-  <g transform="rotate(-6 47 140)">
-    <rect x="18" y="114" width="40" height="47" rx="4" fill="#FBBC05"/>
-    <rect x="23" y="120" width="30" height="7" rx="3.5" fill="#FFF8E1" opacity=".95"/>
-    <path d="M24 136h26M24 144h20M24 152h23" stroke="#FFF8E1" stroke-width="2.6" stroke-linecap="round" opacity=".85"/>
+  <g>
+    <rect x="20" y="114" width="40" height="47" rx="4" fill="#FBBC05"/>
+    <rect x="25" y="120" width="30" height="7" rx="3.5" fill="#FFF8E1" opacity=".95"/>
+    <path d="M26 136h26M26 144h20M26 152h23" stroke="#FFF8E1" stroke-width="2.6" stroke-linecap="round" opacity=".85"/>
   </g>
-  <ellipse cx="61" cy="132" rx="6.4" ry="5.2" fill="#E8B48C"/>
-  <path d="M58 130c2 1 5 1 7 0" stroke="#C98F6E" stroke-width="1.3" stroke-linecap="round" fill="none"/>
+  <ellipse cx="40" cy="112" rx="6.2" ry="5.2" fill="#E8B48C"/>
+  <path d="M37 110c2 1 5 1 7 0" stroke="#C98F6E" stroke-width="1.3" stroke-linecap="round" fill="none"/>
   <!-- голова взрослее: меньше и с посадкой на шее -->
   <ellipse cx="65" cy="35" rx="18" ry="21" fill="#E8B48C"/>
   <circle cx="47" cy="38" r="3.6" fill="#E8B48C"/>

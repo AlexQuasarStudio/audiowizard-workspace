@@ -1404,6 +1404,7 @@ const QUICK_BY_ROLE = {
     <rect x="46" y="73" width="88" height="54" rx="21" fill="var(--mascot-screen,color-mix(in srgb,var(--accent) 16%,#fff))" stroke="none"/>
     <ellipse cx="58" cy="115" rx="7.5" ry="4.3" fill="var(--mascot-cheek)" opacity="var(--mascot-cheek-op,.55)" stroke="none"/>
     <ellipse cx="122" cy="115" rx="7.5" ry="4.3" fill="var(--mascot-cheek)" opacity="var(--mascot-cheek-op,.55)" stroke="none"/>
+    <path d="M60 81c5-4 11-4 16 0M104 81c5-4 11-4 16 0" fill="none" stroke="var(--mascot-brow,#4a3563)" stroke-width="2.8"/>
     <g class="m-eyes">
       <ellipse cx="70" cy="96" rx="9.5" ry="12" fill="var(--mascot-eye,#202124)" stroke="none"/>
       <ellipse cx="110" cy="96" rx="9.5" ry="12" fill="var(--mascot-eye,#202124)" stroke="none"/>
@@ -1433,6 +1434,7 @@ const QUICK_BY_ROLE = {
     <rect x="46" y="73" width="88" height="54" rx="21" fill="var(--mascot-screen,color-mix(in srgb,var(--accent) 16%,#fff))" stroke="none"/>
     <ellipse cx="58" cy="115" rx="7.5" ry="4.3" fill="var(--mascot-cheek)" opacity="var(--mascot-cheek-op,.55)" stroke="none"/>
     <ellipse cx="122" cy="115" rx="7.5" ry="4.3" fill="var(--mascot-cheek)" opacity="var(--mascot-cheek-op,.55)" stroke="none"/>
+    <path d="M58 82c5-4 10-3 15 2M107 84c5-5 10-6 15-2" fill="none" stroke="var(--mascot-brow,#4a3563)" stroke-width="2.8"/>
     <g class="m-eyes">
       <ellipse cx="70" cy="98" rx="8.6" ry="10.6" fill="var(--mascot-eye,#202124)" stroke="none"/>
       <ellipse cx="110" cy="98" rx="8.6" ry="10.6" fill="var(--mascot-eye,#202124)" stroke="none"/>
@@ -2151,11 +2153,12 @@ ex.innerHTML = avatarHTML(user(), '');
     { sel:'[data-tour="nav"]', t:'Навигация по ролям', d:'Меню подстраивается под вашу роль: дашборд, заказы, чаты, идеи и инструменты.', scene:'nav' },
     { sel:'[data-tour="search"]', t:'Глобальный поиск', d:'Ctrl K — палетка команд: заказы, клиенты, действия и переходы. Задержка поиска < 200 мс.', scene:'search' },
     { sel:'[data-tour="bell"]', t:'Центр уведомлений', d:'Изменения заказов, патчноуты и тикеты — всё в одном месте.', scene:'bell' },
-    { sel:'[data-tour="orders-link"]', t:'Заказы', d:'Цветовые статусы строк, живые фильтры и групповые операции.', scene:'orders' },
-    { t:'Окна: свернуть и развернуть', d:'Двойной клик по шапке разворачивает окно на весь экран, повторный — возвращает прежний размер.', scene:'winSize' },
-    { t:'Окна: тащить за заголовок', d:'Заголовок — ручка перетаскивания. Окно не уезжает за край: оно упирается в границу экрана.', scene:'winDrag' },
-    { t:'Окна: правый клик по заказу', d:'Контекстное меню даёт быстрые действия без похода в карточку: статус, задача, чат.', scene:'winMenu' },
-    { sel:'[data-tour="user"]', t:'Профиль и темы', d:'Аватар, настройки, пять тем оформления и выход. Настройки сохраняются в профиле.', scene:'tasks' }
+    { sel:'[data-tour="orders-link"]', t:'Заказы', d:'Цветовые статусы строк, живые фильтры и групповые операции.', scene:'orders', route:'orders' },
+    { t:'Окна: как создать', d:'Перетащите пункт меню в рабочую область или дважды щёлкните по нему — раздел откроется в отдельном окне. То же есть в правом клике по меню: «Открыть в окне».', scene:'winCreate', route:'orders' },
+    { t:'Окна: свернуть и развернуть', d:'Двойной клик по шапке разворачивает окно на весь экран, повторный — возвращает прежний размер.', scene:'winSize', route:'orders' },
+    { t:'Окна: тащить за заголовок', d:'Заголовок — ручка перетаскивания. Окно не уезжает за край: оно упирается в границу экрана.', scene:'winDrag', route:'orders' },
+    { t:'Окна: правый клик по заказу', d:'Контекстное меню даёт быстрые действия без похода в карточку: статус, задача, чат.', scene:'winMenu', route:'orders' },
+    { sel:'[data-tour="user"]', t:'Профиль и темы', d:'Аватар, настройки, пять тем оформления и выход. Настройки сохраняются в профиле.', scene:'tasks', route:'settings' }
   ];
 
   /* Сцены 340×200: рамка окна повторяет настоящую шапку с тремя точками,
@@ -2250,6 +2253,29 @@ ex.innerHTML = avatarHTML(user(), '');
       <g class="t-fade"><rect x="24" y="112" width="292" height="22" rx="7" fill="var(--accent-soft)" opacity=".7"/></g>
       <rect x="24" y="150" width="92" height="22" rx="8" fill="var(--accent)"/>
       <rect x="36" y="157" width="62" height="8" rx="4" fill="#fff" opacity=".85"/>
+    </svg>`,
+    winCreate: `<svg class="tour-scene" viewBox="0 0 340 200" role="img" aria-label="Окно из меню: перетащить или двойной клик">
+      <rect x="10" y="12" width="104" height="176" rx="12" fill="var(--panel)" stroke="var(--border-2)"/>
+      <rect x="22" y="26" width="70" height="8" rx="4" fill="var(--border-2)"/>
+      <g class="t-menu">
+        <rect x="18" y="48" width="88" height="22" rx="7" fill="none"/>
+        <rect x="26" y="55" width="54" height="8" rx="4" fill="var(--border)"/>
+        <rect x="18" y="76" width="88" height="22" rx="7" fill="var(--accent-soft)"/>
+        <rect x="26" y="83" width="62" height="8" rx="4" fill="var(--accent)"/>
+        <rect x="18" y="104" width="88" height="22" rx="7" fill="none"/>
+        <rect x="26" y="111" width="46" height="8" rx="4" fill="var(--border)"/>
+      </g>
+      <g class="t-drag-window">
+        <rect x="110" y="70" width="66" height="36" rx="7" fill="var(--panel)" stroke="var(--accent)"/>
+        <path d="M110 80h66" stroke="var(--accent)" opacity=".45"/>
+        <rect x="118" y="88" width="40" height="6" rx="3" fill="var(--border)"/>
+      </g>
+      <rect x="190" y="34" width="138" height="132" rx="12" fill="var(--panel)" stroke="var(--border-2)" stroke-dasharray="6 5"/>
+      <rect x="204" y="48" width="84" height="9" rx="4.5" fill="var(--border-2)"/>
+      <rect x="204" y="66" width="108" height="8" rx="4" fill="var(--border)"/>
+      <rect x="204" y="82" width="92" height="8" rx="4" fill="var(--border)"/>
+      <g class="t-plus"><circle cx="258" cy="118" r="16" fill="var(--accent-soft)"/><path d="M258 110v16M250 118h16" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/></g>
+      <path d="M112 98c18 14 54 22 86 22" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 5" fill="none" opacity=".65"/>
     </svg>`,
     winSize: `<svg class="tour-scene" viewBox="0 0 340 200" role="img" aria-label="Окно: двойной клик по шапке разворачивает окно">
       <rect x="10" y="12" width="320" height="176" rx="12" fill="var(--bg-2)" stroke="var(--border)"/>
@@ -2452,11 +2478,14 @@ ex.innerHTML = avatarHTML(user(), '');
     });
   }
   function startTour(i){
-    if (i >= TOUR.length){ user().tour_completed = true; saveState(); toast('Тур завершён — отличная работа!','ok'); setTimeout(showInstallHint, 260); return; }
+    if (i >= TOUR.length){ user().tour_completed = true; saveState(); go('dash'); toast('Тур завершён — отличная работа!','ok'); setTimeout(showInstallHint, 260); return; }
     /* Старые карточки убираем до расчёта новой: иначе они копятся и
        перекрывают друг друга при быстрых переходах. */
     document.querySelectorAll('.tour-card,.tour-spot').forEach(n=>n.remove());
     const step = TOUR[i];
+    /* Шаг сам переключает раздел: про заказы и окна — на «Заказы», про
+       профиль — в настройки. Возврат на шаг назад тоже вернёт раздел. */
+    if (step.route && route.name !== step.route){ go(step.route); setTimeout(()=>startTour(i), 420); return; }
     /* Шаг без привязки к элементу (сцены окон) показываем по центру, а не
        пропускаем: раньше `$(undefined)` давал null и тур перепрыгивал
        сразу несколько шагов. */
@@ -2484,13 +2513,16 @@ ex.innerHTML = avatarHTML(user(), '');
       <div class="row row--between"><b>${step.t}</b><span class="badge c-gray">${i+1} / ${TOUR.length}</span></div>
       <p class="small muted" style="margin:8px 0 ${step.video?'10px':'14px'}">${step.d}</p>
       ${step.scene ? `<figure class="tour-figure">${TOUR_SCENES[step.scene] || ''}</figure>` : ''}
-      <div class="row row--between">
+      <div class="row tour-card__nav">
+        <button class="btn btn--ghost btn--sm" data-prev ${i===0?'hidden':''}>${icon('chev-l','ico-sm')} Назад</button>
         <button class="btn btn--ghost btn--sm" data-skip>Пропустить</button>
+        <span class="spacer"></span>
         <button class="btn btn--primary btn--sm" data-next>${i===TOUR.length-1?'Готово':'Далее'} ${icon('arrow-r','ico-sm')}</button>
       </div>`;
     if (spot) document.body.appendChild(spot);
     document.body.appendChild(card);
     card.querySelector('[data-skip]').onclick = ()=>{ if (spot) spot.remove(); card.remove(); user().tour_completed = true; saveState(); setTimeout(showInstallHint, 260); };
+    card.querySelector('[data-prev]').onclick = ()=>{ if (spot) spot.remove(); card.remove(); startTour(i-1); };
     card.querySelector('[data-next]').onclick = ()=>{ if (spot) spot.remove(); card.remove(); startTour(i+1); };
   }
 
