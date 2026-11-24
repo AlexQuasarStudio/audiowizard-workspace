@@ -14,7 +14,6 @@
   <!-- рука с папкой: плечо, локоть и кисть одной линией -->
   <path d="M45 70c-8 11-12 23-9 35" fill="none" stroke="#3367D6" stroke-width="11" stroke-linecap="round"/>
   <path d="M35 104c1 4 3 7 5 8" fill="none" stroke="#E8B48C" stroke-width="8" stroke-linecap="round"/>
-  <ellipse cx="46" cy="136" rx="6.4" ry="5.2" fill="#E8B48C"/>
   <!-- правая рука опущена, кисть у бедра -->
   <path d="M85 70c8 13 11 27 9 41" fill="none" stroke="#3367D6" stroke-width="11" stroke-linecap="round"/>
   <path d="M94 119c-1 6-3 11-7 14" fill="none" stroke="#E8B48C" stroke-width="8" stroke-linecap="round"/>

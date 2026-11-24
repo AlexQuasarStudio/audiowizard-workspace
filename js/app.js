@@ -9515,7 +9515,7 @@ const cm = root.querySelector('.chat-main');
             ${langList.map(l => `<label class="check calc-lang-item" data-lang-row data-search="${esc(norm(l.label + ' ' + l.code))}">
               <input type="checkbox" class="calc-lang-cb" value="${esc(l.code)}" ${!enabledLangs || enabledLangs.has(l.code) ? 'checked' : ''}>
               <span class="box"><svg><use href="#i-check-c"/></svg></span>
-              <span class="calc-lang-name">${esc(l.label)}</span><span class="calc-lang-code">${esc(l.code)}</span>
+              <span class="calc-lang-name">${esc(l.label)}</span>
               <span class="calc-lang-rate-wrap" title="Надбавка за этот язык, % к сумме"><input class="input calc-lang-rate" data-lang-pct="${esc(l.code)}" type="number" min="0" max="100" step="1" aria-label="Надбавка за язык ${esc(l.label)}, %" value="${Number((S.calcSettings.langPctByCode||{})[l.code] ?? S.calcSettings.langPct ?? 10)}"><span class="calc-lang-rate-unit">%</span></span>
             </label>`).join('')}
           </div>
@@ -10025,7 +10025,7 @@ const cm = root.querySelector('.chat-main');
         const has = !!(window.Migrate && Migrate.readBackup(b.id));
         const summary = b.summary ? ` · ${b.summary.users} проф. / ${b.summary.orders} зак.` : '';
         const size = b.size ? ` · ${Math.round(b.size/1024)} КБ` : '';
-        return `<div class="session-row" style="gap:8px;flex-wrap:wrap">${icon('db')}
+        return `<div class="session-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${icon('db')}
           <span style="flex:1;min-width:170px"><b class="small">${esc(b.name)}</b>
             <div class="cell-sub">${b.type==='auto'?'автоматический':'ручной'} · ${fmtDT(b.t)} · схема ${b.schema||1}${size}${summary}</div></span>
           <span class="badge ${has?'c-green':'c-gray'}">${has?'целостность ок':'только метаданные'}</span>
