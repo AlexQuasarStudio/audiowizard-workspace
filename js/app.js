@@ -2477,12 +2477,21 @@ ex.innerHTML = avatarHTML(user(), '');
       onMount:(m2,c2)=>{ const b=m2.querySelector('[data-x]'); if (b) b.onclick=c2; const wm=m2.querySelector('.modal'); if(wm){ const cx=document.createElement('button'); cx.className='modal-float-x'; cx.type='button'; cx.setAttribute('aria-label','Закрыть'); cx.textContent='×'; cx.onclick=c2; wm.appendChild(cx); } }
     });
   }
+  let tourKeyHandler = null;
+  function tourSteps(){
+    /* На телефоне оконный режим — это sheet без перетаскивания и ресайза,
+       поэтому шаги про окна там только путают. */
+    return isNarrowUI() ? TOUR.filter(s => !String(s.scene||'').startsWith('win')) : TOUR;
+  }
   function startTour(i){
-    if (i >= TOUR.length){ user().tour_completed = true; saveState(); go('dash'); toast('Тур завершён — отличная работа!','ok'); setTimeout(showInstallHint, 260); return; }
+    if (tourKeyHandler){ document.removeEventListener('keydown', tourKeyHandler); tourKeyHandler = null; }
+    const steps = tourSteps();
+    if (i < 0) i = 0;
+    if (i >= steps.length){ user().tour_completed = true; saveState(); go('dash'); toast('Тур завершён — отличная работа!','ok'); setTimeout(showInstallHint, 260); return; }
     /* Старые карточки убираем до расчёта новой: иначе они копятся и
        перекрывают друг друга при быстрых переходах. */
     document.querySelectorAll('.tour-card,.tour-spot').forEach(n=>n.remove());
-    const step = TOUR[i];
+    const step = steps[i];
     /* Шаг сам переключает раздел: про заказы и окна — на «Заказы», про
        профиль — в настройки. Возврат на шаг назад тоже вернёт раздел. */
     if (step.route && route.name !== step.route){ go(step.route); setTimeout(()=>startTour(i), 420); return; }
@@ -2510,20 +2519,34 @@ ex.innerHTML = avatarHTML(user(), '');
     Object.assign(card.style, { top: top+'px', left: left+'px' });
     card.classList.toggle('tour-card--video', !!step.video);
     card.innerHTML = `
-      <div class="row row--between"><b>${step.t}</b><span class="badge c-gray">${i+1} / ${TOUR.length}</span></div>
+      <div class="row row--between"><b>${step.t}</b><span class="badge c-gray">${i+1} / ${steps.length}</span></div>
       <p class="small muted" style="margin:8px 0 ${step.video?'10px':'14px'}">${step.d}</p>
       ${step.scene ? `<figure class="tour-figure">${TOUR_SCENES[step.scene] || ''}</figure>` : ''}
       <div class="row tour-card__nav">
         <button class="btn btn--ghost btn--sm" data-prev ${i===0?'hidden':''}>${icon('chev-l','ico-sm')} Назад</button>
         <button class="btn btn--ghost btn--sm" data-skip>Пропустить</button>
         <span class="spacer"></span>
-        <button class="btn btn--primary btn--sm" data-next>${i===TOUR.length-1?'Готово':'Далее'} ${icon('arrow-r','ico-sm')}</button>
+        <button class="btn btn--primary btn--sm" data-next>${i===steps.length-1?'Готово':'Далее'} ${icon('arrow-r','ico-sm')}</button>
       </div>`;
     if (spot) document.body.appendChild(spot);
     document.body.appendChild(card);
+    tourKeyHandler = e => {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = (e.target && e.target.closest) ? e.target.closest('input,textarea,select,[contenteditable="true"]') : null;
+      if (tag) return;
+      const dir = e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1
+        : e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : 0;
+      if (!dir) return;
+      const btn = card.querySelector(dir < 0 ? '[data-prev]' : '[data-next]');
+      if (!btn || btn.hidden) return;
+      e.preventDefault();
+      btn.click();
+    };
+    document.addEventListener('keydown', tourKeyHandler);
     /* Карточка и подсветка уходят мягко: резкое remove() читалось как
        «мигнуло и пропало», особенно на кнопке «Пропустить». */
     const closeTour = done => {
+      if (tourKeyHandler){ document.removeEventListener('keydown', tourKeyHandler); tourKeyHandler = null; }
       card.classList.add('tour-card--out');
       if (spot) spot.classList.add('tour-spot--out');
       setTimeout(()=>{ if (spot) spot.remove(); card.remove(); if (done) done(); }, 190);
@@ -2533,7 +2556,7 @@ ex.innerHTML = avatarHTML(user(), '');
     });
     card.querySelector('[data-prev]').onclick = ()=>{ if (spot) spot.remove(); card.remove(); startTour(i-1); };
     card.querySelector('[data-next]').onclick = ()=>{
-      if (i === TOUR.length-1){
+      if (i === steps.length-1){
         closeTour(()=>{ user().tour_completed = true; saveState(); go('dash'); toast('Тур завершён — отличная работа!','ok'); setTimeout(showInstallHint, 260); });
         return;
       }
