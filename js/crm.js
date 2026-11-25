@@ -6130,7 +6130,7 @@ const wrap = root.querySelector('.pl-wrap');
           mask.querySelectorAll('[data-ex]:checked').forEach(i => {
             const p = (i.dataset.ex || '').split('|');
             const def = exDef(p[0], p[1]);
-            const base = { kind:'ex', nid:p[0], name:p[1], unitPrice:+p[2] || 0, price:0, pct:+p[3] || 0, qty:1, parent:def.parent || '' };
+            const base = { kind:'ex', nid:p[0], name:p[1], unitPrice:+p[2] || 0, price:0, pct:+p[3] || 0, qty:1, parent:def.parent || '', extraPrice:def.extraPrice == null ? null : Math.max(0, +def.extraPrice || 0) };
             out.push({ ...base, multi:isMany(def), qty:Math.max(1, Math.round(+i.dataset.qty || 1)) });
           });
           /* Подпункт идёт, если у него своя галочка или включён родитель.
@@ -6143,7 +6143,11 @@ const wrap = root.querySelector('.pl-wrap');
                 pct:Number(e.pct)||0, qty:Math.max(1, Math.round(+(own && own.dataset.qty) || 1)),
                 parent:e.parent, multi:isMany(e) });
             });
-          out.forEach(o => { o.price = o.pct ? 0 : o.unitPrice * (o.multi ? o.qty : 1); });
+          out.forEach(o => {
+            if (o.pct) o.price = 0;
+            else if (o.extraPrice != null) o.price = o.unitPrice + Math.max(0, o.qty - 1) * o.extraPrice;
+            else o.price = o.unitPrice * (o.multi ? o.qty : 1);
+          });
           const svcs = [...mask.querySelectorAll('[data-sv]:checked')].map(i => {
             const p = (i.dataset.sv || '').split('|');
             return { kind:'sv', nid:p[0], name:p[1], unitPrice:+p[2] || 0, price:+p[2] || 0, pct:0, qty:1 };
@@ -6162,18 +6166,16 @@ const wrap = root.querySelector('.pl-wrap');
           .map(x => {
               const many = isMany(calcExtrasFor(x.nid).find(y => y && y.id === x.name));
             if (!many) return `${x.unitPrice}`;
+            if (x.extraPrice != null){
+              const extra = Math.max(0, x.qty - 1);
+              return extra ? `${x.unitPrice} + ${extra} × ${x.extraPrice}` : `${x.unitPrice}`;
+            }
             return x.qty > 1 ? `${x.qty} × ${x.unitPrice}` : `${x.unitPrice}`;
           });
         /* Число копий вводится прямо в пункте распечатки: у своей строки
            в калькуляторе есть счётчик × N (по умолчанию 1). */
-        const copiesSel = nid => {
-          const list = calcExtrasFor(nid).filter(e => /копи|распечат|экземпляр/i.test(e.unit || ''));
-          /* Подпункт («доп. копия») — та строка, где и вводят число. */
-          return (list.find(e => e.parent) || list[0] || {}).id || '';
-        };
         /* Поле ввода живёт внутри пилюли, количество — в dataset чекбокса. */
         const copiesBox = sel2 => mask.querySelector(`[data-ex^="${sel2}|"]`);
-        const copiesInpOf = sel2 => mask.querySelector(`[data-exq="${sel2}"] input`);
         /* Счётчик активен, когда его строка участвует в расчёте: своя
            галочка стоит, либо включён родитель-распечатка. */
         const syncCopiesCounters = () => {
@@ -6194,11 +6196,13 @@ const wrap = root.querySelector('.pl-wrap');
           /* Счётчики копий зависят от выбора, а не от готовности выражения. */
           syncCopiesCounters();
           const inp = g2('#cx-in'); if (!inp) return;
-          if (userTyping || autoBase == null) return;
+          if (userTyping) return;
           /* В поле — та же арифметика, что и в сумме: объём плюс каждая
              фиксированная опция с её количеством (копии, заверение). */
-          const parts = manualBase ? [autoBase] : [autoBase, ...fixedTerms()];
-          const body = parts.filter(p => String(p).trim()).join(' + ');
+          const fixed = fixedTerms();
+          if (autoBase == null && !fixed.length) return;
+          const parts = manualBase ? [autoBase] : [autoBase, ...fixed];
+          const body = parts.filter(p => p != null && String(p).trim()).join(' + ');
           if (!body) return;
           const pct = pctSum();
           const mults = [];
@@ -6471,7 +6475,7 @@ const wrap = root.querySelector('.pl-wrap');
             const sel = g2('#cx-niche');
             if (sel && nid && sel.value !== nid){ sel.value = nid; paintRush(); }
             toggleSubs(inp, true);
-            if (!autoBase && !isNaN(val)){ autoBase = String(val); manualBase = false; }
+            if (!autoBase && val != null && isFinite(val)){ autoBase = String(val); manualBase = false; }
           } else if (inp){
             toggleSubs(inp, false);
           }

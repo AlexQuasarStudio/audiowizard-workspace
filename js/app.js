@@ -1454,9 +1454,16 @@ const QUICK_BY_ROLE = {
   </svg>`;
     function mascotsHTML(cls=''){
     return `<div class="welcome-mascots ${cls}" aria-hidden="true">
-      <img class="welcome-mascot welcome-mascot--human welcome-mascot--left" src="assets/mascot-human-1.svg" alt="">
+      <div class="welcome-mascots__side welcome-mascots__side--left">
+        <img class="welcome-mascot welcome-mascot--human" src="assets/mascot-human-3.svg" alt="">
+        <img class="welcome-mascot welcome-mascot--human" src="assets/mascot-human-4.svg" alt="">
+        <img class="welcome-mascot welcome-mascot--human" src="assets/mascot-human-1.svg" alt="">
+      </div>
       <span class="welcome-mascot welcome-mascot--robot mascot-art">${MASCOT_ROBOT_SVG}</span>
-      <img class="welcome-mascot welcome-mascot--human welcome-mascot--right" src="assets/mascot-human-2.svg" alt="">
+      <div class="welcome-mascots__side welcome-mascots__side--right">
+        <img class="welcome-mascot welcome-mascot--human" src="assets/mascot-human-5.svg" alt="">
+        <img class="welcome-mascot welcome-mascot--human" src="assets/mascot-human-2.svg" alt="">
+      </div>
     </div>`;
   }
   function renderJoin(inv){
@@ -2154,10 +2161,10 @@ ex.innerHTML = avatarHTML(user(), '');
     { sel:'[data-tour="search"]', t:'Глобальный поиск', d:'Ctrl K — палетка команд: заказы, клиенты, действия и переходы. Задержка поиска < 200 мс.', scene:'search' },
     { sel:'[data-tour="bell"]', t:'Центр уведомлений', d:'Изменения заказов, патчноуты и тикеты — всё в одном месте.', scene:'bell' },
     { sel:'[data-tour="orders-link"]', t:'Заказы', d:'Цветовые статусы строк, живые фильтры и групповые операции.', scene:'orders', route:'orders' },
-    { t:'Окна: как создать', d:'Перетащите пункт меню в рабочую область или дважды щёлкните по нему — раздел откроется в отдельном окне. То же есть в правом клике по меню: «Открыть в окне».', scene:'winCreate', route:'orders' },
-    { t:'Окна: свернуть и развернуть', d:'Двойной клик по шапке разворачивает окно на весь экран, повторный — возвращает прежний размер.', scene:'winSize', route:'orders' },
-    { t:'Окна: тащить за заголовок', d:'Заголовок — ручка перетаскивания. Окно не уезжает за край: оно упирается в границу экрана.', scene:'winDrag', route:'orders' },
-    { t:'Окна: правый клик по заказу', d:'Контекстное меню даёт быстрые действия без похода в карточку: статус, задача, чат.', scene:'winMenu', route:'orders' },
+    { sel:'[data-tour="orders-link"]', t:'Окна: как создать', d:'Перетащите пункт меню в рабочую область или дважды щёлкните по нему — раздел откроется в отдельном окне. То же есть в правом клике по меню: «Открыть в окне».', scene:'winCreate', route:'orders' },
+    { sel:'[data-tour="orders-link"]', t:'Окна: свернуть и развернуть', d:'Двойной клик по шапке разворачивает окно на весь экран, повторный — возвращает прежний размер.', scene:'winSize', route:'orders' },
+    { sel:'[data-tour="orders-link"]', t:'Окна: тащить за заголовок', d:'Заголовок — ручка перетаскивания. Окно не уезжает за край: оно упирается в границу экрана.', scene:'winDrag', route:'orders' },
+    { sel:'[data-tour="orders-link"]', t:'Окна: правый клик по заказу', d:'Контекстное меню даёт быстрые действия без похода в карточку: статус, задача, чат.', scene:'winMenu', route:'orders' },
     { sel:'[data-tour="user"]', t:'Профиль и темы', d:'Аватар, настройки, пять тем оформления и выход. Настройки сохраняются в профиле.', scene:'tasks', route:'settings' }
   ];
 
@@ -2340,7 +2347,7 @@ ex.innerHTML = avatarHTML(user(), '');
   function offerOnboarding(){
     const u2 = user();
     openModal({
-      narrow:true, title:'Добро пожаловать!', modalClass:'modal--welcome', hideTitle:true, dismissible:false,
+      title:'Добро пожаловать!', modalClass:'modal--welcome', hideTitle:true, dismissible:false,
       body:`${mascotsHTML('welcome-mascots--modal')}
         <div class="welcome-intro" data-ob-intro>
           <div class="welcome-hero"><span class="welcome-kicker">Audiowizard Workspace</span><h2>Добро пожаловать в свою мастерскую</h2><p>Профиль уже создан. Можно сразу настроить имя, аватар и оформление — или отложить это на потом и вернуться к работе.</p></div>
@@ -2511,7 +2518,9 @@ ex.innerHTML = avatarHTML(user(), '');
     let top, left;
     if (hasSpot){
       top = Math.max(14, Math.min(innerHeight - cardH - 8, r.bottom + 14 + cardH > innerHeight ? r.top - cardH : r.bottom + 14));
-      left = Math.max(14, Math.min(r.left, innerWidth - 346));
+      /* Узкую подсветку в боковом меню карточка не накрывает: встаёт справа. */
+      const beside = r.left < 300 && r.right < 430;
+      left = Math.max(14, Math.min(beside ? r.right + 14 : r.left, innerWidth - 346));
     } else {
       top = Math.max(14, Math.round((innerHeight - cardH) / 2));
       left = Math.max(14, Math.round((innerWidth - Math.min(346, innerWidth - 28)) / 2));

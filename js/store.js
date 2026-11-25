@@ -235,8 +235,7 @@ const DEFAULT_CALC_SETTINGS = {
       { id:'ce-a3', name:'Повышенная сложность', price:0, pct:20, unit:'% от стоимости', active:true },
       { id:'ce-a4', name:'Особые требования к оформлению', price:0, pct:10, unit:'% от стоимости', active:true },
       { id:'ce-a0', name:'Заверение стенограммы', price:1299, pct:0, unit:'за документ', active:true },
-      { id:'ce-a5', name:'Распечатка копии', price:99, pct:0, unit:'за копию', active:true },
-      { id:'ce-a6', name:'Дополнительная копия', price:49, pct:0, unit:'за копию', parent:'ce-a5', active:true }
+      { id:'ce-a5', name:'Распечатка копии', price:99, pct:0, unit:'за копию', active:true, multi:true, extraPrice:49 }
     ],
     n2: [],
     n3: [
@@ -660,7 +659,7 @@ let S;
 function loadState(){
   try{
     const raw = localStorage.getItem(LS_KEY);
-    if (raw){ S = JSON.parse(raw); if (S && (S._v >= 1 || Array.isArray(S.users))){ S._v = Number(S._v) || 1; migrateSchema(); migrateSiteCatalog(); migrateTranscriptionMinutes(); migrateSmartcatServices(); migrateLegalServices(); migrateTranscriptCertification(); migrateCopiesAsSub(); migrateServiceDescriptions(); migrateOrderServices(); migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); migrateKeys(); migrateStaffBalances(); migrateFinance(); saveState(); return; } }
+    if (raw){ S = JSON.parse(raw); if (S && (S._v >= 1 || Array.isArray(S.users))){ S._v = Number(S._v) || 1; migrateSchema(); migrateSiteCatalog(); migrateTranscriptionMinutes(); migrateSmartcatServices(); migrateLegalServices(); migrateTranscriptCertification(); migrateCopiesAsSub(); migrateCopiesQty(); migrateServiceDescriptions(); migrateOrderServices(); migrateThemes(); migrateRules(); migrateVioletDefault(); migrateDemoMarks(); migrateImportRulesSeed(); migrateUiText(); migrateKeys(); migrateStaffBalances(); migrateFinance(); saveState(); return; } }
   }catch(e){}
   S = seedState();
   saveState();
@@ -843,6 +842,19 @@ function migrateCopiesAsSub(){
     if (e.id === 'ce-a5' && /копи|распечат|экземпляр/i.test(e.unit || '')) e.multi = e.multi !== false;
   });
   S.settings.copiesSubVersion = 1;
+}
+function migrateCopiesQty(){
+  if (!S || !S.settings) return;
+  if (S.settings.copiesQtyVersion >= 1) return;
+  const ex = (((S.calcSettings || {}).extras || {}).n1) || [];
+  const print = ex.find(e => e && (e.id === 'ce-a5' || /^распечат.*копи/i.test(e.name || '')));
+  const extra = ex.find(e => e && e.id === 'ce-a6');
+  if (print){
+    if (print.extraPrice == null) print.extraPrice = extra ? Math.max(0, Number(extra.price) || 0) : 49;
+    print.multi = true;
+  }
+  S.calcSettings.extras.n1 = ex.filter(e => e && e.id !== 'ce-a6');
+  S.settings.copiesQtyVersion = 1;
 }
 function migrateServiceDescriptions(){
   Object.values(S.calcServices || {}).forEach(list => {

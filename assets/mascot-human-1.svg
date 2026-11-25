@@ -3,14 +3,14 @@
   <ellipse cx="65" cy="192" rx="30" ry="4" fill="#202124" opacity=".13"/>
   <!-- ноги: короткие, начинаются под туловищем -->
   <path d="M54 137h22l-2 50h-8l-3-31-3 31h-8l2-50Z" fill="#2F3A4A"/>
-  <path d="M46 184h18a4 4 0 0 1 4 4v4H42v-4a4 4 0 0 1 4-4Z" fill="#20242C"/>
-  <path d="M66 184h18a4 4 0 0 1 4 4v4H62v-4a4 4 0 0 1 4-4Z" fill="#20242C"/>
+  <path d="M44 184h15a4 4 0 0 1 4 4v4H40v-4a4 4 0 0 1 4-4Z" fill="#20242C"/>
+  <path d="M70 184h15a4 4 0 0 1 4 4v4H66v-4a4 4 0 0 1 4-4Z" fill="#20242C"/>
   <!-- короткая шея: от подбородка уходит под воротник -->
   <rect x="57" y="48" width="16" height="18" rx="7" fill="#E8B48C"/>
   <!-- туловище: плечи шире талии -->
   <path d="M43 66c6-5 14-8 22-8s16 3 22 8l3 69c0 5-4 8-9 8H49c-5 0-9-3-9-8l3-69Z" fill="#4285F4"/>
   <path d="M58 60h14l5 9-12 9-12-9 5-9Z" fill="#F7FAFF"/>
-  <path d="M64 87l6 4-6 34-6-34 6-4Z" fill="#EA4335"/>
+  <path d="M64 78l6 4-6 34-6-34 6-4Z" fill="#EA4335"/>
   <!-- рука с папкой: плечо, локоть и кисть одной линией -->
   <path d="M45 70c-8 11-12 23-9 35" fill="none" stroke="#3367D6" stroke-width="11" stroke-linecap="round"/>
   <path d="M35 104c1 4 3 7 5 8" fill="none" stroke="#E8B48C" stroke-width="8" stroke-linecap="round"/>

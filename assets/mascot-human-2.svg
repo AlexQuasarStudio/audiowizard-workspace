@@ -2,8 +2,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 200" role="img" aria-label="Менеджер с ноутбуком">
   <ellipse cx="65" cy="192" rx="30" ry="4" fill="#202124" opacity=".13"/>
   <path d="M54 137h22l-2 50h-8l-3-31-3 31h-8l2-50Z" fill="#334155"/>
-  <path d="M46 184h18a4 4 0 0 1 4 4v4H42v-4a4 4 0 0 1 4-4Z" fill="#1F2937"/>
-  <path d="M66 184h18a4 4 0 0 1 4 4v4H62v-4a4 4 0 0 1 4-4Z" fill="#1F2937"/>
+  <path d="M44 184h15a4 4 0 0 1 4 4v4H40v-4a4 4 0 0 1 4-4Z" fill="#1F2937"/>
+  <path d="M70 184h15a4 4 0 0 1 4 4v4H66v-4a4 4 0 0 1 4-4Z" fill="#1F2937"/>
   <rect x="57" y="48" width="16" height="18" rx="7" fill="#F1C7A6"/>
   <path d="M43 66c6-5 14-8 22-8s16 3 22 8l3 69c0 5-4 8-9 8H49c-5 0-9-3-9-8l3-69Z" fill="#34A853"/>
   <path d="M60 61h10l5 8-10 6-10-6 5-8Z" fill="#2D944A"/><path d="M60 61h10l5 8" fill="none" stroke="#F7FAFF" stroke-width="1.6" stroke-linecap="round"/>

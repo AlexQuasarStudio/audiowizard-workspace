@@ -273,14 +273,17 @@ html[data-theme="dark-mono"] .mascot-art{--accent:#14181f;--accent-2:#3d434d;--a
 /* Уши робота в тёмной монохромной остаются белыми, как раньше: тёмный
    контур на тёмном фоне их не заменяет. */
 html[data-theme="dark-mono"] .mascot-art .m-ear{fill:#fff}
-.welcome-mascots{display:flex;align-items:flex-end;justify-content:center;pointer-events:none;user-select:none}
+.welcome-mascots{display:flex;align-items:flex-end;justify-content:center;pointer-events:none;user-select:none;
+  --mascot-human-w:96px;--mascot-human-h:140px;--mascot-overlap:36px;--mascot-side-shift:28px;--mascot-robot-w:154px;--mascot-robot-h:172px}
+.welcome-mascots__side{display:flex;align-items:flex-end;flex:none;position:relative;z-index:1}
+.welcome-mascots__side .welcome-mascot + .welcome-mascot{margin-left:calc(var(--mascot-overlap) * -1)}
+.welcome-mascots__side--left{margin-right:calc(var(--mascot-side-shift) * -1);transform:rotate(-3deg)}
+.welcome-mascots__side--right{margin-left:calc(var(--mascot-side-shift) * -1);transform:rotate(3deg)}
 .welcome-mascot{display:block;object-fit:contain;flex:none}
 .mascot-svg{display:block;width:100%;height:100%}
-.welcome-mascot--robot{width:154px;height:172px;filter:drop-shadow(0 12px 18px rgba(45,34,70,.22))}
-.welcome-mascot--human{width:96px;height:140px;filter:drop-shadow(0 8px 13px rgba(45,34,70,.18))}
-.welcome-mascot--left{margin-right:-36px;transform:rotate(-4deg) translateY(4px)}
-.welcome-mascot--right{margin-left:-36px;transform:rotate(4deg) translateY(4px)}
-.welcome-mascots--modal{position:relative;height:172px;margin:-58px auto -10px}
+.welcome-mascot--robot{position:relative;z-index:2;width:var(--mascot-robot-w);height:var(--mascot-robot-h);filter:drop-shadow(0 12px 18px rgba(45,34,70,.22))}
+.welcome-mascot--human{width:var(--mascot-human-w);height:var(--mascot-human-h);filter:drop-shadow(0 8px 13px rgba(45,34,70,.18))}
+.welcome-mascots--modal{position:relative;height:190px;margin:-58px auto -10px}
 .auth__card{position:relative;width:100%;max-width:430px;max-height:calc(100dvh - 40px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;background:color-mix(in srgb,var(--panel) 62%,transparent);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid color-mix(in srgb,var(--border-2) 86%,transparent);border-radius:22px;box-shadow:var(--sh-2);padding:26px;animation:popIn 0.56s var(--ease)}
 /* Тёмная тема: тёмное гало */
 html[data-theme^='dark'] .auth__card{box-shadow:var(--sh-2)}
@@ -1453,7 +1456,8 @@ body.menu-dragging .main .theme-card:hover{box-shadow:none!important;transform:n
 .aw-win--welcome{overflow:visible}
 .aw-win--welcome .aw-win__body{overflow-y:auto;overflow-x:hidden;padding-top:116px}
 .aw-win--locked .aw-win__head{cursor:default}
-.aw-win--welcome .welcome-mascots--float{position:absolute;left:-52px;right:-52px;top:-48px;width:auto;height:190px;margin:0;z-index:2;pointer-events:none}
+.aw-win--welcome .welcome-mascots--float{position:absolute;left:-52px;right:-52px;top:-48px;width:auto;height:190px;margin:0;z-index:2;pointer-events:none;justify-content:center;
+  --mascot-human-w:92px;--mascot-human-h:134px;--mascot-overlap:36px;--mascot-side-shift:28px;--mascot-robot-w:160px;--mascot-robot-h:190px}
 .aw-win--welcome .welcome-hero{padding-top:28px}
 .aw-win--install .aw-win__body{overflow-y:auto}
 .install-row{display:flex;gap:10px;align-items:flex-start}.install-row .sys-ico{flex:none;width:34px;height:34px;border-radius:10px;background:var(--bg-2);display:flex;align-items:center;justify-content:center;color:var(--accent)}
@@ -1467,12 +1471,10 @@ body.menu-dragging .main .theme-card:hover{box-shadow:none!important;transform:n
 .welcome-hero h2{font-size:clamp(23px,3vw,30px);line-height:1.12;letter-spacing:-.03em;margin:10px 0 7px}
 .welcome-hero p{max-width:390px;margin:0 auto;color:var(--muted);font-size:13.5px;line-height:1.55}
 .welcome-hero .welcome-kicker{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--border-2);border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft)}
-.welcome-mascots--modal{width:calc(100% + 96px);margin:-54px -48px -8px;height:190px;overflow:visible}
-.welcome-mascots--modal .welcome-mascot--robot{width:176px;height:196px}
-.welcome-mascots--modal .welcome-mascot--human{width:108px;height:153px}
-.welcome-mascots--modal .welcome-mascot--left{margin-right:-46px;transform:rotate(-6deg) translateY(8px)}
-.welcome-mascots--modal .welcome-mascot--right{margin-left:-46px;transform:rotate(6deg) translateY(8px)}
-@media (max-width:520px){.welcome-mascots--modal{width:calc(100% + 48px);margin-left:-24px;margin-right:-24px}.welcome-mascots--modal .welcome-mascot--robot{width:138px;height:154px}.welcome-mascots--modal .welcome-mascot--human{width:84px;height:119px}.welcome-mascots--modal .welcome-mascot--left{margin-right:-40px}.welcome-mascots--modal .welcome-mascot--right{margin-left:-40px}}
+.welcome-mascots--modal{width:calc(100% + 96px);margin:-54px -48px -8px;height:190px;overflow:visible;
+  --mascot-human-w:96px;--mascot-human-h:140px;--mascot-overlap:40px;--mascot-side-shift:32px;--mascot-robot-w:168px;--mascot-robot-h:190px}
+@media (max-width:520px){.welcome-mascots--modal{width:calc(100% + 48px);margin-left:-24px;margin-right:-24px;height:154px;
+  --mascot-human-w:68px;--mascot-human-h:98px;--mascot-overlap:32px;--mascot-side-shift:20px;--mascot-robot-w:132px;--mascot-robot-h:152px}}
 .aw-win--dragging{box-shadow:0 30px 90px -12px rgba(0,0,0,.65);opacity:.97}
 
 /* В активном сплите тень между окнами не рисуется (стык без наложения) */
@@ -1938,7 +1940,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1519");mask-image:url("../bg/pattern-ai.svg?v=1519");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1520");mask-image:url("../bg/pattern-ai.svg?v=1520");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2024,7 +2026,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1519");mask-image:url("../bg/pattern-ai.svg?v=1519");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1520");mask-image:url("../bg/pattern-ai.svg?v=1520");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2863,13 +2865,14 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 .modal--welcome .modal__h,.modal--install .modal__h{display:none}
 .modal--welcome .modal__h h3{display:none}
 .modal--welcome .modal__b{padding:246px 20px 18px;overflow-y:auto;overscroll-behavior:contain}
-.modal--welcome .welcome-mascots--float{position:absolute;left:-28px;right:-28px;top:8px;width:auto;height:214px;margin:0;z-index:3;pointer-events:none;perspective:720px;transform-style:preserve-3d;justify-content:space-between;transition:transform .28s var(--ease),opacity .28s var(--ease)}
+.modal--welcome .welcome-mascots--float{position:absolute;left:-28px;right:-28px;top:8px;width:auto;height:190px;margin:0;z-index:3;pointer-events:none;perspective:720px;transform-style:preserve-3d;justify-content:center;transition:transform .28s var(--ease),opacity .28s var(--ease);
+  --mascot-human-w:96px;--mascot-human-h:140px;--mascot-overlap:40px;--mascot-side-shift:32px;--mascot-robot-w:168px;--mascot-robot-h:190px}
 /* Скролл окна уводит маскотов наверх — они не наезжают на текст формы. */
 .modal--welcome .modal__b.is-scrolled .welcome-mascots--float{transform:translateY(-40px) scale(.94);opacity:.55}
-.modal--welcome .welcome-mascots--float .welcome-mascot--robot{width:192px;height:214px;transform:translateZ(64px) rotate(-3deg);filter:drop-shadow(0 18px 24px rgba(32,33,36,.25))}
-.modal--welcome .welcome-mascots--float .welcome-mascot--human{width:112px;height:160px;filter:drop-shadow(0 12px 16px rgba(32,33,36,.2))}
-.modal--welcome .welcome-mascots--float .welcome-mascot--left{margin-right:-40px;transform:translateZ(18px) translateX(-6px) rotateY(12deg) rotate(-7deg)}
-.modal--welcome .welcome-mascots--float .welcome-mascot--right{margin-left:-40px;transform:translateZ(10px) translateX(6px) rotateY(-12deg) rotate(7deg)}
+.modal--welcome .welcome-mascots--float .welcome-mascot--robot{transform:translateZ(64px) rotate(-3deg);filter:drop-shadow(0 18px 24px rgba(32,33,36,.25))}
+.modal--welcome .welcome-mascots--float .welcome-mascot--human{filter:drop-shadow(0 12px 16px rgba(32,33,36,.2))}
+.modal--welcome .welcome-mascots--float .welcome-mascots__side--left{transform:translateZ(18px) translateX(-6px) rotateY(12deg) rotate(-5deg)}
+.modal--welcome .welcome-mascots--float .welcome-mascots__side--right{transform:translateZ(10px) translateX(6px) rotateY(-12deg) rotate(5deg)}
 .modal-float-x{position:absolute;right:10px;top:10px;z-index:8;width:30px;height:30px;border:0;border-radius:9px;background:color-mix(in srgb,var(--panel) 75%,transparent);color:var(--faint);font-size:19px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background-color .15s var(--ease),color .15s var(--ease)}
 .modal-float-x:hover{background:var(--red-soft);color:var(--red)}
 .modal--welcome .modal__b{padding-top:224px}
@@ -2899,7 +2902,9 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 .share-ico{display:inline-flex;vertical-align:-4px;margin-left:4px;color:var(--accent)}
 .share-ico svg{width:16px;height:16px;display:block}
 .sys-ico svg{width:21px;height:21px;display:block}
-@media (max-width:520px){.modal--welcome .welcome-mascots--float{left:0;right:0;top:26px;height:166px;justify-content:center;gap:2px}.modal--welcome .welcome-mascots--float .welcome-mascot--robot{width:148px;height:166px}.modal--welcome .welcome-mascots--float .welcome-mascot--human{width:94px;height:134px}.modal--welcome .modal__b{padding-top:190px}}
+@media (max-width:520px){.modal--welcome .welcome-mascots--float{left:0;right:0;top:26px;height:166px;justify-content:center;
+  --mascot-human-w:68px;--mascot-human-h:98px;--mascot-overlap:32px;--mascot-side-shift:20px;--mascot-robot-w:132px;--mascot-robot-h:152px}
+  .modal--welcome .modal__b{padding-top:190px}}
 /* Пузыри: время float в конце текста, реакции не меняют ширину */
 .msg__bubble .txt{display:block}
 .msg__bubble .txt .time{position:static;float:right;margin:2px 0 0 8px;background:none;box-shadow:none;border-radius:0}
