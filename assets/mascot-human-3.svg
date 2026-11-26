@@ -20,12 +20,11 @@
   <path d="M46 34c-1-14 8-24 20-24 12 0 20 11 19 25-4-2-7-5-9-9-3 6-9 10-16 11-5 1-10 0-14-3Z" fill="#C45524"/>
   <path d="M50 45c1 9 7 17 15 17s14-8 15-17c-4 3-9 5-15 5s-11-2-15-5Z" fill="#B94A1F"/>
   <path d="M56 50c2 4 5 6 9 6s7-2 9-6c-3 2-6 3-9 3s-6-1-9-3Z" fill="#F0C29B"/>
-  <path d="M57 52c2-2 5-2 7 0M66 52c2-2 5-2 7 0" stroke="#8E3A18" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+  <path d="M58 53c2.6-2.4 6.2-2.4 9 0" stroke="#8E3A18" stroke-width="2.4" stroke-linecap="round" fill="none"/>
   <path d="M55 33c2-1.6 4-1.6 6 0M69 33c2-1.6 4-1.6 6 0" stroke="#8E3A18" stroke-width="2" stroke-linecap="round" fill="none"/>
   <circle cx="58" cy="37" r="2.1" fill="#202124"/>
   <circle cx="72" cy="37" r="2.1" fill="#202124"/>
   <path d="M64.8 40l-1 4.4h2.8" stroke="#C98F6E" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <path d="M59 45c3.4 2.4 7.4 2.4 11 0" stroke="#7A3418" stroke-width="2" stroke-linecap="round" fill="none"/>
   <ellipse cx="52" cy="43" rx="3.4" ry="2.3" fill="#D96B4A" opacity=".28"/>
   <ellipse cx="78" cy="43" rx="3.4" ry="2.3" fill="#D96B4A" opacity=".28"/>
 </svg>

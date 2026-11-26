@@ -233,10 +233,19 @@
        масштаб только для просмотра и точной обводки. */
     let viewZoom = 1, panX = 0, panY = 0;
     const zoomVal = $('[data-cap-zoom-val]', root);
+    /* Курсор зависит и от инструмента, и от того, тащат кадр прямо сейчас:
+       при панорамировании — «grabbing», иначе на увеличенном кадре «grab». */
+    let panning = false;
+    const syncCursor = () => {
+      if (panning){ canvas.style.cursor = 'grabbing'; return; }
+      if (shot && shot.tool === 'cursor'){ canvas.style.cursor = 'default'; return; }
+      if (shot && shot.tool !== 'hand' && shot.tool !== 'select'){ canvas.style.cursor = 'crosshair'; return; }
+      canvas.style.cursor = viewZoom > 1 ? 'grab' : 'crosshair';
+    };
     const applyView = () => {
       canvas.style.transformOrigin = 'center center';
       canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${viewZoom})`;
-      canvas.style.cursor = viewZoom > 1 ? 'grab' : 'crosshair';
+      syncCursor();
       if (zoomVal) zoomVal.textContent = Math.round(viewZoom * 100) + '%';
       root.classList.toggle('is-zoomed', viewZoom > 1);
     };
@@ -300,16 +309,68 @@
         ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.setLineDash([7,4]); ctx.strokeRect(c.x,c.y,c.w,c.h); ctx.restore();
       }
       shot.shapes.forEach(sh=>drawShape(ctx,sh));
+      /* Рамка-превью элемента под курсором — тонкая, чтобы не путать с выделением. */
+      if (shot.hoverBox && shot.tool === 'select'){
+        const hb = shot.hoverBox;
+        ctx.save(); ctx.strokeStyle = 'rgba(76,201,240,.85)'; ctx.lineWidth = 1.5; ctx.setLineDash([4,3]);
+        ctx.strokeRect(hb.x, hb.y, hb.w, hb.h); ctx.restore();
+      }
       if (shot.snapLines){ ctx.save(); ctx.strokeStyle='#ff4fa3'; ctx.lineWidth=1.5; ctx.setLineDash([6,4]); shot.snapLines.forEach(l=>{ctx.beginPath(); if(l.axis==='x'){ctx.moveTo(l.v,0);ctx.lineTo(l.v,canvas.height);} else {ctx.moveTo(0,l.v);ctx.lineTo(canvas.width,l.v);} ctx.stroke();}); ctx.restore(); }
-      if (shot.sel){ const bb=bbox(shot.sel); ctx.save(); const pulse = .5 + .5*Math.sin(performance.now()/320); const t0 = shot.sel.t0 || (shot.sel.t0 = performance.now()); const rise = Math.min(1, (performance.now()-t0)/180); ctx.globalAlpha = rise; ctx.strokeStyle=`rgba(76,201,240,${.72+.28*pulse})`; ctx.lineWidth=2; ctx.setLineDash([5,4]); ctx.strokeRect(bb.x,bb.y,bb.w,bb.h); ctx.setLineDash([]); [[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x,bb.y+bb.h],[bb.x+bb.w,bb.y+bb.h]].forEach(p=>{ctx.fillStyle='#fff';ctx.fillRect(p[0]-4,p[1]-4,8,8);ctx.strokeRect(p[0]-4,p[1]-4,8,8);}); const rx=bb.x+bb.w/2, ry=bb.y-22; ctx.beginPath(); ctx.arc(rx,ry,5,0,Math.PI*2); ctx.fillStyle='#4cc9f0'; ctx.fill(); ctx.restore(); }
+      if (shot.sel){ const bb=bbox(shot.sel); ctx.save(); { const sel0=shot.sel; const c0={x:bb.x+bb.w/2,y:bb.y+bb.h/2}; if(sel0.rot){ ctx.translate(c0.x,c0.y); ctx.rotate(sel0.rot); ctx.translate(-c0.x,-c0.y); } } const pulse = .5 + .5*Math.sin(performance.now()/320); const t0 = shot.sel.t0 || (shot.sel.t0 = performance.now()); const rise = Math.min(1, (performance.now()-t0)/180); ctx.globalAlpha = rise; ctx.strokeStyle=`rgba(76,201,240,${.72+.28*pulse})`; ctx.lineWidth=2; ctx.setLineDash([5,4]); ctx.strokeRect(bb.x,bb.y,bb.w,bb.h); ctx.setLineDash([]); [[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x,bb.y+bb.h],[bb.x+bb.w,bb.y+bb.h]].forEach(p=>{ctx.fillStyle='#fff';ctx.fillRect(p[0]-4,p[1]-4,8,8);ctx.strokeRect(p[0]-4,p[1]-4,8,8);}); const rx=bb.x+bb.w/2, ry=bb.y-22; ctx.beginPath(); ctx.arc(rx,ry,5,0,Math.PI*2); ctx.fillStyle='#4cc9f0'; ctx.fill(); ctx.restore(); }
     };
     let drag = null;
     const snap = p => { const th=9*shot.guides.scale; let bestX=null,bestY=null,dx=th,dy=th; (shot.guides.xs||[]).forEach(v=>{if(Math.abs(p.x-v)<dx){dx=Math.abs(p.x-v);bestX=v;}}); (shot.guides.ys||[]).forEach(v=>{if(Math.abs(p.y-v)<dy){dy=Math.abs(p.y-v);bestY=v;}}); shot.snapLines=[]; if(bestX!=null)shot.snapLines.push({axis:'x',v:bestX}); if(bestY!=null)shot.snapLines.push({axis:'y',v:bestY}); return {x:bestX??p.x,y:bestY??p.y}; };
     const pt = e => { const r = canvas.getBoundingClientRect(); return { x:(e.clientX-r.left)*canvas.width/r.width, y:(e.clientY-r.top)*canvas.height/r.height }; };
+    /* Рамка-превью: снимок — статичный кадр, поэтому «элемент» под курсором
+       выделяем по направляющим из живого DOM (границы всех узлов окна).
+       При наведении показываем ту рамку, которую получит клик. */
+    const hoverRectAt = p => {
+      const xs = shot.guides.xs || [], ys = shot.guides.ys || [], sc = shot.guides.scale || 1;
+      if (!xs.length || !ys.length) return null;
+      const t = 10 * sc;
+      const near = (list, v) => { let best = null, d = t; list.forEach(x => { const dd = Math.abs(x - v); if (dd < d){ d = dd; best = x; } }); return best; };
+      const l = near(xs, p.x), r2 = near(xs, p.x);
+      /* Кандидаты рамки — ближайшие направляющие слева и справа, сверху и снизу. */
+      let left = null, right = null, top = null, bottom = null;
+      xs.forEach(v => { if (v < p.x - 1 && (left == null || v > left)) left = v; if (v > p.x + 1 && (right == null || v < right)) right = v; });
+      ys.forEach(v => { if (v < p.y - 1 && (top == null || v > top)) top = v; if (v > p.y + 1 && (bottom == null || v < bottom)) bottom = v; });
+      if (left == null || right == null || top == null || bottom == null) return null;
+      const w = right - left, h = bottom - top;
+      if (w < 6 || h < 6) return null;
+      return { x:left, y:top, w, h };
+    };
+    let hover = null, hoverPid = null;
+    const paintHover = () => {
+      if (!shot) return;
+      shot.hoverBox = hover;
+      draw();
+    };
     const startShape = p => ({ tool:shot.tool, x:p.x, y:p.y, w:0, h:0, color:shot.color, width:shot.line, points:[p] });
     let mode=null, last=null;
-    const hit = p => [...shot.shapes].reverse().find(sh=>{const b=bbox(sh);return p.x>=b.x-6&&p.x<=b.x+b.w+6&&p.y>=b.y-6&&p.y<=b.y+b.h+6;});
-    const handleAt = p => { if(!shot.sel)return null; const b=bbox(shot.sel); const hs={nw:[b.x,b.y],ne:[b.x+b.w,b.y],sw:[b.x,b.y+b.h],se:[b.x+b.w,b.y+b.h],rot:[b.x+b.w/2,b.y-22]}; return Object.keys(hs).find(k=>Math.hypot(p.x-hs[k][0],p.y-hs[k][1])<10)||null; };
+    /* Проверка попадания с учётом поворота: точку возвращаем в систему
+       фигуры (обратный поворот вокруг её центра), иначе после поворота
+       выделение схватывалось по старой, неповёрнутой рамке. */
+    const unrot = (p, sh) => {
+      const b = bbox(sh), cx = b.x + b.w/2, cy = b.y + b.h/2, a = -(sh.rot || 0);
+      const dx = p.x - cx, dy = p.y - cy;
+      return { x: cx + dx*Math.cos(a) - dy*Math.sin(a), y: cy + dx*Math.sin(a) + dy*Math.cos(a) };
+    };
+    const hit = p => [...shot.shapes].reverse().find(sh=>{const q=unrot(p,sh),b=bbox(sh);return q.x>=b.x-6&&q.x<=b.x+b.w+6&&q.y>=b.y-6&&q.y<=b.y+b.h+6;});
+    /* Ручки повёрнутой фигуры стоят на повёрнутой рамке, а не на прямой. */
+    const handlePt = (hx, hy, sh) => {
+      const b = bbox(sh), cx = b.x + b.w/2, cy = b.y + b.h/2, a = sh.rot || 0;
+      const dx = hx - cx, dy = hy - cy;
+      return [cx + dx*Math.cos(a) - dy*Math.sin(a), cy + dx*Math.sin(a) + dy*Math.cos(a)];
+    };
+    const handleAt = p => {
+      if(!shot.sel)return null;
+      const s0 = shot.sel, b = bbox(s0);
+      const hs = { nw:[b.x,b.y], ne:[b.x+b.w,b.y], sw:[b.x,b.y+b.h], se:[b.x+b.w,b.y+b.h], rot:[b.x+b.w/2,b.y-22] };
+      return Object.keys(hs).find(k=>{
+        const q = handlePt(hs[k][0], hs[k][1], s0);
+        return Math.hypot(p.x-q[0], p.y-q[1]) < 12;
+      }) || null;
+    };
     /* Пока выделение активно — пульсация обводки и мягкое появление/уход. */
     let selRaf = 0;
     const keepSelAlive = () => {
@@ -323,15 +384,28 @@
     let lastC = null;
     canvas.addEventListener('pointerdown', e => {
       const raw = pt(e); const p = (mode || drag) ? raw : snap(raw);
-      if (shot.tool === 'hand' && viewZoom > 1){ mode='pan'; lastC={x:e.clientX,y:e.clientY}; canvas.setPointerCapture(e.pointerId); return; }
+      if (shot.tool === 'hand' && viewZoom > 1){ mode='pan'; panning = true; syncCursor(); lastC={x:e.clientX,y:e.clientY}; canvas.setPointerCapture(e.pointerId); return; }
       if (shot.tool === 'text'){ inlineText(p); return; }
-      if (shot.tool === 'hand' || shot.tool === 'select'){ const h=handleAt(p); if(h){ mode=h; last=p; shot._orig=JSON.parse(JSON.stringify(shot.sel)); canvas.setPointerCapture(e.pointerId); return; } const s=hit(p);
+      if (shot.tool === 'select'){
+        /* Клик по инструменту «Выделить» выделяет элемент под курсором из
+           направляющих — даже если рамка ещё не рисовалась. */
+        const hb = hover || hoverRectAt(p);
+        shot.sel = hb ? { tool:'select', x:hb.x, y:hb.y, w:hb.w, h:hb.h, color:'#4cc9f0' } : null;
+        if (shot.sel){ mode='move'; last=p; shot._orig=JSON.parse(JSON.stringify(shot.sel)); keepSelAlive(); }
+        draw(); return;
+      }
+      if (shot.tool === 'hand'){ const h=handleAt(p); if(h){ mode=h; last=p; shot._orig=JSON.parse(JSON.stringify(shot.sel)); canvas.setPointerCapture(e.pointerId); return; } const s=hit(p);
         /* Повторный клик по уже выделенному элементу снимает выделение. */
         if (s && shot.sel === s){ shot.sel = null; shot.selFade = performance.now(); draw(); return; }
         shot.sel=s||null; if(s){mode='move';last=p;shot._orig=JSON.parse(JSON.stringify(s)); keepSelAlive(); } draw(); return; }
       drag = p; const sh = startShape(p); shot.shapes.push(sh); shot.sel=null; canvas.setPointerCapture(e.pointerId); draw();
     });
     canvas.addEventListener('pointermove', e => {
+      if (shot.tool === 'select' && !mode && !drag){
+        const r = hoverRectAt(pt(e));
+        const changed = (!!r !== !!hover) || (r && hover && (r.x !== hover.x || r.y !== hover.y || r.w !== hover.w || r.h !== hover.h));
+        if (changed){ hover = r; paintHover(); }
+      }
       if (mode === 'pan' && lastC){
         panX += e.clientX - lastC.x; panY += e.clientY - lastC.y;
         /* Не даём утащить кадр целиком за пределы сцены. */
@@ -352,9 +426,9 @@
       else { sh.w=p.x-drag.x; sh.h=p.y-drag.y; }
       draw();
     });
-    const end = () => { drag = null; mode=null; last=null; lastC=null; shot.snapLines=null; draw(); };
+    const end = () => { drag = null; mode=null; last=null; lastC=null; panning = false; syncCursor(); shot.snapLines=null; draw(); };
     canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end);
-    root.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{ if (b.dataset.tool==='crop' && typeof syncCropBtn==='function') syncCropBtn(); shot.tool=b.dataset.tool; root.querySelectorAll('[data-tool]').forEach(x=>x.classList.toggle('on',x===b)); root.classList.toggle('is-cursor', shot.tool==='cursor'); canvas.style.cursor=shot.tool==='hand'?'grab':'crosshair'; });
+    root.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{ if (b.dataset.tool==='crop' && typeof syncCropBtn==='function') syncCropBtn(); shot.tool=b.dataset.tool; root.querySelectorAll('[data-tool]').forEach(x=>x.classList.toggle('on',x===b)); root.classList.toggle('is-cursor', shot.tool==='cursor'); syncCursor(); });
     root.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{ shot.color=b.dataset.color; root.querySelectorAll('[data-color]').forEach(x=>x.classList.toggle('on',x===b)); });
     $('[data-cap-undo]',root).onclick=()=>{ if(shot.shapes.length){ shot.redo.push(shot.shapes.pop()); draw(); } };
     $('[data-cap-redo]',root).onclick=()=>{ if(shot.redo.length){ shot.shapes.push(shot.redo.pop()); draw(); } };
@@ -507,6 +581,10 @@
       const cw=Math.max(2,Math.round(vw*k/2)*2), chh=Math.max(2,Math.round(vh*k/2)*2);
       const canvas=document.createElement('canvas'); canvas.width=cw; canvas.height=chh; const ctx=canvas.getContext('2d');
       const out=canvas.captureStream(24); let micStream=null;
+      /* Дорожка видео из холста — нужна, чтобы просить у потока кадр
+         вручную: иначе в моменты паузы отрисовки MediaRecorder обрывает
+         запись на зуме. */
+      const vTrack = out.getVideoTracks && out.getVideoTracks()[0];
       /* Волна-капелька от клика и наезд камеры на выбранную область —
          одноместные состояния записи, живут вне разметки. */
       let ripples = [], zoom = null;
@@ -565,6 +643,11 @@
         }
         drawShapes(ctx,canvas.width/innerWidth);
         ripples.forEach(r => paintRipple(ctx, r, canvas.width / innerWidth));
+        /* captureStream(24) сам берёт кадр с холста по таймеру — и пока
+           «Зум» только существует, картинка на мгновение не менялась,
+           поток считал её статичной и MediaRecorder обрывал запись.
+           Нативный requestFrame держит дорожку живой на каждом кадре. */
+        try { if (vTrack && typeof vTrack.requestFrame === 'function') vTrack.requestFrame(); } catch(e){}
       };
       mr.start(500); const tick=setInterval(pump,41); pump();
       /* Счётчик идёт только пока запись активна: на паузе время замирает. */
@@ -602,11 +685,22 @@
       const zbtn = $('[data-rzoom]', bar);
       const startZoomPick = () => {
         if (zoom){ zoom = null; zbtn.classList.remove('on'); return; }
+        /* Любое нажатие запускает новое выделение. Раньше сюда срабатывало
+           и нажатие по самой кнопке «Зум»: выделение начиналось в точке
+           кнопки в панели, панель исчезала из-под пальца, и pointerup
+           не приходил — запись «замирала». Кнопку и панель пропускаем. */
         let box = null, start = null;
         const pickMove = e => { if (!start) return; box = { x:Math.min(start.x,e.clientX), y:Math.min(start.y,e.clientY), w:Math.abs(e.clientX-start.x), h:Math.abs(e.clientY-start.y) }; pickDraw(); };
+        const pickDown = e => {
+          if (e.target && e.target.closest && e.target.closest('.cap-rec-bar')) return;
+          start = { x:e.clientX, y:e.clientY };
+          box = { x:start.x, y:start.y, w:0, h:0 };
+        };
         const pickUp = () => {
           window.removeEventListener('pointermove', pickMove, true);
           window.removeEventListener('pointerup', pickUp, true);
+          window.removeEventListener('pointercancel', pickUp, true);
+          window.removeEventListener('pointerdown', pickDown, true);
           pickCv.remove();
           if (box && box.w > 40 && box.h > 40){ applyZoom(box); zbtn.classList.add('on'); }
           else notice('Область слишком мала — выделите её заново','warn');
@@ -621,11 +715,12 @@
         const pickDraw = () => {
           pctx.clearRect(0,0,innerWidth,innerHeight);
           pctx.fillStyle = 'rgba(8,10,16,.35)'; pctx.fillRect(0,0,innerWidth,innerHeight);
-          if (box){ pctx.clearRect(box.x, box.y, box.w, box.h); pctx.strokeStyle = '#4cc9f0'; pctx.lineWidth = 2; pctx.setLineDash([6,4]); pctx.strokeRect(box.x, box.y, box.w, box.h); }
+          if (box && box.w > 0 && box.h > 0){ pctx.clearRect(box.x, box.y, box.w, box.h); pctx.strokeStyle = '#4cc9f0'; pctx.lineWidth = 2; pctx.setLineDash([6,4]); pctx.strokeRect(box.x, box.y, box.w, box.h); }
         };
-        window.addEventListener('pointerdown', e => { start = { x:e.clientX, y:e.clientY }; }, true);
+        window.addEventListener('pointerdown', pickDown, true);
         window.addEventListener('pointermove', pickMove, true);
         window.addEventListener('pointerup', pickUp, true);
+        window.addEventListener('pointercancel', pickUp, true);
         pickDraw();
       };
       anno.addEventListener('pointerdown',e=>{ if(tool==='cursor'||tool==='hand')return; const p=pt(e); if(tool==='select'){ const list=document.elementsFromPoint(e.clientX,e.clientY).filter(el=>!el.closest('.cap-rec-live,.cap-rec-bar,.cap-tools')); const t=list.find(el=>el && el!==document.documentElement && el!==document.body); if(!t)return; const r=t.getBoundingClientRect(); shapes.push({tool:'select',x:r.left,y:r.top,w:r.width,h:r.height,color:'#4cc9f0'}); redraw(); return; } if(tool==='text'){ const inp=document.createElement('input');inp.placeholder='Текст';inp.style.cssText='position:fixed;z-index:10000;left:'+p.x+'px;top:'+p.y+'px;background:var(--panel);border:1px solid var(--accent);border-radius:5px;padding:3px;color:#ff5c5c';document.body.appendChild(inp);inp.focus();const done=()=>{if(inp.value.trim()){shapes.push({tool:'text',x:p.x,y:p.y,text:inp.value.trim(),color:'#ff5c5c'});redraw();}inp.remove();};inp.onblur=done;inp.onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();done();}};return;} drawing={tool,x:p.x,y:p.y,w:0,h:0,points:[p],color:drawColor}; shapes.push(drawing); });

@@ -5563,25 +5563,39 @@ const wrap = root.querySelector('.pl-wrap');
 
   /* ==================== КАЛЬКУЛЯТОР ==================== */
   function openCalculator({ onResult=null, nishId='', deadline=null } = {}){
-    /* Две направленные ставки: «с языка» и «на язык». Старое одиночное
-       значение делится пополам, чтобы сумма пары осталась прежней. */
-    const langOldRate = code => Math.max(0, Math.min(100, Number((((S.calcSettings || {}).langPctByCode || {})[code]) ?? (S.calcSettings || {}).langPct ?? 10)));
-    const langFromRate = code => Math.max(0, Math.min(100, Number((((S.calcSettings || {}).langFromPctByCode || {})[code]) ?? (langOldRate(code) / 2))));
-    const langToRate = code => Math.max(0, Math.min(100, Number((((S.calcSettings || {}).langToPctByCode || {})[code]) ?? (langOldRate(code) / 2))));
+    /* Ставки по направлению: «с языка» и «на язык» — независимые надбавки,
+       они не складываются в одну сумму. На языке перевода надбавка обычно
+       выше, чем с языка оригинала. Язык вне списка включённых считается
+       по общей ставке направления. */
+    const shownCodes = new Set(((S.calcSettings || {}).languages) || []);
+    const fromRateOf = code => Math.max(0, Math.min(100, Number(((S.calcSettings || {}).langFromPctByCode || {})[code] ?? ((S.calcSettings || {}).langFromPct ?? 5))));
+    const toRateOf = code => Math.max(0, Math.min(100, Number(((S.calcSettings || {}).langToPctByCode || {})[code] ?? ((S.calcSettings || {}).langToPct ?? 15))));
+    const langFromRate = fromRateOf;
+    const langToRate = toRateOf;
     const langBase = code => String(code || '').split('-')[0].toLowerCase();
     const POPULAR_LANGS = new Set(['ru','en','de','fr','es','it','pt','zh','ja','ko','ar','tr','pl','uk','nl','sv','fi','da','no','cs','ro','hu','bg','el','he','hi','id','vi','th']);
     /* Редкая пара без общего популярного языка идёт через посредника:
-       сначала на английский, если он включён, иначе на русский. */
+       первой ступенью английский (если включён), второй — русский, если
+       он попадает на путь между исходным и целевым; иначе — любой включённый
+       популярный язык, который уже выставлен в настройках. */
+    const viaCandidates = from => {
+      const list = ['en', 'ru'];
+      const f = langBase(from);
+      if (f === 'en' || f === 'ru') return list.filter(c => c !== f);
+      return list;
+    };
     const langRoute = (from, to) => {
       if (!from || !to || from === to) return { rate:0, via:'', legs:[], rates:[] };
       const f = langBase(from), t = langBase(to);
       let via = '';
-      if (!POPULAR_LANGS.has(f) && !POPULAR_LANGS.has(t) && f !== 'en' && f !== 'ru' && t !== 'en' && t !== 'ru'){
-        const enabled = new Set(CALC_LANGS.map(([code]) => code));
-        via = ['en','ru'].find(code => enabled.has(code) && code !== from && code !== to) || '';
+      if (!POPULAR_LANGS.has(f) && !POPULAR_LANGS.has(t)){
+        /* Плечо через английский, если его язык есть в калькуляторе;
+           иначе через русский. Если и русского нет — пара считается
+           напрямую, без наценки за посредника. */
+        via = viaCandidates(from).find(code => (shownCodes.size ? shownCodes.has(code) : true) && code !== to && code !== from) || '';
       }
       const legs = via ? [[from, via], [via, to]] : [[from, to]];
-      const rates = legs.map(([a,b]) => langFromRate(a) + langToRate(b));
+      const rates = legs.map(([a,b]) => Math.max(langFromRate(a), langToRate(b)));
       return { rate:rates.reduce((n,x)=>n+x,0), via, legs, rates };
     };
     if (!onResult){
@@ -5662,7 +5676,7 @@ const wrap = root.querySelector('.pl-wrap');
               </div></div>
           </div>
           <div class="tiny faint" id="cx-svc-desc" style="margin-top:6px"></div>
-          <div id="cx-lang-wrap"${initNiche==='n3'?' class="is-open"' : ' class="is-collapsed"'}>
+          <div id="cx-lang-wrap">
             <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
               <div class="field" style="flex:1;min-width:150px"><label>Язык оригинала</label>
                 <div class="calc-combo">
@@ -5681,8 +5695,13 @@ const wrap = root.querySelector('.pl-wrap');
             <div class="tiny faint" id="cx-lang-note" style="margin-top:4px"></div>
             <label class="check small" style="margin-top:8px" id="cx-multi-label"><input type="checkbox" id="cx-multi"><span class="box"><svg><use href="#i-check-c"/></svg></span><span>Мультиперевод — несколько языков перевода</span></label>
             <div id="cx-multi-box" hidden style="margin-top:6px">
-              <select class="input" id="cx-lang-targets" multiple size="4" aria-label="Дополнительные языки перевода">${CALC_LANGS.map(([code,name])=>`<option value="${esc(code)}">${esc(name)}</option>`).join('')}</select>
-              <div class="tiny faint" style="margin-top:4px">Выберите дополнительные языки — каждый считается отдельной языковой парой. Ctrl/⌘ — несколько.</div>
+              <div class="field"><label>Дополнительные языки перевода</label>
+                <div class="calc-combo">
+                  <input class="input" id="cx-lang-targets-q" placeholder="Начните вводить язык…" autocomplete="off" spellcheck="false">
+                  <select class="input" id="cx-lang-targets" multiple hidden>${CALC_LANGS.map(([code,name])=>`<option value="${esc(code)}">${esc(name)}</option>`).join('')}</select>
+                  <div class="calc-combo__list calc-combo__list--lang" id="cx-lang-targets-live" aria-hidden="true"></div>
+                </div></div>
+              <div class="calc-lang-chips" id="cx-lang-chips"></div>
             </div>
           </div>
           <div class="small" id="cx-volume-note" style="margin-top:6px"></div>
@@ -5880,14 +5899,30 @@ const wrap = root.querySelector('.pl-wrap');
             input.disabled = !!s.disabled;
           });
         };
-        /* Все цели перевода: основная плюс выбранные в мультисписке. */
+        /* Все цели перевода: основная плюс отмеченные в мультисписке.
+           Скрытый select хранит только дополнительные языки; основная цель
+           живёт в #cx-lang-to и в сумму пар не дублируется. */
         const langTargets = () => {
           const from = g2('#cx-lang-from') ? g2('#cx-lang-from').value : '';
           const primary = g2('#cx-lang-to') ? g2('#cx-lang-to').value : '';
           const multiOn = g2('#cx-multi') ? g2('#cx-multi').checked : false;
           const sel = g2('#cx-lang-targets');
           const extras = multiOn && sel ? [...sel.selectedOptions].map(o => o.value) : [];
-          return [...new Set([primary, ...extras].filter(Boolean))].filter(t => t !== from);
+          return [primary, ...extras].filter((t,i,arr) => t && t !== from && arr.indexOf(t) === i);
+        };
+        /* Чипы выбранных дополнительных языков: каждый можно снять крестиком,
+           основная цель не показывается — она стоит в поле «Язык перевода». */
+        const paintLangChips = () => {
+          const box = g2('#cx-lang-chips'); if (!box) return;
+          const multiOn = g2('#cx-multi') ? g2('#cx-multi').checked : false;
+          const sel = g2('#cx-lang-targets');
+          if (!multiOn || !sel){ box.innerHTML = ''; return; }
+          const from = g2('#cx-lang-from') ? g2('#cx-lang-from').value : '';
+          const name = c => ((CALC_LANGS.find(x => x[0] === c) || [])[1]) || c;
+          box.innerHTML = [...sel.selectedOptions].map(o => {
+            const r = langRoute(from, o.value);
+            return `<span class="calc-lang-chip" data-lang-chip="${esc(o.value)}"><b>${esc(name(o.value))}</b><span class="faint">+${r.rate}%${r.via ? ' · ' + esc(name(r.via)) : ''}</span><button type="button" data-lang-chip-x="${esc(o.value)}" title="Убрать язык" aria-label="Убрать ${esc(name(o.value))}">×</button></span>`;
+          }).join('');
         };
         const langSurcharge = () => {
           const from = g2('#cx-lang-from') ? g2('#cx-lang-from').value : '';
@@ -5906,22 +5941,20 @@ const wrap = root.querySelector('.pl-wrap');
             ? `Языковая пара: ${name(from)} → ${parts.join(' · ')}${targets.length > 1 ? ` · ${targets.length} языка, каждая пара считается отдельно` : ` · итого +${langSurcharge()}% к стоимости и сроку`}`
             : '';
           syncLangInputs();
+          paintLangChips();
         };
         const paintLangVisibility = nid => {
           const wrap = g2('#cx-lang-wrap'); if (!wrap) return;
           const show = nid === 'n3';
-          wrap.classList.toggle('is-collapsed', !show);
-          wrap.setAttribute('aria-hidden', show ? 'false' : 'true');
+          /* Блок не вынимаем из раскладки: только приглушаем. Иначе при
+             выборе языка пропадает само поле ввода и теряется фокус. */
+          wrap.classList.toggle('is-dim', !show);
           const from = g2('#cx-lang-from'), to = g2('#cx-lang-to');
           const swap = g2('#cx-lang-swap');
-          if (from) from.disabled = !show;
-          if (to) to.disabled = !show;
-          if (swap) swap.disabled = !show;
+          if (swap) swap.disabled = false;
           if (from && to){
             const codes = CALC_LANGS.map(([c]) => c);
-            if (!show){
-              from.value = 'ru'; to.value = 'ru';
-            } else if (codes.length){
+            if (show && codes.length){
               const pick = (preferred, current) => codes.includes(preferred) ? preferred : (codes.includes(current) ? current : codes[0]);
               let f = pick('en', from.value), t = pick('ru', to.value);
               if (codes.length > 1 && f === t) t = codes.find(c => c !== f) || t;
@@ -5946,7 +5979,7 @@ const wrap = root.querySelector('.pl-wrap');
         };
         /* Комбобоксы с плавной подсказкой: скрытый select хранит значение,
            видимый input — только поиск и выбранную подпись. */
-        const bindCalcCombo = ({input, select, list, getItems, onPick}) => {
+        const bindCalcCombo = ({input, select, list, getItems, onPick, multi=false}) => {
           if (!input || !select || !list) return;
           let items = [], active = -1;
           const close = () => {
@@ -5979,8 +6012,14 @@ const wrap = root.querySelector('.pl-wrap');
           const pick = idx => {
             const it = items[idx];
             if (!it) return;
-            select.value = it.value;
-            input.value = it.label;
+            if (multi){
+              const opt = [...select.options].find(o => o.value === it.value);
+              if (opt) opt.selected = true;
+              input.value = '';
+            } else {
+              select.value = it.value;
+              input.value = it.label;
+            }
             close();
             onPick && onPick(it);
           };
@@ -6023,6 +6062,16 @@ const wrap = root.querySelector('.pl-wrap');
           getItems: () => CALC_LANGS.map(([code,name]) => ({ value: code, label: name })),
           onPick: () => { applyLang(); }
         });
+        bindCalcCombo({
+          input: g2('#cx-lang-targets-q'), select: g2('#cx-lang-targets'), list: g2('#cx-lang-targets-live'),
+          multi:true,
+          getItems: () => {
+            const from = g2('#cx-lang-from') ? g2('#cx-lang-from').value : '';
+            const primary = g2('#cx-lang-to') ? g2('#cx-lang-to').value : '';
+            return CALC_LANGS.filter(([code]) => code !== from && code !== primary).map(([code,name]) => ({ value: code, label: name }));
+          },
+          onPick: () => { paintLang(); upd(true); setTimeout(paintNormDeadline, 0); }
+        });
         paintLangVisibility(initNiche);
         /* Мультиперевод: вторая цель и более. */
         {
@@ -6036,6 +6085,14 @@ const wrap = root.querySelector('.pl-wrap');
           if (targetsSel) targetsSel.onchange = ()=>{
             paintLang(); upd(true); setTimeout(paintNormDeadline, 0);
           };
+          const chips = g2('#cx-lang-chips');
+          if (chips) chips.addEventListener('click', e=>{
+            const b = e.target.closest('[data-lang-chip-x]');
+            if (!b || !targetsSel) return;
+            const opt = [...targetsSel.options].find(o => o.value === b.dataset.langChipX);
+            if (opt) opt.selected = false;
+            paintLang(); upd(true); setTimeout(paintNormDeadline, 0);
+          });
         }
         syncVolInput();
         /* Срок по суточной норме объёма: исполнителю — объём ÷ норма,
@@ -6229,7 +6286,15 @@ const wrap = root.querySelector('.pl-wrap');
         /* Скидки считаются из настроек: список промокодов не захардкожен.
            «За объём» срабатывает сам по часам, разовый — по коду. Берём
            максимальную подходящую скидку, а не сумму скидок. */
-        const promoList = () => (S.settings.promos || []).filter(p => p.active !== false);
+        /* Разовый промокод гасится не для всех, а для конкретного клиента:
+           used_by хранит id тех, кто уже применил код. Остальным он остаётся
+           доступен, пока admin не выключит его вручную. */
+        const promoUsableBy = (p, uid2) => p.active !== false && p.kind !== 'once' ? p.active !== false : (p.active !== false && !((p.used_by || []).includes(uid2)));
+        const clientIdForPromo = () => {
+          const me2 = (typeof window.me === 'function' ? window.me() : null) || (typeof me === 'function' ? me() : null);
+          return (me2 && me2.id) || 'anon';
+        };
+        const promoList = () => (S.settings.promos || []).filter(p => promoUsableBy(p, clientIdForPromo()));
         const calcDiscount = () => {
           const hours = volumeHours();
           const code = String(g2('#cx-promo').value || '').trim().toUpperCase();
@@ -6515,7 +6580,14 @@ const wrap = root.querySelector('.pl-wrap');
           /* Разовый промокод гасим только в момент применения. */
           if (d.best && d.best.by === 'code' && d.best.kind === 'once'){
             const p = (S.settings.promos || []).find(x => x.id === d.best.id);
-            if (p){ p.used_at = Date.now(); p.active = false; saveState(); logAudit(`Промокод ${p.code} применён (${p.percent}%)`, 'Калькулятор'); }
+            const who = clientIdForPromo();
+            if (p){
+              p.used_by = Array.isArray(p.used_by) ? p.used_by : [];
+              if (!p.used_by.includes(who)) p.used_by.push(who);
+              p.used_at = Date.now();
+              saveState();
+              logAudit(`Промокод ${p.code} применён (${p.percent}%) клиентом ${who}`, 'Калькулятор');
+            }
           }
           onResult && onResult(d.sum, metaOf(d));
           toast(`Подставлено: ${fmtMoney(d.sum)}${d.pct ? ` (скидка ${d.pct}%)` : ''}${d.rush ? ` · срочно +${d.rushPct}%` : ''}`, 'ok');

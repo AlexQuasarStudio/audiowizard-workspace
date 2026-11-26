@@ -15,12 +15,13 @@
   <ellipse cx="44" cy="125" rx="6.2" ry="5.2" fill="#F3C9A6"/>
   <path d="M85 70c7 9 9 19 7 28" fill="none" stroke="#E2EBF3" stroke-width="11" stroke-linecap="round"/>
   <path d="M91 98c-1 6-5 10-10 11" fill="none" stroke="#F3C9A6" stroke-width="8" stroke-linecap="round"/>
-  <ellipse cx="80" cy="111" rx="6.2" ry="5.2" fill="#F3C9A6"/>
+  <ellipse cx="78" cy="101" rx="6.2" ry="5.2" fill="#F3C9A6"/>
+  <path d="M74 99c2 1 4 1 6 0" stroke="#C98F6E" stroke-width="1.3" stroke-linecap="round" fill="none"/>
   <g>
-    <path d="M88 92h18l-2 20H90l-2-20Z" fill="#FFFDF8"/>
-    <path d="M88 92h18l-.5 5H88.5L88 92Z" fill="#C97B4A"/>
-    <path d="M86 90h22v4H86z" fill="#E8E1D6"/>
-    <path d="M95 84c-2-3 2-4 0-7M101 84c-2-3 2-4 0-7" stroke="#C9B8A4" stroke-width="1.6" stroke-linecap="round" fill="none" opacity=".8"/>
+    <path d="M77 100h17l-2 20H79l-2-20Z" fill="#FFFDF8"/>
+    <path d="M77 100h17l-.5 5H77.5L77 100Z" fill="#C97B4A"/>
+    <path d="M75 98h21v4H75z" fill="#E8E1D6"/>
+    <path d="M84 92c-2-3 2-4 0-7M90 92c-2-3 2-4 0-7" stroke="#C9B8A4" stroke-width="1.6" stroke-linecap="round" fill="none" opacity=".8"/>
   </g>
   <ellipse cx="65" cy="35" rx="18" ry="21" fill="#F3C9A6"/>
   <circle cx="47" cy="38" r="3.6" fill="#F3C9A6"/>

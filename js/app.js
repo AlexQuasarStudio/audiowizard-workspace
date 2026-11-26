@@ -1455,9 +1455,9 @@ const QUICK_BY_ROLE = {
     function mascotsHTML(cls=''){
     return `<div class="welcome-mascots ${cls}" aria-hidden="true">
       <div class="welcome-mascots__side welcome-mascots__side--left">
+        <img class="welcome-mascot welcome-mascot--human" src="assets/mascot-human-1.svg" alt="">
         <img class="welcome-mascot welcome-mascot--human" src="assets/mascot-human-3.svg" alt="">
         <img class="welcome-mascot welcome-mascot--human" src="assets/mascot-human-4.svg" alt="">
-        <img class="welcome-mascot welcome-mascot--human" src="assets/mascot-human-1.svg" alt="">
       </div>
       <span class="welcome-mascot welcome-mascot--robot mascot-art">${MASCOT_ROBOT_SVG}</span>
       <div class="welcome-mascots__side welcome-mascots__side--right">
@@ -2347,7 +2347,7 @@ ex.innerHTML = avatarHTML(user(), '');
   function offerOnboarding(){
     const u2 = user();
     openModal({
-      title:'Добро пожаловать!', modalClass:'modal--welcome', hideTitle:true, dismissible:false,
+      title:'Добро пожаловать!', modalClass:'modal--welcome', narrow:true, hideTitle:true, dismissible:false,
       body:`${mascotsHTML('welcome-mascots--modal')}
         <div class="welcome-intro" data-ob-intro>
           <div class="welcome-hero"><span class="welcome-kicker">Audiowizard Workspace</span><h2>Добро пожаловать в свою мастерскую</h2><p>Профиль уже создан. Можно сразу настроить имя, аватар и оформление — или отложить это на потом и вернуться к работе.</p></div>
@@ -9487,8 +9487,8 @@ const cm = root.querySelector('.chat-main');
       /* Ставки «с языка» и «на язык». Старое одно число делили пополам,
          чтобы цена пары не выросла после перехода на два направления. */
       const oldLangRate = code => Math.max(0, Math.min(200, Number((((S.calcSettings || {}).langPctByCode || {})[code]) ?? (S.calcSettings || {}).langPct ?? 10)));
-      const langFromVal = code => Math.max(0, Math.min(100, Number((((S.calcSettings || {}).langFromPctByCode || {})[code]) ?? (oldLangRate(code) / 2))));
-      const langToVal = code => Math.max(0, Math.min(100, Number((((S.calcSettings || {}).langToPctByCode || {})[code]) ?? (oldLangRate(code) / 2))));
+      const langFromVal = code => Math.max(0, Math.min(100, Number((((S.calcSettings || {}).langFromPctByCode || {})[code]) ?? 5)));
+      const langToVal = code => Math.max(0, Math.min(100, Number((((S.calcSettings || {}).langToPctByCode || {})[code]) ?? Math.max(10, oldLangRate(code)))));
       const pending = S.settings && S.settings.calcPending;
       const pendingHtml = pending ? `<div class="card card-pad" style="border-color:var(--accent);margin-bottom:12px">
         <b class="small">Изменения на согласовании</b>
@@ -9558,10 +9558,10 @@ const cm = root.querySelector('.chat-main');
         <div class="card card-pad calc-lang-card" style="background:var(--bg-2);margin-top:10px">
           <div class="row row--between" style="gap:10px;flex-wrap:wrap">
             <b class="small">Языки переводов</b>
-            <span class="small faint calc-lang-legend"><span class="calc-lang-rate calc-lang-rate--demo">5</span> + <span class="calc-lang-rate calc-lang-rate--demo">5</span> = 10% за пару</span>
+            <span class="small faint calc-lang-legend"><span class="calc-lang-rate calc-lang-rate--demo">5</span> / <span class="calc-lang-rate calc-lang-rate--demo">15</span> → 15% за пару</span>
             <span class="small faint" id="calc-langs-count"></span>
           </div>
-          <p class="small muted" style="margin:6px 0 8px">Все языки Smartcat по-русски. Найдите нужные и отметьте доступные в калькуляторе. Для каждого языка две ставки: «с» — когда язык оригинал, «на» — когда язык перевода. Надбавка пары складывается из «с» исходного и «на» целевого. Для редкой пары без общего популярного языка калькулятор строит маршрут через английский или русский и считает два плеча.</p>
+          <p class="small muted" style="margin:6px 0 8px">Все языки Smartcat по-русски. Найдите нужные и отметьте доступные в калькуляторе. Для каждого языка две ставки: «с» — когда язык оригинал, «на» — когда язык перевода. В паре берётся большая из двух ставок, а не их сумма: на язык перевода обычно дороже. Для редкой пары без общего популярного языка калькулятор строит маршрут через английский или русский и считает каждое плечо отдельно.</p>
           <div class="input-wrap">${icon('search')}<input class="input" id="calc-lang-q" type="search" placeholder="Поиск языка: немецкий, китайский…" autocomplete="off" spellcheck="false" aria-label="Поиск языка" style="padding-left:36px"></div>
           <div class="calc-lang-list" id="calc-langs">
             ${langList.map(l => `<label class="check calc-lang-item" data-lang-row data-search="${esc(norm(l.label + ' ' + l.code))}">
@@ -10624,19 +10624,25 @@ const cm = root.querySelector('.chat-main');
         const promoSave = e.target.closest('#promo-save');
         if (promoSave){
           const list = [];
+          const seen = new Set();
+          let dup = '';
           el.querySelectorAll('tbody#promo-rows tr[data-promo]').forEach(tr=>{
             const g = f => tr.querySelector(`[data-pf="${f}"]`);
             const code = String(g('code').value || '').trim().toUpperCase();
             if (!code) return;
+            if (seen.has(code)) dup = code;
+            seen.add(code);
             list.push({
               id: tr.dataset.promo,
               code,
               percent: Math.min(90, Math.max(0, +g('percent').value || 0)),
               kind: g('kind').value === 'volume' ? 'volume' : 'once',
               minHours: Math.max(0, +g('minHours').value || 0),
-              active: !!g('active').checked
+              active: !!g('active').checked,
+              used_by: (S.settings.promos || []).find(x => x.id === tr.dataset.promo)?.used_by || []
             });
           });
+          if (dup){ toast(`Код ${dup} уже есть — промокоды должны быть уникальны`, 'err'); return; }
           S.settings.promos = list;
           saveState();
           logAudit('Промокоды обновлены', 'Настройки');
@@ -10645,7 +10651,10 @@ const cm = root.querySelector('.chat-main');
         }
         if (e.target.closest('#promo-add')){
           S.settings.promos = S.settings.promos || [];
-          const p = { id:'pm' + uid(), code:'NEW10', percent:10, kind:'once', minHours:0, active:true };
+          let n = 10, code = 'NEW10';
+          const taken = new Set((S.settings.promos || []).map(x => String(x.code || '').toUpperCase()));
+          while (taken.has(code)){ n += 1; code = 'NEW' + n; }
+          const p = { id:'pm' + uid(), code, percent:10, kind:'once', minHours:0, active:true, used_by:[] };
           S.settings.promos.push(p);
           const tb = el.querySelector('#promo-rows');
           if (tb){

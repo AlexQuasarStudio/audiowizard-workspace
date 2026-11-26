@@ -1940,7 +1940,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1520");mask-image:url("../bg/pattern-ai.svg?v=1520");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1522");mask-image:url("../bg/pattern-ai.svg?v=1522");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2026,7 +2026,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1520");mask-image:url("../bg/pattern-ai.svg?v=1520");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1522");mask-image:url("../bg/pattern-ai.svg?v=1522");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2499,6 +2499,9 @@ body.pills-hide .head{pointer-events:none}
 .err-mascot{position:relative;width:150px;height:170px;margin-bottom:0;animation:errFloat 3.8s ease-in-out infinite;transform-origin:50% 88%}
 .err-mascot::before{content:'';position:absolute;left:22%;right:22%;bottom:-1px;height:9px;border-radius:50%;background:rgba(48,36,76,.18);filter:blur(4px);animation:errShadow 3.8s ease-in-out infinite}
 .err-mascot svg{position:relative;z-index:1;display:block;width:100%;height:100%;fill:none;filter:drop-shadow(0 12px 18px rgba(45,34,70,.18));animation:errTilt 7.6s ease-in-out infinite}
+/* Бантик робота моргает редко: короткое закрытие и долгий покой */
+.err-mascot .m-brow,.err-mascot .m-eye-s{animation:errBlink 9s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes errBlink{0%,92%,100%{transform:scaleY(1)}94.5%,96%{transform:scaleY(.12)}}
 @keyframes errFloat{0%,100%{transform:translateY(0) rotate(-.5deg)}50%{transform:translateY(-6px) rotate(.5deg)}}
 @keyframes errShadow{0%,100%{opacity:.85;transform:scaleX(1)}50%{opacity:.45;transform:scaleX(.82)}}
 @keyframes errTilt{0%,100%{transform:rotate(-1.4deg)}38%{transform:rotate(1.6deg) translateY(-1px)}72%{transform:rotate(-.4deg)}}
@@ -2779,8 +2782,18 @@ svg.ico.wip-ico{width:38px;height:38px}
 /* Калькулятор: длинный каталог услуг не растягивает окно */
 #cx-svcs{max-height:380px;overflow:auto;padding-right:4px;overscroll-behavior:contain}
 .calc-svc-wrap{max-height:420px;overflow:auto}
-#cx-lang-wrap{max-height:150px;overflow:visible;opacity:1;transition:max-height .22s var(--ease),opacity .18s var(--ease)}
-#cx-lang-wrap.is-collapsed{max-height:0;overflow:hidden;opacity:0;pointer-events:none}
+/* Блок языков не вынимается из раскладки: при гашении он остаётся на месте
+   (иначе соседние поля «прыгают», а комбобокс теряет фокус) */
+#cx-lang-wrap{opacity:1;transition:opacity .18s var(--ease)}
+#cx-lang-wrap.is-dim{opacity:.45;pointer-events:none}
+.calc-lang-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;min-height:0}
+.calc-lang-chips:empty{display:none}
+.calc-lang-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--border-2);border-radius:99px;background:var(--bg-2);font-size:12px;line-height:1.2}
+.calc-lang-chip b{font-weight:600}
+.calc-lang-chip .faint{font-variant-numeric:tabular-nums}
+.calc-lang-chip button{width:18px;height:18px;border:0;border-radius:50%;background:none;color:var(--faint);cursor:pointer;font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;transition:background-color .15s var(--ease),color .15s var(--ease)}
+.calc-lang-chip button:hover{background:var(--red-soft);color:var(--red)}
+#cx-lang-targets-live{z-index:70}
 /* Открытый список языков должен выходить за пределы блока и быть поверх полей */
 .calc-combo:has(.calc-combo__list.is-on){z-index:60}
 /* Карточка с открытым списком поднимается над залипающим итогом */
@@ -2915,7 +2928,10 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 .msg__bubble>.msg__foot{flex:none}
 /* Ширину пузыря держит только текст: реакции живут отдельной строкой снизу
    и не участвуют в shrink-to-fit, поэтому клик по реакции не меняет ширину. */
-.msg__reactions{position:absolute;left:0;top:100%;margin-top:1px;display:flex;flex-wrap:wrap;align-items:center;gap:4px;width:max-content;max-width:min(100%,240px);min-width:0}
+/* Плашки реакций живут в потоке подвала пузыря: абсолютное позиционирование
+   выпускало их за край пузыря и они налезали на соседние сообщения. */
+.msg__foot{flex-wrap:wrap}
+.msg__reactions{position:static;display:flex;flex-wrap:wrap;align-items:center;gap:4px;width:100%;max-width:100%;min-width:0;margin:0 auto 0 0}
 .msg__reactions .react-pill{animation:none}
 .msg:has(.msg__reactions){margin-bottom:22px;transition:margin-bottom .22s var(--ease)}
 .msg__reactions.is-gone{opacity:0;transform:translateY(-2px);transition:opacity .2s var(--ease),transform .2s var(--ease)}
