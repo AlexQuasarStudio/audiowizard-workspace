@@ -1443,8 +1443,8 @@ const QUICK_BY_ROLE = {
     </g>
     <!-- Мигание бантиком: вместо глаз на миг появляются «> <» -->
     <g class="m-blink">
-      <path d="M65.5 92.2l6.2 5.2-6.2 5.2" fill="none" stroke="var(--mascot-eye,#202124)" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M114.5 92.2l-6.2 5.2 6.2 5.2" fill="none" stroke="var(--mascot-eye,#202124)" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M66.4 91.4l7.2 6.6-7.2 6.6" fill="none" stroke="var(--mascot-eye,#202124)" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M113.6 91.4l-7.2 6.6 7.2 6.6" fill="none" stroke="var(--mascot-eye,#202124)" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
     <path d="M74 114c5-5 8.6 5 14 0s9 5 14 0" fill="none" stroke="var(--mascot-mouth,#5a3f78)" stroke-width="3.8"/>
     <path d="M128 82c-4 6-3 12 1 12 4 0 5-6 1-12Z" fill="var(--accent-2,var(--accent))" stroke="var(--mascot-line,#3b3155)" stroke-width="2"/>

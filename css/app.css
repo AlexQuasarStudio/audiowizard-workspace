@@ -1957,7 +1957,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1531");mask-image:url("../bg/pattern-ai.svg?v=1531");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1532");mask-image:url("../bg/pattern-ai.svg?v=1532");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2043,7 +2043,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1531");mask-image:url("../bg/pattern-ai.svg?v=1531");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1532");mask-image:url("../bg/pattern-ai.svg?v=1532");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2519,8 +2519,8 @@ body.pills-hide .head{pointer-events:none}
 /* Робот мило моргает бантиком «> <»: часто, но не подряд — одиночные
    закрытия с разными паузами и длительностью, ритм живой. Глаза гаснут и
    бантик всплывает мягко (без steps), чтобы мигание не дёргалось. */
-.err-mascot .m-eyes{animation:errEyesHide 4.4s ease-in-out infinite}
-.err-mascot .m-blink{opacity:0;animation:errBlinkShow 4.4s ease-in-out infinite}
+.err-mascot .m-eyes{animation:errEyesHide 5.2s ease-in-out infinite}
+.err-mascot .m-blink{opacity:0;animation:errBlinkShow 5.2s ease-in-out infinite}
 
 @keyframes errEyesHide{
   0%,8%{opacity:1}
