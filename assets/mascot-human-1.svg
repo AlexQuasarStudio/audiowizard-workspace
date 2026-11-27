@@ -10,7 +10,7 @@
   <!-- туловище: плечи шире талии -->
   <path d="M43 66c6-5 14-8 22-8s16 3 22 8l3 69c0 5-4 8-9 8H49c-5 0-9-3-9-8l3-69Z" fill="#4285F4"/>
   <path d="M58 60h14l5 9-12 9-12-9 5-9Z" fill="#F7FAFF"/>
-  <path d="M64 72l6 4-6 34-6-34 6-4Z" fill="#EA4335"/>
+  <path d="M64 68l6 4-6 34-6-34 6-4Z" fill="#EA4335"/>
   <!-- рука с папкой: плечо, локоть и кисть одной линией -->
   <path d="M45 70c-8 11-12 23-9 35" fill="none" stroke="#3367D6" stroke-width="11" stroke-linecap="round"/>
   <path d="M35 104c1 4 3 7 5 8" fill="none" stroke="#E8B48C" stroke-width="8" stroke-linecap="round"/>

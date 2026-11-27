@@ -842,7 +842,7 @@ const CRM = (() => {
       const ae = document.activeElement;
       const keep = (ae && (ae.id === 'f-q' || ae.id === 'f-from' || ae.id === 'f-to')) ? { s:ae.selectionStart, e:ae.selectionEnd, id:ae.id } : null;
       list = computeList();
-      const cardsView = (S.settings.ordersView || 'table') === 'cards';
+      const cardsView = viewPref('ordersView', 'table') === 'cards';
       /* Скелетон не показываем: контент рендерится из localStorage мгновенно.
          Даже при большом списке строки подставляются сразу (порциями для плавности). */
       root.innerHTML = `
@@ -927,7 +927,7 @@ const CRM = (() => {
     function fillRows(startIdx){
       const host = root.querySelector('#o-rows');
       if (!host) return;
-      const cards = (S.settings.ordersView || 'table') === 'cards';
+      const cards = viewPref('ordersView', 'table') === 'cards';
       if (startIdx === 0){
         host.innerHTML = cards
           ? '<div class="o-cards"></div>'
@@ -989,7 +989,7 @@ const CRM = (() => {
           <span class="${dlCls}" title="Дедлайн" data-inline="deadline">${icon('calendar','ico-sm')} ${dl?fmtDT(dl):'—'}</span>
           <span title="Исполнители">${exShow.length?icon('users','ico-sm')+' '+exShow.length+(exRest?`+${exRest}`:''):''}</span>
         </div>
-        <div class="o-card__foot"><b class="mono" data-inline="total">${fmtMoney(o.total)}</b>${debtMark(o)}
+        <div class="o-card__foot"><span class="o-card__sum"><b class="mono" data-inline="total">${fmtMoney(o.total)}</b>${debtMark(o)}</span>
           <span class="o-card__audio">${orderTotalAudio(o)?icon('play','ico-sm')+' '+fmtDur(orderTotalAudio(o)):''}</span>
         </div>
       </div>`;
@@ -1195,8 +1195,7 @@ const CRM = (() => {
       }));
       const vw = root.querySelector('#o-view');
       if (vw) vw.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
-        S.settings.ordersView = b.dataset.view;
-        saveState();
+        setViewPref('ordersView', b.dataset.view);
         vw.querySelectorAll('[data-view]').forEach(x => x.classList.toggle('on', x === b));
         render(false);
         animateViewSwitch(root);
@@ -1586,7 +1585,7 @@ const CRM = (() => {
        раздел и меню не перерисовываются. */
     ordersRefresh = (o) => {
       if (!root.isConnected || !o) return;
-      const cardsView = (S.settings.ordersView || 'table') === 'cards';
+      const cardsView = viewPref('ordersView', 'table') === 'cards';
       list = computeList();
       const row = root.querySelector(`tr[data-oid="${o.id}"]`);
       const card = root.querySelector(`.o-card[data-oid="${o.id}"]`);
@@ -3300,7 +3299,7 @@ const CRM = (() => {
       const flip0 = flipSnap(root);
       const ae2 = document.activeElement;
       const keep2 = (ae2 && ae2.id === 'pl-q') ? { s:ae2.selectionStart, e:ae2.selectionEnd } : null;
-      const cardsView = (S.settings[viewKey] || S.settings.peopleView || 'cards') === 'cards';
+      const cardsView = viewPref(viewKey, S.settings.peopleView || 'cards') === 'cards';
       const filtered = filteredAll();
       root.innerHTML = `
         <div class="page-head">
@@ -3370,7 +3369,7 @@ const CRM = (() => {
     function fillPeople(startIdx){
       const host = root.querySelector('#pl-rows');
       if (!host) return;
-      const cardsView = (S.settings[viewKey] || S.settings.peopleView || 'cards') === 'cards';
+      const cardsView = viewPref(viewKey, S.settings.peopleView || 'cards') === 'cards';
       const filtered = filteredAll();
       if (startIdx === 0){
         host.innerHTML = '';
@@ -3422,7 +3421,7 @@ const CRM = (() => {
       }
       const pv = $('#pl-view', root);
       if (pv) pv.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
-        S.settings[viewKey] = b.dataset.view; saveState();
+        setViewPref(viewKey, b.dataset.view);
         pv.querySelectorAll('[data-view]').forEach(x => x.classList.toggle('on', x === b));
         render();
         animateViewSwitch(root);
@@ -3823,7 +3822,7 @@ const wrap = root.querySelector('.pl-wrap');
     peopleRefresh = (p) => {
       if (!root.isConnected || !p) return;
       if (!list.some(x => x.id === p.id)) list.push(p);
-      const cardsView = (S.settings[viewKey] || S.settings.peopleView || 'cards') === 'cards';
+      const cardsView = viewPref(viewKey, S.settings.peopleView || 'cards') === 'cards';
       const card = root.querySelector(`.person-card[data-uid="${p.id}"]`);
       const row = root.querySelector(`tr[data-uid="${p.id}"]`);
       const shownNow = () => root.querySelectorAll('#pl-rows > .person-card, #pl-rows > tr[data-uid]').length;

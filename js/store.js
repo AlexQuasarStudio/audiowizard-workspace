@@ -1039,6 +1039,26 @@ function migrateRules(){
   });
 }
 let saveTimer = null;
+/* Вид списка («таблица/карточки») храним у каждого профиля отдельно:
+   ключ — id текущего пользователя, поэтому переключение профиля не меняет
+   вид у остальных. Старые общие значения остаются запасным вариантом. */
+function viewPref(key, def){
+  if (!S.settings) S.settings = {};
+  const uid = S.currentUserId || '';
+  const own = (S.settings.viewPrefs && S.settings.viewPrefs[uid]) || {};
+  if (own[key] != null) return own[key];
+  if (S.settings[key] != null) return S.settings[key];
+  return def;
+}
+function setViewPref(key, val){
+  if (!S.settings) S.settings = {};
+  S.settings.viewPrefs = S.settings.viewPrefs || {};
+  const uid = S.currentUserId || '';
+  S.settings.viewPrefs[uid] = S.settings.viewPrefs[uid] || {};
+  S.settings.viewPrefs[uid][key] = val;
+  saveState();
+}
+
 function saveState(){
   clearTimeout(saveTimer);
   saveTimer = setTimeout(()=>{

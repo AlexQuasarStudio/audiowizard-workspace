@@ -2354,10 +2354,12 @@ ex.innerHTML = avatarHTML(user(), '');
   };
   function offerOnboarding(){
     const u2 = user();
-    openModal({
+    const openWelcome = ()=>openModal({
       title:'Добро пожаловать!', modalClass:'modal--welcome', narrow:true, hideTitle:true, dismissible:false,
-      body:`${mascotsHTML('welcome-mascots--modal')}
-        <div class="welcome-intro" data-ob-intro>
+      /* Маскоты — сразу в .modal: окно строится и красится одним кадром,
+         без переезда строки после вставки и без видимой отрисовки. */
+      decor: mascotsHTML('welcome-mascots--modal welcome-mascots--float'),
+      body:`<div class="welcome-intro" data-ob-intro>
           <span class="welcome-kicker welcome-kicker--brand" data-welcome-brand>Audiowizard Workspace</span>
           <div class="welcome-hero"><h2>Добро пожаловать в свою мастерскую</h2><p>Профиль уже создан. Можно сразу настроить имя, аватар и оформление — или отложить это на потом и вернуться к работе.</p></div>
           <p class="tiny faint welcome-intro__hint">Настройка занимает меньше минуты. Отложить можно в любой момент — приветствие вернётся при следующем входе.</p>
@@ -2394,8 +2396,6 @@ ex.innerHTML = avatarHTML(user(), '');
       footer:`<button class="btn btn--ghost" data-later>Отложить</button><button class="btn btn--primary" data-begin>Начать настройку</button><button class="btn btn--ghost is-hidden" data-skip>Пропустить</button><button class="btn btn--primary is-hidden" data-go>Сохранить и начать тур</button>`,
       onMount:(m2,c2)=>{
         const wm = m2.querySelector('.modal');
-        const mrow = m2.querySelector('.welcome-mascots--modal');
-        if (mrow && wm){ mrow.classList.add('welcome-mascots--float'); wm.appendChild(mrow); }
         if (wm){ const cx=document.createElement('button'); cx.className='modal-float-x'; cx.type='button'; cx.setAttribute('aria-label','Закрыть'); cx.textContent='×'; cx.onclick=c2; wm.appendChild(cx); }
         /* Два этапа: сначала только маскоты и выбор, затем — поля профиля.
            На первом этапе нет ни скролла, ни формы. */
@@ -2463,6 +2463,15 @@ ex.innerHTML = avatarHTML(user(), '');
           saveState(); c2(); startTour(0); toast('Профиль готов — добро пожаловать!', 'ok');
         };
       } });
+
+    /* Окно показываем, когда шрифты и графика уже готовы, и только после
+       кадра вёрстки: первый видимый кадр — сразу с маскотами, без видимой
+       постепенной отрисовки. */
+    const showWelcome = ()=>requestAnimationFrame(()=>requestAnimationFrame(openWelcome));
+    try {
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(showWelcome, showWelcome);
+      else showWelcome();
+    } catch(e){ showWelcome(); }
   }
   function showInstallHint(){
     if (!S || !S.settings) return;
