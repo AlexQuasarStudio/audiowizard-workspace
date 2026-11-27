@@ -1914,6 +1914,7 @@ const CRM = (() => {
             <p class="small muted" style="margin:6px 0 10px">Выберите услуги ниши — сумма подставится в «Итого».</p>
             <div id="of-calc-svcs" class="small"></div>
             <button class="btn btn--soft btn--sm btn--block" id="of-open-calc" style="margin-top:10px">${icon('calc')} Открыть калькулятор</button>
+            <p class="tiny faint" style="margin:8px 0 0">${CALC_NOTE}</p>
           </div>
           <label class="check"><input type="checkbox" id="of-forbid" ${o.forbid_download?'checked':''}><span class="box"><svg><use href="#i-check-c"/></svg></span><span class="small muted">Запретить скачивание файлов (даже при NDA)</span></label>
         </div>
@@ -5562,6 +5563,7 @@ const wrap = root.querySelector('.pl-wrap');
   }
 
   /* ==================== КАЛЬКУЛЯТОР ==================== */
+  const CALC_NOTE = 'Стоимость и сроки — расчётные. Итоговые менеджер озвучит после ознакомления с заявкой.';
   function openCalculator({ onResult=null, nishId='', deadline=null } = {}){
     /* Ставки по направлению: «с языка» и «на язык» — независимые надбавки,
        они не складываются в одну сумму. На языке перевода надбавка обычно
@@ -5658,6 +5660,7 @@ const wrap = root.querySelector('.pl-wrap');
           <div class="field" style="margin-top:8px;max-width:320px"><label>Специализация</label>
             <select class="input" id="cx-niche">${(S.niches||[]).map(n=>`<option value="${n.id}" ${n.id===initNiche?'selected':''}>${esc(n.name)}</option>`).join('')}</select></div>
           <div class="tiny faint" style="margin-top:4px">Сначала выберите направление — услуги, ставки и нормы подстроятся.</div>
+          <p class="tiny faint" style="margin-top:6px">${CALC_NOTE}</p>
           <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
             <div class="field" style="flex:0 0 120px"><label>Количество</label>
               <input class="input" id="cx-volume" type="number" min="0" step="0.1" placeholder="0"></div>

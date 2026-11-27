@@ -277,6 +277,13 @@ html[data-theme="dark-mono"] .mascot-art .m-ear{fill:#fff}
   --mascot-human-w:96px;--mascot-human-h:140px;--mascot-overlap:36px;--mascot-side-shift:28px;--mascot-robot-w:154px;--mascot-robot-h:172px}
 .welcome-mascots__side{display:flex;align-items:flex-end;flex:none;position:relative;z-index:1}
 .welcome-mascots__side .welcome-mascot + .welcome-mascot{margin-left:calc(var(--mascot-overlap) * -1)}
+/* Человечки перекрывают друг друга: дальний к роботу лежит сверху, как в куче */
+.welcome-mascots__side .welcome-mascot:nth-child(1){z-index:1}
+.welcome-mascots__side .welcome-mascot:nth-child(2){z-index:2}
+.welcome-mascots__side .welcome-mascot:nth-child(3){z-index:3}
+.welcome-mascots__side--right .welcome-mascot:nth-child(1){z-index:3}
+.welcome-mascots__side--right .welcome-mascot:nth-child(2){z-index:2}
+.welcome-mascots__side .welcome-mascot{position:relative}
 .welcome-mascots__side--left{margin-right:calc(var(--mascot-side-shift) * -1);transform:rotate(-3deg)}
 .welcome-mascots__side--right{margin-left:calc(var(--mascot-side-shift) * -1);transform:rotate(3deg)}
 .welcome-mascot{display:block;object-fit:contain;flex:none}
@@ -1940,7 +1947,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1522");mask-image:url("../bg/pattern-ai.svg?v=1522");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1523");mask-image:url("../bg/pattern-ai.svg?v=1523");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2026,7 +2033,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1522");mask-image:url("../bg/pattern-ai.svg?v=1522");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1523");mask-image:url("../bg/pattern-ai.svg?v=1523");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2877,9 +2884,9 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 .modal--welcome{overflow:visible;max-height:min(88vh,760px)}
 .modal--welcome .modal__h,.modal--install .modal__h{display:none}
 .modal--welcome .modal__h h3{display:none}
-.modal--welcome .modal__b{padding:246px 20px 18px;overflow-y:auto;overscroll-behavior:contain}
-.modal--welcome .welcome-mascots--float{position:absolute;left:-28px;right:-28px;top:8px;width:auto;height:190px;margin:0;z-index:3;pointer-events:none;perspective:720px;transform-style:preserve-3d;justify-content:center;transition:transform .28s var(--ease),opacity .28s var(--ease);
-  --mascot-human-w:96px;--mascot-human-h:140px;--mascot-overlap:40px;--mascot-side-shift:32px;--mascot-robot-w:168px;--mascot-robot-h:190px}
+.modal--welcome .modal__b{padding:236px 20px 18px;overflow-y:auto;overscroll-behavior:contain}
+.modal--welcome .welcome-mascots--float{position:absolute;left:-28px;right:-28px;top:-6px;width:auto;height:210px;margin:0;z-index:3;pointer-events:none;perspective:720px;transform-style:preserve-3d;justify-content:center;align-items:flex-end;transition:transform .28s var(--ease),opacity .28s var(--ease);
+  --mascot-human-w:96px;--mascot-human-h:140px;--mascot-overlap:56px;--mascot-side-shift:44px;--mascot-robot-w:168px;--mascot-robot-h:190px}
 /* Скролл окна уводит маскотов наверх — они не наезжают на текст формы. */
 .modal--welcome .modal__b.is-scrolled .welcome-mascots--float{transform:translateY(-40px) scale(.94);opacity:.55}
 .modal--welcome .welcome-mascots--float .welcome-mascot--robot{transform:translateZ(64px) rotate(-3deg);filter:drop-shadow(0 18px 24px rgba(32,33,36,.25))}
@@ -2888,7 +2895,7 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 .modal--welcome .welcome-mascots--float .welcome-mascots__side--right{transform:translateZ(10px) translateX(6px) rotateY(-12deg) rotate(5deg)}
 .modal-float-x{position:absolute;right:10px;top:10px;z-index:8;width:30px;height:30px;border:0;border-radius:9px;background:color-mix(in srgb,var(--panel) 75%,transparent);color:var(--faint);font-size:19px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background-color .15s var(--ease),color .15s var(--ease)}
 .modal-float-x:hover{background:var(--red-soft);color:var(--red)}
-.modal--welcome .modal__b{padding-top:224px}
+.modal--welcome .modal__b{padding-top:232px}
 .modal--install .modal__b{padding-top:52px}
 .modal--welcome .welcome-hero{padding-top:0}
 /* Первый этап приветствия: только маскоты и два выбора, без полей и скролла. */
@@ -2917,7 +2924,7 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 .sys-ico svg{width:21px;height:21px;display:block}
 @media (max-width:520px){.modal--welcome .welcome-mascots--float{left:0;right:0;top:26px;height:166px;justify-content:center;
   --mascot-human-w:68px;--mascot-human-h:98px;--mascot-overlap:32px;--mascot-side-shift:20px;--mascot-robot-w:132px;--mascot-robot-h:152px}
-  .modal--welcome .modal__b{padding-top:190px}}
+  .modal--welcome .modal__b{padding-top:196px}}
 /* Пузыри: время float в конце текста, реакции не меняют ширину */
 .msg__bubble .txt{display:block}
 .msg__bubble .txt .time{position:static;float:right;margin:2px 0 0 8px;background:none;box-shadow:none;border-radius:0}
