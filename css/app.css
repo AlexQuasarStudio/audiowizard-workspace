@@ -1957,7 +1957,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1529");mask-image:url("../bg/pattern-ai.svg?v=1529");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1530");mask-image:url("../bg/pattern-ai.svg?v=1530");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2043,7 +2043,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1529");mask-image:url("../bg/pattern-ai.svg?v=1529");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1530");mask-image:url("../bg/pattern-ai.svg?v=1530");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2516,12 +2516,34 @@ body.pills-hide .head{pointer-events:none}
 .err-mascot{position:relative;width:150px;height:170px;margin-bottom:0;animation:errFloat 3.8s ease-in-out infinite;transform-origin:50% 88%}
 .err-mascot::before{content:'';position:absolute;left:22%;right:22%;bottom:-1px;height:9px;border-radius:50%;background:rgba(48,36,76,.18);filter:blur(4px);animation:errShadow 3.8s ease-in-out infinite}
 .err-mascot svg{position:relative;z-index:1;display:block;width:100%;height:100%;fill:none;filter:drop-shadow(0 12px 18px rgba(45,34,70,.18));animation:errTilt 7.6s ease-in-out infinite}
-/* Бантик робота моргает редко: короткое закрытие и долгий покой */
-/* Робот мило моргает бантиком: на долю секунды вместо глаз появляются «> <» */
-.err-mascot .m-eyes{animation:errEyesHide 5.2s steps(1,end) infinite}
-.err-mascot .m-blink{opacity:0;animation:errBlinkShow 5.2s steps(1,end) infinite}
-@keyframes errEyesHide{0%,90%{opacity:1}90.1%,97%{opacity:0}97.1%,100%{opacity:1}}
-@keyframes errBlinkShow{0%,90%{opacity:0}90.1%,97%{opacity:1}97.1%,100%{opacity:0}}
+/* Робот мило моргает бантиком «> <»: часто, но с рваным ритмом — пара
+   быстрых закрытий подряд, иногда одно подольше. Глаза гаснут, бантик
+   всплывает мягко (без steps), поэтому мигание не дёргается. */
+.err-mascot .m-eyes{animation:errEyesHide 3.6s ease-in-out infinite}
+.err-mascot .m-blink{opacity:0;animation:errBlinkShow 3.6s ease-in-out infinite}
+
+@keyframes errEyesHide{
+  0%{opacity:1}
+  20%,24%{opacity:0}
+  28%,40%{opacity:1}
+  42%,48%{opacity:0}
+  52%,62%{opacity:1}
+  64.5%,72%{opacity:0}
+  76%,86%{opacity:1}
+  87%,90%{opacity:0}
+  94%,100%{opacity:1}
+}
+@keyframes errBlinkShow{
+  0%{opacity:0}
+  20%,24%{opacity:1}
+  28%,40%{opacity:0}
+  42%,48%{opacity:1}
+  52%,62%{opacity:0}
+  64.5%,72%{opacity:1}
+  76%,86%{opacity:0}
+  87%,90%{opacity:1}
+  94%,100%{opacity:0}
+}
 @media (prefers-reduced-motion:reduce){
   .err-mascot .m-eyes{animation:none}
   .err-mascot .m-blink{display:none}
@@ -2903,7 +2925,7 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 .modal--welcome .modal__h h3{display:none}
 .modal--welcome .modal__b{padding:246px 20px 18px;overflow-y:auto;overscroll-behavior:contain}
 .modal--welcome .welcome-mascots--float{position:absolute;left:-28px;right:-28px;top:8px;width:auto;height:190px;margin:0;z-index:3;pointer-events:none;perspective:720px;transform-style:preserve-3d;justify-content:center;align-items:flex-end;transition:transform .28s var(--ease),opacity .28s var(--ease);
-  --mascot-human-w:96px;--mascot-human-h:140px;--mascot-overlap:38px;--mascot-side-shift:0px;--mascot-robot-w:168px;--mascot-robot-h:190px}
+  --mascot-human-w:96px;--mascot-human-h:140px;--mascot-overlap:40px;--mascot-side-shift:10px;--mascot-robot-w:168px;--mascot-robot-h:190px}
 /* Скролл окна уводит маскотов наверх — они не наезжают на текст формы. */
 .modal--welcome .modal__b.is-scrolled .welcome-mascots--float{transform:translateY(-40px) scale(.94);opacity:.55}
 .modal--welcome .welcome-mascots--float .welcome-mascot--robot{transform:translateZ(64px) rotate(-3deg);filter:drop-shadow(0 18px 24px rgba(32,33,36,.25))}
