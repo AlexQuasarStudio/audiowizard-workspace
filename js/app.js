@@ -1443,8 +1443,8 @@ const QUICK_BY_ROLE = {
     </g>
     <!-- Мигание бантиком: вместо глаз на миг появляются «> <» -->
     <g class="m-blink">
-      <path d="M60.5 91l8.5 7-8.5 7" fill="none" stroke="var(--mascot-eye,#202124)" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M119.5 91l-8.5 7 8.5 7" fill="none" stroke="var(--mascot-eye,#202124)" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M65.5 92.2l6.2 5.2-6.2 5.2" fill="none" stroke="var(--mascot-eye,#202124)" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M114.5 92.2l-6.2 5.2 6.2 5.2" fill="none" stroke="var(--mascot-eye,#202124)" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
     <path d="M74 114c5-5 8.6 5 14 0s9 5 14 0" fill="none" stroke="var(--mascot-mouth,#5a3f78)" stroke-width="3.8"/>
     <path d="M128 82c-4 6-3 12 1 12 4 0 5-6 1-12Z" fill="var(--accent-2,var(--accent))" stroke="var(--mascot-line,#3b3155)" stroke-width="2"/>
@@ -2355,7 +2355,8 @@ ex.innerHTML = avatarHTML(user(), '');
       title:'Добро пожаловать!', modalClass:'modal--welcome', narrow:true, hideTitle:true, dismissible:false,
       body:`${mascotsHTML('welcome-mascots--modal')}
         <div class="welcome-intro" data-ob-intro>
-          <div class="welcome-hero"><span class="welcome-kicker">Audiowizard Workspace</span><h2>Добро пожаловать в свою мастерскую</h2><p>Профиль уже создан. Можно сразу настроить имя, аватар и оформление — или отложить это на потом и вернуться к работе.</p></div>
+          <span class="welcome-kicker welcome-kicker--brand" data-welcome-brand>Audiowizard Workspace</span>
+          <div class="welcome-hero"><h2>Добро пожаловать в свою мастерскую</h2><p>Профиль уже создан. Можно сразу настроить имя, аватар и оформление — или отложить это на потом и вернуться к работе.</p></div>
           <p class="tiny faint welcome-intro__hint">Настройка занимает меньше минуты. Отложить можно в любой момент — приветствие вернётся при следующем входе.</p>
         </div>
         <div class="welcome-form is-hidden" data-ob-form>
