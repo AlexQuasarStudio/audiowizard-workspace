@@ -1947,7 +1947,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1524");mask-image:url("../bg/pattern-ai.svg?v=1524");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1525");mask-image:url("../bg/pattern-ai.svg?v=1525");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2033,7 +2033,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1524");mask-image:url("../bg/pattern-ai.svg?v=1524");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1525");mask-image:url("../bg/pattern-ai.svg?v=1525");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2507,8 +2507,9 @@ body.pills-hide .head{pointer-events:none}
 .err-mascot::before{content:'';position:absolute;left:22%;right:22%;bottom:-1px;height:9px;border-radius:50%;background:rgba(48,36,76,.18);filter:blur(4px);animation:errShadow 3.8s ease-in-out infinite}
 .err-mascot svg{position:relative;z-index:1;display:block;width:100%;height:100%;fill:none;filter:drop-shadow(0 12px 18px rgba(45,34,70,.18));animation:errTilt 7.6s ease-in-out infinite}
 /* Бантик робота моргает редко: короткое закрытие и долгий покой */
-.err-mascot .m-brow,.err-mascot .m-eye-s{animation:errBlink 9s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
-@keyframes errBlink{0%,92%,100%{transform:scaleY(1)}94.5%,96%{transform:scaleY(.12)}}
+.err-mascot .m-eyes{animation:errBlink 4.5s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes errBlink{0%,88%,100%{transform:scaleY(1)}91.5%,93.5%{transform:scaleY(.08)}}
+@media (prefers-reduced-motion:reduce){.err-mascot .m-eyes{animation:none}}
 @keyframes errFloat{0%,100%{transform:translateY(0) rotate(-.5deg)}50%{transform:translateY(-6px) rotate(.5deg)}}
 @keyframes errShadow{0%,100%{opacity:.85;transform:scaleX(1)}50%{opacity:.45;transform:scaleX(.82)}}
 @keyframes errTilt{0%,100%{transform:rotate(-1.4deg)}38%{transform:rotate(1.6deg) translateY(-1px)}72%{transform:rotate(-.4deg)}}
