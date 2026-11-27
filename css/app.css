@@ -1957,7 +1957,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1533");mask-image:url("../bg/pattern-ai.svg?v=1533");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1534");mask-image:url("../bg/pattern-ai.svg?v=1534");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2043,7 +2043,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1533");mask-image:url("../bg/pattern-ai.svg?v=1533");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1534");mask-image:url("../bg/pattern-ai.svg?v=1534");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2516,33 +2516,25 @@ body.pills-hide .head{pointer-events:none}
 .err-mascot{position:relative;width:150px;height:170px;margin-bottom:0;animation:errFloat 3.8s ease-in-out infinite;transform-origin:50% 88%}
 .err-mascot::before{content:'';position:absolute;left:22%;right:22%;bottom:-1px;height:9px;border-radius:50%;background:rgba(48,36,76,.18);filter:blur(4px);animation:errShadow 3.8s ease-in-out infinite}
 .err-mascot svg{position:relative;z-index:1;display:block;width:100%;height:100%;fill:none;filter:drop-shadow(0 12px 18px rgba(45,34,70,.18));animation:errTilt 7.6s ease-in-out infinite}
-/* Робот мило моргает бантиком «> <»: часто, но не подряд — одиночные
-   закрытия с разными паузами и длительностью, ритм живой. Глаза гаснут и
-   бантик всплывает мягко (без steps), чтобы мигание не дёргалось. */
-.err-mascot .m-eyes{animation:errEyesHide 5.2s ease-in-out infinite}
-.err-mascot .m-blink{opacity:0;animation:errBlinkShow 5.2s ease-in-out infinite}
+/* Робот мило моргает бантиком «> <» — редко и не подряд: за длинный цикл
+   всего два одиночных закрытия разной длительности. Глаза гаснут и бантик
+   всплывает мягко (без steps), чтобы мигание не дёргалось. */
+.err-mascot .m-eyes{animation:errEyesHide 7.5s ease-in-out infinite}
+.err-mascot .m-blink{opacity:0;animation:errBlinkShow 7.5s ease-in-out infinite}
 
 @keyframes errEyesHide{
-  0%,8%{opacity:1}
-  10%,14%{opacity:0}
-  17%,34%{opacity:1}
-  35.5%,41%{opacity:0}
-  44%,62%{opacity:1}
-  63%,66%{opacity:0}
-  69%,84%{opacity:1}
-  86%,93%{opacity:0}
-  96%,100%{opacity:1}
+  0%,7%{opacity:1}
+  9%,14%{opacity:0}
+  17%,52%{opacity:1}
+  54%,60%{opacity:0}
+  63%,100%{opacity:1}
 }
 @keyframes errBlinkShow{
-  0%,8%{opacity:0}
-  10%,14%{opacity:1}
-  17%,34%{opacity:0}
-  35.5%,41%{opacity:1}
-  44%,62%{opacity:0}
-  63%,66%{opacity:1}
-  69%,84%{opacity:0}
-  86%,93%{opacity:1}
-  96%,100%{opacity:0}
+  0%,7%{opacity:0}
+  9%,14%{opacity:1}
+  17%,52%{opacity:0}
+  54%,60%{opacity:1}
+  63%,100%{opacity:0}
 }
 @media (prefers-reduced-motion:reduce){
   .err-mascot .m-eyes{animation:none}
