@@ -1446,7 +1446,11 @@ const QUICK_BY_ROLE = {
       <path d="M66.4 91.4l7.2 6.6-7.2 6.6" fill="none" stroke="var(--mascot-eye,#202124)" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/>
       <path d="M113.6 91.4l-7.2 6.6 7.2 6.6" fill="none" stroke="var(--mascot-eye,#202124)" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
-    <path d="M74 114c5-5 8.6 5 14 0s9 5 14 0" fill="none" stroke="var(--mascot-mouth,#5a3f78)" stroke-width="3.8"/>
+    <!-- Фирменные губки робота «:3»: два закруглённых лепестка над подбородком -->
+    <g class="m-kitty-mouth">
+      <path d="M77.5 114.6c2-4.4 6-4.6 8.4-1.2 2.4-3.4 6.4-3.2 8.4 1.2-1.6 5-5.6 6.4-8.4 2.6-2.8 3.8-6.8 2.4-8.4-2.6Z" fill="var(--mascot-mouth,#5a3f78)" stroke="none"/>
+      <path d="M85.9 114.8c-.4 2.4-1.1 4-1.9 5" fill="none" stroke="color-mix(in srgb,var(--mascot-mouth,#5a3f78) 55%,#fff)" stroke-width="1.4" stroke-linecap="round"/>
+    </g>
     <path d="M128 82c-4 6-3 12 1 12 4 0 5-6 1-12Z" fill="var(--accent-2,var(--accent))" stroke="var(--mascot-line,#3b3155)" stroke-width="2"/>
     <rect x="44" y="146" width="92" height="44" rx="20" fill="#fff"/>
     <circle cx="66" cy="168" r="5" fill="var(--accent)" stroke="none"/>
