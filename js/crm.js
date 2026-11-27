@@ -5597,7 +5597,10 @@ const wrap = root.querySelector('.pl-wrap');
         via = viaCandidates(from).find(code => (shownCodes.size ? shownCodes.has(code) : true) && code !== to && code !== from) || '';
       }
       const legs = via ? [[from, via], [via, to]] : [[from, to]];
-      const rates = legs.map(([a,b]) => Math.max(langFromRate(a), langToRate(b)));
+      /* Пара считается по направлению: «с» исходного и «на» целевого.
+         Это не сумма и не максимум — при обмене языков местами ставки
+         берутся зеркально, поэтому цена пары меняется. */
+      const rates = legs.map(([a,b]) => langFromRate(a) + langToRate(b));
       return { rate:rates.reduce((n,x)=>n+x,0), via, legs, rates };
     };
     if (!onResult){
