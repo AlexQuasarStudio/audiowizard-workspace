@@ -510,10 +510,11 @@ tr.inl-tr{animation:inlRowIn .2s var(--ease)}
 .calc-display .val{font-size:23px;font-weight:700;letter-spacing:-.01em;word-break:break-all}
 .calc-combo{position:relative;min-width:0}
 .calc-combo .input{width:100%}
-.calc-combo__list{position:absolute;z-index:30;left:0;right:0;top:calc(100% + 4px);max-height:240px;overflow:auto;padding:4px;background:var(--panel);border:1px solid var(--border-2);border-radius:12px;box-shadow:0 14px 34px -18px rgba(0,0,0,.55);opacity:0;visibility:hidden;transform:translateY(-4px);transition:opacity .18s var(--ease),transform .18s var(--ease),visibility 0s linear .18s}
+.calc-combo__list{position:absolute;z-index:30;left:0;right:0;top:calc(100% + 6px);max-height:240px;overflow:auto;padding:4px;background:var(--panel);border:1px solid var(--border-2);border-radius:12px;box-shadow:0 14px 34px -18px rgba(0,0,0,.55);opacity:0;visibility:hidden;transform:none;transition:opacity .18s var(--ease),visibility 0s linear .18s}
 .calc-combo__list.is-on{opacity:1;visibility:visible;transform:none;transition-delay:0s}
 .calc-combo__list--lang{max-height:min(78vh, 720px)}
-.calc-combo__list--up{top:auto;bottom:calc(100% + 4px);transform:translateY(4px)}
+/* Список не заходит на поле ввода: отступ 6 px и никакого отрицательного сдвига */
+.calc-combo__list--up{top:auto;bottom:calc(100% + 6px);transform:none}
 .calc-combo__list--up.is-on{transform:none}
 .calc-combo__item{display:block;width:100%;padding:7px 9px;border:0;border-radius:8px;background:transparent;color:var(--text);text-align:left;font-size:12.5px;line-height:1.35;cursor:pointer}
 .calc-combo__item:hover,.calc-combo__item.on{background:var(--accent-soft)}
@@ -1947,7 +1948,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1525");mask-image:url("../bg/pattern-ai.svg?v=1525");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1526");mask-image:url("../bg/pattern-ai.svg?v=1526");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2033,7 +2034,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1525");mask-image:url("../bg/pattern-ai.svg?v=1525");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1526");mask-image:url("../bg/pattern-ai.svg?v=1526");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;

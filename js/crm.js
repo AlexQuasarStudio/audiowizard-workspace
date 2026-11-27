@@ -5993,16 +5993,18 @@ const wrap = root.querySelector('.pl-wrap');
             list.setAttribute('aria-hidden', 'true');
             active = -1;
           };
-          /* Языковые списки открываются вверх, если снизу мало места:
-             иначе окно обрезало их до пары строк. */
+          /* Список раскрывается туда, где есть место. Раньше это правило
+             работало только для языковых списков: меню услуг всегда шло вниз
+             и накрывало соседнее поле ввода. Теперь — для всех комбобоксов. */
           const placeList = () => {
-            if (!list.classList.contains('calc-combo__list--lang')) return;
             const host = input.closest('.aw-win__body') || input.closest('.aw-win') || document.documentElement;
             const hr = host.getBoundingClientRect(), ir = input.getBoundingClientRect();
             const below = hr.bottom - ir.bottom - 12, above = ir.top - hr.top - 12;
-            const up = below < 320 && above > below;
+            const isLang = list.classList.contains('calc-combo__list--lang');
+            const minRoom = isLang ? 320 : 180;
+            const up = below < minRoom && above > below;
             list.classList.toggle('calc-combo__list--up', up);
-            list.style.maxHeight = Math.max(260, Math.min(720, up ? above : below)) + 'px';
+            list.style.maxHeight = Math.max(isLang ? 260 : 120, Math.min(isLang ? 720 : 260, up ? above : below)) + 'px';
           };
           const paint = (q='') => {
             const needle = norm(q);
