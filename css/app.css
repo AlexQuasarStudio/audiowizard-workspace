@@ -1957,7 +1957,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1534");mask-image:url("../bg/pattern-ai.svg?v=1534");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1535");mask-image:url("../bg/pattern-ai.svg?v=1535");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2043,7 +2043,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1534");mask-image:url("../bg/pattern-ai.svg?v=1534");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1535");mask-image:url("../bg/pattern-ai.svg?v=1535");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2933,7 +2933,7 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
    верхнем краю маскотов, поэтому робот оказывается ровно на ней. */
 .welcome-kicker--brand{position:relative;z-index:4;display:inline-flex;margin:6px 0 0}
 .modal--welcome .welcome-intro{position:relative}
-.modal--welcome .welcome-intro > .welcome-kicker--brand{position:absolute;left:0;right:0;top:0;justify-content:center;width:max-content;margin:0 auto}
+.modal--welcome .welcome-intro > .welcome-kicker--brand{position:absolute;left:0;right:0;top:-22px;justify-content:center;width:max-content;margin:0 auto}
 /* Первый этап приветствия: только маскоты и два выбора, без полей и скролла. */
 .welcome-intro{text-align:center;padding:0 4px 4px}
 .welcome-intro .welcome-hero p{max-width:360px}
