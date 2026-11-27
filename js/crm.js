@@ -5571,7 +5571,7 @@ const wrap = root.querySelector('.pl-wrap');
        по общей ставке направления. */
     const shownCodes = new Set(((S.calcSettings || {}).languages) || []);
     const fromRateOf = code => Math.max(0, Math.min(100, Number(((S.calcSettings || {}).langFromPctByCode || {})[code] ?? ((S.calcSettings || {}).langFromPct ?? 5))));
-    const toRateOf = code => Math.max(0, Math.min(100, Number(((S.calcSettings || {}).langToPctByCode || {})[code] ?? ((S.calcSettings || {}).langToPct ?? 15))));
+    const toRateOf = code => Math.max(0, Math.min(100, Number(((S.calcSettings || {}).langToPctByCode || {})[code] ?? ((S.calcSettings || {}).langToPct ?? defaultLangToRate(code)))));
     const langFromRate = fromRateOf;
     const langToRate = toRateOf;
     const langBase = code => String(code || '').split('-')[0].toLowerCase();
@@ -5597,10 +5597,10 @@ const wrap = root.querySelector('.pl-wrap');
         via = viaCandidates(from).find(code => (shownCodes.size ? shownCodes.has(code) : true) && code !== to && code !== from) || '';
       }
       const legs = via ? [[from, via], [via, to]] : [[from, to]];
-      /* Пара считается по направлению: «с» исходного и «на» целевого.
-         Это не сумма и не максимум — при обмене языков местами ставки
-         берутся зеркально, поэтому цена пары меняется. */
-      const rates = legs.map(([a,b]) => langFromRate(a) + langToRate(b));
+      /* В паре действует ставка языка перевода («на»), а не сумма и не
+         максимум: перевод делается НА целевой язык. При обмене пары
+         целевым становится другой язык — цена меняется. */
+      const rates = legs.map(([a,b]) => langToRate(b));
       return { rate:rates.reduce((n,x)=>n+x,0), via, legs, rates };
     };
     if (!onResult){

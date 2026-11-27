@@ -150,6 +150,11 @@ const timeAgo = t => {
 };
 const initials = fio => (fio||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0].toUpperCase()).join('');
 const norm = s => String(s||'').toLowerCase().trim();
+/* Базовые ставки «на язык» для распространённых языков. Это только значение
+   по умолчанию: в настройках калькулятора любую ставку можно переопределить.
+   Нужны, чтобы перестановка пары меняла цену даже без ручной настройки. */
+const DEFAULT_LANG_TO_PCT = { ru:10, en:15, de:18, fr:17, es:17, it:16, pt:16, zh:20, ja:20, ko:20, tr:16, pl:15, uk:12, ar:18 };
+function defaultLangToRate(code){ const base=String(code||'').split('-')[0].toLowerCase(); return DEFAULT_LANG_TO_PCT[base] ?? 15; }
 const debounce = (fn, ms=160) => { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; };
 const rndIp = () => `192.168.${1+Math.floor(Math.random()*40)}.${1+Math.floor(Math.random()*240)}`;
 

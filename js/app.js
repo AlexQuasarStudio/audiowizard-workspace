@@ -1441,6 +1441,11 @@ const QUICK_BY_ROLE = {
       <circle cx="73" cy="94" r="2.8" fill="var(--mascot-pupil,#fff)" stroke="none"/>
       <circle cx="113" cy="94" r="2.8" fill="var(--mascot-pupil,#fff)" stroke="none"/>
     </g>
+    <!-- Мигание бантиком: вместо глаз на миг появляются «> <» -->
+    <g class="m-blink">
+      <path d="M63 92l8 6-8 6" fill="none" stroke="var(--mascot-eye,#202124)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M117 92l-8 6 8 6" fill="none" stroke="var(--mascot-eye,#202124)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
     <path d="M74 114c5-5 8.6 5 14 0s9 5 14 0" fill="none" stroke="var(--mascot-mouth,#5a3f78)" stroke-width="3.8"/>
     <path d="M128 82c-4 6-3 12 1 12 4 0 5-6 1-12Z" fill="var(--accent-2,var(--accent))" stroke="var(--mascot-line,#3b3155)" stroke-width="2"/>
     <rect x="44" y="146" width="92" height="44" rx="20" fill="#fff"/>
@@ -9488,7 +9493,7 @@ const cm = root.querySelector('.chat-main');
          чтобы цена пары не выросла после перехода на два направления. */
       const oldLangRate = code => Math.max(0, Math.min(200, Number((((S.calcSettings || {}).langPctByCode || {})[code]) ?? (S.calcSettings || {}).langPct ?? 10)));
       const langFromVal = code => Math.max(0, Math.min(100, Number((((S.calcSettings || {}).langFromPctByCode || {})[code]) ?? 5)));
-      const langToVal = code => Math.max(0, Math.min(100, Number((((S.calcSettings || {}).langToPctByCode || {})[code]) ?? Math.max(10, oldLangRate(code)))));
+      const langToVal = code => Math.max(0, Math.min(100, Number((((S.calcSettings || {}).langToPctByCode || {})[code]) ?? defaultLangToRate(code))));
       const pending = S.settings && S.settings.calcPending;
       const pendingHtml = pending ? `<div class="card card-pad" style="border-color:var(--accent);margin-bottom:12px">
         <b class="small">Изменения на согласовании</b>
@@ -9561,7 +9566,7 @@ const cm = root.querySelector('.chat-main');
             <span class="small faint calc-lang-legend"><span class="calc-lang-rate calc-lang-rate--demo">5</span> / <span class="calc-lang-rate calc-lang-rate--demo">15</span> → 15% за пару</span>
             <span class="small faint" id="calc-langs-count"></span>
           </div>
-          <p class="small muted" style="margin:6px 0 8px">Все языки Smartcat по-русски. Найдите нужные и отметьте доступные в калькуляторе. Для каждого языка две ставки: «с» — когда язык оригинал, «на» — когда язык перевода. В паре берётся большая из двух ставок, а не их сумма: на язык перевода обычно дороже. Для редкой пары без общего популярного языка калькулятор строит маршрут через английский или русский и считает каждое плечо отдельно.</p>
+          <p class="small muted" style="margin:6px 0 8px">Все языки Smartcat по-русски. Найдите нужные и отметьте доступные в калькуляторе. Для каждого языка две ставки: «с» — когда язык оригинал, «на» — когда язык перевода. В паре действует ставка языка перевода («на»): при обмене пары целевым становится другой язык, поэтому цена меняется. Для редкой пары без общего популярного языка калькулятор строит маршрут через английский или русский и считает каждое плечо отдельно.</p>
           <div class="input-wrap">${icon('search')}<input class="input" id="calc-lang-q" type="search" placeholder="Поиск языка: немецкий, китайский…" autocomplete="off" spellcheck="false" aria-label="Поиск языка" style="padding-left:36px"></div>
           <div class="calc-lang-list" id="calc-langs">
             ${langList.map(l => `<label class="check calc-lang-item" data-lang-row data-search="${esc(norm(l.label + ' ' + l.code))}">
