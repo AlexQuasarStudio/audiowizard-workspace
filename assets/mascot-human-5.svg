@@ -13,21 +13,22 @@
   <path d="M45 70c-8 12-11 26-8 38" fill="none" stroke="#E2EBF3" stroke-width="11" stroke-linecap="round"/>
   <path d="M37 108c1 6 3 10 6 13" fill="none" stroke="#F3C9A6" stroke-width="8" stroke-linecap="round"/>
   <ellipse cx="44" cy="125" rx="6.2" ry="5.2" fill="#F3C9A6"/>
-  <path d="M85 70c9 8 12 18 10 30" fill="none" stroke="#E2EBF3" stroke-width="11" stroke-linecap="round"/>
-  <path d="M95 100c1 6-1 11-5 14" fill="none" stroke="#F3C9A6" stroke-width="7.2" stroke-linecap="round"/>
-  <!-- кисть держит стакан точно за дно: ладонь снизу, пальцы подхватывают корпус -->
-  <ellipse cx="87.5" cy="123" rx="7.4" ry="4.4" fill="#F3C9A6"/>
+  <path d="M85 70c8 9 10 19 8 28" fill="none" stroke="#E2EBF3" stroke-width="11" stroke-linecap="round"/>
+  <path d="M93 98c-1 9-6 16-15 19" fill="none" stroke="#F3C9A6" stroke-width="7.2" stroke-linecap="round"/>
+  <!-- стакан по центру тела: держит за дно правой рукой -->
   <g>
-    <path d="M77 100h17l-2 20H79l-2-20Z" fill="#FFFDF8"/>
-    <path d="M77 100h17l-.5 5H77.5L77 100Z" fill="#C97B4A"/>
-    <path d="M75 98h21v4H75z" fill="#E8E1D6"/>
-    <path d="M84 92c-2-3 2-4 0-7M90 92c-2-3 2-4 0-7" stroke="#C9B8A4" stroke-width="1.6" stroke-linecap="round" fill="none" opacity=".8"/>
+    <path d="M56.5 100h17l-2 20H58.5l-2-20Z" fill="#FFFDF8"/>
+    <path d="M56.5 100h17l-.5 5H57l-.5-5Z" fill="#C97B4A"/>
+    <path d="M54.5 98h21v4h-21z" fill="#E8E1D6"/>
+    <path d="M63.5 92c-2-3 2-4 0-7M69.5 92c-2-3 2-4 0-7" stroke="#C9B8A4" stroke-width="1.6" stroke-linecap="round" fill="none" opacity=".8"/>
   </g>
-  <!-- пальцы и большой палец ложатся поверх стакана -->
-  <path d="M80.8 121.6c3 1 6.4 1 9.6 0" fill="none" stroke="#F3C9A6" stroke-width="4.2" stroke-linecap="round"/>
-  <path d="M81.8 124.4c2.8.7 5.8.5 8.4-.4" fill="none" stroke="#F3C9A6" stroke-width="3.4" stroke-linecap="round"/>
-  <path d="M91.2 120.4c1.8-2.4 1.8-5.2.2-7.4" fill="none" stroke="#F3C9A6" stroke-width="4" stroke-linecap="round"/>
-  <path d="M83 121.8c2.4.6 4.8.4 6.9-.3M84 124.5c2 .4 4.1.2 5.9-.4" fill="none" stroke="#C98F6E" stroke-width="1" stroke-linecap="round" opacity=".5"/>
+  <!-- кисть под дном: ладонь снизу, пальцы подхватывают, большой палец по стенке -->
+  <ellipse cx="66" cy="123" rx="8" ry="4.4" fill="#F3C9A6"/>
+  <path d="M78 117c-2.4 2.4-5.6 4.6-9 5.6" fill="none" stroke="#F3C9A6" stroke-width="6.6" stroke-linecap="round"/>
+  <path d="M59.6 121.8c3.4 1 7.4.8 10.6-.4" fill="none" stroke="#F3C9A6" stroke-width="4.2" stroke-linecap="round"/>
+  <path d="M60.6 124.6c3 .8 6.2.6 9-.3" fill="none" stroke="#F3C9A6" stroke-width="3.4" stroke-linecap="round"/>
+  <path d="M72.6 120.8c1.8-2.4 1.8-5.2 0-7.2" fill="none" stroke="#F3C9A6" stroke-width="4" stroke-linecap="round"/>
+  <path d="M61.6 122c2.6.6 5.4.4 7.9-.4M62.6 124.7c2.2.5 4.5.2 6.4-.5" fill="none" stroke="#C98F6E" stroke-width="1" stroke-linecap="round" opacity=".5"/>
   <ellipse cx="65" cy="35" rx="18" ry="21" fill="#F3C9A6"/>
   <circle cx="47" cy="38" r="3.6" fill="#F3C9A6"/>
   <circle cx="83" cy="38" r="3.6" fill="#F3C9A6"/>

@@ -1293,8 +1293,19 @@ body:not(.zen) .side{position:fixed;top:7px;left:12px;bottom:7px;height:auto;tra
   /* Фон панели прозрачный: сквозь неё виден общий дудл-фон приложения.
      Футер под панелью на время открытого чата гасим, иначе он просвечивал
      сквозь ленту сообщений. */
-  .view--chats.chats-chat-open{position:relative;left:auto;right:auto;top:auto;bottom:auto;z-index:80;display:flex;flex-direction:column;height:calc(100dvh - var(--head-h) - 12px);padding:0 12px 10px;background:transparent;overflow:hidden}
-  body:has(.view--chats.chats-chat-open) .foot{opacity:0;visibility:hidden;pointer-events:none}
+  /* Открытый чат занимает РОВНО экран: оболочка фиксируется по высоте,
+     футер уходит из потока (он и так невидим), поэтому страница больше
+     не прокручивается ниже поля ввода — скроллится только лента. */
+  .view--chats.chats-chat-open{position:relative;left:auto;right:auto;top:auto;bottom:auto;z-index:80;display:flex;flex-direction:column;height:100%;padding:0 12px 10px;background:transparent;overflow:hidden}
+  body:has(.view--chats.chats-chat-open){overflow:hidden}
+  body:has(.view--chats.chats-chat-open) .shell{height:100dvh;min-height:100dvh;overflow:hidden}
+  body:has(.view--chats.chats-chat-open) .foot{display:none}
+  body:has(.view--chats.chats-chat-open) #main{padding-bottom:0}
+  /* Список чатов на телефоне подстраивается под содержимое: короткий список
+     не растягивается пустой плашкой, длинный упирается в высоту экрана
+     и прокручивается внутри, а не тянет страницу. */
+  .chats-layout--withlist .chat-list{top:0;left:0;right:0;bottom:auto;height:auto;max-height:100%}
+  .chats-layout--withlist .chat-list__scroll{min-height:0}
   /* Шапка не исчезает мгновенно: она складывается по высоте, поэтому
      контейнер и лента плавно поднимаются, а при выходе так же плавно
      опускаются на место списка. */
@@ -1957,7 +1968,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1537");mask-image:url("../bg/pattern-ai.svg?v=1537");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1538");mask-image:url("../bg/pattern-ai.svg?v=1538");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2043,7 +2054,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1537");mask-image:url("../bg/pattern-ai.svg?v=1537");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1538");mask-image:url("../bg/pattern-ai.svg?v=1538");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
