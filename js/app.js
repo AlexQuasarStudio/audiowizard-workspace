@@ -1411,9 +1411,9 @@ const QUICK_BY_ROLE = {
       <circle cx="73" cy="91" r="3" fill="var(--mascot-pupil,#fff)" stroke="none"/>
       <circle cx="113" cy="91" r="3" fill="var(--mascot-pupil,#fff)" stroke="none"/>
     </g>
-    <!-- Фирменные губки «:3»: тройка повёрнута на 90° — губы с двумя мягкими лепестками -->
-    <g class="m-kitty-mouth" transform="translate(4.4 -.3) rotate(90 85.6 112.3)">
-      <path d="M81.2 107.2c3.5-2.5 8.2-2.3 8.5 1.2.3 3.2-3.4 4.4-6.2 2.8 2.8 1.6 6.5 2.8 6.2 6-.3 3.5-5 3.7-8.5 1.2" fill="none" stroke="var(--mascot-mouth,#5a3f78)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Фирменные губки «:3»: ровные лепестки-губы, как повёрнутая тройка -->
+    <g class="m-kitty-mouth" >
+      <path d="M81.4 109.2c1.7 5 5.4 5 8.6.2 3.2 4.8 6.9 4.8 8.6-.2" fill="none" stroke="var(--mascot-mouth,#5a3f78)" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
     <rect x="44" y="146" width="92" height="44" rx="20" fill="#fff"/>
     <circle cx="66" cy="168" r="5" fill="var(--accent)" stroke="none"/>

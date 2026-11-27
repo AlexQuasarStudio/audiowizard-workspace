@@ -1957,7 +1957,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1536");mask-image:url("../bg/pattern-ai.svg?v=1536");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1537");mask-image:url("../bg/pattern-ai.svg?v=1537");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2043,7 +2043,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1536");mask-image:url("../bg/pattern-ai.svg?v=1536");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1537");mask-image:url("../bg/pattern-ai.svg?v=1537");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2516,25 +2516,25 @@ body.pills-hide .head{pointer-events:none}
 .err-mascot{position:relative;width:150px;height:170px;margin-bottom:0;animation:errFloat 3.8s ease-in-out infinite;transform-origin:50% 88%}
 .err-mascot::before{content:'';position:absolute;left:22%;right:22%;bottom:-1px;height:9px;border-radius:50%;background:rgba(48,36,76,.18);filter:blur(4px);animation:errShadow 3.8s ease-in-out infinite}
 .err-mascot svg{position:relative;z-index:1;display:block;width:100%;height:100%;fill:none;filter:drop-shadow(0 12px 18px rgba(45,34,70,.18));animation:errTilt 7.6s ease-in-out infinite}
-/* Робот мило моргает бантиком «> <» — редко, коротко и резко: за длинный
-   цикл два одиночных закрытия примерно по 100 мс. Переключение мгновенное
-   (доли процента), держится коротко и так же мгновенно возвращается. */
-.err-mascot .m-eyes{animation:errEyesHide 7.5s linear infinite}
-.err-mascot .m-blink{opacity:0;animation:errBlinkShow 7.5s linear infinite}
+/* Робот мило моргает бантиком «> <» — редко и резко, но двойным: два
+   коротких закрытия подряд (~80 мс) и длинная пауза. Переключение
+   мгновенное, поэтому моргание читается как «морг-морг», а не плавно. */
+.err-mascot .m-eyes{animation:errEyesHide 6.5s linear infinite}
+.err-mascot .m-blink{opacity:0;animation:errBlinkShow 6.5s linear infinite}
 
 @keyframes errEyesHide{
-  0%,19%{opacity:1}
-  19.02%,20.5%{opacity:0}
-  20.52%,61%{opacity:1}
-  61.02%,62.5%{opacity:0}
-  62.52%,100%{opacity:1}
+  0%,20%{opacity:1}
+  20.02%,21.2%{opacity:0}
+  21.22%,23%{opacity:1}
+  23.02%,24.2%{opacity:0}
+  24.22%,100%{opacity:1}
 }
 @keyframes errBlinkShow{
-  0%,19%{opacity:0}
-  19.02%,20.5%{opacity:1}
-  20.52%,61%{opacity:0}
-  61.02%,62.5%{opacity:1}
-  62.52%,100%{opacity:0}
+  0%,20%{opacity:0}
+  20.02%,21.2%{opacity:1}
+  21.22%,23%{opacity:0}
+  23.02%,24.2%{opacity:1}
+  24.22%,100%{opacity:0}
 }
 @media (prefers-reduced-motion:reduce){
   .err-mascot .m-eyes{animation:none}
@@ -2917,23 +2917,22 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 .modal--welcome .modal__h h3{display:none}
 .modal--welcome .modal__b{padding:246px 20px 18px;overflow-y:auto;overscroll-behavior:contain}
 .modal--welcome .welcome-mascots--float{position:absolute;left:-28px;right:-28px;top:8px;width:auto;height:190px;margin:0;z-index:3;pointer-events:none;perspective:720px;transform-style:preserve-3d;justify-content:center;align-items:flex-end;transition:transform .28s var(--ease),opacity .28s var(--ease);
-  --mascot-human-w:96px;--mascot-human-h:140px;--mascot-overlap:40px;--mascot-side-shift:10px;--mascot-robot-w:168px;--mascot-robot-h:190px}
+  --mascot-human-w:96px;--mascot-human-h:140px;--mascot-overlap:48px;--mascot-side-shift:40px;--mascot-robot-w:168px;--mascot-robot-h:190px}
 /* Скролл окна уводит маскотов наверх — они не наезжают на текст формы. */
 .modal--welcome .modal__b.is-scrolled .welcome-mascots--float{transform:translateY(-40px) scale(.94);opacity:.55}
 .modal--welcome .welcome-mascots--float .welcome-mascot--robot{transform:translateZ(64px) rotate(-3deg);filter:drop-shadow(0 18px 24px rgba(32,33,36,.25))}
 .modal--welcome .welcome-mascots--float .welcome-mascot--human{filter:drop-shadow(0 12px 16px rgba(32,33,36,.2))}
-.modal--welcome .welcome-mascots--float .welcome-mascots__side--left{transform:translateZ(18px) translateX(-6px) rotateY(12deg) rotate(-5deg)}
-.modal--welcome .welcome-mascots--float .welcome-mascots__side--right{transform:translateZ(10px) translateX(6px) rotateY(-12deg) rotate(5deg)}
+.modal--welcome .welcome-mascots--float .welcome-mascots__side--left{transform:translateZ(14px) translateX(2px) rotateY(7deg) rotate(-3deg)}
+.modal--welcome .welcome-mascots--float .welcome-mascots__side--right{transform:translateZ(8px) translateX(-2px) rotateY(-7deg) rotate(3deg)}
 .modal-float-x{position:absolute;right:10px;top:10px;z-index:8;width:30px;height:30px;border:0;border-radius:9px;background:color-mix(in srgb,var(--panel) 75%,transparent);color:var(--faint);font-size:19px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background-color .15s var(--ease),color .15s var(--ease)}
 .modal-float-x:hover{background:var(--red-soft);color:var(--red)}
-.modal--welcome .modal__b{padding-top:224px}
+.modal--welcome .modal__b{padding-top:212px}
 .modal--install .modal__b{padding-top:52px}
 .modal--welcome .welcome-hero{padding-top:0}
-/* Название — первым, под ним робот: пилюля «Audiowizard Workspace» стоит на
-   верхнем краю маскотов, поэтому робот оказывается ровно на ней. */
-.welcome-kicker--brand{position:relative;z-index:4;display:inline-flex;margin:6px 0 0}
-.modal--welcome .welcome-intro{position:relative}
-.modal--welcome .welcome-intro > .welcome-kicker--brand{position:absolute;left:0;right:0;top:-22px;justify-content:center;width:max-content;margin:0 auto}
+/* Название — обычная пилюля в потоке сразу под роботом: отступ тела
+   подобран так, чтобы ступни робота ложились ровно на её верхний край. */
+.welcome-kicker--brand{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--border-2);border-radius:99px;
+  font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);white-space:nowrap;margin:0 0 2px}
 /* Первый этап приветствия: только маскоты и два выбора, без полей и скролла. */
 .welcome-intro{text-align:center;padding:0 4px 4px}
 .welcome-intro .welcome-hero p{max-width:360px}
@@ -2960,7 +2959,7 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 .sys-ico svg{width:21px;height:21px;display:block}
 @media (max-width:520px){.modal--welcome .welcome-mascots--float{left:0;right:0;top:26px;height:166px;justify-content:center;
   --mascot-human-w:68px;--mascot-human-h:98px;--mascot-overlap:32px;--mascot-side-shift:20px;--mascot-robot-w:132px;--mascot-robot-h:152px}
-  .modal--welcome .modal__b{padding-top:190px}}
+  .modal--welcome .modal__b{padding-top:204px}}
 /* Пузыри: время float в конце текста, реакции не меняют ширину */
 .msg__bubble .txt{display:block}
 .msg__bubble .txt .time{position:static;float:right;margin:2px 0 0 8px;background:none;box-shadow:none;border-radius:0}
