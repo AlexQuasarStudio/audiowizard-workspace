@@ -1708,9 +1708,15 @@ const CRM = (() => {
   /* Сдача работы: заказ уходит на проверку менеджеру, а не сразу в «Выполнено». */
   function submitOrder(o){
     const u = me(); if (!u) return;
+    const DAY = 86400000, now = Date.now();
+    const share = Math.max(0, Math.min(100, Number(o.review_share != null ? o.review_share
+      : ((S.settings || {}).reviewSharePct != null ? S.settings.reviewSharePct : 20))));
+    const term = Math.max(0, (+o.deadline || now + 3 * DAY) - (+o.created_at || now));
     o.status = 'review';
+    o.review_until = now + Math.max(DAY, Math.round(term * share / 100));
+    o.review_share = share;
     o.history = o.history || [];
-    o.history.push({ t:Date.now(), txt:`Сдал(а) на проверку: ${u.full_name}` });
+    o.history.push({ t: now, txt:`Сдал(а) на проверку: ${u.full_name} · на проверку ${share}% срока, до ${new Date(o.review_until).toLocaleString('ru-RU')}` });
     saveState();
     toast('Работа сдана — заказ на проверке у менеджера','ok');
     if (typeof render === 'function') render();
@@ -1743,6 +1749,21 @@ const CRM = (() => {
     saveState();
     toast(fast ? 'Заказ вернулся в ожидание, карма не пострадала' : `Отказ принят, карма −${penalty}`, fast ? 'ok' : 'warn');
     if (typeof render === 'function') render();
+  }
+
+  /* Истёк срок проверки — заказ автоматически становится выполненным. */
+  function sweepReview(){
+    const now = Date.now(); let changed = false;
+    (S.orders || []).forEach(o => {
+      if (o.status === 'review' && o.review_until && o.review_until <= now){
+        o.status = 'done';
+        o.history = o.history || [];
+        o.history.push({ t: now, txt:'Проверка истекла — автоматически переведено в «Выполнено»' });
+        changed = true;
+      }
+    });
+    if (changed){ saveState(); try { if (typeof render === 'function') render(); } catch(e){} }
+    return changed;
   }
 
   /* Передача заказа другому менеджеру: руководитель ведёт его дальше. */
@@ -1953,8 +1974,16 @@ const CRM = (() => {
             <div class="field"><label>Объём <span class="tiny faint">(можно править вручную)</span></label>
               <div class="row" style="gap:6px">
                 <input class="input" id="of-volume" type="number" min="0" step="0.1" placeholder="0" value="${Number(o.volume)||''}">
-                <select class="input" id="of-volume-unit" style="max-width:130px">
-                  ${[['min','мин'],['char','знаков'],['page','стр.']].map(([v,l])=>`<option value="${v}" ${((o.volume_unit||'min')===v)?'selected':''}>${l}</option>`).join('')}
+
+              </div>
+              <input class="input" id="of-volume-note" placeholder="Что именно (для «другое»)" style="margin-top:6px" value="${esc(o.volume_note||'')}">
+            </div>
+            <div class="field"><label>Время на проверку, % срока</label>
+              <input class="input" id="of-review-share" type="number" min="0" max="100" step="1" placeholder="20" value="${o.review_share != null ? o.review_share : ''}">
+              <div style="display:none">
+              <div style="display:none">
+                <select class="input" id="of-volume-unit" style="max-width:170px">
+                  ${[['min','мин'],['char','знаков с пробелами'],['char_ns','знаков без пробелов'],['page','стр.'],['other','другое']].map(([v,l])=>`<option value="${v}" ${((o.volume_unit||'min')===v)?'selected':''}>${l}</option>`).join('')}
                 </select>
               </div>
             </div>
@@ -2530,7 +2559,7 @@ const CRM = (() => {
         function collect(){
           const rush = isRushOrder();
           return cleanRecord({
-            order_id:sanitizeOrderId(g('#of-id').value), client_id:g('#of-client').value, client_ids:[...selClients], nish_id:g('#of-niche').value, service:g('#of-service').value, tariff:g('#of-tariff').value, volume:(+g('#of-volume').value || 0), volume_unit:(g('#of-volume-unit').value || 'min'),
+            order_id:sanitizeOrderId(g('#of-id').value), client_id:g('#of-client').value, client_ids:[...selClients], nish_id:g('#of-niche').value, service:g('#of-service').value, tariff:g('#of-tariff').value, volume:(+g('#of-volume').value || 0), volume_unit:(g('#of-volume-unit').value || 'min'), volume_note:(((g('#of-volume-note')||{}).value) || '').trim(), review_share: (g('#of-review-share') && g('#of-review-share').value !== '' ? Math.max(0, Math.min(100, +g('#of-review-share').value)) : undefined),
             status:g('#of-status').value, deadline:g('#of-deadline').value||null, start:g('#of-start').value||null, total:+g('#of-total').value||0, is_test:!!(g('#of-test')||{}).checked,
             rush: rush.urgent, rush_pct: rush.urgent ? rush.pct : 0, rush_fee: rush.urgent ? (Number(form.calcRushFee)||0) : 0,
             managerFee: Math.max(0, Math.min(100, +g('#of-mgrfee').value || 10)),
@@ -2851,7 +2880,7 @@ const CRM = (() => {
           ${(()=>{ const au = orderTotalAudio(o);
             return au ? `<span class="badge badge--outline" title="Объём работы">${icon('mic','ico-sm')} ${fmtDur(au)}</span>` : ''; })()}
           ${(o.files||[]).length ? `<span class="badge badge--outline" title="Файлов в заказе">${icon('clip','ico-sm')} ${o.files.length}</span>` : ''}
-          ${o.volume ? `<span class="badge badge--outline" title="Объём услуги из калькулятора">${icon('calc','ico-sm')} ${esc(String(o.volume))} ${o.volume_unit==='char'?'знаков':o.volume_unit==='page'?'стр.':'мин'}</span>` : ''}
+          ${o.volume ? `<span class="badge badge--outline" title="Объём услуги из калькулятора">${icon('calc','ico-sm')} ${esc(String(o.volume))} ${o.volume_unit==='char'?'знаков':o.volume_unit==='char_ns'?'знаков без пробелов':o.volume_unit==='page'?'стр.':o.volume_unit==='other'?esc(o.volume_note||'другое'):'мин'}</span>` : ''}
           ${o.deadline ? `<span class="badge badge--outline" title="Дедлайн">${icon('calendar','ico-sm')} ${esc(fmtDT(o.deadline))}</span>` : ''}
           ${o.nda?'<span class="badge c-violet">NDA</span>':''}
           ${o.forbid_download?'<span class="badge c-red">Запрет скачивания</span>':''}
@@ -7109,6 +7138,6 @@ const wrap = root.querySelector('.pl-wrap');
   }
   window.openInvites = openInvites;
 
-  return { ordersView, openOrderForm, openOrderDetail, openCalculator, openTicket, orderContextMenu,
+  return { sweepReview, ordersView, openOrderForm, openOrderDetail, openCalculator, openTicket, orderContextMenu,
     peopleView, projectsView, toolsView, kanbanView, setStatus, payOrder, generateOrderId, openPersonForm, openPersonCard, refreshMoneyUsers };
 })();
