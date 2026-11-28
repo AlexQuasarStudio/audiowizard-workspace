@@ -59,6 +59,20 @@ const CRM = (() => {
   const tariffLabel = id => (TARIFFS.find(t => t.id === id) || {}).label || '';
   const tariffChip = id => id ? `<span class="badge badge--outline tariff-chip tariff-chip--${esc(id)}">${esc(tariffLabel(id))}</span>` : '';
 
+  /* Квалификация исполнителя: 1–3. Ниже 3 — оплата по коэффициенту и
+     обязательная вычитка после сдачи. Коэффициенты настраиваются. */
+  const QUAL_COEF_DEF = { 1: 0.80, 2: 0.90, 3: 1.00 };
+  const qualOf = uid => {
+    const u = (S.users || []).find(x => x && x.id === uid);
+    const v = u && ((u.ext && u.ext.qual) || u.qual);
+    return v === 1 || v === 2 || v === 3 ? v : 3;
+  };
+  const qualCoef = level => {
+    const cfg = (S.settings && S.settings.qualPay) || {};
+    const v = Number(cfg[level]);
+    return Number.isFinite(v) && v > 0 ? v : (QUAL_COEF_DEF[level] || 1);
+  };
+
   const canStatus = (from, to, user) => {
     if (from === to) return { ok:false, why:'Статус не изменён' };
     if (to === 'waiting'){
@@ -1712,11 +1726,20 @@ const CRM = (() => {
     const share = Math.max(0, Math.min(100, Number(o.review_share != null ? o.review_share
       : ((S.settings || {}).reviewSharePct != null ? S.settings.reviewSharePct : 20))));
     const term = Math.max(0, (+o.deadline || now + 3 * DAY) - (+o.created_at || now));
+    const lvl = qualOf(u.id), coef = qualCoef(lvl);
+    const ex = (o.executors || []).find(e => e.uid === u.id && !e.is_review);
+    if (ex && coef !== 1 && !ex.coefApplied){
+      ex.base_amount = Number(ex.amount) || 0;
+      ex.amount = Math.round(ex.base_amount * coef);
+      ex.coefApplied = coef;
+    }
+    o.review_required = lvl < 3;
     o.status = 'review';
     o.review_until = now + Math.max(DAY, Math.round(term * share / 100));
     o.review_share = share;
     o.history = o.history || [];
     o.history.push({ t: now, txt:`Сдал(а) на проверку: ${u.full_name} · на проверку ${share}% срока, до ${new Date(o.review_until).toLocaleString('ru-RU')}` });
+    if (lvl < 3) o.history.push({ t: now, txt:`Квалификация ${lvl}: оплата ×${coef} — обязательная вычитка` });
     saveState();
     toast('Работа сдана — заказ на проверке у менеджера','ok');
     if (typeof render === 'function') render();
@@ -2798,6 +2821,7 @@ const CRM = (() => {
         pctInp.addEventListener('input', paint);
         const whBox = m2.querySelector('#rv-withhold'), whWrap = m2.querySelector('#rv-from-wrap');
         if (whBox && whWrap) whBox.onchange = ()=>{ whWrap.hidden = !whBox.checked; };
+        if (o.review_required && whBox && whWrap){ whBox.checked = true; whWrap.hidden = false; }
         m2.querySelector('[data-x]').onclick = close2;
         m2.querySelector('[data-rv-save]').onclick = async ()=>{
           const uidv = m2.querySelector('#rv-user').value;
