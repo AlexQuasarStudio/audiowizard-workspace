@@ -1950,6 +1950,14 @@ const CRM = (() => {
           </div>
           <div class="cols-2 grid" style="gap:13px">
             <div class="field"><label>Услуга</label><select class="input" id="of-service">${serviceChoices(o.nish_id, o.service)}</select></div>
+            <div class="field"><label>Объём <span class="tiny faint">(можно править вручную)</span></label>
+              <div class="row" style="gap:6px">
+                <input class="input" id="of-volume" type="number" min="0" step="0.1" placeholder="0" value="${Number(o.volume)||''}">
+                <select class="input" id="of-volume-unit" style="max-width:130px">
+                  ${[['min','мин'],['char','знаков'],['page','стр.']].map(([v,l])=>`<option value="${v}" ${((o.volume_unit||'min')===v)?'selected':''}>${l}</option>`).join('')}
+                </select>
+              </div>
+            </div>
             <div class="field"><label>Тариф</label><select class="input" id="of-tariff">
               <option value="">— не указан —</option>
               ${TARIFFS.map(t=>`<option value="${t.id}" ${o.tariff===t.id?'selected':''}>${esc(t.label)}</option>`).join('')}</select></div>
@@ -2479,6 +2487,8 @@ const CRM = (() => {
               paintRecs();
             }
             if (meta.service && g('#of-service')) g('#of-service').value = meta.service;
+            if (meta.volume != null && g('#of-volume')) g('#of-volume').value = meta.volume || '';
+            if (meta.volumeUnit && g('#of-volume-unit')) g('#of-volume-unit').value = meta.volumeUnit;
             if (meta.deadline){
               const dl = g('#of-deadline');
               dl.value = new Date(meta.deadline - new Date(meta.deadline).getTimezoneOffset()*60000).toISOString().slice(0,16);
@@ -2520,7 +2530,7 @@ const CRM = (() => {
         function collect(){
           const rush = isRushOrder();
           return cleanRecord({
-            order_id:sanitizeOrderId(g('#of-id').value), client_id:g('#of-client').value, client_ids:[...selClients], nish_id:g('#of-niche').value, service:g('#of-service').value, tariff:g('#of-tariff').value,
+            order_id:sanitizeOrderId(g('#of-id').value), client_id:g('#of-client').value, client_ids:[...selClients], nish_id:g('#of-niche').value, service:g('#of-service').value, tariff:g('#of-tariff').value, volume:(+g('#of-volume').value || 0), volume_unit:(g('#of-volume-unit').value || 'min'),
             status:g('#of-status').value, deadline:g('#of-deadline').value||null, start:g('#of-start').value||null, total:+g('#of-total').value||0, is_test:!!(g('#of-test')||{}).checked,
             rush: rush.urgent, rush_pct: rush.urgent ? rush.pct : 0, rush_fee: rush.urgent ? (Number(form.calcRushFee)||0) : 0,
             managerFee: Math.max(0, Math.min(100, +g('#of-mgrfee').value || 10)),
@@ -2841,6 +2851,7 @@ const CRM = (() => {
           ${(()=>{ const au = orderTotalAudio(o);
             return au ? `<span class="badge badge--outline" title="Объём работы">${icon('mic','ico-sm')} ${fmtDur(au)}</span>` : ''; })()}
           ${(o.files||[]).length ? `<span class="badge badge--outline" title="Файлов в заказе">${icon('clip','ico-sm')} ${o.files.length}</span>` : ''}
+          ${o.volume ? `<span class="badge badge--outline" title="Объём услуги из калькулятора">${icon('calc','ico-sm')} ${esc(String(o.volume))} ${o.volume_unit==='char'?'знаков':o.volume_unit==='page'?'стр.':'мин'}</span>` : ''}
           ${o.deadline ? `<span class="badge badge--outline" title="Дедлайн">${icon('calendar','ico-sm')} ${esc(fmtDT(o.deadline))}</span>` : ''}
           ${o.nda?'<span class="badge c-violet">NDA</span>':''}
           ${o.forbid_download?'<span class="badge c-red">Запрет скачивания</span>':''}
@@ -6475,6 +6486,8 @@ const wrap = root.querySelector('.pl-wrap');
           return from && targets.length ? from + '→' + targets.join('+') : '';
         };
         const metaOf = d => ({ deadline:d.deadline, rush:d.rush, rushPct:d.rushPct, rushFee:d.rushFee, nishId:d.nid,
+          volume: g2('#cx-volume') ? Math.max(0, +g2('#cx-volume').value || 0) : 0,
+          volumeUnit: g2('#cx-unit') ? g2('#cx-unit').value : 'min',
           service: (volState().s || {}).name || '',
           langFrom: g2('#cx-lang-from') ? g2('#cx-lang-from').value : '',
           langTo: g2('#cx-lang-to') ? g2('#cx-lang-to').value : '', langPair:langPair() });
