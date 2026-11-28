@@ -971,7 +971,7 @@ body.zen .day-sep.on-scroll{top:0}
 .msg--own .msg__bubble{margin-left:auto}
 /* Переход к сообщению по цитате/счётчику ответов: мягкая волна подсветки.
    Раньше класс msg--flash добавлялся и снимался, но стиля для него не было. */
-.msg__bubble{transition:box-shadow .2s var(--ease)}
+.msg__bubble{transition:box-shadow .2s var(--ease),width .18s var(--ease),height .18s var(--ease)}
 .msg--flash .msg__bubble{animation:msgFlash 1.5s var(--ease)}
 @keyframes msgFlash{
   0%{box-shadow:0 0 0 0 transparent}
@@ -1981,7 +1981,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1544");mask-image:url("../bg/pattern-ai.svg?v=1544");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1545");mask-image:url("../bg/pattern-ai.svg?v=1545");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2067,7 +2067,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1544");mask-image:url("../bg/pattern-ai.svg?v=1544");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1545");mask-image:url("../bg/pattern-ai.svg?v=1545");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -3000,10 +3000,11 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
    и не участвуют в shrink-to-fit, поэтому клик по реакции не меняет ширину. */
 /* Плашки реакций живут в потоке подвала пузыря: абсолютное позиционирование
    выпускало их за край пузыря и они налезали на соседние сообщения. */
-.msg__foot{flex-wrap:nowrap}
-/* Реакции занимают свободное место, время всегда последнее в этой же строке;
-   при переполнении пилюли поджимаются, а не уезжают под время. */
-.msg__foot .msg__reactions{flex:1 1 auto;min-width:0;overflow:hidden}
+/* Реакции и время одной строкой, пока влезают; если пилюли уже наезжают —
+   строка переносится ЦЕЛИКОМ, время никогда не перекрывается реакциями. */
+.msg__foot{flex-wrap:wrap;row-gap:4px}
+.msg__foot .msg__reactions{flex:0 1 auto;min-width:0;max-width:100%;flex-wrap:wrap;overflow:visible}
+.msg__foot .time{margin-left:auto}
 .msg__reactions{position:static;display:flex;flex-wrap:wrap;align-items:center;gap:4px;width:100%;max-width:100%;min-width:0;margin:0 auto 0 0}
 .msg__reactions .react-pill{animation:none}
 .msg:has(.msg__reactions){margin-bottom:22px;transition:margin-bottom .22s var(--ease)}
