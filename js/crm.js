@@ -1577,7 +1577,8 @@ const CRM = (() => {
         const row = e.target.closest('[data-ctx="order"]');
         if (!row || !row.dataset.oid) return;
         e.preventDefault();
-        if (staff) orderContextMenu(row.dataset.oid, e.clientX, e.clientY);
+        const role = (me()||{}).role;
+        if (staff || role === 'executor') orderContextMenu(row.dataset.oid, e.clientX, e.clientY);
       });
     }
 
@@ -1715,6 +1716,35 @@ const CRM = (() => {
     if (typeof render === 'function') render();
   }
 
+  /* Отказ от заказа. Сразу после взятия — без потери кармы; позже — со
+     штрафом, который растёт по мере приближения дедлайна. Заказ возвращается
+     в «В ожидании», менеджер видит это в истории. */
+  function refuseOrder(o){
+    const u = me(); if (!u) return;
+    const ex = (o.executors || []).find(e => e.uid === u.id);
+    if (!ex){ toast('Вы не в этом заказе','info'); return; }
+    const now = Date.now();
+    const taken = ex.taken_at || o.updated_at || now;
+    const fast = (now - taken) < 10 * 60 * 1000;
+    o.executors = (o.executors || []).filter(e => e.uid !== u.id);
+    if (!o.executors.length) o.status = 'waiting';
+    let penalty = 0;
+    if (!fast){
+      const dl = +o.deadline || 0;
+      const left = dl ? (dl - now) : Infinity;
+      const DAY = 86400000;
+      penalty = left <= DAY ? 12 : left <= 3 * DAY ? 8 : 5;
+      try { if (typeof karmaAdjust === 'function') karmaAdjust(u.id, -penalty, 'Отказ от заказа #' + o.order_id); } catch(e){}
+    }
+    o.history = o.history || [];
+    o.history.push({ t: now, txt: fast
+      ? `Отказ без потери кармы: ${u.full_name}; заказ снова в ожидании`
+      : `Отказ: ${u.full_name}, карма −${penalty}; заказ снова в ожидании` });
+    saveState();
+    toast(fast ? 'Заказ вернулся в ожидание, карма не пострадала' : `Отказ принят, карма −${penalty}`, fast ? 'ok' : 'warn');
+    if (typeof render === 'function') render();
+  }
+
   /* Передача заказа другому менеджеру: руководитель ведёт его дальше. */
   function pickOrderManager(o, x, y){
     const list = (S.users || []).filter(u=>['manager','top_manager','admin'].includes(u.role) && u.id!==o.manager_id);
@@ -1750,19 +1780,25 @@ const CRM = (() => {
         ? [{ label:'Взять в работу', icon:'check-c', onClick:()=>takeOrder(o) }] : []),
       ...(o.status==='work' && (me()||{}).role==='executor' && (o.executors||[]).some(e=>e.uid===me().id)
         ? [{ label:'Сдать работу', icon:'check-c', onClick:()=>submitOrder(o) }] : []),
+      ...(o.status==='work' && (me()||{}).role==='executor' && (o.executors||[]).some(e=>e.uid===me().id)
+        ? [{ label:'Отказаться от заказа', icon:'x', danger:true, onClick:()=>refuseOrder(o) }] : []),
       ...(isStaff((me()||{}).role)
         ? [{ label:'Передать менеджеру', icon:'users', onClick:()=>pickOrderManager(o, x, y) }] : []),
-      '-',
-      { label:'Изменить статус', header:true, label:STATUS_META[o.status].label },
-      ...Object.entries(STATUS_META).filter(([st])=>canStatus(o.status,st).ok||st===o.status).map(([st,m])=>({
-        label:m.label, icon:'refresh', danger:st==='archived', onClick:()=>setStatus(o, st)
-      })),
-      '-',
+      ...(isStaff((me()||{}).role) ? [
+        '-',
+        { label:'Изменить статус', header:true, label:STATUS_META[o.status].label },
+        ...Object.entries(STATUS_META).filter(([st])=>canStatus(o.status,st).ok||st===o.status).map(([st,m])=>({
+          label:m.label, icon:'refresh', danger:st==='archived', onClick:()=>setStatus(o, st)
+        })),
+        '-'
+      ] : []),
       ...(o.status==='done' && o.executors.some(e=>!e.is_paid) ? [{ label:'Оплатить всем', icon:'card', onClick:()=>payOrder(o) }] : []),
       ...((isStaff((me()||{}).role) && ((o.executors||[]).some(e=>e.is_paid) || !!(o.splitAccrual && o.splitAccrual.manager && o.splitAccrual.manager.paid)))
         ? [{ label:'Вернуть в неоплаченные', icon:'refresh', onClick:()=>returnToUnpaid(o) }] : []),
-      ...(o.status!=='archived' ? [{ label:'В архив', icon:'archive', onClick:()=>setStatus(o,'archived') }] : [{ label:'Из архива', icon:'archive', onClick:()=>setStatus(o, o.history.some(h=>h.txt.includes('Выполнено'))?'done':'work') }]),
-      { label:'Удалить', icon:'trash', danger:true, onClick:()=>staffCanDelete?deleteOrder(o):toast('Удаление доступно только для статусов «Черновик» и «В ожидании»','err') }
+      ...(isStaff((me()||{}).role) ? [
+        ...(o.status!=='archived' ? [{ label:'В архив', icon:'archive', onClick:()=>setStatus(o,'archived') }] : [{ label:'Из архива', icon:'archive', onClick:()=>setStatus(o, o.history.some(h=>h.txt.includes('Выполнено'))?'done':'work') }]),
+        { label:'Удалить', icon:'trash', danger:true, onClick:()=>staffCanDelete?deleteOrder(o):toast('Удаление доступно только для статусов «Черновик» и «В ожидании»','err') }
+      ] : [])
     ];
     contextMenu(x, y, items.filter(Boolean), anchor);
   }
