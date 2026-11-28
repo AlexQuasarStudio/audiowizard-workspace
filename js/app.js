@@ -4461,7 +4461,10 @@ ex.innerHTML = avatarHTML(user(), '');
       }
       curChat = f.id;
       chatSel.set.clear(); chatSel.mode = false;
-      if (typeof go === 'function') go('chats'); else location.hash = '#/chats';
+      /* На телефоне раздел чатов сначала показывал список: идём через
+         отложенное открытие, чтобы диалог встал сразу. */
+      if (typeof window.openChatAt === 'function') window.openChatAt(f.id);
+      else if (typeof go === 'function') go('chats'); else location.hash = '#/chats';
       return;
     }
     if (!other) return;
@@ -4483,7 +4486,9 @@ ex.innerHTML = avatarHTML(user(), '');
     }
     curChat = d.id;
     chatSel.set.clear(); chatSel.mode = false;
-    if (typeof go === 'function') go('chats');
+    /* Диалог открывается сразу, а не через список чатов (мобильный). */
+    if (typeof window.openChatAt === 'function') window.openChatAt(d.id);
+    else if (typeof go === 'function') go('chats');
     else { location.hash = '#/chats'; }
   }
   window.openDirectChat = openDirectChat;
@@ -7098,6 +7103,9 @@ const cm = root.querySelector('.chat-main');
           const s = String(window.getSelection ? window.getSelection() : '');
           const inside = e.target.closest('.msg__bubble');
           if (s.trim() && inside) selFrag = s.trim().slice(0, 300);
+          /* Мобильный: выделение к моменту клика по пункту меню часто уже
+             схлопнуто. Берём последний выделенный фрагмент этого пузыря. */
+          else if (!s.trim() && inside && inside.__lastSel) selFrag = inside.__lastSel;
         } catch(err){}
         const items = [
           /* Выделили текст — «Цитировать» первым пунктом, как в ТГ. */
@@ -7307,6 +7315,17 @@ const cm = root.querySelector('.chat-main');
       }
       setTimeout(()=>el2.classList.remove('msg--reacting'), 1300);
     };
+    /* Запоминаем выделенный фрагмент внутри пузыря — он и станет цитатой. */
+    document.addEventListener('selectionchange', ()=>{
+      try {
+        const sel = window.getSelection();
+        if (!sel || sel.isCollapsed) return;
+        const node = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+        const bubble = node && node.closest && node.closest('.msg__bubble');
+        const txt = sel.toString().trim();
+        if (bubble && txt) bubble.__lastSel = txt.slice(0, 300);
+      } catch(err){}
+    });
     box.addEventListener('dblclick', e=>{
       if (chatSel.mode || Date.now() < suppressLikeUntil) return;
       const el2 = e.target.closest('.msg');
