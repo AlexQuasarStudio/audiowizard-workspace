@@ -157,10 +157,28 @@ const APP = (() => {
 
   /* Цвет системной плашки/адресной строки на телефоне берётся из акцента,
      а не из статичной меты в index.html. */
+  let __favBase = null;
   function syncBrandColor(){
     const meta = document.querySelector('meta[name="theme-color"]');
     const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
     if (meta && accent) meta.setAttribute('content', accent);
+    if (!accent) return;
+    /* Фавиконка тоже красится акцентом: подставляем SVG как data-URI. */
+    const paint = base => {
+      const svg = base.replace(/#b49dd6/gi, accent);
+      let link = document.querySelector('link[rel="icon"][type="image/svg+xml"]');
+      if (!link){
+        link = document.createElement('link');
+        link.rel = 'icon'; link.type = 'image/svg+xml';
+        document.head.appendChild(link);
+      }
+      link.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+    };
+    if (__favBase){ paint(__favBase); return; }
+    fetch('icons/favicon.svg', { cache: 'force-cache' })
+      .then(r => r.text())
+      .then(t => { __favBase = t; paint(t); })
+      .catch(()=>{});
   }
   window.__syncBrandColor = syncBrandColor;
 
