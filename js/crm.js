@@ -1974,18 +1974,14 @@ const CRM = (() => {
             <div class="field"><label>Объём <span class="tiny faint">(можно править вручную)</span></label>
               <div class="row" style="gap:6px">
                 <input class="input" id="of-volume" type="number" min="0" step="0.1" placeholder="0" value="${Number(o.volume)||''}">
-
+                <select class="input" id="of-volume-unit" style="max-width:170px">
+                  ${[['min','мин'],['char','знаков с пробелами'],['char_ns','знаков без пробелов'],['page','стр.'],['other','другое']].map(([v,l])=>`<option value="${v}" ${((o.volume_unit||'min')===v)?'selected':''}>${l}</option>`).join('')}
+                </select>
               </div>
               <input class="input" id="of-volume-note" placeholder="Что именно (для «другое»)" style="margin-top:6px" value="${esc(o.volume_note||'')}">
             </div>
             <div class="field"><label>Время на проверку, % срока</label>
               <input class="input" id="of-review-share" type="number" min="0" max="100" step="1" placeholder="20" value="${o.review_share != null ? o.review_share : ''}">
-              <div style="display:none">
-              <div style="display:none">
-                <select class="input" id="of-volume-unit" style="max-width:170px">
-                  ${[['min','мин'],['char','знаков с пробелами'],['char_ns','знаков без пробелов'],['page','стр.'],['other','другое']].map(([v,l])=>`<option value="${v}" ${((o.volume_unit||'min')===v)?'selected':''}>${l}</option>`).join('')}
-                </select>
-              </div>
             </div>
             <div class="field"><label>Тариф</label><select class="input" id="of-tariff">
               <option value="">— не указан —</option>
@@ -2789,7 +2785,10 @@ const CRM = (() => {
         <div class="field"><label>Кто вычитывает</label><select class="input" id="rv-user">${opts}</select></div>
         <div class="field"><label>Ставка, % от суммы исполнителям</label><input class="input" id="rv-pct" type="number" min="0" max="50" step="1" value="${defPct}"></div>
         <div class="row row--between small"><span class="muted">Сумма вычитки</span><b id="rv-sum">${fmtMoney(Math.round(base * defPct / 100))}</b></div>
-        <p class="small faint" style="margin:0">База: ${fmtMoney(base)} · потолок бюджета исполнителей ${fmtMoney(cap)} · свободно ${fmtMoney(free)}. Из оплаты исполнителя ничего не вычитается.</p>
+        <label class="check small"><input type="checkbox" id="rv-withhold"><span class="box"><svg><use href="#i-check-c"/></svg></span><span>Удержать сумму вычитки из оплаты исполнителя</span></label>
+        <div class="field" id="rv-from-wrap" hidden><label>Из кого удерживать</label>
+          <select class="input" id="rv-from">${execs.map(e=>`<option value="${esc(e.uid)}">${esc((userById(e.uid)||{}).full_name||e.uid)} — ${fmtMoney(e.amount||0)}</option>`).join('')}</select></div>
+        <p class="small faint" style="margin:0">База: ${fmtMoney(base)} · потолок бюджета исполнителей ${fmtMoney(cap)} · свободно ${fmtMoney(free)}. Без удержания вычитка идёт отдельной строкой бюджета.</p>
       </div>`,
       footer:`<button class="btn btn--ghost" data-x>Отмена</button><button class="btn btn--primary" data-rv-save>Назначить</button>`,
       onMount:(m2, close2)=>{
@@ -2797,16 +2796,19 @@ const CRM = (() => {
         const sumEl = m2.querySelector('#rv-sum');
         const paint = ()=>{ const pct = Math.min(50, Math.max(0, +pctInp.value || 0)); sumEl.textContent = fmtMoney(Math.round(base * pct / 100)); };
         pctInp.addEventListener('input', paint);
+        const whBox = m2.querySelector('#rv-withhold'), whWrap = m2.querySelector('#rv-from-wrap');
+        if (whBox && whWrap) whBox.onchange = ()=>{ whWrap.hidden = !whBox.checked; };
         m2.querySelector('[data-x]').onclick = close2;
         m2.querySelector('[data-rv-save]').onclick = async ()=>{
           const uidv = m2.querySelector('#rv-user').value;
           const pct = Math.min(50, Math.max(0, +pctInp.value || 0));
           const amount = Math.round(base * pct / 100);
+          const withholding = !!(m2.querySelector('#rv-withhold') || {}).checked;
           if (!uidv){ toast('Выберите исполнителя','warn'); return; }
           if (!amount){ toast('Сумма вычитки нулевая','warn'); return; }
           /* Потолок бюджета исполнителей: как и при смене статуса, не
              блокируем молча, а показываем дефицит и просим подтвердить. */
-          if (amount > free){
+          if (!withholding && amount > free){
             const ok = await (window.confirmModal ? confirmModal({
               title:'Бюджет исполнителей превышен', danger:true, okText:'Всё равно назначить',
               text:`Вычитка ${fmtMoney(amount)} при свободных ${fmtMoney(free)} из потолка ${fmtMoney(cap)}. Не хватает ${fmtMoney(amount - free)}.`,
@@ -2817,6 +2819,17 @@ const CRM = (() => {
           o.executors = o.executors || [];
           const rvEntry = { uid:uidv, amount, percent:pct, is_review:true, is_paid:false, paid:0, accrued:false };
           o.executors.push(rvEntry);
+          /* Удержание из оплаты того, чью работу вычитывают: бюджет не растёт. */
+          if (withholding){
+            const fromUid = (m2.querySelector('#rv-from') || {}).value || '';
+            const victim = (o.executors || []).find(e => e.uid === fromUid && !e.is_review);
+            if (victim){
+              const cut = Math.min(Number(victim.amount) || 0, amount);
+              victim.amount = Math.max(0, (Number(victim.amount) || 0) - cut);
+              o.history = o.history || [];
+              o.history.push({ t:Date.now(), txt:`Удержано ${fmtMoney(cut)} из оплаты ${(userById(fromUid)||{}).full_name||fromUid} на вычитку` });
+            }
+          }
           /* Заказ уже выполнен — вычитку начисляем сразу. Иначе при выплате
              её сумма списалась бы с баланса, не будучи начисленной. */
           if (completedStatus(o.status) && window.Finance){ Finance.credit(uidv, amount); rvEntry.accrued = true; }
