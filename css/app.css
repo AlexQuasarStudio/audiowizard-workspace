@@ -1980,7 +1980,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1555");mask-image:url("../bg/pattern-ai.svg?v=1555");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1556");mask-image:url("../bg/pattern-ai.svg?v=1556");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2066,7 +2066,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1555");mask-image:url("../bg/pattern-ai.svg?v=1555");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1556");mask-image:url("../bg/pattern-ai.svg?v=1556");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -3142,3 +3142,25 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 @media (max-width:520px){.calc-lang-fromto{gap:2px}.calc-lang-fromto .calc-lang-rate{width:31px!important}}
 
 .c-blue{color:var(--accent)}
+
+/* Мобильные чаты: список тянется до нижнего края. Футер в этом разделе
+   съедал 176 px и лента не доставала до низа экрана. */
+@media (max-width:960px){
+  body:has(.view--chats) .foot{display:none}
+  body:has(.view--chats) #main{padding-bottom:0}
+  body:has(.view--chats) .view--chats{height:calc(100dvh - 66px);display:flex;flex-direction:column;min-height:0}
+  body:has(.view--chats) .view--chats > .chats-layout{height:auto;flex:1 1 auto;min-height:0;padding-bottom:8px}
+}
+
+@media (max-width:960px){
+  /* Список чатов — карточка на всю высоту раздела, а не по контенту. */
+  body:has(.view--chats) .chats-layout--withlist .chat-list{height:100%;max-height:none}
+  body:has(.view--chats) .chats-layout{grid-template-rows:1fr}
+}
+
+/* Телефон: поля внутри окон не выпирают за свою карточку (был input шире
+   контейнера на 43 px). Ширина ограничена, минимум снят. */
+@media (max-width:960px){
+  .aw-win .input, .aw-win .select, .modal .input, .modal .select{max-width:100%;min-width:0}
+  .aw-win .row, .modal .row{min-width:0}
+}
