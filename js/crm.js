@@ -1704,6 +1704,17 @@ const CRM = (() => {
     if (typeof render === 'function') render();
   }
 
+  /* Сдача работы: заказ уходит на проверку менеджеру, а не сразу в «Выполнено». */
+  function submitOrder(o){
+    const u = me(); if (!u) return;
+    o.status = 'review';
+    o.history = o.history || [];
+    o.history.push({ t:Date.now(), txt:`Сдал(а) на проверку: ${u.full_name}` });
+    saveState();
+    toast('Работа сдана — заказ на проверке у менеджера','ok');
+    if (typeof render === 'function') render();
+  }
+
   /* Передача заказа другому менеджеру: руководитель ведёт его дальше. */
   function pickOrderManager(o, x, y){
     const list = (S.users || []).filter(u=>['manager','top_manager','admin'].includes(u.role) && u.id!==o.manager_id);
@@ -1737,6 +1748,8 @@ const CRM = (() => {
       } },
       ...(o.status==='waiting' && (me()||{}).role==='executor' && !(o.executors||[]).some(e=>e.uid===me().id)
         ? [{ label:'Взять в работу', icon:'check-c', onClick:()=>takeOrder(o) }] : []),
+      ...(o.status==='work' && (me()||{}).role==='executor' && (o.executors||[]).some(e=>e.uid===me().id)
+        ? [{ label:'Сдать работу', icon:'check-c', onClick:()=>submitOrder(o) }] : []),
       ...(isStaff((me()||{}).role)
         ? [{ label:'Передать менеджеру', icon:'users', onClick:()=>pickOrderManager(o, x, y) }] : []),
       '-',

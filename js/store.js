@@ -13,6 +13,7 @@ const STATUS_META = {
   draft:    { label:'Черновик',    cls:'c-gray',   row:'tr-draft' },
   waiting:  { label:'В ожидании',  cls:'c-gray',   row:'tr-waiting' },
   work:     { label:'В работе',    cls:'c-yellow', row:'tr-work' },
+  review:   { label:'На проверке', cls:'c-blue',   row:'tr-review' },
   done:     { label:'Выполнено',   cls:'c-green',  row:'tr-done' },
   revision: { label:'В доработке', cls:'c-orange', row:'tr-revision' },
   problem:  { label:'Проблема',    cls:'c-red',    row:'tr-problem' },
