@@ -6020,6 +6020,9 @@ const wrap = root.querySelector('.pl-wrap');
             wrap.style.maxHeight = (wrap.scrollHeight || 0) + 'px';
             requestAnimationFrame(() => { wrap.style.maxHeight = '0px'; wrap.classList.add('is-off'); });
           }
+          /* После раскрытия снимаем фиксированную высоту: иначе позднее
+             выросшее содержимое (мультиперевод) срезалось. */
+          if (show) setTimeout(()=>{ if (!wrap.classList.contains('is-off')) wrap.style.maxHeight = 'none'; }, 330);
           const from = g2('#cx-lang-from'), to = g2('#cx-lang-to');
           const swap = g2('#cx-lang-swap');
           if (swap) swap.disabled = false;

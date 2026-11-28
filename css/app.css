@@ -1980,7 +1980,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1553");mask-image:url("../bg/pattern-ai.svg?v=1553");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1554");mask-image:url("../bg/pattern-ai.svg?v=1554");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2066,7 +2066,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1553");mask-image:url("../bg/pattern-ai.svg?v=1553");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1554");mask-image:url("../bg/pattern-ai.svg?v=1554");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2851,7 +2851,10 @@ svg.ico.wip-ico{width:38px;height:38px}
 #cx-lang-wrap{opacity:1;transition:opacity .18s var(--ease)}
 /* Языки и мультиперевод нужны только переводам: у остальных услуг блок
    полностью убирается, но плавно — высота и прозрачность идут вместе. */
-#cx-lang-wrap{overflow:hidden;transition:max-height .3s var(--ease),opacity .22s var(--ease),margin-top .3s var(--ease)}
+/* Обрезаем только пока блок свёрнут: иначе срезались подсказки языков и
+   содержимое, которое выросло после раскрытия (например, мультиперевод). */
+#cx-lang-wrap{overflow:visible;transition:max-height .3s var(--ease),opacity .22s var(--ease),margin-top .3s var(--ease)}
+#cx-lang-wrap.is-off{overflow:hidden}
 #cx-lang-wrap.is-off{opacity:0;pointer-events:none;visibility:hidden;margin-top:0!important}
 .calc-lang-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;min-height:0}
 .calc-lang-chips:empty{display:none}
