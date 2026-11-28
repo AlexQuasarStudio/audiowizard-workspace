@@ -469,10 +469,9 @@ function showDropdown(anchor, items, opts={}){
     const emBtn = e.target.closest('[data-emoji]');
     if (emBtn){
       const em = emBtn.dataset.emoji;
-      /* Плашку не закрываем: можно поставить несколько реакций подряд. */
-      emBtn.classList.toggle('on');
-      emBtn.setAttribute('aria-pressed', emBtn.classList.contains('on') ? 'true' : 'false');
+      /* Плашку не закрываем: реакций может понадобиться несколько подряд. */
       opts.onEmoji && opts.onEmoji(em);
+      emBtn.classList.toggle('dd__emoji--on');
       return;
     }
     const b = e.target.closest('[data-i]');
