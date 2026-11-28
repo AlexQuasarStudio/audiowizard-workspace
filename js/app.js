@@ -158,8 +158,8 @@ const APP = (() => {
   function parseHash(){
     const h = (location.hash||'').replace(/^#\/?/,'');
     if (!h) return null;
-    const [name, param] = h.split('/');
-    return { name: name||'dash', param: param||null };
+    const [name, param, msg] = h.split('/');
+    return { name: name||'dash', param: param||null, msg: msg||null };
   }
 
   /* ---------- Рендер оболочки ---------- */
@@ -7143,6 +7143,20 @@ const cm = root.querySelector('.chat-main');
               const t = box.querySelector('.msg[data-msg="' + repliesToThis[0].id + '"]');
               if (t){ t.scrollIntoView({ block:'center', behavior:'smooth' }); t.classList.add('msg--flash'); setTimeout(()=>t.classList.remove('msg--flash'), 1300); }
             } }] : []),
+          { label:'Копировать ссылку', icon:'copy', onClick:()=>{
+              const url = location.origin + location.pathname + '#/chats/' + m.chat_id + '/' + m.id;
+              const done = ()=> toast('Ссылка на сообщение скопирована','ok');
+              const fallback = ()=>{
+                const ta = document.createElement('textarea');
+                ta.value = url; ta.style.position='fixed'; ta.style.opacity='0';
+                document.body.appendChild(ta); ta.select();
+                try { document.execCommand('copy'); } catch(e){}
+                ta.remove(); done();
+              };
+              if (navigator.clipboard && navigator.clipboard.writeText){
+                navigator.clipboard.writeText(url).then(done, fallback);
+              } else fallback();
+            } },
           { label:'Переслать…', icon:'send', onClick:()=>openForwardMenu(m) },
           { label: m.pinned ? 'Открепить сообщение' : 'Закрепить сообщение', icon:'pin', onClick:()=>{
               const wasPinned = !!m.pinned;
@@ -12627,9 +12641,22 @@ function initPWA(){
     const q = new URLSearchParams(location.search);
     if (q.get('action')==='new-order' && user() && isStaff(user().role)){ setTimeout(()=>CRM.openOrderForm(), 80); }
     if (q.get('action')==='search' && user()) setTimeout(openPalette, 300);
+    /* Ссылка вида #/chats/<чат>/<сообщение> открывает диалог и подсвечивает
+       сообщение — по ней участник чата попадает ровно в нужное место. */
+    const openDeepLink = (r)=>{
+      if (!r || r.name!=='chats' || !r.param || !r.msg) return;
+      const key = r.param + '/' + r.msg;
+      if (window.__lastDeepLink === key) return;
+      window.__lastDeepLink = key;
+      /* go('chats') на уже открытом разделе не перерисовывает вид, поэтому
+         ставим отложенное открытие и просим рендер сами. */
+      setTimeout(()=>{ try { window.__pendingChatOpen = { id:r.param, msgId:r.msg }; render(); } catch(e){} }, 40);
+    };
+    openDeepLink(route);
     window.addEventListener('hashchange', ()=>{
       const h2 = parseHash();
-      if (h2 && (h2.name!==route.name || h2.param!==route.param)){ route = h2; render(); }
+      if (h2 && (h2.name!==route.name || h2.param!==route.param || h2.msg!==route.msg)){ route = h2; render(); }
+      openDeepLink(h2);
     });
     /* Пересоздание дудл-фонов при смене темы/акцента приложения */
     try {
