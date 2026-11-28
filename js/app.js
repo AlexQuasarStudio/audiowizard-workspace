@@ -155,6 +155,15 @@ const APP = (() => {
     const dr = $('#app .side'); if (dr && dr.classList.contains('open')){ dr.classList.remove('open'); const sc = $('.side-scrim'); if (sc){ sc.classList.add('closing'); setTimeout(()=>sc.remove(), 320); } }
   }
 
+  /* Цвет системной плашки/адресной строки на телефоне берётся из акцента,
+     а не из статичной меты в index.html. */
+  function syncBrandColor(){
+    const meta = document.querySelector('meta[name="theme-color"]');
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    if (meta && accent) meta.setAttribute('content', accent);
+  }
+  window.__syncBrandColor = syncBrandColor;
+
   function parseHash(){
     const h = (location.hash||'').replace(/^#\/?/,'');
     if (!h) return null;
@@ -7188,14 +7197,19 @@ const cm = root.querySelector('.chat-main');
                 m.pinned = false; m.pinned_until = null; saveState(); renderChat();
                 toast('Сообщение откреплено','ok');
               } }]
-            : [['навсегда', 0], ['на сутки', 86400000], ['на неделю', 7*86400000], ['на месяц', 30*86400000]].map(([word, ms]) => ({
-                label: 'Закрепить ' + word, icon:'pin', onClick:()=>{
-                  m.pinned = true; m.pinned_at = Date.now(); m.pinned_until = ms ? Date.now() + ms : null;
-                  saveState();
-                  try { pushChatAction(`${u.full_name} закрепил(а) сообщение ${word}`); } catch(e){}
-                  toast('Сообщение закреплено ' + word,'ok'); renderChat();
-                }
-              }))),
+            : [{ label:'Закрепить', icon:'pin', onClick:()=>{
+                const anchor = box && box.querySelector('.msg[data-msg="' + m.id + '"]');
+                if (typeof showDropdown !== 'function' || !anchor) return;
+                const rr = anchor.getBoundingClientRect();
+                showDropdown(anchor, [['навсегда', 0], ['на сутки', 86400000], ['на неделю', 7*86400000], ['на месяц', 30*86400000]].map(([word, ms]) => ({
+                  label: word.charAt(0).toUpperCase() + word.slice(1), icon:'pin', onClick:()=>{
+                    m.pinned = true; m.pinned_at = Date.now(); m.pinned_until = ms ? Date.now() + ms : null;
+                    saveState();
+                    try { pushChatAction(`${u.full_name} закрепил(а) сообщение на ${word}`); } catch(e){}
+                    toast('Сообщение закреплено на ' + word,'ok'); renderChat();
+                  }
+                })), { x: rr.left + 12, y: rr.top + 12, force:true });
+              } }]),
 
           { label:'Копировать текст', icon:'copy', onClick:()=>{
               try { navigator.clipboard.writeText(m.text||''); toast('Текст скопирован','ok'); }
@@ -12657,6 +12671,7 @@ function initPWA(){
         }
       } catch(e){}
       applyTheme(user()?.mode || 'system', user()?.accent || 'violet');
+      try { syncBrandColor(); } catch(e){}
       initKeys();
       initPWA();
       initLongPress();
@@ -12701,7 +12716,7 @@ function initPWA(){
     try {
       const themeObs = new MutationObserver(() => {
         clearTimeout(themeObs._t);
-        themeObs._t = setTimeout(() => { try { refreshBgThemes(); } catch(e){} }, 40);
+        themeObs._t = setTimeout(() => { try { refreshBgThemes(); } catch(e){} try { window.__syncBrandColor && window.__syncBrandColor(); } catch(e){} }, 40);
       });
       themeObs.observe(document.documentElement, { attributes:true, attributeFilter:['data-theme'] });
     } catch(e){}
