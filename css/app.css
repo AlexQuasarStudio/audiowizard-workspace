@@ -1513,7 +1513,7 @@ body.menu-dragging .main .theme-card:hover{box-shadow:none!important;transform:n
 .welcome-mascots--modal{width:calc(100% + 96px);margin:-54px -48px -8px;height:190px;overflow:visible;
   --mascot-human-w:96px;--mascot-human-h:140px;--mascot-overlap:40px;--mascot-side-shift:32px;--mascot-robot-w:168px;--mascot-robot-h:190px}
 @media (max-width:520px){.welcome-mascots--modal{width:calc(100% + 48px);margin-left:-24px;margin-right:-24px;height:154px;
-  --mascot-human-w:60px;--mascot-human-h:88px;--mascot-overlap:8px;--mascot-side-shift:20px;--mascot-robot-w:132px;--mascot-robot-h:152px}}
+  --mascot-human-w:46px;--mascot-human-h:68px;--mascot-overlap:12px;--mascot-side-shift:0px;--mascot-robot-w:132px;--mascot-robot-h:152px}}
 .aw-win--dragging{box-shadow:0 30px 90px -12px rgba(0,0,0,.65);opacity:.97}
 
 /* В активном сплите тень между окнами не рисуется (стык без наложения) */
@@ -1980,7 +1980,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1563");mask-image:url("../bg/pattern-ai.svg?v=1563");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1564");mask-image:url("../bg/pattern-ai.svg?v=1564");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2066,7 +2066,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1563");mask-image:url("../bg/pattern-ai.svg?v=1563");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1564");mask-image:url("../bg/pattern-ai.svg?v=1564");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2990,7 +2990,7 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 .share-ico svg{width:16px;height:16px;display:block}
 .sys-ico svg{width:21px;height:21px;display:block}
 @media (max-width:520px){.modal--welcome .welcome-mascots--float{left:0;right:0;top:26px;height:166px;justify-content:center;
-  --mascot-human-w:60px;--mascot-human-h:88px;--mascot-overlap:8px;--mascot-side-shift:20px;--mascot-robot-w:132px;--mascot-robot-h:152px}
+  --mascot-human-w:46px;--mascot-human-h:68px;--mascot-overlap:12px;--mascot-side-shift:0px;--mascot-robot-w:132px;--mascot-robot-h:152px}
   .modal--welcome .modal__b{padding-top:204px}}
 /* Пузыри: время float в конце текста, реакции не меняют ширину */
 .msg__bubble .txt{display:block}
@@ -3172,3 +3172,16 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
    под него, а крайние выглядывают за окно лишь чуть-чуть. */
 .modal--welcome .welcome-mascots--float > .welcome-mascots__side--left{left:-10px;right:auto}
 .modal--welcome .welcome-mascots--float > .welcome-mascots__side--right{right:-10px;left:auto}
+
+/* Телефон: маскоты строго внутри окна — места мало. */
+@media (max-width:960px){
+  .modal--welcome .welcome-mascots--float > .welcome-mascots__side--left{left:6px;right:auto}
+  .modal--welcome .welcome-mascots--float > .welcome-mascots__side--right{right:6px;left:auto}
+}
+
+/* Подсветка процитированного фрагмента при клике по цитате */
+.quote-hl{position:absolute;pointer-events:none;border-radius:4px;z-index:0;
+  background:color-mix(in srgb,var(--accent) 24%,transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 60%,transparent);
+  animation:quoteHl 2.4s var(--ease) forwards}
+@keyframes quoteHl{0%{opacity:0}12%{opacity:1}70%{opacity:1}100%{opacity:0}}

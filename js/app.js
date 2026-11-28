@@ -7392,6 +7392,21 @@ const cm = root.querySelector('.chat-main');
         r.setEnd(n, Math.min(n.textContent.length, i + frag.length));
         const sel = window.getSelection();
         sel.removeAllRanges(); sel.addRange(r);
+        /* Подсветка: рамка поверх выделенного фрагмента, чтобы было видно,
+           что именно процитировано. */
+        try {
+          const bubble = src.querySelector('.msg__bubble');
+          if (bubble){
+            const br = bubble.getBoundingClientRect();
+            [...r.getClientRects()].forEach(rc => {
+              const d = document.createElement('div');
+              d.className = 'quote-hl';
+              d.style.cssText = `left:${rc.left-br.left}px;top:${rc.top-br.top}px;width:${rc.width}px;height:${rc.height}px`;
+              bubble.appendChild(d);
+              setTimeout(()=>{ try { d.remove(); } catch(e){} }, 2400);
+            });
+          }
+        } catch(e){}
         src.scrollIntoView({ block:'center', behavior:'smooth' });
         break;
       }
