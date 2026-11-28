@@ -6000,6 +6000,16 @@ const wrap = root.querySelector('.pl-wrap');
           const show = nid === 'n3';
           /* У не-переводов блок убираем целиком — вместе с мультипереводом.
              Прячем анимацией высоты, чтобы раскладка не дёргалась. */
+          /* Первый показ — сразу в конечном состоянии: иначе окно открывается
+             с видимым схлопыванием блока языков. */
+          if (wrap.dataset.init !== '1'){
+            wrap.dataset.init = '1';
+            wrap.classList.toggle('is-off', !show);
+            wrap.style.transition = 'none';
+            wrap.style.maxHeight = show ? 'none' : '0px';
+            requestAnimationFrame(()=>{ wrap.style.transition = ''; });
+            return finishLang(nid);
+          }
           if (show){
             wrap.classList.remove('is-off');
             wrap.style.maxHeight = 'none';
@@ -6022,9 +6032,23 @@ const wrap = root.querySelector('.pl-wrap');
               from.value = f; to.value = t;
             }
           }
+          finishLang(nid);
+        };
+        function finishLang(nid){
+          const show = nid === 'n3';
+          const from = g2('#cx-lang-from'), to = g2('#cx-lang-to');
+          if (show && from && to){
+            const codes = CALC_LANGS.map(([c]) => c);
+            if (codes.length){
+              const pick = (preferred, current) => codes.includes(preferred) ? preferred : (codes.includes(current) ? current : codes[0]);
+              let f = pick('en', from.value), t = pick('ru', to.value);
+              if (codes.length > 1 && f === t) t = codes.find(c => c !== f) || t;
+              from.value = f; to.value = t;
+            }
+          }
           syncLangInputs();
           paintLang();
-        };
+        }
         const applyLang = () => { paintLang(); upd(true); setTimeout(paintNormDeadline, 0); };
         ['#cx-lang-from','#cx-lang-to'].forEach(sel => {
           const el = g2(sel); if (el) el.addEventListener('change', applyLang);
@@ -6135,6 +6159,11 @@ const wrap = root.querySelector('.pl-wrap');
           },
           onPick: () => { paintLang(); upd(true); setTimeout(paintNormDeadline, 0); }
         });
+        /* Мультиперевод: галочка обязана раскрывать выбор нескольких языков. */
+        {
+          const mc = g2('#cx-multi'), mb = g2('#cx-multi-box');
+          if (mc && mb) mc.addEventListener('change', ()=>{ mb.hidden = !mc.checked; });
+        }
         paintLangVisibility(initNiche);
         /* Мультиперевод: вторая цель и более. */
         {
@@ -6250,7 +6279,9 @@ const wrap = root.querySelector('.pl-wrap');
           mask.querySelectorAll('[data-ex]:checked').forEach(i => {
             const p = (i.dataset.ex || '').split('|');
             const def = exDef(p[0], p[1]);
-            const base = { kind:'ex', nid:p[0], name:p[1], unitPrice:+p[2] || 0, price:0, pct:+p[3] || 0, qty:1, parent:def.parent || '', extraPrice:def.extraPrice == null ? null : Math.max(0, +def.extraPrice || 0) };
+            const svcDef = (S.calcServices[p[0]] || []).find(y => y && y.id === p[1]) || {};
+            const rawExtra = def.extraPrice != null ? def.extraPrice : svcDef.extraPrice;
+            const base = { kind:'ex', nid:p[0], name:p[1], unitPrice:+p[2] || 0, price:0, pct:+p[3] || 0, qty:1, parent:def.parent || '', extraPrice: rawExtra == null ? null : Math.max(0, +rawExtra || 0) };
             out.push({ ...base, multi:isMany(def), qty:Math.max(1, Math.round(+i.dataset.qty || 1)) });
           });
           /* Подпункт идёт, если у него своя галочка или включён родитель.
