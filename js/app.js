@@ -5467,7 +5467,13 @@ ex.innerHTML = avatarHTML(user(), '');
         const isTail = !(nxm && nxm.type !== 'system' && nxm.user_id === m.user_id
           && new Date(nxm.created_at).toDateString() === day
           && (nxm.created_at - m.created_at) < GROUP_MS);
-        const reactions = m.reactions ? Object.entries(m.reactions).filter(([,us])=>us.length).map(([em,us])=>{
+        /* Порядок пилюль — как в ТГ: чем больше поставили, тем левее.
+           Равные количества держат порядок первого появления, чтобы
+           плашки не перескакивали местами на каждом клике. */
+        const reactions = m.reactions ? Object.entries(m.reactions)
+          .filter(([,us])=>us.length)
+          .sort((a,b)=> (b[1].length - a[1].length))
+          .map(([em,us])=>{
           return `<button class="react-pill ${us.includes(u.id)?'on':''}" data-react="${m.id}|${em}" title="Реакция ${em}">${em}<span class="react-face${us.length>3?' react-face--num':''}">${reactionFaceHtml(us, em)}</span></button>`;
         }).join('') : '';
         /* Опрос ищем по poll_id самого сообщения: раньше брался первый опрос чата,

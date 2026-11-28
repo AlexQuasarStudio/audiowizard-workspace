@@ -5951,9 +5951,18 @@ const wrap = root.querySelector('.pl-wrap');
         const paintLangVisibility = nid => {
           const wrap = g2('#cx-lang-wrap'); if (!wrap) return;
           const show = nid === 'n3';
-          /* Блок не вынимаем из раскладки: только приглушаем. Иначе при
-             выборе языка пропадает само поле ввода и теряется фокус. */
-          wrap.classList.toggle('is-dim', !show);
+          /* У не-переводов блок убираем целиком — вместе с мультипереводом.
+             Прячем анимацией высоты, чтобы раскладка не дёргалась. */
+          if (show){
+            wrap.classList.remove('is-off');
+            wrap.style.maxHeight = 'none';
+            const h = wrap.scrollHeight;
+            wrap.style.maxHeight = '0px';
+            requestAnimationFrame(() => { wrap.style.maxHeight = h + 'px'; });
+          } else {
+            wrap.style.maxHeight = (wrap.scrollHeight || 0) + 'px';
+            requestAnimationFrame(() => { wrap.style.maxHeight = '0px'; wrap.classList.add('is-off'); });
+          }
           const from = g2('#cx-lang-from'), to = g2('#cx-lang-to');
           const swap = g2('#cx-lang-swap');
           if (swap) swap.disabled = false;

@@ -35,7 +35,7 @@
   }
 
 /* Sidebar */
-.side{grid-row:1 / span 3;width:var(--side-w);background:var(--panel);border:1px solid var(--border-2);display:flex;flex-direction:column;position:fixed;top:7px;left:12px;bottom:7px;height:auto;width:var(--side-w);border-radius:20px;box-shadow:0 10px 34px -14px rgba(0,0,0,.35),0 2px 6px rgba(0,0,0,.16);z-index:60;transition:width 0.34s var(--ease),transform 0.3s var(--ease),opacity 0.3s var(--ease);overflow:hidden}
+.side{grid-row:1 / span 3;width:var(--side-w);background:var(--panel);border:1px solid var(--border-2);display:flex;flex-direction:column;position:fixed;top:7px;left:12px;bottom:7px;height:auto;width:var(--side-w);border-radius:20px;box-shadow:0 10px 34px -14px rgba(0,0,0,.35),0 2px 6px rgba(0,0,0,.16);z-index:90;transition:width 0.34s var(--ease),transform 0.3s var(--ease),opacity 0.3s var(--ease);overflow:hidden}
 .side__brand{display:flex;align-items:center;gap:11px;padding:10px 14px;height:var(--head-h);flex:none;justify-content:space-between}
 /* Логотип-марка: плашка с гарантированным центрированием */
 .side__brand-logo,.auth__logo,.logo-mark--lg{display:block;background:none;border:none;box-shadow:none;color:var(--accent)}
@@ -132,7 +132,7 @@
 
 .side__close{display:none}
 /* Затемнение под мобильным drawer: тап по нему закрывает меню */
-.side-scrim{position:fixed;inset:0;z-index:55;background:rgba(12,10,18,.42);opacity:0;transition:opacity .3s var(--ease);-webkit-backdrop-filter:blur(1px);backdrop-filter:blur(1px)}
+.side-scrim{position:fixed;inset:0;z-index:85;background:rgba(12,10,18,.42);opacity:0;transition:opacity .3s var(--ease);-webkit-backdrop-filter:blur(1px);backdrop-filter:blur(1px)}
 .side-scrim.show{opacity:1}
 .side-scrim.closing{opacity:0;pointer-events:none}
 
@@ -552,7 +552,7 @@ tr.inl-tr{animation:inlRowIn .2s var(--ease)}
 .svc-row--sub{padding-left:18px!important;opacity:.92}
 .svc-row--sub>span:first-of-type{position:relative}
 .calc-qty{display:inline-flex;align-items:center;gap:4px;flex:none;margin-right:4px}
-.calc-qty .input{width:52px!important;min-height:28px!important;padding:2px 6px!important;text-align:center}
+.calc-qty .input{position:static;opacity:1;width:52px!important;min-height:28px!important;padding:2px 6px!important;text-align:center}
 /* Поле «N копий» всегда доступно для ввода, даже пока не выбрана распечатка:
    так видно, куда вводить число, и оно применится, как только галочка встанет. */
 .calc-qty.is-off{opacity:.6}
@@ -769,6 +769,12 @@ body.app-bg--none::before{content:'';display:none}
 /* Дудлы — наложение поверх фона. ОДИН тонкий слой линий с ГРАДИЕНТОМ В ИХ СТРОКЕ
    (переливаются сами линии, фон остаётся нейтральным). */
 #bg-doodles{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+/* На телефоне fixed-слой при прокрутке перерисовывается полосами и не всегда
+   доходит до низа экрана. Там слой тянется по всему документу. */
+@media (max-width:960px){
+  body{position:relative}
+  #bg-doodles{position:absolute;height:100%;min-height:100dvh}
+}
 #bg-doodles .dd--full{
   position:absolute;
   inset:0;
@@ -939,7 +945,10 @@ body.zen .day-sep.on-scroll{top:0}
 /* Время и галочки — всегда у нижнего края пузыря (и после реакций),
    прижаты вправо, даже если сообщение широкое. Строка не переносится:
    реакции живут слева в этой же строке, переносятся только пилюли. */
-.msg__foot{display:flex;flex-wrap:nowrap;justify-content:flex-end;align-items:flex-end;gap:8px;margin-top:4px}
+.msg__foot{display:flex;flex-wrap:nowrap;justify-content:flex-end;align-items:center;gap:8px;margin-top:4px}
+/* Реакции слева, время справа — одной строкой под текстом. */
+.msg__foot .msg__reactions{margin-right:auto;display:flex;align-items:center;gap:4px;flex-wrap:wrap;min-width:0}
+.msg__foot--react{gap:10px}
 .msg__foot .time{flex:none;display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--faint);line-height:1.2;white-space:nowrap}
 /* Появление/исчезновение сообщений — как в ТГ: плавно и только для новых
    (класс .msg--in вешает JS по diff'у id), история при перерисовке не дёргается. */
@@ -1210,6 +1219,9 @@ body:not(.zen) .side{position:fixed;top:7px;left:12px;bottom:7px;height:auto;tra
      которая оставалась из-за десктопных top/left 12px и радиуса. */
   body:not(.zen) .side{position:fixed;top:0;left:0;bottom:0;border-radius:0;transform:translateX(-104%)}
   body:not(.zen) .side.open{transform:none;border-radius:0 18px 18px 0}
+  /* Яндекс-подложка просвечивала сквозь drawer: под чатом он выглядел
+     наложенным на переписку. На телефоне панель плотная. */
+  body:not(.zen) .side{background:var(--panel)}
   /* Мобильная оболочка — одна колонка: панель вынесена в fixed-drawer,
      контент занимает всю ширину экрана (раньше оставалась колонка 264px,
      из-за чего страница была шире экрана). */
@@ -1969,7 +1981,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1540");mask-image:url("../bg/pattern-ai.svg?v=1540");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1541");mask-image:url("../bg/pattern-ai.svg?v=1541");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2055,7 +2067,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1540");mask-image:url("../bg/pattern-ai.svg?v=1540");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1541");mask-image:url("../bg/pattern-ai.svg?v=1541");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2836,7 +2848,10 @@ svg.ico.wip-ico{width:38px;height:38px}
 /* Блок языков не вынимается из раскладки: при гашении он остаётся на месте
    (иначе соседние поля «прыгают», а комбобокс теряет фокус) */
 #cx-lang-wrap{opacity:1;transition:opacity .18s var(--ease)}
-#cx-lang-wrap.is-dim{opacity:.45;pointer-events:none}
+/* Языки и мультиперевод нужны только переводам: у остальных услуг блок
+   полностью убирается, но плавно — высота и прозрачность идут вместе. */
+#cx-lang-wrap{overflow:hidden;transition:max-height .3s var(--ease),opacity .22s var(--ease),margin-top .3s var(--ease)}
+#cx-lang-wrap.is-off{opacity:0;pointer-events:none;visibility:hidden;margin-top:0!important}
 .calc-lang-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;min-height:0}
 .calc-lang-chips:empty{display:none}
 .calc-lang-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--border-2);border-radius:99px;background:var(--bg-2);font-size:12px;line-height:1.2}
@@ -2985,7 +3000,10 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
    и не участвуют в shrink-to-fit, поэтому клик по реакции не меняет ширину. */
 /* Плашки реакций живут в потоке подвала пузыря: абсолютное позиционирование
    выпускало их за край пузыря и они налезали на соседние сообщения. */
-.msg__foot{flex-wrap:wrap}
+.msg__foot{flex-wrap:nowrap}
+/* Реакции занимают свободное место, время всегда последнее в этой же строке;
+   при переполнении пилюли поджимаются, а не уезжают под время. */
+.msg__foot .msg__reactions{flex:1 1 auto;min-width:0;overflow:hidden}
 .msg__reactions{position:static;display:flex;flex-wrap:wrap;align-items:center;gap:4px;width:100%;max-width:100%;min-width:0;margin:0 auto 0 0}
 .msg__reactions .react-pill{animation:none}
 .msg:has(.msg__reactions){margin-bottom:22px;transition:margin-bottom .22s var(--ease)}
