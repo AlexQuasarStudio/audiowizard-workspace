@@ -469,7 +469,9 @@ function showDropdown(anchor, items, opts={}){
     const emBtn = e.target.closest('[data-emoji]');
     if (emBtn){
       const em = emBtn.dataset.emoji;
-      closeDropdown();
+      /* Плашку не закрываем: можно поставить несколько реакций подряд. */
+      emBtn.classList.toggle('on');
+      emBtn.setAttribute('aria-pressed', emBtn.classList.contains('on') ? 'true' : 'false');
       opts.onEmoji && opts.onEmoji(em);
       return;
     }
