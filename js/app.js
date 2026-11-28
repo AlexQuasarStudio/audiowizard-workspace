@@ -5761,7 +5761,13 @@ const cm = root.querySelector('.chat-main');
         box.addEventListener('pointercancel', ()=>{ tracking = false; if (cur) cur.style.transform = ''; cur = null; });
       }
       /* Панель «Закреплено» в шапке чата (как в ТГ) */
-      const pinnedMsg = msgs.find(mm => mm.pinned);
+      /* Закреплено может быть несколько: показываем последнее, остальные — в
+         списке. Закрепления с истёкшим сроком снимаем на лету. */
+      const nowPin = Date.now();
+      msgs.forEach(mm => { if (mm.pinned && mm.pinned_until && mm.pinned_until <= nowPin){ mm.pinned = false; mm.pinned_until = null; } });
+      const pinnedList = msgs.filter(mm => mm.pinned)
+        .sort((a,b) => (b.pinned_at || b.created_at) - (a.pinned_at || a.created_at));
+      const pinnedMsg = pinnedList[0] || null;
       const pbar = $('#chat-pinned', root);
       if (pbar){
         if (pinnedMsg){
@@ -5769,6 +5775,7 @@ const cm = root.querySelector('.chat-main');
           pbar.hidden = false;
           pbar.innerHTML = `<span class="pinned-msg-bar__ico">${icon('pin','ico-sm')}</span>
             <span class="pinned-msg-bar__body"><b>${esc(pa?pa.full_name:'')}</b><span>${esc((pinnedMsg.text||'').slice(0,80))}</span></span>
+            ${pinnedList.length > 1 ? `<span class="pinned-msg-bar__cnt">${pinnedList.length}</span>` : ''}
             <button class="iconbtn" id="chat-pinned-x" aria-label="Открепить">${icon('x','ico-sm')}</button>`;
           if (window.__pinnedShownId !== pinnedMsg.id){
             window.__pinnedShownId = pinnedMsg.id;
@@ -5777,7 +5784,7 @@ const cm = root.querySelector('.chat-main');
           }
           const px = pbar.querySelector('#chat-pinned-x');
           if (px) px.onclick = ()=>{
-            pinnedMsg.pinned = false; saveState();
+            pinnedMsg.pinned = false; pinnedMsg.pinned_until = null; saveState();
             pbar.classList.add('closing');
             setTimeout(()=>{ try { renderChat(); } catch(e){} }, 160);
           };
@@ -5786,19 +5793,20 @@ const cm = root.querySelector('.chat-main');
           pbar.onclick = (ev)=>{
             if (ev.target.closest('#chat-pinned-x')) return;
             if (typeof showDropdown !== 'function') return;
-            const all = msgs.filter(mm => mm.pinned);
-            if (!all.length) return;
-            showDropdown(pbar, all.map(mm => {
-              const aa = userById(mm.user_id);
-              return { label: (aa ? aa.full_name + ': ' : '') + String(mm.text || '').slice(0, 60), icon:'pin', onClick:()=>{
-                  const t = box && box.querySelector('.msg[data-msg="' + mm.id + '"]');
-                  if (t){
-                    t.scrollIntoView({ block:'center', behavior:'smooth' });
-                    t.classList.add('msg--flash');
-                    setTimeout(()=>t.classList.remove('msg--flash'), 1300);
-                  }
-                } };
-            }), {});
+            if (!pinnedList.length) return;
+            const goTo = mm => { const t = box && box.querySelector('.msg[data-msg="' + mm.id + '"]');
+              if (t){ t.scrollIntoView({ block:'center', behavior:'smooth' }); t.classList.add('msg--flash'); setTimeout(()=>t.classList.remove('msg--flash'), 1300); } };
+            const unpin = mm => { mm.pinned = false; mm.pinned_until = null; saveState(); renderChat(); };
+            showDropdown(pbar, [
+              ...pinnedList.map(mm => { const aa = userById(mm.user_id);
+                return { label: (aa ? aa.full_name + ': ' : '') + String(mm.text || '').slice(0, 60), icon:'pin', onClick:()=>goTo(mm) }; }),
+              '-',
+              ...pinnedList.map(mm => ({ label: 'Открепить: ' + String(mm.text || '').slice(0, 40), icon:'x', onClick:()=>unpin(mm) })),
+              ...(pinnedList.length > 1 ? [{ label:'Открепить все', icon:'trash', danger:true, onClick:()=>{
+                  msgs.forEach(mm => { mm.pinned = false; mm.pinned_until = null; });
+                  saveState(); renderChat();
+              } }] : [])
+            ], {});
           };
         } else {
           pbar.hidden = true; pbar.innerHTML = '';
@@ -7157,21 +7165,20 @@ const cm = root.querySelector('.chat-main');
               } else fallback();
             } },
           { label:'Переслать…', icon:'send', onClick:()=>openForwardMenu(m) },
-          { label: m.pinned ? 'Открепить сообщение' : 'Закрепить сообщение', icon:'pin', onClick:()=>{
-              const wasPinned = !!m.pinned;
-              m.pinned = !m.pinned; saveState();
-              pushChatAction(`${u.full_name} ${m.pinned?'закрепил(а)':'открепил(а)'} сообщение`);
-              toast(m.pinned ? 'Сообщение закреплено' : 'Сообщение откреплено', 'ok');
-              if (wasPinned){
-                const pb = document.querySelector('.pinned-msg-bar');
-                if (pb){
-                  pb.classList.add('closing');
-                  setTimeout(()=>{ try { renderChat(); } catch(e){} }, 160);
-                  return;
+          ...(m.pinned
+            ? [{ label:'Открепить сообщение', icon:'pin', onClick:()=>{
+                m.pinned = false; m.pinned_until = null; saveState(); renderChat();
+                toast('Сообщение откреплено','ok');
+              } }]
+            : [['навсегда', 0], ['на сутки', 86400000], ['на неделю', 7*86400000], ['на месяц', 30*86400000]].map(([word, ms]) => ({
+                label: 'Закрепить ' + word, icon:'pin', onClick:()=>{
+                  m.pinned = true; m.pinned_at = Date.now(); m.pinned_until = ms ? Date.now() + ms : null;
+                  saveState();
+                  try { pushChatAction(`${u.full_name} закрепил(а) сообщение ${word}`); } catch(e){}
+                  toast('Сообщение закреплено ' + word,'ok'); renderChat();
                 }
-              }
-              renderChat();
-            } },
+              }))),
+
           { label:'Копировать текст', icon:'copy', onClick:()=>{
               try { navigator.clipboard.writeText(m.text||''); toast('Текст скопирован','ok'); }
               catch(err){ toast('Не удалось скопировать','err'); }
