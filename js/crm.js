@@ -2838,6 +2838,10 @@ const CRM = (() => {
         <div class="row wrap" style="gap:7px;margin-bottom:14px">
           ${statusChip(o.status)} ${nicheChip(o.nish_id)} ${o.tariff ? tariffChip(o.tariff) : ''}
           ${rushMark(o)}
+          ${(()=>{ const au = orderTotalAudio(o);
+            return au ? `<span class="badge badge--outline" title="Объём работы">${icon('mic','ico-sm')} ${fmtDur(au)}</span>` : ''; })()}
+          ${(o.files||[]).length ? `<span class="badge badge--outline" title="Файлов в заказе">${icon('clip','ico-sm')} ${o.files.length}</span>` : ''}
+          ${o.deadline ? `<span class="badge badge--outline" title="Дедлайн">${icon('calendar','ico-sm')} ${esc(fmtDT(o.deadline))}</span>` : ''}
           ${o.nda?'<span class="badge c-violet">NDA</span>':''}
           ${o.forbid_download?'<span class="badge c-red">Запрет скачивания</span>':''}
           ${o.certification_amount?'<span class="badge c-blue">Заверение '+fmtMoney(o.certification_amount)+'</span>':''}
