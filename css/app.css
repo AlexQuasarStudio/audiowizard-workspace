@@ -1513,7 +1513,7 @@ body.menu-dragging .main .theme-card:hover{box-shadow:none!important;transform:n
 .welcome-mascots--modal{width:calc(100% + 96px);margin:-54px -48px -8px;height:190px;overflow:visible;
   --mascot-human-w:96px;--mascot-human-h:140px;--mascot-overlap:40px;--mascot-side-shift:32px;--mascot-robot-w:168px;--mascot-robot-h:190px}
 @media (max-width:520px){.welcome-mascots--modal{width:calc(100% + 48px);margin-left:-24px;margin-right:-24px;height:154px;
-  --mascot-human-w:68px;--mascot-human-h:98px;--mascot-overlap:32px;--mascot-side-shift:20px;--mascot-robot-w:132px;--mascot-robot-h:152px}}
+  --mascot-human-w:68px;--mascot-human-h:98px;--mascot-overlap:0px;--mascot-side-shift:20px;--mascot-robot-w:132px;--mascot-robot-h:152px}}
 .aw-win--dragging{box-shadow:0 30px 90px -12px rgba(0,0,0,.65);opacity:.97}
 
 /* В активном сплите тень между окнами не рисуется (стык без наложения) */
@@ -1980,7 +1980,7 @@ body.no-anim *,body.no-anim *::before,body.no-anim *::after{transition-duration:
   isolation:isolate;will-change:transform;
   /* Маска — на самом слое, а не на псевдоэлементе с многослойным градиентом:
      такая комбинация на части GPU рисовала тёмные «заплатки» в углах кадра. */
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1558");mask-image:url("../bg/pattern-ai.svg?v=1558");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1559");mask-image:url("../bg/pattern-ai.svg?v=1559");
   /* Единый холст вместо тайлинга: у SVG-паттерна рисунок не бесшовный,
      и на стыках тайлов был виден шов (заметнее всего у синего прожектора).
      Одним слоем шов исключён. */
@@ -2066,7 +2066,7 @@ html[data-theme^='dark'] .auth__doodles::before{background:
   background:radial-gradient(120% 85% at 2% 0%,var(--accent-2,var(--accent)) 0%,transparent 46%),
              radial-gradient(145% 125% at 100% 100%,var(--accent) 8%,transparent 62%),
              linear-gradient(125deg,var(--accent) 0%,var(--accent-2,var(--accent)) 55%,var(--accent) 100%);
-  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1558");mask-image:url("../bg/pattern-ai.svg?v=1558");
+  -webkit-mask-image:url("../bg/pattern-ai.svg?v=1559");mask-image:url("../bg/pattern-ai.svg?v=1559");
   -webkit-mask-size:440px 880px;mask-size:440px 880px;
   -webkit-mask-repeat:repeat;mask-repeat:repeat;
   -webkit-mask-position:top left;mask-position:top left;
@@ -2949,7 +2949,7 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 .modal--welcome .modal__h h3{display:none}
 .modal--welcome .modal__b{padding:246px 20px 18px;overflow-y:auto;overscroll-behavior:contain}
 .modal--welcome .welcome-mascots--float{position:absolute;left:-28px;right:-28px;top:8px;width:auto;height:190px;margin:0;z-index:3;pointer-events:none;perspective:720px;transform-style:preserve-3d;justify-content:center;align-items:flex-end;transition:transform .28s var(--ease),opacity .28s var(--ease);
-  --mascot-human-w:96px;--mascot-human-h:140px;--mascot-overlap:74px;--mascot-side-shift:8px;--mascot-robot-w:168px;--mascot-robot-h:190px}
+  --mascot-human-w:96px;--mascot-human-h:140px;--mascot-overlap:0px;--mascot-side-shift:8px;--mascot-robot-w:168px;--mascot-robot-h:190px}
 /* Скролл окна уводит маскотов наверх — они не наезжают на текст формы. */
 .modal--welcome .modal__b.is-scrolled .welcome-mascots--float{transform:translateY(-40px) scale(.94);opacity:.55}
 .modal--welcome .welcome-mascots--float .welcome-mascot--robot{transform:translateZ(64px) rotate(-3deg) translateY(15px);filter:drop-shadow(0 18px 24px rgba(32,33,36,.25))}
@@ -2990,7 +2990,7 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
 .share-ico svg{width:16px;height:16px;display:block}
 .sys-ico svg{width:21px;height:21px;display:block}
 @media (max-width:520px){.modal--welcome .welcome-mascots--float{left:0;right:0;top:26px;height:166px;justify-content:center;
-  --mascot-human-w:68px;--mascot-human-h:98px;--mascot-overlap:32px;--mascot-side-shift:20px;--mascot-robot-w:132px;--mascot-robot-h:152px}
+  --mascot-human-w:68px;--mascot-human-h:98px;--mascot-overlap:0px;--mascot-side-shift:20px;--mascot-robot-w:132px;--mascot-robot-h:152px}
   .modal--welcome .modal__b{padding-top:204px}}
 /* Пузыри: время float в конце текста, реакции не меняют ширину */
 .msg__bubble .txt{display:block}
@@ -3164,3 +3164,9 @@ body.capture-privacy .rp-file-row{filter:blur(7px)!important;user-select:none!im
   .aw-win .input, .aw-win .select, .modal .input, .modal .select{max-width:100%;min-width:0}
   .aw-win .row, .modal .row{min-width:0}
 }
+
+/* Приветствие: робот строго по центру, человечки не накладываются друг на
+   друга, крайние чуть выглядывают за окно. */
+.modal--welcome .welcome-mascots--float > .welcome-mascots__side{position:absolute;bottom:0;margin:0}
+.modal--welcome .welcome-mascots--float > .welcome-mascots__side--left{left:-22px}
+.modal--welcome .welcome-mascots--float > .welcome-mascots__side--right{right:-22px}

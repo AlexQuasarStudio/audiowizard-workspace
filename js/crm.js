@@ -6333,7 +6333,8 @@ const wrap = root.querySelector('.pl-wrap');
           mask.querySelectorAll('[data-ex]:checked').forEach(i => {
             const p = (i.dataset.ex || '').split('|');
             const def = exDef(p[0], p[1]);
-            const svcDef = (S.calcServices[p[0]] || []).find(y => y && y.id === p[1]) || {};
+            const altDef = (((S.calcSettings || {}).extras || {})[p[0]]) || [];
+            const svcDef = (S.calcServices[p[0]] || []).find(y => y && y.id === p[1]) || altDef.find(y => y && y.id === p[1]) || {};
             const rawExtra = def.extraPrice != null ? def.extraPrice : svcDef.extraPrice;
             const base = { kind:'ex', nid:p[0], name:p[1], unitPrice:+p[2] || 0, price:0, pct:+p[3] || 0, qty:1, parent:def.parent || '', extraPrice: rawExtra == null ? null : Math.max(0, +rawExtra || 0) };
             out.push({ ...base, multi:isMany(def), qty:Math.max(1, Math.round(+i.dataset.qty || 1)) });
@@ -6374,6 +6375,15 @@ const wrap = root.querySelector('.pl-wrap');
             if (x.extraPrice != null){
               const extra = Math.max(0, x.qty - 1);
               return extra ? `${x.unitPrice} + ${extra} × ${x.extraPrice}` : `${x.unitPrice}`;
+            }
+            const epFallback = (() => {
+              const b = ((S.calcSettings || {}).extras || {})[x.nid] || [];
+              const d = b.find(y => y && y.id === x.name);
+              return d && d.extraPrice != null ? +d.extraPrice : null;
+            })();
+            if (epFallback != null){
+              const extra = Math.max(0, x.qty - 1);
+              return extra ? `${x.unitPrice} + ${extra} × ${epFallback}` : `${x.unitPrice}`;
             }
             return x.qty > 1 ? `${x.qty} × ${x.unitPrice}` : `${x.unitPrice}`;
           });
