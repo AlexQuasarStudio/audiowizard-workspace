@@ -1689,6 +1689,36 @@ const CRM = (() => {
     contextMenu(x, y, items.filter(Boolean), anchor);
   }
 
+  /* Исполнитель берёт заказ из «В ожидании»: попадает в состав и заказ
+     уходит в работу. Ставку исполнителю проставляет менеджер. */
+  function takeOrder(o){
+    const u = me(); if (!u) return;
+    o.executors = o.executors || [];
+    if (o.executors.some(e=>e.uid===u.id)){ toast('Вы уже в этом заказе','info'); return; }
+    o.executors.push({ uid:u.id, amount:0, is_paid:false, taken_at:Date.now() });
+    o.status = 'work';
+    o.history = o.history || [];
+    o.history.push({ t:Date.now(), txt:`Взял(а) в работу: ${u.full_name}` });
+    saveState();
+    toast('Заказ у вас в работе','ok');
+    if (typeof render === 'function') render();
+  }
+
+  /* Передача заказа другому менеджеру: руководитель ведёт его дальше. */
+  function pickOrderManager(o, x, y){
+    const list = (S.users || []).filter(u=>['manager','top_manager','admin'].includes(u.role) && u.id!==o.manager_id);
+    if (!list.length){ toast('Нет других менеджеров','info'); return; }
+    contextMenu(x, y, list.map(m=>({ label:m.full_name, icon:'users', onClick:()=>{
+      const from = (S.users||[]).find(u=>u.id===o.manager_id);
+      o.manager_id = m.id;
+      o.history = o.history || [];
+      o.history.push({ t:Date.now(), txt:`Передан менеджеру ${m.full_name}${from?' (от '+from.full_name+')':''}` });
+      saveState();
+      toast(`Заказ передан: ${m.full_name}`,'ok');
+      if (typeof render === 'function') render();
+    } })));
+  }
+
   function orderContextMenu(oid, x, y, anchor){
     const o = S.orders.find(v=>v.id===oid); if (!o) return;
     const staffCanDelete = ['draft','waiting'].includes(o.status);
@@ -1705,6 +1735,10 @@ const CRM = (() => {
         copyPlainText(text);
         toast(`Скопировано: ${text}`, 'ok');
       } },
+      ...(o.status==='waiting' && (me()||{}).role==='executor' && !(o.executors||[]).some(e=>e.uid===me().id)
+        ? [{ label:'Взять в работу', icon:'check-c', onClick:()=>takeOrder(o) }] : []),
+      ...(isStaff((me()||{}).role)
+        ? [{ label:'Передать менеджеру', icon:'users', onClick:()=>pickOrderManager(o, x, y) }] : []),
       '-',
       { label:'Изменить статус', header:true, label:STATUS_META[o.status].label },
       ...Object.entries(STATUS_META).filter(([st])=>canStatus(o.status,st).ok||st===o.status).map(([st,m])=>({
