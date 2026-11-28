@@ -2165,8 +2165,8 @@ ex.innerHTML = avatarHTML(user(), '');
      приложения и анимируется по кругу (только transform/opacity — дёшево
      и без разметки). Ничего не грузится и не выходит за карточку. */
   const TOUR = [
-    { sel:'[data-tour="nav"]', t:'Навигация по ролям', d:'Меню подстраивается под вашу роль: дашборд, заказы, чаты, идеи и инструменты.', scene:'nav' },
-    { sel:'[data-tour="search"]', t:'Глобальный поиск', d:'Ctrl K — палетка команд: заказы, клиенты, действия и переходы. Задержка поиска < 200 мс.', scene:'search' },
+    { sel:'[data-tour="nav"]', selMobile:'#mobile-menu', t:'Навигация', d:'Дашборд, заказы, чаты, идеи и инструменты — всё в меню.', scene:'nav' },
+    { sel:'[data-tour="search"]', t:'Глобальный поиск', d:'Ctrl K — палетка команд: заказы, клиенты, действия и переходы.', scene:'search' },
     { sel:'[data-tour="bell"]', t:'Центр уведомлений', d:'Изменения заказов, патчноуты и тикеты — всё в одном месте.', scene:'bell' },
     { sel:'[data-tour="orders-link"]', t:'Заказы', d:'Цветовые статусы строк, живые фильтры и групповые операции.', scene:'orders', route:'orders' },
     { sel:'[data-tour="orders-link"]', t:'Окна: как создать', d:'Перетащите пункт меню в рабочую область или дважды щёлкните по нему — раздел откроется в отдельном окне. То же есть в правом клике по меню: «Открыть в окне».', scene:'winCreate', route:'orders' },
@@ -2523,7 +2523,9 @@ ex.innerHTML = avatarHTML(user(), '');
     /* Шаг без привязки к элементу (сцены окон) показываем по центру, а не
        пропускаем: раньше `$(undefined)` давал null и тур перепрыгивал
        сразу несколько шагов. */
-    const el = step.sel ? $(step.sel) : null;
+    const isMob = !!(window.matchMedia && matchMedia('(max-width:960px)').matches);
+    const el = (isMob && step.selMobile) ? ($(step.selMobile) || (step.sel ? $(step.sel) : null))
+      : (step.sel ? $(step.sel) : null);
     const r = el ? el.getBoundingClientRect() : null;
     const hasSpot = !!(r && r.width > 2 && r.height > 2 && r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth);
     let spot = null;
