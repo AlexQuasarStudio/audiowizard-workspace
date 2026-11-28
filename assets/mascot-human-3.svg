@@ -21,7 +21,6 @@
   <path d="M50 45c1 9 7 17 15 17s14-8 15-17c-4 3-9 5-15 5s-11-2-15-5Z" fill="#B94A1F"/>
   <!-- рот — лёгкая прорезь в бороде, ровно по центру лица (голова cx=65),
        опущена чуть ниже носа и мягче по контрасту -->
-  <path d="M60.2 52.4c2.9 3 6.7 3 9.6 0" stroke="#F0C29B" stroke-width="3.4" stroke-linecap="round" fill="none"/>
   <path d="M60.2 52.4c2.9 3 6.7 3 9.6 0" stroke="#6B2E12" stroke-width="2.3" stroke-linecap="round" fill="none" opacity=".85"/>
   <path d="M61.2 56.2c2.1 1.4 4.5 1.4 6.6 0" stroke="#9A4A22" stroke-width="1.1" stroke-linecap="round" fill="none" opacity=".3"/>
   <circle cx="58" cy="37" r="2.1" fill="#202124"/>

@@ -1464,12 +1464,13 @@ const QUICK_BY_ROLE = {
     return `<div class="welcome-mascots ${cls}" aria-hidden="true">
       <div class="welcome-mascots__side welcome-mascots__side--left">
         <img class="welcome-mascot welcome-mascot--human" src="assets/mascot-human-1.svg" alt="">
+        <img class="welcome-mascot welcome-mascot--human" src="assets/mascot-human-3.svg" alt="">
         <img class="welcome-mascot welcome-mascot--human" src="assets/mascot-human-4.svg" alt="">
       </div>
       <span class="welcome-mascot welcome-mascot--robot mascot-art">${MASCOT_ROBOT_SVG}</span>
       <div class="welcome-mascots__side welcome-mascots__side--right">
         <img class="welcome-mascot welcome-mascot--human" src="assets/mascot-human-5.svg" alt="">
-        <img class="welcome-mascot welcome-mascot--human" src="assets/mascot-human-3.svg" alt="">
+        <img class="welcome-mascot welcome-mascot--human" src="assets/mascot-human-2.svg" alt="">
       </div>
     </div>`;
   }
