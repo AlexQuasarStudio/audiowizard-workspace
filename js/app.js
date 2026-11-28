@@ -5791,7 +5791,22 @@ const cm = root.querySelector('.chat-main');
           };
           /* Клик по плашке — список ВСЕХ закреплённых, как в ТГ */
           pbar.style.cursor = 'pointer';
+          /* Левый клик — листаем закреплённые по одному; правый — список. */
           pbar.onclick = (ev)=>{
+            if (ev.target.closest('#chat-pinned-x')) return;
+            if (!pinnedList.length) return;
+            const idx = (window.__pinCycle || 0) % pinnedList.length;
+            const mm = pinnedList[idx];
+            const t = box && box.querySelector('.msg[data-msg="' + mm.id + '"]');
+            if (t){
+              t.scrollIntoView({ block:'center', behavior:'smooth' });
+              t.classList.add('msg--flash');
+              setTimeout(()=>{ try { t.classList.remove('msg--flash'); } catch(e){} }, 1300);
+            }
+            window.__pinCycle = idx + 1;
+          };
+          pbar.oncontextmenu = (ev)=>{
+            ev.preventDefault();
             if (ev.target.closest('#chat-pinned-x')) return;
             if (typeof showDropdown !== 'function') return;
             if (!pinnedList.length) return;
