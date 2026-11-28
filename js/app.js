@@ -7105,7 +7105,11 @@ const cm = root.querySelector('.chat-main');
           if (s.trim() && inside) selFrag = s.trim().slice(0, 300);
           /* Мобильный: выделение к моменту клика по пункту меню часто уже
              схлопнуто. Берём последний выделенный фрагмент этого пузыря. */
-          else if (!s.trim() && inside && inside.__lastSel) selFrag = inside.__lastSel;
+          else if (!s.trim()){
+            const lf = window.__chatLastFrag;
+            if (lf && lf.id === m.id) selFrag = lf.text;
+            else if (inside && inside.__lastSel) selFrag = inside.__lastSel;
+          }
         } catch(err){}
         const items = [
           /* Выделили текст — «Цитировать» первым пунктом, как в ТГ. */
@@ -7315,15 +7319,18 @@ const cm = root.querySelector('.chat-main');
       }
       setTimeout(()=>el2.classList.remove('msg--reacting'), 1300);
     };
-    /* Запоминаем выделенный фрагмент внутри пузыря — он и станет цитатой. */
+    /* Запоминаем выделенный фрагмент вместе с id сообщения: к моменту клика
+       по пункту меню выделение уже схлопнуто, и без запаса цитата брала
+       весь текст пузыря. */
     document.addEventListener('selectionchange', ()=>{
       try {
         const sel = window.getSelection();
         if (!sel || sel.isCollapsed) return;
         const node = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
-        const bubble = node && node.closest && node.closest('.msg__bubble');
+        const msgEl = node && node.closest && node.closest('.msg');
         const txt = sel.toString().trim();
-        if (bubble && txt) bubble.__lastSel = txt.slice(0, 300);
+        if (msgEl && txt) window.__chatLastFrag = { id: msgEl.dataset.msg, text: txt.slice(0, 300) };
+        if (msgEl) msgEl.__lastSel = txt.slice(0, 300);
       } catch(err){}
     });
     box.addEventListener('dblclick', e=>{
