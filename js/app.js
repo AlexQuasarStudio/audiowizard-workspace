@@ -7267,13 +7267,40 @@ const cm = root.querySelector('.chat-main');
           animateBubbleWidth(mm.id, prevW);
         }, 190);
       } else if (arr.length){
-        el2.classList.add('msg--reacting');
-        rerenderKeepScroll();
-        animateBubbleHeight(mm.id, prevH);
-        animateBubbleWidth(mm.id, prevW);
-        const np = root.querySelector('.msg[data-msg="' + mm.id + '"] .react-pill[data-react="' + mm.id + '|👍"]')
-          || document.querySelector('.msg[data-msg="' + mm.id + '"] .react-pill[data-react="' + mm.id + '|👍"]');
-        if (np) np.classList.add('react-pill--in');
+        /* Первая реакция: достраиваем строку реакций на месте, без перерисовки
+           всей ленты — иначе на телефоне двойной тап мерцал и терял тап. */
+        const bubble = el2.querySelector('.msg__bubble');
+        if (bubble){
+          let foot = bubble.querySelector('.msg__foot');
+          if (!foot){
+            foot = document.createElement('div');
+            foot.className = 'msg__foot';
+            const t = bubble.querySelector('.txt .time--in');
+            if (t){
+              t.classList.remove('time--in');
+              const ctx = t.closest('.txt');
+              if (ctx) ctx.classList.remove('txt--time-inline');
+              foot.appendChild(t);
+            }
+            const row = document.createElement('div');
+            row.className = 'msg__reactions';
+            foot.insertBefore(row, foot.firstChild);
+            bubble.appendChild(foot);
+          }
+          let row = foot.querySelector('.msg__reactions');
+          if (!row){
+            row = document.createElement('div');
+            row.className = 'msg__reactions';
+            foot.insertBefore(row, foot.firstChild);
+          }
+          row.insertAdjacentHTML('beforeend',
+            `<button class="react-pill on react-pill--in" data-react="${mm.id}|👍" title="Реакция 👍">👍<span class="react-face">${reactionFaceHtml(arr, '👍')}</span></button>`);
+          el2.classList.add('msg--reacting');
+          animateBubbleHeight(mm.id, prevH);
+          animateBubbleWidth(mm.id, prevW);
+        } else {
+          rerenderKeepScroll();
+        }
       } else {
         rerenderKeepScroll();
         animateBubbleWidth(mm.id, prevW);
@@ -7289,18 +7316,20 @@ const cm = root.querySelector('.chat-main');
       applyLike(el2);
     });
     /* Мобильный: двойной тап по сообщению ставит 👍 (с вибрацией) */
-    let lastTapT = 0, lastTapEl = null;
+    let lastTapT = 0, lastTapId = null;
     box.addEventListener('touchend', e=>{
       if (chatSel.mode) return;
       const el2 = e.target.closest('.msg');
       if (!el2) return;
       if (e.target.closest('.react-pill, .msg__more, .msg__replies, .poll__opt, a, .msg__audio, .msg-quick')) return;
       const now = Date.now();
-      if (now - lastTapT < 320 && lastTapEl === el2){
-        applyLike(el2);
+      const id = el2.dataset.msg;
+      /* Сравниваем по id: после точечной правки узел мог быть пересоздан. */
+      if (now - lastTapT < 320 && id && lastTapId === id){
+        applyLike(document.querySelector('.msg[data-msg="' + id + '"]') || el2);
         suppressLikeUntil = Date.now() + 700;
-        lastTapT = 0; lastTapEl = null;
-      } else { lastTapT = now; lastTapEl = el2; }
+        lastTapT = 0; lastTapId = null;
+      } else { lastTapT = now; lastTapId = id; }
     }, { passive: true });
     };
 
