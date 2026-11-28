@@ -7100,13 +7100,14 @@ const cm = root.querySelector('.chat-main');
           if (s.trim() && inside) selFrag = s.trim().slice(0, 300);
         } catch(err){}
         const items = [
-          ...(m.user_id!==u.id ? [{ label:'Ответить лично', icon:'chats', onClick:()=>{
-              if (m.user_id) openDirectChat(m.user_id);
-            } }] : []),
-          ...(selFrag ? [{ label:'Цитировать фрагмент', icon:'copy', onClick:()=>{
+          /* Выделили текст — «Цитировать» первым пунктом, как в ТГ. */
+          ...(selFrag ? [{ label:'Цитировать', icon:'copy', onClick:()=>{
               chatReplyTo = m; chatReplyTo.replyText = selFrag;
               renderChat(); const t = $('#chat-t', root); if (t) { t.focus(); }
               toast('Фрагмент будет процитирован в ответе','info');
+            } }] : []),
+          ...(m.user_id!==u.id ? [{ label:'Ответить лично', icon:'chats', onClick:()=>{
+              if (m.user_id) openDirectChat(m.user_id);
             } }] : []),
           { label:'Выделить', icon:'check-c', onClick:()=>{
               if (!chatSel.mode){ chatSel.set.clear(); chatSel.mode = true; }
