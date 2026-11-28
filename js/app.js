@@ -7333,6 +7333,33 @@ const cm = root.querySelector('.chat-main');
         if (msgEl) msgEl.__lastSel = txt.slice(0, 300);
       } catch(err){}
     });
+    /* Клик по цитате выделяет в исходном сообщении ровно процитированный
+       фрагмент, а не весь пузырь. capture — чтобы прежний обработчик,
+       выделявший сообщение целиком, не перебил выделение. */
+    box.addEventListener('click', e=>{
+      const q = e.target.closest('.msg__quote');
+      if (!q) return;
+      const src = document.querySelector('.msg[data-msg="' + q.dataset.quote + '"]');
+      if (!src) return;
+      const frag = (q.querySelector('span')?.textContent || '').trim();
+      const txt = src.querySelector('.txt');
+      if (!frag || !txt) return;
+      e.preventDefault(); e.stopPropagation();
+      const needle = frag.slice(0, 24);
+      const walker = document.createTreeWalker(txt, NodeFilter.SHOW_TEXT);
+      let n;
+      while ((n = walker.nextNode())){
+        const i = n.textContent.indexOf(needle);
+        if (i < 0) continue;
+        const r = document.createRange();
+        r.setStart(n, i);
+        r.setEnd(n, Math.min(n.textContent.length, i + frag.length));
+        const sel = window.getSelection();
+        sel.removeAllRanges(); sel.addRange(r);
+        src.scrollIntoView({ block:'center', behavior:'smooth' });
+        break;
+      }
+    }, true);
     box.addEventListener('dblclick', e=>{
       if (chatSel.mode || Date.now() < suppressLikeUntil) return;
       const el2 = e.target.closest('.msg');
